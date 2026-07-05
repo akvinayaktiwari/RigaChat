@@ -8,7 +8,7 @@ import {
   updateBot,
 } from '../repositories/bot-repository.js'
 import { deleteChunksByBotId } from '../repositories/vector-repository.js'
-import { indexWebsite } from './rag-service.js'
+import { indexWebsite, reindexBot } from './rag-service.js'
 import type { BotConfig } from '../types/index.js'
 
 interface CreateBotInput {
@@ -87,6 +87,16 @@ export async function updateBotConfig(
       `Failed to update bot ${botId}: ${error instanceof Error ? error.message : String(error)}`
     )
   }
+}
+
+export async function resyncBot(
+  botId: string,
+  clientId: string,
+  websiteUrl: string
+): Promise<{ pagesIndexed: number; chunksIndexed: number }> {
+  const bot = await getBotById(botId, clientId)
+  if (!bot) throw new Error('Bot not found')
+  return reindexBot(botId, websiteUrl)
 }
 
 export async function removeBot(botId: string, clientId: string): Promise<void> {
