@@ -100,3 +100,10 @@ export interface ConversationRecord {
   createdAt: string
   updatedAt: string
 }
+
+export interface SimilarityResult {
+  chunkId: string
+  text: string
+  sourceUrl: string
+  score: number
+}

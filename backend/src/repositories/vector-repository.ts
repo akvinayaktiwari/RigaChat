@@ -1,5 +1,5 @@
 import { getIndex } from '../lib/pinecone.js'
-import type { Chunk } from '../types/index.js'
+import type { Chunk, SimilarityResult } from '../types/index.js'
 
 const UPSERT_BATCH_SIZE = 100
 const MIN_SIMILARITY_SCORE = 0.7
@@ -14,13 +14,6 @@ interface VectorRecord {
     sourceUrl: string
     createdAt: string
   }
-}
-
-interface SimilarityResult {
-  chunkId: string
-  text: string
-  sourceUrl: string
-  score: number
 }
 
 export async function upsertChunks(chunks: Chunk[], embeddings: number[][]): Promise<void> {
