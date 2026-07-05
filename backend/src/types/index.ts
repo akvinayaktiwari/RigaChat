@@ -80,3 +80,23 @@ export interface ApiResponse<T> {
   data?: T
   error?: string
 }
+
+export interface ClientRecord {
+  clientId: string
+  email: string
+  name: string
+  authProvider: 'google'
+  plan: 'starter' | 'growth' | 'agency'
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ConversationRecord {
+  botId: string
+  conversationId: string
+  messages: ConversationMessage[]
+  leadCaptured: boolean
+  sourceUrl: string
+  createdAt: string
+  updatedAt: string
+}
