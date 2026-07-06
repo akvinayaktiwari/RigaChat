@@ -5,6 +5,8 @@ import { DashboardLayout } from './src/components/DashboardLayout/DashboardLayou
 import { ToastContainer } from './src/components/Toast/Toast'
 import LoginPage from './src/pages/LoginPage'
 import AuthCallbackPage from './src/pages/AuthCallbackPage'
+import WidgetTestPage from './src/pages/WidgetTestPage'
+import WidgetTestPreviewPage from './src/pages/WidgetTestPreviewPage'
 import DashboardHome from './src/pages/DashboardHome'
 import BotsPage from './src/pages/BotsPage'
 import NewBotPage from './src/pages/NewBotPage'
@@ -26,6 +28,8 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
+        <Route path="/widget-test" element={<WidgetTestPage />} />
+        <Route path="/widget-test/preview" element={<WidgetTestPreviewPage />} />
         <Route path="/" element={<RootRedirect />} />
         <Route
           path="/dashboard"

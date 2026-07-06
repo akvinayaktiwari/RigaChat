@@ -131,6 +131,9 @@ export default function BotDetailPage() {
       <Card padding="lg">
         <h2 className={styles.sectionTitle}>Embed Code</h2>
         <EmbedSnippet botId={bot.botId} />
+        <a href="/widget-test" target="_blank" rel="noopener noreferrer" className={styles.testWidgetLink}>
+          Test this snippet &rarr;
+        </a>
       </Card>
 
       <Card padding="lg" className={styles.dangerZone}>

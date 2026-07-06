@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Widget Embed Test — RigaChat</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      margin: 0;
+      color: #1a1a2e;
+      background: #f8f9fc;
+    }
+    .mock-site header {
+      background: #1a1a2e;
+      color: #fff;
+      padding: 20px 40px;
+      font-weight: 600;
+      font-size: 1.2rem;
+    }
+    .mock-site .hero {
+      padding: 80px 40px;
+      text-align: center;
+    }
+    .mock-site .hero h1 {
+      font-size: 2.2rem;
+      margin-bottom: 12px;
+    }
+    .mock-site .hero p {
+      color: #555;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+    .mock-site footer {
+      padding: 24px 40px;
+      color: #888;
+      font-size: 0.85rem;
+      border-top: 1px solid #e5e7eb;
+    }
+    .control-panel {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 9999;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 14px 16px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      max-width: 320px;
+      font-size: 0.85rem;
+    }
+    .control-panel h2 {
+      margin: 0 0 8px;
+      font-size: 0.95rem;
+    }
+    .control-panel input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 6px 8px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      margin-bottom: 8px;
+    }
+    .control-panel button {
+      width: 100%;
+      padding: 7px 8px;
+      background: #6366f1;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .control-panel .status {
+      margin-top: 8px;
+      color: #666;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <!--
+    Standalone harness for testing the exact embed snippet the CRM dashboard
+    generates (see frontend/src/components/EmbedSnippet/EmbedSnippet.tsx),
+    without needing a real external client website. Open this file directly
+    in a browser, or serve it with any static file server.
+
+    Usage: widget-test.html?botId=<real-bot-id>&cdn=<widget-cdn-base-url>
+    - botId: required to actually load the widget
+    - cdn: optional, defaults to the deployed widget CDN below
+  -->
+  <div class="control-panel">
+    <h2>Widget Embed Test</h2>
+    <input id="bot-id-input" type="text" placeholder="Paste a real Bot ID" />
+    <input id="cdn-input" type="text" placeholder="Widget CDN base URL" />
+    <button id="load-btn">Load Widget</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="mock-site">
+    <header>Acme Real Estate — Example Client Website</header>
+    <div class="hero">
+      <h1>Find your next home with Acme</h1>
+      <p>
+        This is a mock client website used only to verify that the widget
+        embed snippet copied from the RigaChat dashboard actually works when
+        dropped onto a real page — same script tag, same CDN, same flow a
+        client would use.
+      </p>
+    </div>
+    <footer>&copy; 2026 Acme Real Estate (fake, for widget testing only)</footer>
+  </div>
+
+  <script>
+    var DEFAULT_CDN_URL = 'https://d30yf1mzs1yo7h.cloudfront.net';
+    var params = new URLSearchParams(window.location.search);
+
+    var botIdInput = document.getElementById('bot-id-input');
+    var cdnInput = document.getElementById('cdn-input');
+    var status = document.getElementById('status');
+
+    botIdInput.value = params.get('botId') || '';
+    cdnInput.value = params.get('cdn') || DEFAULT_CDN_URL;
+
+    function loadWidget() {
+      var botId = botIdInput.value.trim();
+      var cdnUrl = cdnInput.value.trim() || DEFAULT_CDN_URL;
+
+      if (!botId) {
+        status.textContent = 'Enter a Bot ID first.';
+        return;
+      }
+
+      var existing = document.getElementById('rigachat-widget-script');
+      if (existing) existing.remove();
+
+      // Exact same snippet shape as EmbedSnippet.tsx generates.
+      var script = document.createElement('script');
+      script.id = 'rigachat-widget-script';
+      script.src = cdnUrl + '/widget.js';
+      script.setAttribute('data-bot-id', botId);
+      script.async = true;
+      document.body.appendChild(script);
+
+      status.textContent = 'Loaded ' + cdnUrl + '/widget.js with data-bot-id="' + botId + '". Check console for errors.';
+    }
+
+    document.getElementById('load-btn').addEventListener('click', loadWidget);
+
+    if (params.get('botId')) {
+      loadWidget();
+    }
+  </script>
+</body>
+</html>

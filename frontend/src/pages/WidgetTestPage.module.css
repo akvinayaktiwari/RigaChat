@@ -1,0 +1,25 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--space-10) var(--space-4);
+  background: var(--color-surface-2);
+}
+
+.card {
+  width: 100%;
+  max-width: 640px;
+}
+
+.title {
+  font-size: var(--font-size-xl);
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-primary);
+}
+
+.subtitle {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  margin: 0 0 var(--space-6);
+}
