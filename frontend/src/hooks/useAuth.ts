@@ -70,7 +70,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       response_type: 'code',
       client_id: COGNITO_CLIENT_ID,
       redirect_uri: COGNITO_REDIRECT_URI,
-      scope: 'openid email profile',
+      // 'profile' is intentionally omitted — it isn't in this Cognito app
+      // client's AllowedOAuthScopes and requesting it causes invalid_scope.
+      scope: 'openid email',
       identity_provider: 'Google',
     })
     window.location.href = `https://${COGNITO_DOMAIN}/oauth2/authorize?${params.toString()}`
