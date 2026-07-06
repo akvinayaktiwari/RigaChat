@@ -45,7 +45,7 @@ export function DashboardLayout() {
   return (
     <div className={styles.layout}>
       <aside className={styles.sidebar}>
-        <div className={styles.logo}>ChatIQ</div>
+        <div className={styles.logo}>RigaChat</div>
 
         <nav className={styles.nav}>
           {NAV_LINKS.map((link) => (

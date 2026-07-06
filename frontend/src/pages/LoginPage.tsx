@@ -31,7 +31,7 @@ export default function LoginPage() {
   return (
     <div className={styles.page}>
       <div className={styles.card}>
-        <div className={styles.logo}>ChatIQ</div>
+        <div className={styles.logo}>RigaChat</div>
         <p className={styles.tagline}>AI-powered conversations for your website</p>
 
         <Button size="lg" onClick={login}>

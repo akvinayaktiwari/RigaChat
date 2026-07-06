@@ -19,7 +19,7 @@ export interface AuthState {
 interface AuthContextValue extends AuthState {
   login: () => void
   logout: () => void
-  handleCallback: (code: string) => Promise<void>
+  handleCallback: (code: string) => Promise<boolean>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -49,20 +49,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   })
 
   useEffect(() => {
-    async function init() {
-      try {
-        const code = new URLSearchParams(window.location.search).get('code')
-        if (code) {
-          await handleCallback(code)
-        } else {
-          setState((prev) => ({ ...prev, isLoading: false }))
-        }
-      } catch (error) {
-        console.error('Auth initialization failed:', error)
-        setState((prev) => ({ ...prev, isLoading: false }))
-      }
-    }
-    void init()
+    // The /auth/callback route (AuthCallbackPage) is solely responsible for
+    // consuming the one-time authorization code and calling handleCallback.
+    // Doing it here too would race it and burn the code on a duplicate
+    // /oauth2/token request, which Cognito rejects on the second use.
+    setState((prev) => ({ ...prev, isLoading: false }))
   }, [])
 
   function login(): void {
@@ -78,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = `https://${COGNITO_DOMAIN}/oauth2/authorize?${params.toString()}`
   }
 
-  async function handleCallback(code: string): Promise<void> {
+  async function handleCallback(code: string): Promise<boolean> {
     try {
       const body = new URLSearchParams({
         grant_type: 'authorization_code',
@@ -119,12 +110,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         token: tokens.id_token,
       })
 
-      window.history.replaceState({}, '', '/dashboard')
+      return true
     } catch (error) {
       console.error('Cognito callback handling failed:', error)
       setAuthToken(null)
       setState({ isAuthenticated: false, isLoading: false, user: null, token: null })
       window.location.href = '/login'
+      return false
     }
   }
 
