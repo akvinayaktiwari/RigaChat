@@ -1,0 +1,141 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Build
+        working-directory: backend
+        run: npm run build
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Zip build output
+        run: cd backend/dist && zip -r ../function.zip index.js
+
+      - name: Deploy to main Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
+            --zip-file fileb://backend/function.zip \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Wait for main Lambda update
+        run: |
+          aws lambda wait function-updated \
+            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Deploy to streaming Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ secrets.LAMBDA_STREAMING_FUNCTION_NAME }} \
+            --zip-file fileb://backend/function.zip \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Wait for streaming Lambda update
+        run: |
+          aws lambda wait function-updated \
+            --function-name ${{ secrets.LAMBDA_STREAMING_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Deployment success
+        run: echo "Backend deployed successfully at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Inject BACKEND_URL into widget.js
+        run: |
+          sed -i 's|__BACKEND_URL__|${{ secrets.BACKEND_URL }}|g' frontend/dist/widget.js
+
+      - name: Upload widget.js to S3
+        run: |
+          aws s3 cp frontend/dist/widget.js \
+            s3://${{ secrets.S3_BUCKET_WIDGET }}/widget.js \
+            --cache-control "public, max-age=3600" \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Sync dashboard assets to S3 (excluding index.html)
+        run: |
+          aws s3 sync frontend/dist/ \
+            s3://${{ secrets.S3_BUCKET_FRONTEND }} \
+            --exclude "index.html" \
+            --cache-control "public, max-age=31536000, immutable" \
+            --delete \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Upload index.html with no-cache
+        run: |
+          aws s3 cp frontend/dist/index.html \
+            s3://${{ secrets.S3_BUCKET_FRONTEND }}/index.html \
+            --cache-control "no-cache, no-store, must-revalidate" \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Invalidate dashboard CloudFront distribution
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
+
+      - name: Invalidate widget CloudFront distribution
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_WIDGET_DISTRIBUTION_ID }} \
+            --paths "/*"
+
+      - name: Deployment success
+        run: echo "Frontend and widget deployed successfully at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+  deploy-summary:
+    runs-on: ubuntu-latest
+    needs: [deploy-backend, deploy-frontend]
+    steps:
+      - name: Print deployment summary
+        run: |
+          echo "Backend: both Lambda functions updated"
+          echo "Frontend: S3 synced, CloudFront invalidated"
+          echo "Widget: deployed to CDN with BACKEND_URL injected"
+          echo "Time: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
