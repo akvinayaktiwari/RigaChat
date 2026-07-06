@@ -1,4 +1,3 @@
-import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { Button } from '../components/Button/Button'
 import styles from './LoginPage.module.css'
@@ -28,19 +27,6 @@ function GoogleIcon() {
 
 export default function LoginPage() {
   const { login } = useAuth()
-  const navigate = useNavigate()
-
-  function handleGoogleLogin() {
-    const token = 'mock-token-' + Date.now()
-    const user = {
-      clientId: 'mock-123',
-      email: 'demo@example.com',
-      name: 'Demo User',
-      plan: 'starter',
-    }
-    login(token, user)
-    navigate('/dashboard')
-  }
 
   return (
     <div className={styles.page}>
@@ -48,7 +34,7 @@ export default function LoginPage() {
         <div className={styles.logo}>ChatIQ</div>
         <p className={styles.tagline}>AI-powered conversations for your website</p>
 
-        <Button size="lg" onClick={handleGoogleLogin}>
+        <Button size="lg" onClick={login}>
           <GoogleIcon />
           Continue with Google
         </Button>

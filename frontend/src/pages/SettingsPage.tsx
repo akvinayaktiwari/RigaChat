@@ -22,7 +22,7 @@ const PLANS: PlanInfo[] = [
 ]
 
 export default function SettingsPage() {
-  const { user, token, login } = useAuth()
+  const { user, token } = useAuth()
   const { show } = useToast()
   const [name, setName] = useState(user?.name ?? '')
   const [saving, setSaving] = useState(false)
@@ -36,7 +36,6 @@ export default function SettingsPage() {
     const res = await syncMe()
     setSaving(false)
     if (res.success) {
-      login(token, { ...user, name })
       show('Profile updated', 'success')
     } else {
       show(res.error ?? 'Failed to update profile', 'error')

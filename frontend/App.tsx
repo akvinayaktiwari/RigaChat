@@ -4,6 +4,7 @@ import { ProtectedRoute } from './src/components/ProtectedRoute/ProtectedRoute'
 import { DashboardLayout } from './src/components/DashboardLayout/DashboardLayout'
 import { ToastContainer } from './src/components/Toast/Toast'
 import LoginPage from './src/pages/LoginPage'
+import AuthCallbackPage from './src/pages/AuthCallbackPage'
 import DashboardHome from './src/pages/DashboardHome'
 import BotsPage from './src/pages/BotsPage'
 import NewBotPage from './src/pages/NewBotPage'
@@ -24,6 +25,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route path="/" element={<RootRedirect />} />
         <Route
           path="/dashboard"
