@@ -31,6 +31,7 @@ export async function setupBot(
     botId,
     clientId: input.clientId,
     name: input.name,
+    websiteUrl: input.websiteUrl,
     greetingMessage: input.greetingMessage,
     brandColor: input.brandColor,
     leadTriggerAfterMessages: input.leadTriggerAfterMessages,

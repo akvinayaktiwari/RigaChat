@@ -80,3 +80,45 @@ export interface ApiResponse<T> {
   data?: T
   error?: string
 }
+
+export interface ClientRecord {
+  clientId: string
+  email: string
+  name: string
+  authProvider: 'google'
+  plan: 'starter' | 'growth' | 'agency'
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateBotInput {
+  name: string
+  websiteUrl: string
+  greetingMessage: string
+  brandColor: string
+  widgetTrigger: BotConfig['widgetTrigger']
+  leadTriggerAfterMessages: number
+  leadFormFields: LeadFormField[]
+}
+
+export interface SetupBotResult {
+  bot: BotConfig
+  pagesIndexed: number
+  chunksIndexed: number
+}
+
+export interface ResyncResult {
+  pagesIndexed: number
+  chunksIndexed: number
+}
+
+export interface CreateKBEntryInput {
+  botId: string
+  title: string
+  content: string
+}
+
+export interface UpdateKBInput {
+  title: string
+  content: string
+}
