@@ -28,10 +28,20 @@ const widgetCors = cors({
 })
 
 app.use('/api/clients/*', dashboardCors)
-app.use('/api/leads/*', dashboardCors)
 app.use('/api/kb/*', dashboardCors)
 
 app.use('/api/chat/*', widgetCors)
+
+// POST /api/leads (exact path, no auth) is the public lead-capture endpoint
+// widget.js calls from any client's external website — it must get widgetCors.
+// The nested GET routes (/bot/:botId, /all, /:botId/:leadId) are dashboard-only
+// and require auth, so they keep the strict dashboardCors. Same single-dispatch
+// pattern as /api/bots/* above, for the same reason (cors() only sets headers,
+// never clears them).
+app.use('/api/leads/*', (c, next) => {
+  const corsMiddleware = c.req.path === '/api/leads' ? widgetCors : dashboardCors
+  return corsMiddleware(c, next)
+})
 
 // /api/bots/public/:botId must get widgetCors ONLY — never dashboardCors.
 // Hono's cors() middleware only sets headers, it never clears them, so if both
