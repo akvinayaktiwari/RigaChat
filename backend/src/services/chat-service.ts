@@ -50,21 +50,6 @@ export async function streamMessage(input: SendMessageInput): Promise<AsyncGener
     throw new Error('Conversation not found')
   }
 
-  const botConfig = await getPublicConfig(input.botId)
-  const contextChunks = await retrieveContext(input.botId, input.message)
-
-  const systemPrompt = `You are a helpful assistant for this business.
-Keep responses concise and helpful.
-Always be polite and professional.`
-
-  const generator = streamChatResponse({
-    systemPrompt,
-    contextChunks,
-    conversationHistory: conversation.messages,
-    userMessage: input.message,
-    botName: botConfig.name,
-  })
-
   const userMessage: ConversationMessage = {
     role: 'user',
     content: input.message,
@@ -72,8 +57,21 @@ Always be polite and professional.`
   }
   await appendMessage(input.botId, input.conversationId, userMessage)
 
+  const botConfig = await getPublicConfig(input.botId)
+  const contextChunks = await retrieveContext(input.botId, input.message)
+
+  const systemPrompt = `You are a helpful assistant for this business.
+Keep responses concise and helpful.
+Always be polite and professional.`
+
   // The assistant's response is saved after streaming completes, handled in the route layer.
-  return generator
+  return streamChatResponse({
+    systemPrompt,
+    contextChunks,
+    conversationHistory: conversation.messages,
+    userMessage: input.message,
+    botName: botConfig.name,
+  })
 }
 
 export async function saveAssistantMessage(
