@@ -1,0 +1,6 @@
+{
+  "name": "RigaChat - Real Estate AI Dashboard",
+  "description": "A high-fidelity chatbot control dashboard to create, train, configure, and monitor AI chatbots for real estate.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
