@@ -20,6 +20,7 @@ export interface BotConfig {
   botId: string
   clientId: string
   name: string
+  websiteUrl: string
   greetingMessage: string
   brandColor: string
   leadTriggerAfterMessages: number
