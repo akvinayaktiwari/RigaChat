@@ -1,89 +1,156 @@
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
-import { Badge } from '../Badge/Badge'
-import styles from './DashboardLayout.module.css'
+import { useToast } from '../Toast/Toast'
 
 const NAV_LINKS = [
-  { to: '/dashboard', label: 'Dashboard', end: true },
-  { to: '/dashboard/bots', label: 'My Bots', end: false },
-  { to: '/dashboard/leads', label: 'Leads', end: false },
-  { to: '/dashboard/settings', label: 'Settings', end: false },
+  { to: '/dashboard', label: 'Dashboard', icon: 'dashboard', end: true },
+  { to: '/dashboard/bots', label: 'Chatbots', icon: 'smart_toy', end: false },
+  { to: '/dashboard/leads', label: 'Leads', icon: 'group', end: false },
+  { to: '/dashboard/settings', label: 'Settings', icon: 'settings', end: false },
 ]
 
 function getPageTitle(pathname: string): string {
   if (pathname === '/dashboard') return 'Dashboard'
-  if (pathname === '/dashboard/bots/new') return 'New Bot'
-  if (pathname === '/dashboard/bots') return 'My Bots'
+  if (pathname === '/dashboard/bots/new') return 'New Chatbot'
+  if (pathname === '/dashboard/bots') return 'Chatbots'
   if (/^\/dashboard\/bots\/[^/]+$/.test(pathname)) return 'Bot Settings'
   if (pathname === '/dashboard/leads') return 'Leads'
   if (/^\/dashboard\/leads\/[^/]+$/.test(pathname)) return 'Lead Detail'
-  if (/^\/dashboard\/kb\/[^/]+$/.test(pathname)) return 'Knowledge Base'
+  if (pathname.startsWith('/dashboard/kb')) return 'Knowledge Base'
   if (pathname === '/dashboard/settings') return 'Settings'
   return 'Dashboard'
 }
 
 function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map((part) => part[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length <= 1) {
+    return (parts[0] ?? '').slice(0, 2).toUpperCase()
+  }
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
+
+const navLinkClasses = (isActive: boolean): string =>
+  `w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 text-left ${
+    isActive
+      ? 'active-nav-link shadow-sm'
+      : 'text-slate-400 font-medium hover:bg-slate-800/60 hover:text-white hover:translate-x-1'
+  }`
 
 export function DashboardLayout() {
   const { user, logout } = useAuth()
+  const { show } = useToast()
   const location = useLocation()
-  const navigate = useNavigate()
 
-  function handleLogout() {
-    logout()
-    navigate('/login')
+  const initials = user ? getInitials(user.name) : ''
+
+  function handleKnowledgeBaseClick() {
+    show('Open Knowledge Base from a bot\'s detail page for now — a dedicated view is coming soon.', 'warning')
   }
 
   return (
-    <div className={styles.layout}>
-      <aside className={styles.sidebar}>
-        <div className={styles.logo}>RigaChat</div>
-
-        <nav className={styles.nav}>
-          {NAV_LINKS.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              end={link.end}
-              className={({ isActive }) => `${styles.navLink} ${isActive ? styles.navLinkActive : ''}`}
+    <div className="min-h-screen bg-[#F8FAFC]">
+      {/* Sidebar */}
+      <aside className="glass-sidebar fixed left-0 top-0 h-screen w-60 flex flex-col py-8 px-4 z-50">
+        <div className="flex items-center gap-3 px-2 mb-10">
+          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-inner">
+            <span
+              className="material-symbols-outlined text-[#6366F1] text-2xl"
+              style={{ fontVariationSettings: "'FILL' 1" }}
             >
-              {link.label}
+              chat_bubble
+            </span>
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-white tracking-tight leading-tight">
+              RigaChat<span className="text-[#6366F1]">.ai</span>
+            </h1>
+            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400">Real Estate AI</p>
+          </div>
+        </div>
+
+        <nav className="flex-1 space-y-1">
+          {NAV_LINKS.map((link) => (
+            <NavLink key={link.to} to={link.to} end={link.end} className={({ isActive }) => navLinkClasses(isActive)}>
+              <span className="material-symbols-outlined">{link.icon}</span>
+              <span className="text-sm tracking-wide">{link.label}</span>
             </NavLink>
           ))}
+
+          {/* Knowledge Base is scoped per-bot (/dashboard/kb/:botId) — there is
+              no standalone list route to link to yet, so this is a disabled
+              entry point rather than a real nav link. */}
+          <button
+            type="button"
+            onClick={handleKnowledgeBaseClick}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-slate-500 font-medium cursor-not-allowed opacity-70"
+          >
+            <span className="material-symbols-outlined">menu_book</span>
+            <span className="text-sm tracking-wide">Knowledge Base</span>
+          </button>
         </nav>
 
-        <div className={styles.comingSoon}>
-          <div className={styles.comingSoonHeader}>
-            <span>WhatsApp Automation</span>
-            <Badge variant="warning">Coming Soon</Badge>
+        <div className="space-y-4">
+          {/* Coming Soon: WhatsApp Automation */}
+          <div className="rounded-2xl border border-[#334155]/60 bg-[#1E293B]/60 p-4 opacity-60">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-slate-300">WhatsApp Automation</span>
+              <span className="text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
+                Coming Soon
+              </span>
+            </div>
+          </div>
+
+          {/* User footer */}
+          <div className="pt-4 border-t border-[#1E293B]">
+            <div className="bg-[#1E293B] border border-[#334155]/60 rounded-2xl p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#334155] flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
+                {initials}
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <p className="text-sm font-bold text-white truncate">{user?.name}</p>
+                <p className="text-[10px] text-slate-400 truncate">{user?.email}</p>
+              </div>
+              <button
+                type="button"
+                onClick={logout}
+                title="Logout"
+                className="text-slate-400 hover:text-white transition-colors flex-shrink-0"
+              >
+                <span className="material-symbols-outlined text-[20px]">logout</span>
+              </button>
+            </div>
           </div>
         </div>
       </aside>
 
-      <div className={styles.main}>
-        <header className={styles.header}>
-          <h1 className={styles.pageTitle}>{getPageTitle(location.pathname)}</h1>
-          <div className={styles.userArea}>
-            <span className={styles.userName}>{user?.name}</span>
-            <div className={styles.avatar}>{user ? getInitials(user.name) : ''}</div>
-            <button className={styles.logoutButton} onClick={handleLogout}>
-              Logout
-            </button>
-          </div>
-        </header>
+      {/* Header */}
+      <header className="glass-header fixed top-0 right-0 left-60 h-[60px] flex items-center justify-between px-8 z-40">
+        <h2 className="text-lg font-extrabold text-slate-800 tracking-tight">{getPageTitle(location.pathname)}</h2>
 
-        <main className={styles.content}>
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            className="relative w-10 h-10 flex items-center justify-center rounded-full text-slate-500 hover:text-indigo-600 hover:bg-slate-50 transition-all"
+            title="Notifications"
+          >
+            <span className="material-symbols-outlined">notifications</span>
+          </button>
+
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-700 flex-shrink-0">
+              {initials}
+            </div>
+            <span className="text-sm font-bold text-slate-800 hidden md:block">{user?.name}</span>
+          </div>
+        </div>
+      </header>
+
+      {/* Content */}
+      <main className="ml-60 pt-[60px] min-h-screen overflow-y-auto">
+        <div className="p-6">
           <Outlet />
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   )
 }
