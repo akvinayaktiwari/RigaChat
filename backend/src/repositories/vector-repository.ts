@@ -2,7 +2,11 @@ import { getIndex } from '../lib/pinecone.js'
 import type { Chunk, SimilarityResult } from '../types/index.js'
 
 const UPSERT_BATCH_SIZE = 100
-const MIN_SIMILARITY_SCORE = 0.7
+// text-embedding-3-small cosine similarity for genuinely relevant natural-language
+// query/chunk pairs typically lands in the 0.2-0.5 range, not 0.7+ — a 0.7 floor
+// discarded real matches (observed 0.25-0.30 scores for on-topic content) before
+// the LLM ever saw them, so retrieval always came back empty.
+const MIN_SIMILARITY_SCORE = 0.2
 
 interface VectorRecord {
   id: string
