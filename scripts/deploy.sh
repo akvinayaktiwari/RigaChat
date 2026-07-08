@@ -11,8 +11,12 @@ S3_BUCKET_WIDGET="${S3_BUCKET_WIDGET:-rigachat-widget}"
 CLOUDFRONT_DISTRIBUTION_ID="${CLOUDFRONT_DISTRIBUTION_ID:-E24Z9D4G4FY8PH}"
 CLOUDFRONT_WIDGET_DISTRIBUTION_ID="${CLOUDFRONT_WIDGET_DISTRIBUTION_ID:-E2KNENIBJEZYTF}"
 BACKEND_URL="${BACKEND_URL:-https://hxtvyv6kgsasppyrvyljaezeii0zxzco.lambda-url.ap-south-1.on.aws}"
+VITE_COGNITO_DOMAIN="${VITE_COGNITO_DOMAIN:-ap-south-1d7y7lw8aj.auth.ap-south-1.amazoncognito.com}"
+VITE_COGNITO_CLIENT_ID="${VITE_COGNITO_CLIENT_ID:-bia5g9e6gsb3h9n191rcvkugn}"
+VITE_COGNITO_REDIRECT_URI="${VITE_COGNITO_REDIRECT_URI:-https://d1gaddygcav1ob.cloudfront.net/auth/callback}"
+VITE_CDN_URL="${VITE_CDN_URL:-https://d30yf1mzs1yo7h.cloudfront.net}"
 
-trap 'code=$?; if [ $code -ne 0 ]; then echo "=============================="; echo "Deployment failed."; echo "=============================="; fi' EXIT
+trap 'code=$?; rm -f frontend/.env.production; if [ $code -ne 0 ]; then echo "=============================="; echo "Deployment failed."; echo "=============================="; fi' EXIT
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -76,7 +80,21 @@ aws lambda wait function-updated \
 echo "==> Step 5: Building frontend..."
 cd frontend
 npm ci
+
+# Create temporary production env file for build
+cat > .env.production << EOF
+VITE_API_URL=${BACKEND_URL}
+VITE_COGNITO_DOMAIN=${VITE_COGNITO_DOMAIN}
+VITE_COGNITO_CLIENT_ID=${VITE_COGNITO_CLIENT_ID}
+VITE_COGNITO_REDIRECT_URI=${VITE_COGNITO_REDIRECT_URI}
+VITE_CDN_URL=${VITE_CDN_URL}
+EOF
+
 npm run build
+
+# Remove temp production env file after build
+rm -f .env.production
+
 cd ..
 if [ ! -f frontend/dist/index.html ]; then
   echo "Build failed: frontend/dist/index.html not found."
