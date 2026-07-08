@@ -1,6 +1,5 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
-import { useToast } from '../Toast/Toast'
 
 const NAV_LINKS = [
   { to: '/dashboard', label: 'Dashboard', icon: 'dashboard', end: true },
@@ -38,14 +37,9 @@ const navLinkClasses = (isActive: boolean): string =>
 
 export function DashboardLayout() {
   const { user, logout } = useAuth()
-  const { show } = useToast()
   const location = useLocation()
 
   const initials = user ? getInitials(user.name) : ''
-
-  function handleKnowledgeBaseClick() {
-    show('Open Knowledge Base from a bot\'s detail page for now — a dedicated view is coming soon.', 'warning')
-  }
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
@@ -75,18 +69,6 @@ export function DashboardLayout() {
               <span className="text-sm tracking-wide">{link.label}</span>
             </NavLink>
           ))}
-
-          {/* Knowledge Base is scoped per-bot (/dashboard/kb/:botId) — there is
-              no standalone list route to link to yet, so this is a disabled
-              entry point rather than a real nav link. */}
-          <button
-            type="button"
-            onClick={handleKnowledgeBaseClick}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-slate-500 font-medium cursor-not-allowed opacity-70"
-          >
-            <span className="material-symbols-outlined">menu_book</span>
-            <span className="text-sm tracking-wide">Knowledge Base</span>
-          </button>
         </nav>
 
         <div className="space-y-4">
