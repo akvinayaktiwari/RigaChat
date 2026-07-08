@@ -1,127 +1,258 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { getBotById, getLeadById } from '../services/api'
+import {
+  ArrowLeft,
+  Bot as BotIcon,
+  Calendar,
+  DollarSign,
+  Globe,
+  Home,
+  Mail,
+  MessageSquare,
+  Phone,
+} from 'lucide-react'
+import { getLeadById, getMyBots } from '../services/api'
 import type { Lead } from '../types/index'
-import { Card } from '../components/Card/Card'
-import { Button } from '../components/Button/Button'
-import { Spinner } from '../components/Spinner/Spinner'
-import styles from './LeadDetailPage.module.css'
 
 interface TranscriptLine {
-  speaker: 'user' | 'bot'
+  role: 'user' | 'bot'
   text: string
 }
 
 function parseTranscript(transcript: string): TranscriptLine[] {
+  if (!transcript) return []
   return transcript
     .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
+    .filter((line) => line.trim())
     .map((line) => {
-      const userMatch = line.match(/^user:\s*/i)
-      if (userMatch) {
-        return { speaker: 'user', text: line.slice(userMatch[0].length) }
+      if (line.startsWith('User:')) {
+        return { role: 'user' as const, text: line.replace('User:', '').trim() }
       }
-      const botMatch = line.match(/^(bot|assistant):\s*/i)
-      if (botMatch) {
-        return { speaker: 'bot', text: line.slice(botMatch[0].length) }
+      if (line.startsWith('Bot:') || line.startsWith('Assistant:')) {
+        return { role: 'bot' as const, text: line.replace(/^(Bot:|Assistant:)/, '').trim() }
       }
-      return { speaker: 'bot', text: line }
+      return { role: 'bot' as const, text: line.trim() }
     })
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+}
+
+function formatFullDate(dateString: string): string {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function LoadingSkeleton() {
+  return (
+    <div>
+      <div className="h-4 w-24 bg-slate-100 rounded animate-pulse mb-6" />
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <div className="lg:col-span-3 bg-white rounded-2xl p-6 border border-slate-100 animate-pulse">
+          <div className="w-[72px] h-[72px] rounded-full bg-slate-200 mx-auto mb-4" />
+          <div className="h-6 w-40 bg-slate-200 rounded mx-auto mb-6" />
+          <div className="space-y-4">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="h-4 bg-slate-100 rounded" />
+            ))}
+          </div>
+        </div>
+        <div className="lg:col-span-2 bg-white rounded-2xl p-6 border border-slate-100 animate-pulse">
+          <div className="h-4 w-32 bg-slate-200 rounded mb-4" />
+          <div className="space-y-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-10 bg-slate-100 rounded-2xl" />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function LeadDetailPage() {
   const { leadId } = useParams<{ leadId: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const botId = searchParams.get('botId')
+  const botId = searchParams.get('botId') ?? ''
 
   const [lead, setLead] = useState<Lead | null>(null)
   const [botName, setBotName] = useState('')
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
   useEffect(() => {
-    if (!botId || !leadId) {
+    if (!leadId || !botId) {
+      setError(true)
       setLoading(false)
       return
     }
 
-    Promise.all([getLeadById(botId, leadId), getBotById(botId)]).then(([leadRes, botRes]) => {
-      if (leadRes.success && leadRes.data) setLead(leadRes.data)
-      if (botRes.success && botRes.data) setBotName(botRes.data.name)
-      setLoading(false)
-    })
+    Promise.all([getLeadById(botId, leadId), getMyBots()])
+      .then(([leadRes, botsRes]) => {
+        if (leadRes.success && leadRes.data) {
+          setLead(leadRes.data)
+        } else {
+          setError(true)
+        }
+        const bots = botsRes.data ?? []
+        setBotName(bots.find((b) => b.botId === botId)?.name ?? 'Unknown Bot')
+        setLoading(false)
+      })
+      .catch(() => {
+        setError(true)
+        setLoading(false)
+      })
   }, [botId, leadId])
 
   if (loading) {
-    return (
-      <div className={styles.loading}>
-        <Spinner size="lg" />
-      </div>
-    )
+    return <LoadingSkeleton />
   }
 
-  if (!lead) {
-    return <p>Lead not found.</p>
+  if (error || !lead) {
+    return (
+      <div className="flex flex-col items-center text-center py-16">
+        <p className="text-slate-800 font-medium">Lead not found</p>
+        <button
+          type="button"
+          onClick={() => navigate('/dashboard/leads')}
+          className="mt-4 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm hover:bg-indigo-700 transition-colors"
+        >
+          Back to Leads
+        </button>
+      </div>
+    )
   }
 
   const transcriptLines = parseTranscript(lead.chatTranscript)
 
   return (
     <div>
-      <Button variant="ghost" onClick={() => navigate('/dashboard/leads')}>
-        ← Back
-      </Button>
+      <button
+        type="button"
+        onClick={() => navigate('/dashboard/leads')}
+        className="flex items-center gap-1 text-slate-500 text-sm hover:text-slate-700 transition-colors"
+      >
+        <ArrowLeft size={16} />
+        Back to Leads
+      </button>
 
-      <div className={styles.columns}>
-        <div className={styles.left}>
-          <Card padding="lg">
-            <h2 className={styles.name}>{lead.name}</h2>
-            <dl className={styles.info}>
-              <dt>Email</dt>
-              <dd>{lead.email}</dd>
-              <dt>Phone</dt>
-              <dd>{lead.phone}</dd>
-              <dt>Date</dt>
-              <dd>{new Date(lead.createdAt).toLocaleString()}</dd>
+      <div className="flex items-start justify-between mt-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">{lead.name}</h1>
+          <p className="text-slate-500">Lead Details</p>
+        </div>
+        <div className="text-right">
+          <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+            New
+          </span>
+          <p className="text-xs text-slate-400 mt-1">Captured {formatFullDate(lead.createdAt)}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
+        <div className="lg:col-span-3 bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+          <div className="w-[72px] h-[72px] rounded-full bg-indigo-600 text-white text-2xl font-bold flex items-center justify-center mx-auto">
+            {getInitials(lead.name)}
+          </div>
+          <h2 className="text-xl font-bold text-slate-800 mt-4 text-center">{lead.name}</h2>
+
+          <div className="mt-4">
+            <div className="flex items-center gap-3 py-3 border-b border-slate-50">
+              <Mail size={16} className="text-slate-400 shrink-0" />
+              <span className="text-sm text-slate-500 w-32 shrink-0">Email</span>
+              <span className="text-sm text-slate-800">{lead.email}</span>
+            </div>
+            <div className="flex items-center gap-3 py-3 border-b border-slate-50">
+              <Phone size={16} className="text-slate-400 shrink-0" />
+              <span className="text-sm text-slate-500 w-32 shrink-0">Phone</span>
+              <span className="text-sm text-slate-800">{lead.phone}</span>
+            </div>
+            <div className="flex items-center gap-3 py-3 border-b border-slate-50">
+              <Globe size={16} className="text-slate-400 shrink-0" />
+              <span className="text-sm text-slate-500 w-32 shrink-0">Source URL</span>
+              <a
+                href={lead.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-indigo-600 hover:underline truncate"
+              >
+                {lead.sourceUrl}
+              </a>
+            </div>
+            <div className="flex items-center gap-3 py-3 border-b border-slate-50">
+              <BotIcon size={16} className="text-slate-400 shrink-0" />
+              <span className="text-sm text-slate-500 w-32 shrink-0">Bot</span>
+              <span className="text-sm text-slate-800">{botName}</span>
+            </div>
+            <div className="flex items-center gap-3 py-3">
+              <Calendar size={16} className="text-slate-400 shrink-0" />
+              <span className="text-sm text-slate-500 w-32 shrink-0">Captured</span>
+              <span className="text-sm text-slate-800">{formatFullDate(lead.createdAt)}</span>
+            </div>
+          </div>
+
+          {(lead.propertyInterest || lead.budgetRange) && (
+            <div className="mt-4">
+              <p className="text-sm font-medium text-slate-500 mt-4 mb-2">Additional Info</p>
               {lead.propertyInterest && (
-                <>
-                  <dt>Property Interest</dt>
-                  <dd>{lead.propertyInterest}</dd>
-                </>
+                <div className="flex items-center gap-3 py-3 border-b border-slate-50">
+                  <Home size={16} className="text-slate-400 shrink-0" />
+                  <span className="text-sm text-slate-500 w-32 shrink-0">Property Interest</span>
+                  <span className="text-sm text-slate-800">{lead.propertyInterest}</span>
+                </div>
               )}
               {lead.budgetRange && (
-                <>
-                  <dt>Budget Range</dt>
-                  <dd>{lead.budgetRange}</dd>
-                </>
+                <div className="flex items-center gap-3 py-3">
+                  <DollarSign size={16} className="text-slate-400 shrink-0" />
+                  <span className="text-sm text-slate-500 w-32 shrink-0">Budget Range</span>
+                  <span className="text-sm text-slate-800">{lead.budgetRange}</span>
+                </div>
               )}
-              <dt>Source URL</dt>
-              <dd>{lead.sourceUrl}</dd>
-              <dt>Bot</dt>
-              <dd>{botName || 'Unknown'}</dd>
-            </dl>
-          </Card>
+            </div>
+          )}
         </div>
 
-        <div className={styles.right}>
-          <Card padding="lg">
-            <h3 className={styles.transcriptTitle}>Chat Transcript</h3>
-            <div className={styles.transcript}>
-              {transcriptLines.length === 0 ? (
-                <p className={styles.noTranscript}>No transcript available.</p>
-              ) : (
-                transcriptLines.map((line, i) => (
+        <div className="lg:col-span-2 bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <MessageSquare size={18} className="text-slate-500" />
+            <h3 className="font-semibold text-slate-800">Conversation Transcript</h3>
+          </div>
+
+          {transcriptLines.length === 0 ? (
+            <div className="flex flex-col items-center text-center py-8">
+              <MessageSquare size={32} className="text-slate-300 mb-2" />
+              <p className="text-slate-400 text-sm">No conversation transcript available</p>
+            </div>
+          ) : (
+            <div className="max-h-96 overflow-y-auto space-y-3">
+              {transcriptLines.map((line, i) => (
+                <div key={i} className={line.role === 'user' ? 'ml-auto max-w-xs' : 'max-w-xs'}>
                   <div
-                    key={i}
-                    className={`${styles.bubble} ${line.speaker === 'user' ? styles.userBubble : styles.botBubble}`}
+                    className={
+                      line.role === 'user'
+                        ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-2 text-sm ml-auto'
+                        : 'bg-slate-100 text-slate-800 rounded-2xl rounded-tl-sm px-4 py-2 text-sm'
+                    }
                   >
                     {line.text}
                   </div>
-                ))
-              )}
+                </div>
+              ))}
             </div>
-          </Card>
+          )}
         </div>
       </div>
     </div>
