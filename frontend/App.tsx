@@ -1,8 +1,8 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { useAuth } from './src/hooks/useAuth'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { ProtectedRoute } from './src/components/ProtectedRoute/ProtectedRoute'
 import { DashboardLayout } from './src/components/DashboardLayout/DashboardLayout'
 import { ToastContainer } from './src/components/Toast/Toast'
+import LandingPage from './src/pages/LandingPage'
 import LoginPage from './src/pages/LoginPage'
 import AuthCallbackPage from './src/pages/AuthCallbackPage'
 import WidgetTestPage from './src/pages/WidgetTestPage'
@@ -16,12 +16,6 @@ import LeadDetailPage from './src/pages/LeadDetailPage'
 import KnowledgeBasePage from './src/pages/KnowledgeBasePage'
 import SettingsPage from './src/pages/SettingsPage'
 
-function RootRedirect() {
-  const { isAuthenticated, isLoading } = useAuth()
-  if (isLoading) return null
-  return <Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />
-}
-
 function App() {
   return (
     <BrowserRouter>
@@ -30,7 +24,7 @@ function App() {
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route path="/widget-test" element={<WidgetTestPage />} />
         <Route path="/widget-test/preview" element={<WidgetTestPreviewPage />} />
-        <Route path="/" element={<RootRedirect />} />
+        <Route path="/" element={<LandingPage />} />
         <Route
           path="/dashboard"
           element={
