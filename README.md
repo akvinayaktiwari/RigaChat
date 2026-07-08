@@ -77,3 +77,4 @@ npm run dev
 | POST   | /api/clients/me              | required  | Sync Cognito user to DynamoDB (on login) |
 | GET    | /api/clients/me              | required  | Get the logged-in client's record     |
 | PATCH  | /api/clients/me/plan         | required  | Change the client's plan              |
+ 
