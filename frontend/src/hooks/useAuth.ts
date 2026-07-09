@@ -40,12 +40,28 @@ interface IdTokenPayload {
   sub: string
   email: string
   name?: string
+  exp?: number
 }
 
 function decodeIdToken(idToken: string): IdTokenPayload {
   const [, payloadSegment] = idToken.split('.')
   const decoded = atob(payloadSegment.replace(/-/g, '+').replace(/_/g, '/'))
   return JSON.parse(decoded) as IdTokenPayload
+}
+
+// sessionStorage (not localStorage) so a session survives a page refresh but
+// is cleared when the tab closes and can't be read from other tabs.
+const SESSION_TOKEN_KEY = 'bb_token'
+const SESSION_USER_KEY = 'bb_user'
+
+function saveSession(token: string, user: AuthUser): void {
+  sessionStorage.setItem(SESSION_TOKEN_KEY, token)
+  sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(user))
+}
+
+function clearSession(): void {
+  sessionStorage.removeItem(SESSION_TOKEN_KEY)
+  sessionStorage.removeItem(SESSION_USER_KEY)
 }
 
 interface CognitoErrorBody {
@@ -73,6 +89,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [, setPendingSignupEmail] = useState<string | null>(null)
 
   useEffect(() => {
+    // Restore a session saved by a previous handleCallback()/signIn() call so
+    // a page refresh doesn't log the user out. Falls through to the existing
+    // isLoading:false below if there's no saved session or it's expired.
+    const savedToken = sessionStorage.getItem(SESSION_TOKEN_KEY)
+    const savedUserJson = sessionStorage.getItem(SESSION_USER_KEY)
+
+    if (savedToken && savedUserJson) {
+      try {
+        const user = JSON.parse(savedUserJson) as AuthUser
+        const payload = decodeIdToken(savedToken)
+        const now = Math.floor(Date.now() / 1000)
+
+        if (payload.exp && payload.exp > now) {
+          setAuthToken(savedToken)
+          setState({
+            isAuthenticated: true,
+            isLoading: false,
+            user,
+            token: savedToken,
+          })
+          return
+        }
+      } catch {
+        // Malformed saved session — fall through to clearing it below.
+      }
+      clearSession()
+    }
+
     // The /auth/callback route (AuthCallbackPage) is solely responsible for
     // consuming the one-time authorization code and calling handleCallback.
     // Doing it here too would race it and burn the code on a duplicate
@@ -122,22 +166,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(meResponse.error ?? 'Failed to sync client record')
       }
 
+      const user: AuthUser = {
+        clientId: sub,
+        email,
+        name: name ?? email.split('@')[0],
+        plan: meResponse.data.plan,
+      }
+
       setState({
         isAuthenticated: true,
         isLoading: false,
-        user: {
-          clientId: sub,
-          email,
-          name: name ?? email.split('@')[0],
-          plan: meResponse.data.plan,
-        },
+        user,
         token: tokens.id_token,
       })
+      saveSession(tokens.id_token, user)
 
       return true
     } catch (error) {
       console.error('Cognito callback handling failed:', error)
       setAuthToken(null)
+      clearSession()
       setState({ isAuthenticated: false, isLoading: false, user: null, token: null })
       window.location.href = '/login'
       return false
@@ -146,6 +194,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   function logout(): void {
     setAuthToken(null)
+    clearSession()
     setState({ isAuthenticated: false, isLoading: false, user: null, token: null })
 
     const params = new URLSearchParams({
@@ -196,17 +245,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(meResponse.error ?? 'Failed to sync client record')
     }
 
+    const user: AuthUser = {
+      clientId: payload.sub,
+      email: payload.email,
+      name: payload.name ?? payload.email.split('@')[0],
+      plan: meResponse.data.plan,
+    }
+
     setState({
       isAuthenticated: true,
       isLoading: false,
-      user: {
-        clientId: payload.sub,
-        email: payload.email,
-        name: payload.name ?? payload.email.split('@')[0],
-        plan: meResponse.data.plan,
-      },
+      user,
       token: idToken,
     })
+    saveSession(idToken, user)
   }
 
   async function signUp(name: string, email: string, password: string): Promise<void> {
