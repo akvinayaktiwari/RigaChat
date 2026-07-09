@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { authRoutes } from './auth-routes.js'
 import { botRoutes } from './bot-routes.js'
 import { chatRoutes } from './chat-routes.js'
 import { clientRoutes } from './client-routes.js'
@@ -30,6 +31,10 @@ const widgetCors = cors({
 
 app.use('/api/clients/*', dashboardCors)
 app.use('/api/kb/*', dashboardCors)
+// /api/auth/confirm is called by the dashboard frontend right after signup,
+// before the user has a token — public, but still dashboard-origin only, not
+// the wildcard widget origin.
+app.use('/api/auth/*', dashboardCors)
 
 app.use('/api/chat/*', widgetCors)
 
@@ -74,6 +79,7 @@ app.get('/health', (c) => {
   })
 })
 
+app.route('/api/auth', authRoutes)
 app.route('/api/bots', botRoutes)
 app.route('/api/chat', chatRoutes)
 app.route('/api/leads', leadRoutes)
