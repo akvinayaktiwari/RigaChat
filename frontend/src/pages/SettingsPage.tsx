@@ -1,6 +1,8 @@
-import { useState } from 'react'
-import { LogOut } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { LogOut, Loader2 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
+import { connectZoho, disconnectCRM, getIntegrationStatus } from '../services/api'
+import type { CRMConnection } from '../types/index'
 
 interface PlanInfo {
   id: 'starter' | 'growth' | 'agency'
@@ -68,9 +70,50 @@ export default function SettingsPage() {
   const { user, logout } = useAuth()
   const [showUpgradeToast, setShowUpgradeToast] = useState(false)
 
+  const [crmConnection, setCrmConnection] = useState<CRMConnection | null>(null)
+  const [crmLoading, setCrmLoading] = useState(true)
+  const [showDisconnectModal, setShowDisconnectModal] = useState(false)
+  const [disconnecting, setDisconnecting] = useState(false)
+  const [zohoToast, setZohoToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
   function handleUpgrade() {
     setShowUpgradeToast(true)
     setTimeout(() => setShowUpgradeToast(false), 3000)
+  }
+
+  useEffect(() => {
+    getIntegrationStatus()
+      .then((res) => setCrmConnection(res.success ? (res.data ?? null) : null))
+      .finally(() => setCrmLoading(false))
+
+    const params = new URLSearchParams(window.location.search)
+    const zohoParam = params.get('zoho')
+    if (zohoParam === 'connected') {
+      setZohoToast({ type: 'success', message: 'Zoho CRM connected successfully' })
+      window.history.replaceState({}, '', '/dashboard/settings')
+    } else if (zohoParam === 'error') {
+      setZohoToast({ type: 'error', message: 'Failed to connect Zoho CRM. Please try again.' })
+      window.history.replaceState({}, '', '/dashboard/settings')
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!zohoToast) return
+    const timer = setTimeout(() => setZohoToast(null), 4000)
+    return () => clearTimeout(timer)
+  }, [zohoToast])
+
+  async function handleDisconnect() {
+    setDisconnecting(true)
+    try {
+      const res = await disconnectCRM()
+      if (res.success) {
+        setCrmConnection(null)
+      }
+    } finally {
+      setDisconnecting(false)
+      setShowDisconnectModal(false)
+    }
   }
 
   const currentPlan = user?.plan as PlanInfo['id'] | undefined
@@ -173,6 +216,73 @@ export default function SettingsPage() {
             })}
           </div>
 
+          <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm mt-6">
+            <h2 className="font-semibold text-lg text-slate-800 mb-1">Integrations</h2>
+            <p className="text-slate-500 text-sm mb-6">Connect your CRM to sync leads automatically</p>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between border border-slate-200 rounded-xl p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-orange-500 text-white font-bold flex items-center justify-center shrink-0">
+                    Z
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-800">Zoho CRM</p>
+                    <p className="text-slate-500 text-sm">Sync form leads to Zoho automatically</p>
+                  </div>
+                </div>
+
+                {crmLoading ? (
+                  <Loader2 size={18} className="animate-spin text-slate-400" />
+                ) : crmConnection?.connected ? (
+                  <div className="flex items-center gap-3">
+                    <span className="bg-emerald-100 text-emerald-700 text-xs px-3 py-1 rounded-full font-medium">
+                      Connected
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowDisconnectModal(true)}
+                      className="text-red-600 hover:text-red-700 text-sm font-medium transition-colors"
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={connectZoho}
+                    className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+                  >
+                    Connect Zoho
+                  </button>
+                )}
+              </div>
+
+              {[
+                { label: 'H', name: 'HubSpot' },
+                { label: 'S', name: 'Salesforce' },
+              ].map((crm) => (
+                <div
+                  key={crm.name}
+                  className="flex items-center justify-between border border-slate-100 rounded-xl p-4 opacity-50"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-slate-300 text-white font-bold flex items-center justify-center shrink-0">
+                      {crm.label}
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-800">{crm.name}</p>
+                      <p className="text-slate-500 text-sm">Sync form leads to {crm.name} automatically</p>
+                    </div>
+                  </div>
+                  <span className="bg-slate-100 text-slate-500 text-xs px-3 py-1 rounded-full font-medium">
+                    Coming Soon
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="bg-white rounded-2xl p-6 border border-red-100 shadow-sm mt-6">
             <h2 className="font-semibold text-lg text-red-600 mb-4">Danger Zone</h2>
             <button
@@ -190,6 +300,45 @@ export default function SettingsPage() {
       {showUpgradeToast && (
         <div className="fixed bottom-4 right-4 bg-slate-800 text-white text-sm px-4 py-2 rounded-xl shadow-lg">
           Coming soon! We&apos;ll notify you when upgrades are available.
+        </div>
+      )}
+
+      {zohoToast && (
+        <div
+          className={`fixed bottom-4 right-4 text-white text-sm px-4 py-2 rounded-xl shadow-lg ${
+            zohoToast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'
+          }`}
+        >
+          {zohoToast.message}
+        </div>
+      )}
+
+      {showDisconnectModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <h2 className="text-lg font-bold text-slate-800">Disconnect Zoho CRM?</h2>
+            <p className="text-sm text-slate-500 mt-2">
+              New form leads will stop syncing to Zoho until you reconnect.
+            </p>
+            <div className="flex items-center justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setShowDisconnectModal(false)}
+                disabled={disconnecting}
+                className="text-slate-600 hover:text-slate-800 transition-colors px-4 py-2 text-sm font-medium disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDisconnect}
+                disabled={disconnecting}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {disconnecting ? 'Disconnecting...' : 'Disconnect'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

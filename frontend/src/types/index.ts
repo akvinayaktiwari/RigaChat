@@ -159,4 +159,16 @@ export interface FormLead {
   customFields: string | Record<string, string>
   sourceUrl: string
   createdAt: string
+  crmSynced?: boolean
+  crmSyncedAt?: string
+  crmExternalId?: string
+  crmSyncError?: string
+  crmSyncAttempts?: number
+}
+
+export interface CRMConnection {
+  provider: 'zoho'
+  connected: boolean
+  connectedAt: string
+  tokenExpiry: string
 }

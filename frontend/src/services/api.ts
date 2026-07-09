@@ -2,6 +2,7 @@ import type {
   ApiResponse,
   BotConfig,
   ClientRecord,
+  CRMConnection,
   CreateBotInput,
   CreateFormInput,
   CreateKBEntryInput,
@@ -164,4 +165,22 @@ export function getFormLeads(formId: string): Promise<ApiResponse<FormLead[]>> {
 
 export function getAllFormLeads(): Promise<ApiResponse<FormLead[]>> {
   return apiClient<FormLead[]>('/api/forms/leads/all')
+}
+
+// CRM Integration API
+
+export function getIntegrationStatus(): Promise<ApiResponse<CRMConnection | null>> {
+  return apiClient<CRMConnection | null>('/api/integrations/status')
+}
+
+export function disconnectCRM(): Promise<ApiResponse<{ success: boolean }>> {
+  return apiClient<{ success: boolean }>('/api/integrations/disconnect', 'DELETE')
+}
+
+// GET /zoho/connect is a top-level browser redirect (not a fetch call), so the
+// auth token can't travel as an Authorization header — it's passed as a query
+// param instead, verified server-side by requireAuthFromQuery.
+export function connectZoho(): void {
+  if (!authToken) return
+  window.location.href = `${BASE_URL}/api/integrations/zoho/connect?token=${encodeURIComponent(authToken)}`
 }
