@@ -59,6 +59,17 @@ jobs:
             --function-name ${{ secrets.LAMBDA_STREAMING_FUNCTION_NAME }} \
             --region ${{ secrets.AWS_REGION }}
 
+      - name: Health check main Lambda
+        run: |
+          RESPONSE=$(curl -s -o /tmp/health.json -w "%{http_code}" "${{ secrets.BACKEND_URL }}/api/bots/health-check/config")
+          echo "HTTP status: $RESPONSE"
+          cat /tmp/health.json
+          echo
+          if [ "$RESPONSE" -ge 500 ]; then
+            echo "Lambda returned $RESPONSE — failing deploy"
+            exit 1
+          fi
+
       - name: Deployment success
         run: echo "Backend deployed successfully at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
