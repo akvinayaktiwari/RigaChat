@@ -82,12 +82,22 @@ export interface ApiResponse<T> {
   error?: string
 }
 
+export interface CRMConnection {
+  provider: 'zoho'
+  connected: boolean
+  accessToken: string
+  refreshToken: string
+  tokenExpiry: string
+  connectedAt: string
+}
+
 export interface ClientRecord {
   clientId: string
   email: string
   name: string
   authProvider: 'google'
   plan: 'starter' | 'growth' | 'agency'
+  crmConnection?: CRMConnection
   createdAt: string
   updatedAt: string
 }
@@ -145,6 +155,12 @@ export interface FormLead {
   customFields: string
   sourceUrl: string
   createdAt: string
+  updatedAt?: string
+  crmSynced?: boolean
+  crmSyncedAt?: string
+  crmExternalId?: string
+  crmSyncError?: string
+  crmSyncAttempts?: number
 }
 
 export interface CreateFormLeadInput {
