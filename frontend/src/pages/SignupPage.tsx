@@ -69,26 +69,81 @@ function BrandPanel() {
 const inputClasses =
   'w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all'
 const labelClasses = 'block text-sm font-medium text-slate-700 mb-2'
+const fieldErrorClasses = 'text-xs text-red-500 mt-1'
 
-export default function LoginPage() {
-  const { login, signIn } = useAuth()
+interface FieldErrors {
+  name?: string
+  email?: string
+  password?: string
+  confirmPassword?: string
+}
+
+interface PasswordStrength {
+  score: 0 | 1 | 2 | 3 | 4
+  label: string
+  color: string
+}
+
+function getPasswordStrength(password: string): PasswordStrength {
+  const hasMinLength = password.length >= 8
+  const hasNumber = /\d/.test(password)
+  const hasUppercase = /[A-Z]/.test(password)
+
+  if (!hasMinLength) return { score: password.length > 0 ? 1 : 0, label: 'Weak', color: 'bg-red-500' }
+  if (hasMinLength && hasNumber && hasUppercase) return { score: 4, label: 'Strong', color: 'bg-green-500' }
+  if (hasMinLength && hasNumber) return { score: 3, label: 'Good', color: 'bg-yellow-500' }
+  return { score: 2, label: 'Fair', color: 'bg-amber-500' }
+}
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+export default function SignupPage() {
+  const { login, signUp } = useAuth()
   const navigate = useNavigate()
 
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const strength = getPasswordStrength(password)
+
+  function validate(): boolean {
+    const nextErrors: FieldErrors = {}
+
+    if (!name.trim() || name.trim().length < 2) {
+      nextErrors.name = 'Name must be at least 2 characters'
+    }
+    if (!email.trim() || !EMAIL_REGEX.test(email.trim())) {
+      nextErrors.email = 'Enter a valid email address'
+    }
+    if (password.length < 8) {
+      nextErrors.password = 'Password must be at least 8 characters'
+    }
+    if (confirmPassword !== password) {
+      nextErrors.confirmPassword = 'Passwords do not match'
+    }
+
+    setFieldErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
+    if (!validate()) return
+
     setLoading(true)
     try {
-      await signIn(email, password)
+      await signUp(name.trim(), email.trim(), password)
       navigate('/dashboard')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign in failed. Please try again.')
+      setError(err instanceof Error ? err.message : 'Sign up failed. Please try again.')
       setLoading(false)
     }
   }
@@ -99,8 +154,8 @@ export default function LoginPage() {
 
       <div className="bg-white flex items-center justify-center p-8 lg:p-12">
         <div className="max-w-md w-full">
-          <h1 className="text-2xl font-bold text-slate-800">Welcome back</h1>
-          <p className="text-slate-500 text-sm mt-1">Sign in to your BeepBoop account</p>
+          <h1 className="text-2xl font-bold text-slate-800">Create your account</h1>
+          <p className="text-slate-500 text-sm mt-1">Start capturing leads with AI today</p>
 
           <button
             type="button"
@@ -108,7 +163,7 @@ export default function LoginPage() {
             className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer shadow-sm mt-8"
           >
             <GoogleIcon />
-            Continue with Google
+            Sign up with Google
           </button>
 
           <div className="flex items-center gap-4 mt-6">
@@ -119,16 +174,29 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="mt-6">
             <div>
+              <label className={labelClasses}>Full name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Vinayak Tiwari"
+                autoComplete="name"
+                className={inputClasses}
+              />
+              {fieldErrors.name && <p className={fieldErrorClasses}>{fieldErrors.name}</p>}
+            </div>
+
+            <div className="mt-4">
               <label className={labelClasses}>Email address</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                placeholder="you@company.com"
                 autoComplete="email"
-                required
                 className={inputClasses}
               />
+              {fieldErrors.email && <p className={fieldErrorClasses}>{fieldErrors.email}</p>}
             </div>
 
             <div className="mt-4">
@@ -138,9 +206,8 @@ export default function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                  required
+                  placeholder="Min. 8 characters"
+                  autoComplete="new-password"
                   className={`${inputClasses} pr-11`}
                 />
                 <button
@@ -152,6 +219,44 @@ export default function LoginPage() {
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+              {fieldErrors.password && <p className={fieldErrorClasses}>{fieldErrors.password}</p>}
+
+              {password.length > 0 && (
+                <div className="mt-2">
+                  <div className="flex items-center gap-1.5">
+                    {[0, 1, 2, 3].map((i) => (
+                      <span
+                        key={i}
+                        className={`h-1.5 flex-1 rounded-full ${i < strength.score ? strength.color : 'bg-slate-200'}`}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">{strength.label}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4">
+              <label className={labelClasses}>Confirm password</label>
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Repeat your password"
+                  autoComplete="new-password"
+                  className={`${inputClasses} pr-11`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+              {fieldErrors.confirmPassword && <p className={fieldErrorClasses}>{fieldErrors.confirmPassword}</p>}
             </div>
 
             {error && (
@@ -161,20 +266,24 @@ export default function LoginPage() {
               </div>
             )}
 
+            <p className="text-xs text-slate-400 text-center mt-4">
+              By creating an account you agree to our Terms of Service and Privacy Policy
+            </p>
+
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-6 bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full mt-4 bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading && <Loader2 size={16} className="animate-spin" />}
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? 'Creating account...' : 'Create Account'}
             </button>
           </form>
 
           <p className="text-center mt-6 text-slate-500 text-sm">
-            Don&apos;t have an account?{' '}
-            <Link to="/signup" className="text-indigo-600 font-medium hover:text-indigo-700">
-              Create account
+            Already have an account?{' '}
+            <Link to="/login" className="text-indigo-600 font-medium hover:text-indigo-700">
+              Sign in
             </Link>
           </p>
         </div>

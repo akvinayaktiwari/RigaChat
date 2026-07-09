@@ -4,6 +4,7 @@ import { DashboardLayout } from './src/components/DashboardLayout/DashboardLayou
 import { ToastContainer } from './src/components/Toast/Toast'
 import LandingPage from './src/pages/LandingPage'
 import LoginPage from './src/pages/LoginPage'
+import SignupPage from './src/pages/SignupPage'
 import AuthCallbackPage from './src/pages/AuthCallbackPage'
 import WidgetTestPage from './src/pages/WidgetTestPage'
 import WidgetTestPreviewPage from './src/pages/WidgetTestPreviewPage'
@@ -27,6 +28,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route path="/widget-test" element={<WidgetTestPage />} />
         <Route path="/widget-test/preview" element={<WidgetTestPreviewPage />} />
