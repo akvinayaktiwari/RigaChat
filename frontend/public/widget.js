@@ -30,48 +30,84 @@
   var shadowRoot = null;
   var els = {};
   var CSS_TEMPLATE =
+    "@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');" +
     ':host{all:initial;--brand:__BRAND__}' +
-    '*{box-sizing:border-box;font-family:Arial,Helvetica,sans-serif}' +
+    '*{box-sizing:border-box;font-family:"Inter",Arial,sans-serif;margin:0;padding:0}' +
     '.ciq-hidden{display:none!important}' +
     '#ciq-bubble{position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;' +
-    'background:var(--brand);box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:999999;cursor:pointer;' +
-    'border:none;transition:transform .2s ease;display:flex;align-items:center;justify-content:center;padding:0}' +
-    '#ciq-bubble:hover{transform:scale(1.05)}' +
-    '#ciq-window{position:fixed;bottom:90px;right:24px;width:360px;height:520px;background:#fff;' +
-    'border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.12);z-index:999998;display:flex;' +
-    'flex-direction:column;overflow:hidden;transition:transform .2s ease,opacity .2s ease}' +
-    '#ciq-header{background:var(--brand);color:#fff;padding:16px;display:flex;align-items:center;' +
-    'justify-content:space-between;font-weight:500;font-size:15px}' +
-    '#ciq-close{background:transparent;border:none;color:#fff;cursor:pointer;font-size:16px}' +
-    '#ciq-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}' +
+    'background:linear-gradient(135deg,#6366f1,#4f46e5);box-shadow:0 8px 32px rgba(99,102,241,.35);' +
+    'z-index:999999;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;padding:0;' +
+    'transition:transform .2s cubic-bezier(0.34,1.56,0.64,1)}' +
+    '#ciq-bubble:hover{transform:scale(1.08)}' +
+    '#ciq-bubble:active{transform:scale(.95)}' +
+    '.ciq-ping{position:absolute;top:-2px;right:-2px;width:14px;height:14px;display:flex}' +
+    '.ciq-ping-outer{position:absolute;display:inline-flex;height:100%;width:100%;border-radius:50%;' +
+    'background:#eab308;opacity:.75;animation:ciq-ping 1.4s cubic-bezier(0,0,.2,1) infinite}' +
+    '.ciq-ping-inner{position:relative;display:inline-flex;height:14px;width:14px;border-radius:50%;background:#ca8a04}' +
+    '@keyframes ciq-ping{75%,100%{transform:scale(2);opacity:0}}' +
+    '#ciq-bubble.ciq-open .ciq-ping{display:none}' +
+    '#ciq-window{position:fixed;bottom:90px;right:24px;width:360px;height:500px;background:#fff;' +
+    'border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.15);border:1px solid #e5e7eb;z-index:999998;' +
+    'display:flex;flex-direction:column;overflow:hidden;transform-origin:bottom right;transform:scale(.85);' +
+    'opacity:0;pointer-events:none;transition:transform .35s cubic-bezier(0.34,1.56,0.64,1),opacity .25s ease}' +
+    '#ciq-window.ciq-open{transform:scale(1);opacity:1;pointer-events:auto}' +
+    '#ciq-header{background:var(--brand);padding:16px;display:flex;align-items:center;gap:12px}' +
+    '#ciq-avatar-wrap{position:relative;flex-shrink:0;width:40px;height:40px}' +
+    '#ciq-avatar{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.1);' +
+    'border:1.5px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;' +
+    'font-weight:700;font-size:14px;color:#fff}' +
+    '#ciq-online-dot{position:absolute;bottom:0;right:0;width:12px;height:12px;background:#4ade80;' +
+    'border:2px solid var(--brand);border-radius:50%}' +
+    '#ciq-header-info{flex:1;min-width:0}' +
+    '#ciq-bot-name{font-weight:700;font-size:13px;color:#fff;display:flex;align-items:center;gap:4px;' +
+    'white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+    '#ciq-subtitle{font-size:11px;color:rgba(255,255,255,.8);margin-top:2px}' +
+    '#ciq-close{flex-shrink:0;width:28px;height:28px;background:transparent;border:none;' +
+    'color:rgba(255,255,255,.8);cursor:pointer;font-size:14px;border-radius:50%;' +
+    'display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s}' +
+    '#ciq-close:hover{background:rgba(255,255,255,.1);color:#fff}' +
+    '#ciq-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;' +
+    'background:rgba(249,250,251,.3)}' +
+    '#ciq-messages::-webkit-scrollbar{width:4px}' +
+    '#ciq-messages::-webkit-scrollbar-track{background:transparent}' +
+    '#ciq-messages::-webkit-scrollbar-thumb{background:#e5e7eb;border-radius:4px}' +
     '.ciq-msg-bot{background:#f3f4f6;color:#111827;align-self:flex-start;padding:10px 14px;' +
-    'border-radius:4px 14px 14px 14px;max-width:80%;font-size:14px;line-height:1.5;' +
-    'white-space:pre-wrap;word-break:break-word}' +
+    'border-radius:16px;border-top-left-radius:4px;border:1px solid #e5e7eb;max-width:85%;' +
+    'font-size:14px;line-height:1.5}' +
     '.ciq-msg-user{background:var(--brand);color:#fff;align-self:flex-end;padding:10px 14px;' +
-    'border-radius:14px 4px 14px 14px;max-width:80%;font-size:14px;line-height:1.5;' +
-    'white-space:pre-wrap;word-break:break-word}' +
-    '.ciq-typing{background:#f3f4f6;align-self:flex-start;padding:12px 14px;' +
-    'border-radius:4px 14px 14px 14px;display:flex;gap:4px}' +
-    '.ciq-typing span{display:inline-block;width:6px;height:6px;border-radius:50%;' +
-    'background:#9ca3af;animation:ciq-bounce 1.2s infinite}' +
+    'border-radius:16px;border-top-right-radius:4px;max-width:85%;font-size:14px;line-height:1.5}' +
+    '.ciq-msg-text{white-space:pre-wrap;word-break:break-word}' +
+    '.ciq-msg-time{font-size:9px;text-align:right;margin-top:6px}' +
+    '.ciq-msg-bot .ciq-msg-time{color:#6b7280}' +
+    '.ciq-msg-user .ciq-msg-time{color:rgba(255,255,255,.6)}' +
+    '.ciq-typing{background:#f3f4f6;border:1px solid #e5e7eb;align-self:flex-start;padding:12px 14px;' +
+    'border-radius:16px;border-top-left-radius:4px;display:flex;gap:4px}' +
+    '.ciq-typing span{display:inline-block;width:8px;height:8px;border-radius:50%;background:#9ca3af;' +
+    'animation:bb-bounce 1s infinite}' +
     '.ciq-typing span:nth-child(2){animation-delay:.2s}' +
     '.ciq-typing span:nth-child(3){animation-delay:.4s}' +
-    '@keyframes ciq-bounce{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-4px);opacity:1}}' +
-    '#ciq-input-area{display:flex;padding:12px;gap:8px;border-top:1px solid #e5e7eb}' +
-    '#ciq-input{flex:1;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-size:14px;outline:none}' +
-    '#ciq-input:focus{border-color:var(--brand)}' +
-    '#ciq-send{width:36px;height:36px;background:var(--brand);border-radius:8px;border:none;' +
-    'cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}' +
-    '#ciq-send:disabled{opacity:.6;cursor:default}' +
+    '@keyframes bb-bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}' +
     '#ciq-lead-form{padding:16px;background:#f9fafb;border-top:1px solid #e5e7eb}' +
     '#ciq-lead-form p{font-size:13px;color:#374151;margin:0 0 10px 0}' +
-    '#ciq-lead-form input{width:100%;margin-bottom:8px;padding:8px 10px;border:1px solid #e5e7eb;' +
-    'border-radius:6px;font-size:13px;outline:none}' +
+    '#ciq-lead-form input{width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:10px;' +
+    'font-size:13px;outline:none;margin-bottom:8px}' +
     '#ciq-lead-form input:focus{border-color:var(--brand)}' +
-    '#ciq-lead-submit{width:100%;padding:10px;background:var(--brand);color:#fff;border:none;' +
-    'border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;margin-top:4px}' +
+    '#ciq-lead-submit{width:100%;padding:10px;background:linear-gradient(135deg,#6366f1,#4f46e5);' +
+    'color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;' +
+    'transition:opacity .15s}' +
+    '#ciq-lead-submit:hover{opacity:.92}' +
     '#ciq-lead-error{color:#ef4444;font-size:12px;margin-top:8px}' +
-    '@media (max-width:480px){#ciq-window{width:calc(100vw - 24px);right:12px;bottom:80px}' +
+    '#ciq-input-area{display:flex;padding:12px;gap:8px;background:#fff;border-top:1px solid #e5e7eb}' +
+    '#ciq-input{flex:1;padding:10px 16px;border:1px solid #e5e7eb;border-radius:12px;font-size:14px;' +
+    'background:#f9fafb;outline:none}' +
+    '#ciq-input:focus{border-color:var(--brand)}' +
+    '#ciq-input::placeholder{color:#6b7280}' +
+    '#ciq-send{width:40px;height:40px;background:linear-gradient(135deg,#6366f1,#4f46e5);border:none;' +
+    'border-radius:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;' +
+    'transition:opacity .15s}' +
+    '#ciq-send:hover{opacity:.9}' +
+    '#ciq-send:disabled{opacity:.4;cursor:default}' +
+    '@media (max-width:480px){#ciq-window{width:calc(100vw - 24px);right:12px}' +
     '#ciq-bubble{bottom:12px;right:12px}}';
   var BUBBLE_ICON =
     '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
@@ -80,11 +116,22 @@
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
     '<line x1="22" y1="2" x2="11" y2="13" stroke="white" stroke-width="2"/>' +
     '<polygon points="22 2 15 22 11 13 2 9 22 2" fill="white"/></svg>';
+  var SPARKLES_ICON =
+    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+    '<path d="M12 2l1.5 6.5L20 10l-6.5 1.5L12 18l-1.5-6.5L4 10l6.5-1.5L12 2z" fill="#fde047"/></svg>';
   var SHELL_HTML =
-    '<button id="ciq-bubble" aria-label="Open chat">' + BUBBLE_ICON + '</button>' +
-    '<div id="ciq-window" class="ciq-hidden">' +
-    '<div id="ciq-header"><div id="ciq-bot-name"></div>' +
-    '<button id="ciq-close" aria-label="Close chat">✕</button></div>' +
+    '<button id="ciq-bubble" aria-label="Open chat">' + BUBBLE_ICON +
+    '<span class="ciq-ping"><span class="ciq-ping-outer"></span><span class="ciq-ping-inner"></span></span>' +
+    '</button>' +
+    '<div id="ciq-window">' +
+    '<div id="ciq-header">' +
+    '<div id="ciq-avatar-wrap"><div id="ciq-avatar"></div><span id="ciq-online-dot"></span></div>' +
+    '<div id="ciq-header-info">' +
+    '<div id="ciq-bot-name"><span id="ciq-bot-name-text"></span>' + SPARKLES_ICON + '</div>' +
+    '<div id="ciq-subtitle">Powered by BeepBoop</div>' +
+    '</div>' +
+    '<button id="ciq-close" aria-label="Close chat">✕</button>' +
+    '</div>' +
     '<div id="ciq-messages"></div>' +
     '<div id="ciq-lead-form" class="ciq-hidden">' +
     '<p>Please share your details and we\'ll be in touch.</p>' +
@@ -126,7 +173,8 @@
       }
       els.bubble = shadowRoot.getElementById('ciq-bubble');
       els.window = shadowRoot.getElementById('ciq-window');
-      els.botName = shadowRoot.getElementById('ciq-bot-name');
+      els.avatar = shadowRoot.getElementById('ciq-avatar');
+      els.botName = shadowRoot.getElementById('ciq-bot-name-text');
       els.close = shadowRoot.getElementById('ciq-close');
       els.messages = shadowRoot.getElementById('ciq-messages');
       els.leadForm = shadowRoot.getElementById('ciq-lead-form');
@@ -134,7 +182,9 @@
       els.leadSubmit = shadowRoot.getElementById('ciq-lead-submit');
       els.input = shadowRoot.getElementById('ciq-input');
       els.send = shadowRoot.getElementById('ciq-send');
-      els.botName.textContent = state.botConfig.name || '';
+      var botName = state.botConfig.name || '';
+      els.botName.textContent = botName;
+      els.avatar.textContent = (botName || 'AI').trim().substring(0, 2).toUpperCase();
       els.bubble.classList.add('ciq-hidden');
       bindEvents();
       applyTrigger();
@@ -190,7 +240,8 @@
   }
   function openChat() {
     state.isOpen = true;
-    els.window.classList.remove('ciq-hidden');
+    els.window.classList.add('ciq-open');
+    els.bubble.classList.add('ciq-open');
     if (!state.started) {
       state.started = true;
       startConversation();
@@ -198,15 +249,32 @@
   }
   function closeChat() {
     state.isOpen = false;
-    els.window.classList.add('ciq-hidden');
+    els.window.classList.remove('ciq-open');
+    els.bubble.classList.remove('ciq-open');
   }
   function scrollToBottom() {
     els.messages.scrollTop = els.messages.scrollHeight;
   }
+  function formatTime(date) {
+    var hours = date.getHours();
+    var minutes = date.getMinutes();
+    var period = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    if (hours === 0) hours = 12;
+    var minuteStr = minutes < 10 ? '0' + minutes : String(minutes);
+    return hours + ':' + minuteStr + ' ' + period;
+  }
   function addMessage(role, text) {
     var bubble = document.createElement('div');
     bubble.className = role === 'user' ? 'ciq-msg-user' : 'ciq-msg-bot';
-    bubble.textContent = text;
+    var textEl = document.createElement('div');
+    textEl.className = 'ciq-msg-text';
+    textEl.textContent = text;
+    var timeEl = document.createElement('div');
+    timeEl.className = 'ciq-msg-time';
+    timeEl.textContent = formatTime(new Date());
+    bubble.appendChild(textEl);
+    bubble.appendChild(timeEl);
     els.messages.appendChild(bubble);
     scrollToBottom();
     return bubble;
@@ -256,6 +324,7 @@
     state.isLoading = true;
     addTypingIndicator();
     var botBubble = addMessage('bot', '');
+    var textNode = botBubble.querySelector('.ciq-msg-text');
     var accumulated = '';
     fetch(BACKEND_URL + '/api/chat/message', {
       method: 'POST',
@@ -276,7 +345,7 @@
               return;
             }
             accumulated += decoder.decode(result.value, { stream: true });
-            botBubble.textContent = accumulated;
+            textNode.textContent = accumulated;
             scrollToBottom();
             return read();
           });
