@@ -58,7 +58,7 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
               Sign in
             </button>
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => navigate('/signup')}
               className="cta-accent text-white text-sm font-semibold px-5 py-3 rounded-xl transition-all hover:shadow-[0_4px_20px_rgba(99,102,241,0.25)] hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
               id="desktop-signup-btn"
             >
@@ -145,7 +145,7 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
                 <button
                   onClick={() => {
                     setMobileMenuOpen(false)
-                    navigate('/login')
+                    navigate('/signup')
                   }}
                   className="w-full py-4 cta-accent text-white text-center font-bold rounded-xl flex items-center justify-center gap-2 hover:opacity-95 transition-opacity"
                   id="mobile-signup-btn"

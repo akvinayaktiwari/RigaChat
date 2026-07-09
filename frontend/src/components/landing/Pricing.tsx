@@ -119,7 +119,7 @@ export default function Pricing() {
               ) : (
                 <button
                   type="button"
-                  onClick={() => navigate('/login')}
+                  onClick={() => navigate('/signup')}
                   className={`mt-8 w-full font-semibold px-6 py-3 rounded-xl transition-all ${
                     plan.popular
                       ? 'cta-accent text-white hover:shadow-lg hover:-translate-y-0.5'

@@ -46,7 +46,7 @@ export default function Hero({ onOpenDemo }: HeroProps) {
           {/* Call to Actions */}
           <div className="flex flex-wrap gap-4 mt-2">
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => navigate('/signup')}
               className="cta-accent text-white font-bold text-base px-8 py-4.5 rounded-xl shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
               id="hero-trial-btn"
             >

@@ -40,7 +40,7 @@ export default function FinalCTA() {
         {/* Action button */}
         <div className="flex flex-col items-center gap-5">
           <button
-            onClick={() => navigate('/login')}
+            onClick={() => navigate('/signup')}
             className="cta-accent text-white font-extrabold text-lg md:text-xl px-12 py-5.5 rounded-2xl transition-all duration-300 hover:scale-[1.04] hover:shadow-[0_0_50px_rgba(99,102,241,0.45)] cursor-pointer"
             id="cta-signup-btn"
           >

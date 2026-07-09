@@ -12,7 +12,7 @@ export default function TrialModal({ isOpen, onClose }: TrialModalProps) {
 
   const handleGetStarted = () => {
     onClose()
-    navigate('/login')
+    navigate('/signup')
   }
 
   const highlights = [
