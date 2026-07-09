@@ -159,7 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const response = await fetch(COGNITO_API_URL, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-amz-json-1.1',
         'X-Amz-Target': 'AWSCognitoIdentityProviderService.InitiateAuth',
       },
       body: JSON.stringify({
@@ -213,7 +213,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const response = await fetch(COGNITO_API_URL, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-amz-json-1.1',
         'X-Amz-Target': 'AWSCognitoIdentityProviderService.SignUp',
       },
       body: JSON.stringify({
