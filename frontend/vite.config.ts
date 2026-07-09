@@ -4,16 +4,22 @@ import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
+const LOCAL_WIDGET_FILES: Record<string, string> = {
+  '/widget.js': 'public/widget.js',
+  '/form-widget.js': 'public/form-widget.js',
+}
+
 function serveLocalWidget(backendUrl: string): Plugin {
   return {
     name: 'serve-local-widget',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        if (req.url !== '/widget.js') {
+        const relativePath = req.url ? LOCAL_WIDGET_FILES[req.url] : undefined
+        if (!relativePath) {
           next()
           return
         }
-        const raw = fs.readFileSync(path.resolve(__dirname, 'public/widget.js'), 'utf-8')
+        const raw = fs.readFileSync(path.resolve(__dirname, relativePath), 'utf-8')
         res.setHeader('Content-Type', 'application/javascript')
         res.end(raw.replace(/__BACKEND_URL__/g, backendUrl))
       })
