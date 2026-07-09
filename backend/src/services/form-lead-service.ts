@@ -5,6 +5,7 @@ import {
   getFormLeadsByFormId,
 } from '../repositories/form-lead-repository.js'
 import { getPublicConfig } from './form-service.js'
+import { syncFormLeadToCRM } from './crm-service.js'
 import type { CreateFormLeadInput, FormLead } from '../types/index.js'
 
 function parseFormLead(lead: FormLead): FormLead {
@@ -21,13 +22,20 @@ export async function captureFormLead(input: CreateFormLeadInput): Promise<FormL
 
   const customFieldsJson = JSON.stringify(input.customFields)
 
-  return createFormLead({
+  const createdLead = await createFormLead({
     formId: input.formId,
     clientId: input.clientId,
     source: 'form',
     customFields: customFieldsJson,
     sourceUrl: input.sourceUrl,
   })
+
+  // Fire-and-forget: CRM sync never blocks or fails lead capture.
+  syncFormLeadToCRM(createdLead, input.formId, input.clientId).catch((err) => {
+    console.error('CRM sync error:', err)
+  })
+
+  return createdLead
 }
 
 export async function getLeadsForForm(formId: string, limit?: number): Promise<FormLead[]> {

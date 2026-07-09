@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid'
-import { GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import type { FormLead } from '../types/index.js'
 
@@ -73,6 +73,49 @@ export async function getFormLeadById(formId: string, leadId: string): Promise<F
   } catch (error) {
     throw new Error(
       `Failed to get form lead ${leadId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
+export interface FormLeadSyncStatus {
+  crmSynced?: boolean
+  crmSyncedAt?: string
+  crmExternalId?: string
+  crmSyncError?: string
+  crmSyncAttempts?: number
+}
+
+export async function updateFormLeadSyncStatus(
+  formId: string,
+  leadId: string,
+  status: FormLeadSyncStatus
+): Promise<void> {
+  const fields: Record<string, unknown> = { ...status, updatedAt: new Date().toISOString() }
+
+  const updateExpressionParts: string[] = []
+  const expressionAttributeNames: Record<string, string> = {}
+  const expressionAttributeValues: Record<string, unknown> = {}
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined) continue
+    updateExpressionParts.push(`#${key} = :${key}`)
+    expressionAttributeNames[`#${key}`] = key
+    expressionAttributeValues[`:${key}`] = value
+  }
+
+  try {
+    await dynamoClient.send(
+      new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { formId, leadId },
+        UpdateExpression: `SET ${updateExpressionParts.join(', ')}`,
+        ExpressionAttributeNames: expressionAttributeNames,
+        ExpressionAttributeValues: expressionAttributeValues,
+      })
+    )
+  } catch (error) {
+    throw new Error(
+      `Failed to update sync status for form lead ${leadId}: ${error instanceof Error ? error.message : String(error)}`
     )
   }
 }

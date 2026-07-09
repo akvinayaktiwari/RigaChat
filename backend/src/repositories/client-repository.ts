@@ -96,3 +96,20 @@ export async function updateClient(
     )
   }
 }
+
+export async function removeClientCRMConnection(clientId: string): Promise<void> {
+  try {
+    await dynamoClient.send(
+      new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { clientId },
+        UpdateExpression: 'REMOVE crmConnection SET updatedAt = :updatedAt',
+        ExpressionAttributeValues: { ':updatedAt': new Date().toISOString() },
+      })
+    )
+  } catch (error) {
+    throw new Error(
+      `Failed to remove CRM connection for client ${clientId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
