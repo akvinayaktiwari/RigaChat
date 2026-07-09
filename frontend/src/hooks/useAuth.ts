@@ -1,6 +1,6 @@
 import { createContext, createElement, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { setAuthToken, syncMe } from '../services/api'
+import { confirmSignup, setAuthToken, syncMe } from '../services/api'
 
 export interface AuthUser {
   clientId: string
@@ -20,6 +20,8 @@ interface AuthContextValue extends AuthState {
   login: () => void
   logout: () => void
   handleCallback: (code: string) => Promise<boolean>
+  signUp: (name: string, email: string, password: string) => Promise<void>
+  signIn: (email: string, password: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -27,6 +29,12 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 const COGNITO_DOMAIN = import.meta.env.VITE_COGNITO_DOMAIN
 const COGNITO_CLIENT_ID = import.meta.env.VITE_COGNITO_CLIENT_ID
 const COGNITO_REDIRECT_URI = import.meta.env.VITE_COGNITO_REDIRECT_URI
+
+// Region/URL for direct calls to the Cognito User Pools API (SignUp, InitiateAuth),
+// used by the email/password flow. Separate from COGNITO_DOMAIN, which is the
+// Hosted UI domain used by the Google OAuth flow above.
+const REGION = import.meta.env.VITE_COGNITO_REGION || 'ap-south-1'
+const COGNITO_API_URL = `https://cognito-idp.${REGION}.amazonaws.com/`
 
 interface IdTokenPayload {
   sub: string
@@ -40,6 +48,19 @@ function decodeIdToken(idToken: string): IdTokenPayload {
   return JSON.parse(decoded) as IdTokenPayload
 }
 
+interface CognitoErrorBody {
+  __type?: string
+  message?: string
+}
+
+async function parseCognitoError(response: Response): Promise<CognitoErrorBody> {
+  try {
+    return (await response.json()) as CognitoErrorBody
+  } catch {
+    return {}
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     isAuthenticated: false,
@@ -47,6 +68,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user: null,
     token: null,
   })
+  // Stashed during signUp() so a future email-verification/resend flow has it
+  // on hand. Not part of AuthState/AuthContextValue — internal only for now.
+  const [, setPendingSignupEmail] = useState<string | null>(null)
 
   useEffect(() => {
     // The /auth/callback route (AuthCallbackPage) is solely responsible for
@@ -131,9 +155,109 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = `https://${COGNITO_DOMAIN}/logout?${params.toString()}`
   }
 
+  async function signIn(email: string, password: string): Promise<void> {
+    const response = await fetch(COGNITO_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Amz-Target': 'AWSCognitoIdentityProviderService.InitiateAuth',
+      },
+      body: JSON.stringify({
+        AuthFlow: 'USER_PASSWORD_AUTH',
+        ClientId: COGNITO_CLIENT_ID,
+        AuthParameters: { USERNAME: email, PASSWORD: password },
+      }),
+    })
+
+    if (!response.ok) {
+      const errorBody = await parseCognitoError(response)
+      if (errorBody.__type === 'NotAuthorizedException') {
+        throw new Error('Incorrect email or password')
+      }
+      if (errorBody.__type === 'UserNotFoundException') {
+        throw new Error('No account found with this email')
+      }
+      if (errorBody.__type === 'UserNotConfirmedException') {
+        throw new Error('Please verify your email first')
+      }
+      throw new Error('Sign in failed. Please try again.')
+    }
+
+    const result = (await response.json()) as {
+      AuthenticationResult: { IdToken: string; AccessToken: string; RefreshToken: string }
+    }
+    const idToken = result.AuthenticationResult.IdToken
+    const payload = decodeIdToken(idToken)
+
+    setAuthToken(idToken)
+
+    const meResponse = await syncMe()
+    if (!meResponse.success || !meResponse.data) {
+      throw new Error(meResponse.error ?? 'Failed to sync client record')
+    }
+
+    setState({
+      isAuthenticated: true,
+      isLoading: false,
+      user: {
+        clientId: payload.sub,
+        email: payload.email,
+        name: payload.name ?? payload.email.split('@')[0],
+        plan: meResponse.data.plan,
+      },
+      token: idToken,
+    })
+  }
+
+  async function signUp(name: string, email: string, password: string): Promise<void> {
+    const response = await fetch(COGNITO_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Amz-Target': 'AWSCognitoIdentityProviderService.SignUp',
+      },
+      body: JSON.stringify({
+        ClientId: COGNITO_CLIENT_ID,
+        Username: email,
+        Password: password,
+        UserAttributes: [
+          { Name: 'email', Value: email },
+          { Name: 'name', Value: name },
+        ],
+      }),
+    })
+
+    if (!response.ok) {
+      const errorBody = await parseCognitoError(response)
+      if (errorBody.__type === 'UsernameExistsException') {
+        throw new Error('An account with this email already exists')
+      }
+      if (errorBody.__type === 'InvalidPasswordException') {
+        throw new Error('Password does not meet requirements')
+      }
+      if (errorBody.__type === 'InvalidParameterException') {
+        throw new Error('Please check your details and try again')
+      }
+      throw new Error(errorBody.message ?? 'Sign up failed. Please try again.')
+    }
+
+    setPendingSignupEmail(email)
+
+    // Email verification is out of scope for this sprint. New users land in
+    // Cognito's UNCONFIRMED state, which InitiateAuth rejects with
+    // UserNotConfirmedException — so auto-confirm server-side (via an admin
+    // API call the backend makes on our behalf) before signing them in.
+    const confirmResponse = await confirmSignup(email)
+    if (!confirmResponse.success) {
+      throw new Error(confirmResponse.error ?? 'Failed to confirm account. Please try again.')
+    }
+
+    await signIn(email, password)
+  }
+
   return createElement(
     AuthContext.Provider,
-    { value: { ...state, login, logout, handleCallback } },
+    { value: { ...state, login, logout, handleCallback, signUp, signIn } },
     children
   )
 }

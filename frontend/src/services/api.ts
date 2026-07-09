@@ -125,6 +125,12 @@ export function getMe(): Promise<ApiResponse<ClientRecord>> {
   return apiClient<ClientRecord>('/api/clients/me')
 }
 
+// Auth API
+
+export function confirmSignup(username: string): Promise<ApiResponse<null>> {
+  return apiClient<null>('/api/auth/confirm', 'POST', { username })
+}
+
 // Form API
 
 export function createForm(data: CreateFormInput): Promise<ApiResponse<FormConfig>> {
