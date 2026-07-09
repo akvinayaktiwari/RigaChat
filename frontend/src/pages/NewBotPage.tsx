@@ -12,6 +12,7 @@ import {
   User,
 } from 'lucide-react'
 import { setupBot } from '../services/api'
+import { Toggle } from '../components/Toggle'
 import type { BotConfig, LeadFormField } from '../types/index'
 
 const TOTAL_STEPS = 4
@@ -435,27 +436,18 @@ export default function NewBotPage() {
                             >
                               {isEnabled ? 'Enabled' : 'Disabled'}
                             </span>
-                            <button
-                              type="button"
-                              onClick={() =>
+                            <Toggle
+                              checked={isEnabled}
+                              onChange={(checked) =>
                                 update(
                                   field.fieldId === 'propertyInterest'
                                     ? 'propertyInterestEnabled'
                                     : 'budgetRangeEnabled',
-                                  !isEnabled
+                                  checked
                                 )
                               }
-                              className={`w-11 h-6 rounded-full relative cursor-pointer transition-colors ${
-                                isEnabled ? 'bg-indigo-600' : 'bg-slate-300'
-                              }`}
                               title={`Toggle ${field.label}`}
-                            >
-                              <span
-                                className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform ${
-                                  isEnabled ? 'translate-x-5' : 'translate-x-0.5'
-                                }`}
-                              />
-                            </button>
+                            />
                           </div>
                         )}
                       </div>

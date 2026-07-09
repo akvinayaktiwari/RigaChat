@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, GripVertical, Loader2, Plus, Trash2, X } from 'lucide-react'
 import { createForm } from '../services/api'
+import { Toggle } from '../components/Toggle'
 import type { FormField } from '../types/index'
 
 type FieldType = FormField['type']
@@ -273,23 +274,13 @@ export default function NewFormPage() {
                       )}
 
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-slate-600">Required</span>
-                          <button
-                            type="button"
-                            onClick={() => updateField(field.tempId, 'required', !field.required)}
-                            className={`w-11 h-6 rounded-full relative cursor-pointer transition-colors ${
-                              field.required ? 'bg-indigo-600' : 'bg-slate-300'
-                            }`}
-                            title="Toggle required"
-                          >
-                            <span
-                              className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform ${
-                                field.required ? 'translate-x-5' : 'translate-x-0.5'
-                              }`}
-                            />
-                          </button>
-                        </div>
+                        <Toggle
+                          checked={field.required}
+                          onChange={(checked) => updateField(field.tempId, 'required', checked)}
+                          onLabel="Required"
+                          offLabel="Optional"
+                          title="Toggle required"
+                        />
 
                         <button
                           type="button"
