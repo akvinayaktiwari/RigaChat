@@ -108,3 +108,48 @@ export interface SimilarityResult {
   sourceUrl: string
   score: number
 }
+
+export interface FormField {
+  fieldId: string
+  label: string
+  type: 'text' | 'number' | 'email' | 'phone' | 'options'
+  required: boolean
+  placeholder?: string
+  options?: string[]
+}
+
+export interface FormConfig {
+  formId: string
+  clientId: string
+  name: string
+  description?: string
+  submitButtonText: string
+  fields: FormField[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateFormInput {
+  clientId: string
+  name: string
+  description?: string
+  submitButtonText: string
+  fields: Omit<FormField, 'fieldId'>[]
+}
+
+export interface FormLead {
+  leadId: string
+  formId: string
+  clientId: string
+  source: 'form'
+  customFields: string
+  sourceUrl: string
+  createdAt: string
+}
+
+export interface CreateFormLeadInput {
+  formId: string
+  clientId: string
+  customFields: Record<string, string>
+  sourceUrl: string
+}
