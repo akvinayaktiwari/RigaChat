@@ -15,6 +15,12 @@ import LeadsPage from './src/pages/LeadsPage'
 import LeadDetailPage from './src/pages/LeadDetailPage'
 import KnowledgeBasePage from './src/pages/KnowledgeBasePage'
 import SettingsPage from './src/pages/SettingsPage'
+import FormsPage from './src/pages/FormsPage'
+import NewFormPage from './src/pages/NewFormPage'
+import FormDetailPage from './src/pages/FormDetailPage'
+import FormLeadsPage from './src/pages/FormLeadsPage'
+import FormTestPage from './src/pages/FormTestPage'
+import FormTestPreviewPage from './src/pages/FormTestPreviewPage'
 
 function App() {
   return (
@@ -24,6 +30,8 @@ function App() {
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route path="/widget-test" element={<WidgetTestPage />} />
         <Route path="/widget-test/preview" element={<WidgetTestPreviewPage />} />
+        <Route path="/form-test" element={<FormTestPage />} />
+        <Route path="/form-test/preview" element={<FormTestPreviewPage />} />
         <Route path="/" element={<LandingPage />} />
         <Route
           path="/dashboard"
@@ -37,6 +45,10 @@ function App() {
           <Route path="bots" element={<BotsPage />} />
           <Route path="bots/new" element={<NewBotPage />} />
           <Route path="bots/:botId" element={<BotDetailPage />} />
+          <Route path="forms" element={<FormsPage />} />
+          <Route path="forms/new" element={<NewFormPage />} />
+          <Route path="forms/:formId" element={<FormDetailPage />} />
+          <Route path="forms/:formId/leads" element={<FormLeadsPage />} />
           <Route path="leads" element={<LeadsPage />} />
           <Route path="leads/:leadId" element={<LeadDetailPage />} />
           <Route path="kb/:botId" element={<KnowledgeBasePage />} />

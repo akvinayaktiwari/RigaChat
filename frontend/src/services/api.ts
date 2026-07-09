@@ -3,7 +3,10 @@ import type {
   BotConfig,
   ClientRecord,
   CreateBotInput,
+  CreateFormInput,
   CreateKBEntryInput,
+  FormConfig,
+  FormLead,
   KnowledgeBaseEntry,
   Lead,
   ResyncResult,
@@ -120,4 +123,39 @@ export function syncMe(): Promise<ApiResponse<ClientRecord>> {
 
 export function getMe(): Promise<ApiResponse<ClientRecord>> {
   return apiClient<ClientRecord>('/api/clients/me')
+}
+
+// Form API
+
+export function createForm(data: CreateFormInput): Promise<ApiResponse<FormConfig>> {
+  return apiClient<FormConfig>('/api/forms', 'POST', data)
+}
+
+export function getMyForms(): Promise<ApiResponse<FormConfig[]>> {
+  return apiClient<FormConfig[]>('/api/forms')
+}
+
+export function getFormById(formId: string): Promise<ApiResponse<FormConfig>> {
+  return apiClient<FormConfig>(`/api/forms/${formId}`)
+}
+
+export function updateForm(
+  formId: string,
+  updates: Partial<FormConfig>
+): Promise<ApiResponse<FormConfig>> {
+  return apiClient<FormConfig>(`/api/forms/${formId}`, 'PATCH', updates)
+}
+
+export function deleteForm(formId: string): Promise<ApiResponse<{ message: string }>> {
+  return apiClient<{ message: string }>(`/api/forms/${formId}`, 'DELETE')
+}
+
+// Form Leads API
+
+export function getFormLeads(formId: string): Promise<ApiResponse<FormLead[]>> {
+  return apiClient<FormLead[]>(`/api/forms/leads/form/${formId}`)
+}
+
+export function getAllFormLeads(): Promise<ApiResponse<FormLead[]>> {
+  return apiClient<FormLead[]>('/api/forms/leads/all')
 }

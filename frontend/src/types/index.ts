@@ -123,3 +123,40 @@ export interface UpdateKBInput {
   title: string
   content: string
 }
+
+export interface FormField {
+  fieldId?: string
+  label: string
+  type: 'text' | 'number' | 'email' | 'phone' | 'options'
+  required: boolean
+  placeholder?: string
+  options?: string[]
+}
+
+export interface FormConfig {
+  formId: string
+  clientId: string
+  name: string
+  description?: string
+  submitButtonText: string
+  fields: FormField[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateFormInput {
+  name: string
+  description?: string
+  submitButtonText: string
+  fields: FormField[]
+}
+
+export interface FormLead {
+  leadId: string
+  formId: string
+  clientId: string
+  source: 'form'
+  customFields: string | Record<string, string>
+  sourceUrl: string
+  createdAt: string
+}

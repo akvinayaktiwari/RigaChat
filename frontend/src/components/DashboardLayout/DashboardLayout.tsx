@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth'
 const NAV_LINKS = [
   { to: '/dashboard', label: 'Dashboard', icon: 'dashboard', end: true },
   { to: '/dashboard/bots', label: 'Chatbots', icon: 'smart_toy', end: false },
+  { to: '/dashboard/forms', label: 'Forms', icon: 'list_alt', end: false },
   { to: '/dashboard/leads', label: 'Leads', icon: 'group', end: false },
   { to: '/dashboard/settings', label: 'Settings', icon: 'settings', end: false },
 ]
@@ -13,6 +14,10 @@ function getPageTitle(pathname: string): string {
   if (pathname === '/dashboard/bots/new') return 'New Chatbot'
   if (pathname === '/dashboard/bots') return 'Chatbots'
   if (/^\/dashboard\/bots\/[^/]+$/.test(pathname)) return 'Bot Settings'
+  if (pathname === '/dashboard/forms/new') return 'New Form'
+  if (pathname === '/dashboard/forms') return 'Forms'
+  if (/^\/dashboard\/forms\/[^/]+\/leads$/.test(pathname)) return 'Form Leads'
+  if (/^\/dashboard\/forms\/[^/]+$/.test(pathname)) return 'Edit Form'
   if (pathname === '/dashboard/leads') return 'Leads'
   if (/^\/dashboard\/leads\/[^/]+$/.test(pathname)) return 'Lead Detail'
   if (pathname.startsWith('/dashboard/kb')) return 'Knowledge Base'
