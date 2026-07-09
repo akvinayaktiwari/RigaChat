@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 import { botRoutes } from './bot-routes.js'
 import { chatRoutes } from './chat-routes.js'
 import { clientRoutes } from './client-routes.js'
+import { formRoutes } from './form-routes.js'
 import { kbRoutes } from './kb-routes.js'
 import { leadRoutes } from './lead-routes.js'
 import type { ApiResponse } from '../types/index.js'
@@ -54,6 +55,15 @@ app.use('/api/bots/*', (c, next) => {
   return corsMiddleware(c, next)
 })
 
+// /api/forms/public/:formId and /api/forms/leads are called by form-widget.js from
+// any client's external website, so they need widgetCors. Every other /api/forms/*
+// route is dashboard-only. Same single-dispatch pattern as /api/bots/* above.
+app.use('/api/forms/*', (c, next) => {
+  const isPublicRoute = c.req.path.startsWith('/api/forms/public/') || c.req.path === '/api/forms/leads'
+  const corsMiddleware = isPublicRoute ? widgetCors : dashboardCors
+  return corsMiddleware(c, next)
+})
+
 app.options('*', (c) => c.body(null, 204))
 
 app.get('/health', (c) => {
@@ -69,6 +79,7 @@ app.route('/api/chat', chatRoutes)
 app.route('/api/leads', leadRoutes)
 app.route('/api/kb', kbRoutes)
 app.route('/api/clients', clientRoutes)
+app.route('/api/forms', formRoutes)
 
 app.notFound((c) => {
   return c.json<ApiResponse<null>>({
