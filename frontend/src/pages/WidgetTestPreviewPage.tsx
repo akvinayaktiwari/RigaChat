@@ -12,8 +12,9 @@ export default function WidgetTestPreviewPage() {
     injected.current = true
 
     const cdnUrl = import.meta.env.VITE_CDN_URL
+    const widgetSrc = import.meta.env.DEV ? '/widget.js' : `${cdnUrl}/widget.js`
     const script = document.createElement('script')
-    script.src = `${cdnUrl}/widget.js`
+    script.src = widgetSrc
     script.setAttribute('data-bot-id', botId)
     script.async = true
     document.body.appendChild(script)
