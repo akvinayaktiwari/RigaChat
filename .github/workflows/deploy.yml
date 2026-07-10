@@ -146,14 +146,22 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Inject BACKEND_URL into widget.js
+      - name: Inject BACKEND_URL into widget.js and form-widget.js
         run: |
           sed -i 's|__BACKEND_URL__|${{ secrets.BACKEND_URL }}|g' frontend/dist/widget.js
+          sed -i 's|__BACKEND_URL__|${{ secrets.BACKEND_URL }}|g' frontend/dist/form-widget.js
 
       - name: Upload widget.js to S3
         run: |
           aws s3 cp frontend/dist/widget.js \
             s3://${{ secrets.S3_BUCKET_WIDGET }}/widget.js \
+            --cache-control "public, max-age=3600" \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Upload form-widget.js to S3
+        run: |
+          aws s3 cp frontend/dist/form-widget.js \
+            s3://${{ secrets.S3_BUCKET_WIDGET }}/form-widget.js \
             --cache-control "public, max-age=3600" \
             --region ${{ secrets.AWS_REGION }}
 
