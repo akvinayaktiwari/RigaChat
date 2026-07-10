@@ -6,7 +6,7 @@ export default function Footer() {
       { label: 'Features', href: '#features' },
       { label: 'Pricing', href: '#pricing' },
       { label: 'Dashboard', href: '/dashboard' },
-      { label: 'Product Tour', href: '#' },
+      { label: 'WhatsApp Automation', href: '#' },
     ],
     company: [
       { label: 'About Us', href: '#' },
@@ -17,7 +17,7 @@ export default function Footer() {
     support: [
       { label: 'Help Center', href: '#' },
       { label: 'Community', href: '#' },
-      { label: 'Contact Us', href: '#' },
+      { label: 'Contact Us', href: 'mailto:admin@drsyeta.in' },
       { label: 'System Status', href: '#' },
     ],
   }
@@ -35,8 +35,8 @@ export default function Footer() {
               <span className="font-extrabold text-xl tracking-tight text-on-surface dark:text-white">BeepBoop</span>
             </div>
             <p className="text-on-surface-variant dark:text-outline-variant text-sm max-w-sm leading-relaxed">
-              The next generation of AI-powered customer relationship management. Join 35,000+ businesses growing
-              faster with BeepBoop.
+              AI chatbot that captures leads, sends WhatsApp alerts, and syncs to your CRM automatically. Built for
+              businesses that never want to miss a lead.
             </p>
             <div className="flex gap-3">
               <a
@@ -48,7 +48,7 @@ export default function Footer() {
                 <Share2 className="w-4.5 h-4.5" />
               </a>
               <a
-                href="#"
+                href="mailto:admin@drsyeta.in"
                 className="w-10 h-10 rounded-full bg-white/50 hover:bg-white dark:bg-white/10 dark:hover:bg-white/20 flex items-center justify-center text-primary transition-all hover:-translate-y-0.5 border border-outline-variant/20 shadow-sm"
                 aria-label="Email BeepBoop Support"
                 id="footer-email-link"
