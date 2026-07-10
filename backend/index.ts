@@ -1,6 +1,8 @@
 import { serve } from '@hono/node-server'
 import { handle, streamHandle } from 'hono/aws-lambda'
+import type { LambdaEvent } from 'hono/aws-lambda'
 import { app } from './src/routes/index.js'
+import { sendWeeklyReportsForAllClients } from './src/services/whatsapp-service.js'
 
 // Lambda Function URL only supports one invocation mode (BUFFERED or RESPONSE_STREAM)
 // per function, so this same bundle is deployed to two separate Lambda functions:
@@ -23,7 +25,26 @@ interface LambdaStreamingGlobal {
   awslambda?: { streamifyResponse?: unknown }
 }
 
-export const handler = handle(app)
+// EventBridge Scheduler invokes this Lambda directly (no Function URL event
+// shape) with `source: 'aws.events'` and a custom detail-type identifying the
+// job. Function URL invocations never carry that shape, so branching on it
+// here lets one Lambda serve both the HTTP app and the weekly-report cron
+// without a new function or new deploy pipeline entry.
+interface ScheduledEvent {
+  source?: string
+  'detail-type'?: string
+}
+
+const bufferedHandler = handle(app)
+
+export const handler = async (event: LambdaEvent | ScheduledEvent, lambdaContext?: Parameters<typeof bufferedHandler>[1]) => {
+  if ('source' in event && event.source === 'aws.events' && event['detail-type'] === 'whatsapp-weekly-report') {
+    await sendWeeklyReportsForAllClients()
+    return
+  }
+
+  return bufferedHandler(event as LambdaEvent, lambdaContext)
+}
 
 const hasStreamingRuntime =
   typeof (globalThis as LambdaStreamingGlobal).awslambda?.streamifyResponse === 'function'

@@ -3,7 +3,8 @@ import { getCookie, setCookie } from 'hono/cookie'
 import { requireAuth, requireAuthFromQuery } from '../lib/cognito.js'
 import { zohoProvider } from '../providers/zoho-provider.js'
 import { connectZohoCRM, disconnectCRM, getCRMStatus } from '../services/crm-service.js'
-import type { ApiResponse, CRMConnection } from '../types/index.js'
+import { connectGupshup, disconnectWhatsApp, getWhatsAppStatus } from '../services/whatsapp-service.js'
+import type { ApiResponse, CRMConnection, WhatsAppConnection } from '../types/index.js'
 
 interface AuthEnv {
   Variables: {
@@ -75,6 +76,51 @@ integrationRoutes.get('/status', requireAuth, async (c) => {
   try {
     const status = await getCRMStatus(clientId)
     return c.json<ApiResponse<CRMConnection | null>>({ success: true, data: status }, 200)
+  } catch (error) {
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+interface ConnectWhatsAppBody {
+  apiKey: string
+  appName: string
+  sourceNumber: string
+  notificationNumber: string
+}
+
+integrationRoutes.post('/whatsapp/connect', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const body = await c.req.json<ConnectWhatsAppBody>()
+
+  if (!body.apiKey?.trim() || !body.appName?.trim() || !body.sourceNumber?.trim() || !body.notificationNumber?.trim()) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'All WhatsApp fields are required' }, 400)
+  }
+
+  try {
+    await connectGupshup(clientId, body)
+    return c.json<ApiResponse<{ success: boolean }>>({ success: true, data: { success: true } }, 200)
+  } catch (error) {
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+integrationRoutes.delete('/whatsapp/disconnect', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+
+  try {
+    await disconnectWhatsApp(clientId)
+    return c.json<ApiResponse<{ success: boolean }>>({ success: true, data: { success: true } }, 200)
+  } catch (error) {
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+integrationRoutes.get('/whatsapp/status', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+
+  try {
+    const status = await getWhatsAppStatus(clientId)
+    return c.json<ApiResponse<Omit<WhatsAppConnection, 'apiKeyEncrypted'> | null>>({ success: true, data: status }, 200)
   } catch (error) {
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }

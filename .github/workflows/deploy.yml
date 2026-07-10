@@ -54,7 +54,8 @@ jobs:
             --query 'Environment.Variables' --output json | jq \
             --arg whatsapp_provider "${{ vars.WHATSAPP_PROVIDER }}" \
             --arg whatsapp_master_number "${{ secrets.WHATSAPP_MASTER_NUMBER }}" \
-            '. + {WHATSAPP_PROVIDER: $whatsapp_provider, WHATSAPP_MASTER_NUMBER: $whatsapp_master_number}')
+            --arg whatsapp_kms_key_id "${{ secrets.WHATSAPP_KMS_KEY_ID }}" \
+            '. + {WHATSAPP_PROVIDER: $whatsapp_provider, WHATSAPP_MASTER_NUMBER: $whatsapp_master_number, WHATSAPP_KMS_KEY_ID: $whatsapp_kms_key_id}')
           aws lambda update-function-configuration \
             --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
             --region ${{ secrets.AWS_REGION }} \
@@ -87,7 +88,8 @@ jobs:
             --query 'Environment.Variables' --output json | jq \
             --arg whatsapp_provider "${{ vars.WHATSAPP_PROVIDER }}" \
             --arg whatsapp_master_number "${{ secrets.WHATSAPP_MASTER_NUMBER }}" \
-            '. + {WHATSAPP_PROVIDER: $whatsapp_provider, WHATSAPP_MASTER_NUMBER: $whatsapp_master_number}')
+            --arg whatsapp_kms_key_id "${{ secrets.WHATSAPP_KMS_KEY_ID }}" \
+            '. + {WHATSAPP_PROVIDER: $whatsapp_provider, WHATSAPP_MASTER_NUMBER: $whatsapp_master_number, WHATSAPP_KMS_KEY_ID: $whatsapp_kms_key_id}')
           aws lambda update-function-configuration \
             --function-name ${{ secrets.LAMBDA_STREAMING_FUNCTION_NAME }} \
             --region ${{ secrets.AWS_REGION }} \
