@@ -6,7 +6,7 @@ export default function FeatureTwo() {
   const [activeCard, setActiveCard] = useState<'crawler' | 'knowledge'>('crawler')
 
   return (
-    <section className="py-24 px-6 lg:px-8 bg-surface-container-lowest" id="support">
+    <section className="py-24 px-6 lg:px-8 bg-surface-container-lowest" id="knowledge">
       <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
         {/* Left Column: Graphic Illustration */}
         <div className="flex justify-center relative">
