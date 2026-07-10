@@ -3,10 +3,10 @@ import { Share2, Mail } from 'lucide-react'
 export default function Footer() {
   const links = {
     product: [
-      { label: 'Features', href: '#features' },
-      { label: 'Pricing', href: '#pricing' },
+      { label: 'Features', href: '/#features' },
+      { label: 'Pricing', href: '/#pricing' },
       { label: 'Dashboard', href: '/dashboard' },
-      { label: 'WhatsApp Automation', href: '#whatsapp' },
+      { label: 'WhatsApp Automation', href: '/#whatsapp' },
     ],
     company: [
       { label: 'About Us', href: '/about-us' },

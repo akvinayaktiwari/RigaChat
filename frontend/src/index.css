@@ -66,6 +66,10 @@
   border-top: 1px solid #e5e7eb;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
   background-color: #F8FAFC;

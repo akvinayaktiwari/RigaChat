@@ -58,35 +58,35 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-8">
               <a
-                href="#features"
+                href="/#features"
                 className={activeSection === 'features' ? NAV_ACTIVE_CLASS : NAV_INACTIVE_CLASS}
                 id="nav-link-product"
               >
                 Features
               </a>
               <a
-                href="#knowledge"
+                href="/#knowledge"
                 className={activeSection === 'knowledge' ? NAV_ACTIVE_CLASS : NAV_INACTIVE_CLASS}
                 id="nav-link-knowledge"
               >
                 Knowledge Base
               </a>
               <a
-                href="#whatsapp"
+                href="/#whatsapp"
                 className={activeSection === 'whatsapp' ? NAV_ACTIVE_CLASS : NAV_INACTIVE_CLASS}
                 id="nav-link-whatsapp"
               >
                 WhatsApp
               </a>
               <a
-                href="#testimonials"
+                href="/#testimonials"
                 className={activeSection === 'testimonials' ? NAV_ACTIVE_CLASS : NAV_INACTIVE_CLASS}
                 id="nav-link-testimonials"
               >
                 Testimonials
               </a>
               <a
-                href="#pricing"
+                href="/#pricing"
                 className={activeSection === 'pricing' ? NAV_ACTIVE_CLASS : NAV_INACTIVE_CLASS}
                 id="nav-link-pricing-section"
               >
@@ -159,7 +159,7 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
                 <p className="text-xs font-bold text-outline uppercase tracking-wider">Navigation</p>
                 <div className="flex flex-col gap-4">
                   <a
-                    href="#features"
+                    href="/#features"
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-3 text-lg font-bold text-primary py-2 border-b border-outline-variant/10"
                     id="mobile-nav-product"
