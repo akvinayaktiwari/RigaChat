@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Bot, FileText, LayoutDashboard, type LucideIcon, MessageSquare, Settings, Users } from 'lucide-react'
+import { Bell, Bot, FileText, LayoutDashboard, LogOut, type LucideIcon, MessageSquare, Settings, Users } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 
 const NAV_LINKS: { to: string; label: string; icon: LucideIcon; end: boolean }[] = [
@@ -55,12 +55,7 @@ export function DashboardLayout() {
       <aside className="glass-sidebar fixed left-0 top-0 h-screen w-60 flex flex-col py-8 px-4 z-50">
         <div className="flex items-center gap-3 px-2 mb-10">
           <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-inner">
-            <span
-              className="material-symbols-outlined text-[#6366F1] text-2xl"
-              style={{ fontVariationSettings: "'FILL' 1" }}
-            >
-              chat_bubble
-            </span>
+            <MessageSquare className="w-6 h-6 text-[#6366F1] fill-[#6366F1]" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-white tracking-tight leading-tight">
@@ -104,7 +99,7 @@ export function DashboardLayout() {
                 title="Logout"
                 className="text-slate-400 hover:text-white transition-colors flex-shrink-0"
               >
-                <span className="material-symbols-outlined text-[20px]">logout</span>
+                <LogOut className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -121,7 +116,7 @@ export function DashboardLayout() {
             className="relative w-10 h-10 flex items-center justify-center rounded-full text-slate-500 hover:text-indigo-600 hover:bg-slate-50 transition-all"
             title="Notifications"
           >
-            <span className="material-symbols-outlined">notifications</span>
+            <Bell className="w-5 h-5" />
           </button>
 
           <div className="flex items-center gap-3">
