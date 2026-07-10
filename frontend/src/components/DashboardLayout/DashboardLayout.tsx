@@ -1,13 +1,14 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Bot, FileText, LayoutDashboard, type LucideIcon, MessageSquare, Settings, Users } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 
-const NAV_LINKS = [
-  { to: '/dashboard', label: 'Dashboard', icon: 'dashboard', end: true },
-  { to: '/dashboard/bots', label: 'Chatbots', icon: 'smart_toy', end: false },
-  { to: '/dashboard/forms', label: 'Forms', icon: 'list_alt', end: false },
-  { to: '/dashboard/leads', label: 'Leads', icon: 'group', end: false },
-  { to: '/dashboard/whatsapp', label: 'WhatsApp', icon: 'chat', end: false },
-  { to: '/dashboard/settings', label: 'Settings', icon: 'settings', end: false },
+const NAV_LINKS: { to: string; label: string; icon: LucideIcon; end: boolean }[] = [
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/dashboard/bots', label: 'Chatbots', icon: Bot, end: false },
+  { to: '/dashboard/forms', label: 'Forms', icon: FileText, end: false },
+  { to: '/dashboard/leads', label: 'Leads', icon: Users, end: false },
+  { to: '/dashboard/whatsapp', label: 'WhatsApp', icon: MessageSquare, end: false },
+  { to: '/dashboard/settings', label: 'Settings', icon: Settings, end: false },
 ]
 
 function getPageTitle(pathname: string): string {
@@ -70,12 +71,20 @@ export function DashboardLayout() {
         </div>
 
         <nav className="flex-1 space-y-1">
-          {NAV_LINKS.map((link) => (
-            <NavLink key={link.to} to={link.to} end={link.end} className={({ isActive }) => navLinkClasses(isActive)}>
-              <span className="material-symbols-outlined">{link.icon}</span>
-              <span className="text-sm tracking-wide">{link.label}</span>
-            </NavLink>
-          ))}
+          {NAV_LINKS.map((link) => {
+            const Icon = link.icon
+            return (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                end={link.end}
+                className={({ isActive }) => navLinkClasses(isActive)}
+              >
+                <Icon className="w-5 h-5 shrink-0" />
+                <span className="text-sm tracking-wide">{link.label}</span>
+              </NavLink>
+            )
+          })}
         </nav>
 
         <div className="space-y-4">
