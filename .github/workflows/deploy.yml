@@ -46,6 +46,26 @@ jobs:
             --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
             --region ${{ secrets.AWS_REGION }}
 
+      - name: Update main Lambda environment variables
+        run: |
+          MERGED_ENV=$(aws lambda get-function-configuration \
+            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }} \
+            --query 'Environment.Variables' --output json | jq \
+            --arg whatsapp_provider "${{ vars.WHATSAPP_PROVIDER }}" \
+            --arg whatsapp_master_number "${{ secrets.WHATSAPP_MASTER_NUMBER }}" \
+            '. + {WHATSAPP_PROVIDER: $whatsapp_provider, WHATSAPP_MASTER_NUMBER: $whatsapp_master_number}')
+          aws lambda update-function-configuration \
+            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }} \
+            --environment "{\"Variables\":$MERGED_ENV}"
+
+      - name: Wait for main Lambda environment update
+        run: |
+          aws lambda wait function-updated \
+            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }}
+
       - name: Deploy to streaming Lambda
         run: |
           aws lambda update-function-code \
@@ -54,6 +74,26 @@ jobs:
             --region ${{ secrets.AWS_REGION }}
 
       - name: Wait for streaming Lambda update
+        run: |
+          aws lambda wait function-updated \
+            --function-name ${{ secrets.LAMBDA_STREAMING_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Update streaming Lambda environment variables
+        run: |
+          MERGED_ENV=$(aws lambda get-function-configuration \
+            --function-name ${{ secrets.LAMBDA_STREAMING_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }} \
+            --query 'Environment.Variables' --output json | jq \
+            --arg whatsapp_provider "${{ vars.WHATSAPP_PROVIDER }}" \
+            --arg whatsapp_master_number "${{ secrets.WHATSAPP_MASTER_NUMBER }}" \
+            '. + {WHATSAPP_PROVIDER: $whatsapp_provider, WHATSAPP_MASTER_NUMBER: $whatsapp_master_number}')
+          aws lambda update-function-configuration \
+            --function-name ${{ secrets.LAMBDA_STREAMING_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }} \
+            --environment "{\"Variables\":$MERGED_ENV}"
+
+      - name: Wait for streaming Lambda environment update
         run: |
           aws lambda wait function-updated \
             --function-name ${{ secrets.LAMBDA_STREAMING_FUNCTION_NAME }} \
