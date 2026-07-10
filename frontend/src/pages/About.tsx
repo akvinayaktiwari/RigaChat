@@ -28,16 +28,28 @@ const STATS: StatItem[] = [
   { value: '100%', label: 'Data Encrypted at Rest', icon: 'MessageCircle' },
 ]
 
-const FOUNDER: FounderInfo = {
-  name: 'Vinayak Tiwari',
-  role: 'Founder & Builder',
-  description:
-    'Built BeepBoop to help businesses capture every lead automatically. Full-stack engineer and performance marketer at Drsyeta Corp, Bangalore.',
-  avatarGradient: 'from-purple-600 to-indigo-500',
-  github: 'akvinayaktiwari',
-  linkedin: 'akvinayaktiwari',
-  twitter: 'akvinayaktiwari',
-}
+const FOUNDERS: FounderInfo[] = [
+  {
+    name: 'Vinayak Tiwari',
+    role: 'Founder & Builder',
+    description:
+      'Built BeepBoop to help businesses capture every lead automatically. Full-stack engineer at Drsyeta Corp, Bangalore.',
+    avatarGradient: 'from-purple-600 to-indigo-500',
+    github: 'akvinayaktiwari',
+    linkedin: 'akvinayaktiwari',
+    twitter: 'akvinayaktiwari',
+  },
+  {
+    name: 'Adarsh Jee Pandey',
+    role: 'Co-Founder & Performance Marketer',
+    description:
+      'Drives growth and customer acquisition for BeepBoop. Performance marketer at Drsyeta Corp, Bangalore.',
+    avatarGradient: 'from-emerald-600 to-teal-500',
+    github: 'adarshgpandey',
+    linkedin: 'adarshgpandey',
+    twitter: 'adarshgpandey',
+  },
+]
 
 function renderStatIcon(icon: StatItem['icon']) {
   switch (icon) {
@@ -238,26 +250,36 @@ function FounderSocialLinks({ founder }: { founder: FounderInfo }) {
   )
 }
 
+function FounderCard({ founder }: { founder: FounderInfo }) {
+  return (
+    <div className="bg-white border border-outline-variant/30 rounded-2xl p-6 shadow-xs hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col items-center text-center">
+      <div
+        className={`w-28 h-28 rounded-full bg-gradient-to-tr ${founder.avatarGradient} flex items-center justify-center text-white text-3xl font-black shadow-inner uppercase mb-5`}
+      >
+        {founder.name.split(' ').map((n) => n[0]).join('')}
+      </div>
+      <h4 className="font-bold text-base text-on-surface leading-tight">{founder.name}</h4>
+      <p className="text-xs text-outline font-semibold tracking-wider uppercase mt-1">{founder.role}</p>
+      <p className="text-xs md:text-sm text-on-surface-variant mt-3 leading-relaxed">{founder.description}</p>
+      <div className="h-px bg-outline-variant/30 w-full my-4" />
+      <FounderSocialLinks founder={founder} />
+    </div>
+  )
+}
+
 function TeamSection() {
   return (
     <section className="mb-16 max-w-7xl mx-auto">
       <div className="text-center max-w-2xl mx-auto mb-12">
         <span className="text-xs font-bold uppercase tracking-widest text-primary bg-primary/10 px-3 py-1.5 rounded-full">
-          The Builder Behind The AI
+          The Builders Behind The AI
         </span>
-        <h2 className="text-3xl md:text-4xl font-extrabold text-on-surface mt-4 tracking-tight">Meet the Founder</h2>
+        <h2 className="text-3xl md:text-4xl font-extrabold text-on-surface mt-4 tracking-tight">Meet the Founders</h2>
       </div>
-      <div className="max-w-sm mx-auto bg-white border border-outline-variant/30 rounded-2xl p-6 shadow-xs hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col items-center text-center">
-        <div
-          className={`w-28 h-28 rounded-full bg-gradient-to-tr ${FOUNDER.avatarGradient} flex items-center justify-center text-white text-3xl font-black shadow-inner uppercase mb-5`}
-        >
-          {FOUNDER.name.split(' ').map((n) => n[0]).join('')}
-        </div>
-        <h4 className="font-bold text-base text-on-surface leading-tight">{FOUNDER.name}</h4>
-        <p className="text-xs text-outline font-semibold tracking-wider uppercase mt-1">{FOUNDER.role}</p>
-        <p className="text-xs md:text-sm text-on-surface-variant mt-3 leading-relaxed">{FOUNDER.description}</p>
-        <div className="h-px bg-outline-variant/30 w-full my-4" />
-        <FounderSocialLinks founder={FOUNDER} />
+      <div className="max-w-2xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-6">
+        {FOUNDERS.map((founder) => (
+          <FounderCard key={founder.name} founder={founder} />
+        ))}
       </div>
     </section>
   )

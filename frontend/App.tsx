@@ -42,10 +42,10 @@ function App() {
         <Route path="/form-test" element={<FormTestPage />} />
         <Route path="/form-test/preview" element={<FormTestPreviewPage />} />
         <Route path="/" element={<LandingPage />} />
-        <Route path="/about" element={<About />} />
+        <Route path="/about-us" element={<About />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/help" element={<Help />} />
-        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/privacy-policy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/status" element={<Status />} />
         <Route

@@ -9,7 +9,7 @@ export default function Footer() {
       { label: 'WhatsApp Automation', href: '#whatsapp' },
     ],
     company: [
-      { label: 'About Us', href: '/about' },
+      { label: 'About Us', href: '/about-us' },
       { label: 'Careers', href: 'mailto:admin@drsyeta.in' },
     ],
     support: [
@@ -103,7 +103,7 @@ export default function Footer() {
             © 2026 BeepBoop by Drsyeta Corp. All rights reserved.
           </p>
           <div className="flex gap-8 text-sm text-on-surface-variant dark:text-outline-variant font-medium">
-            <a href="/privacy" className="hover:text-primary transition-colors">
+            <a href="/privacy-policy" className="hover:text-primary transition-colors">
               Privacy Policy
             </a>
             <a href="/terms" className="hover:text-primary transition-colors">
