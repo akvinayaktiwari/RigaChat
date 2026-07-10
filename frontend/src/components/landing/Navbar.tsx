@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Menu, X, ArrowRight, MessageSquare } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
@@ -7,9 +7,40 @@ interface NavbarProps {
   onOpenDemo: () => void
 }
 
+const NAV_ACTIVE_CLASS = 'text-sm font-semibold text-primary border-b-2 border-primary py-1.5 px-0.5'
+const NAV_INACTIVE_CLASS = 'text-sm font-semibold text-on-surface-variant hover:text-primary transition-colors py-1.5'
+
 export default function Navbar({ onOpenDemo }: NavbarProps) {
   const navigate = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [activeSection, setActiveSection] = useState('')
+
+  useEffect(() => {
+    const sections = ['features', 'whatsapp', 'pricing']
+
+    function handleScroll() {
+      const scrollPosition = window.scrollY + 100
+
+      for (const section of sections) {
+        const element = document.getElementById(section)
+        if (!element) continue
+
+        const { offsetTop, offsetHeight } = element
+        if (scrollPosition >= offsetTop && scrollPosition < offsetTop + offsetHeight) {
+          setActiveSection(section)
+          return
+        }
+      }
+
+      if (window.scrollY < 100) {
+        setActiveSection('')
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    handleScroll()
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   return (
     <>
@@ -26,10 +57,18 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-8">
-              <a href="#features" className="text-sm font-semibold text-primary border-b-2 border-primary py-1.5 px-0.5" id="nav-link-product">
+              <a
+                href="#features"
+                className={activeSection === 'features' ? NAV_ACTIVE_CLASS : NAV_INACTIVE_CLASS}
+                id="nav-link-product"
+              >
                 Features
               </a>
-              <a href="#pricing" className="text-sm font-semibold text-on-surface-variant hover:text-primary transition-colors py-1.5" id="nav-link-pricing-section">
+              <a
+                href="#pricing"
+                className={activeSection === 'pricing' ? NAV_ACTIVE_CLASS : NAV_INACTIVE_CLASS}
+                id="nav-link-pricing-section"
+              >
                 Pricing
               </a>
             </div>
