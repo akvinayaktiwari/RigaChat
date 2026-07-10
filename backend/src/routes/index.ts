@@ -8,6 +8,7 @@ import { formRoutes } from './form-routes.js'
 import { integrationRoutes } from './integration-routes.js'
 import { kbRoutes } from './kb-routes.js'
 import { leadRoutes } from './lead-routes.js'
+import { webhookRoutes } from './webhooks.js'
 import type { ApiResponse } from '../types/index.js'
 
 export const app = new Hono()
@@ -89,6 +90,7 @@ app.route('/api/kb', kbRoutes)
 app.route('/api/clients', clientRoutes)
 app.route('/api/forms', formRoutes)
 app.route('/api/integrations', integrationRoutes)
+app.route('/api/webhooks', webhookRoutes)
 
 app.notFound((c) => {
   return c.json<ApiResponse<null>>({
