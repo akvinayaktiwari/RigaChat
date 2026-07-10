@@ -1,6 +1,0 @@
-{
-  "name": "RigaChat",
-  "description": "AI-Powered CRM and Live Chat Landing Page that turns conversations into revenue.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
