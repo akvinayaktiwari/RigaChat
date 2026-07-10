@@ -147,7 +147,7 @@ export default function DashboardHome() {
       {!loading && bots.length === 0 ? (
         <div className="py-16 flex flex-col items-center text-center">
           <Bot className="text-indigo-300 mx-auto mb-4" size={64} />
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">Welcome to RigaChat</h2>
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">Welcome to BeepBoop</h2>
           <p className="text-slate-500 mb-6 text-center max-w-md">
             Set up your first chatbot to start capturing leads from your website
           </p>

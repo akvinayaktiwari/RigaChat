@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Widget Embed Test — RigaChat</title>
+  <title>Widget Embed Test — BeepBoop</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -104,7 +104,7 @@
       <h1>Find your next home with Acme</h1>
       <p>
         This is a mock client website used only to verify that the widget
-        embed snippet copied from the RigaChat dashboard actually works when
+        embed snippet copied from the BeepBoop dashboard actually works when
         dropped onto a real page — same script tag, same CDN, same flow a
         client would use.
       </p>
@@ -132,12 +132,12 @@
         return;
       }
 
-      var existing = document.getElementById('rigachat-widget-script');
+      var existing = document.getElementById('beepboop-widget-script');
       if (existing) existing.remove();
 
       // Exact same snippet shape as EmbedSnippet.tsx generates.
       var script = document.createElement('script');
-      script.id = 'rigachat-widget-script';
+      script.id = 'beepboop-widget-script';
       script.src = cdnUrl + '/widget.js';
       script.setAttribute('data-bot-id', botId);
       script.async = true;

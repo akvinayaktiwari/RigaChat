@@ -1,4 +1,4 @@
-# RigaChat
+# BeepBoop
 
 Embeddable AI chatbot SaaS platform. Clients train a chatbot on their website content and a custom knowledge base; captured leads flow into a built-in CRM inside the dashboard.
 

@@ -54,13 +54,11 @@ export function DashboardLayout() {
       {/* Sidebar */}
       <aside className="glass-sidebar fixed left-0 top-0 h-screen w-60 flex flex-col py-8 px-4 z-50">
         <div className="flex items-center gap-3 px-2 mb-10">
-          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-inner">
-            <MessageSquare className="w-6 h-6 text-[#6366F1] fill-[#6366F1]" />
+          <div className="w-10 h-10 rounded-xl cta-accent flex items-center justify-center text-white font-black text-lg shadow-sm">
+            B
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white tracking-tight leading-tight">
-              RigaChat<span className="text-[#6366F1]">.ai</span>
-            </h1>
+            <h1 className="text-xl font-bold text-white tracking-tight leading-tight">BeepBoop</h1>
             <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400">Real Estate AI</p>
           </div>
         </div>

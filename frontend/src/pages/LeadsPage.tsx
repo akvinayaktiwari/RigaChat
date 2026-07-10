@@ -123,7 +123,7 @@ export default function LeadsPage() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'rigachat-leads.csv'
+    a.download = 'beepboop-leads.csv'
     a.click()
     URL.revokeObjectURL(url)
   }
