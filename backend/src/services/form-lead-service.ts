@@ -6,6 +6,7 @@ import {
 } from '../repositories/form-lead-repository.js'
 import { getPublicConfig } from './form-service.js'
 import { syncFormLeadToCRM } from './crm-service.js'
+import { sendLeadNotification } from './whatsapp-service.js'
 import type { CreateFormLeadInput, FormLead } from '../types/index.js'
 
 function parseFormLead(lead: FormLead): FormLead {
@@ -33,6 +34,14 @@ export async function captureFormLead(input: CreateFormLeadInput): Promise<FormL
   // Fire-and-forget: CRM sync never blocks or fails lead capture.
   syncFormLeadToCRM(createdLead, input.formId, input.clientId).catch((err) => {
     console.error('CRM sync error:', err)
+  })
+
+  // Fire-and-forget: WhatsApp notification never blocks or fails lead capture.
+  const fieldsSummary = Object.entries(input.customFields)
+    .map(([key, value]) => `${key}: ${value}`)
+    .join('\n')
+  sendLeadNotification(input.clientId, `${fieldsSummary}\nSource: ${input.sourceUrl}`).catch((err) => {
+    console.error('WhatsApp notification error:', err)
   })
 
   return createdLead

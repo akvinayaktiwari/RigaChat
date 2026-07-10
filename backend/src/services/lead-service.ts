@@ -5,6 +5,7 @@ import {
   getLeadsByClientId,
 } from '../repositories/lead-repository.js'
 import { markLeadCaptured } from '../repositories/conversation-repository.js'
+import { sendLeadNotification } from './whatsapp-service.js'
 import type { Lead } from '../types/index.js'
 
 interface CreateLeadInput {
@@ -35,6 +36,11 @@ export async function captureLead(input: CreateLeadInput): Promise<Lead> {
     })
 
     await markLeadCaptured(input.botId, input.conversationId)
+
+    // Fire-and-forget: WhatsApp notification never blocks or fails lead capture.
+    sendLeadNotification(input.clientId, `Name: ${lead.name}\nPhone: ${lead.phone}\nSource: ${lead.sourceUrl}`).catch(
+      (err) => console.error('WhatsApp notification error:', err)
+    )
 
     return lead
   } catch (error) {
