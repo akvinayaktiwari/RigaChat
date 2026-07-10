@@ -59,7 +59,7 @@ export function DashboardLayout() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-white tracking-tight leading-tight">BeepBoop</h1>
-            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400">Real Estate AI</p>
+            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400">Conversational Agents</p>
           </div>
         </div>
 
