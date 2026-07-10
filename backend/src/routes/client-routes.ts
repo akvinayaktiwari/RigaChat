@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { requireAuth } from '../lib/cognito.js'
-import { getClient, upgradeClientPlan, upsertClient } from '../services/client-service.js'
+import { getClient, updateClientProfile, upgradeClientPlan, upsertClient } from '../services/client-service.js'
 import type { ApiResponse, ClientRecord } from '../types/index.js'
 
 interface AuthEnv {
@@ -15,6 +15,10 @@ const VALID_PLANS: ClientRecord['plan'][] = ['starter', 'growth', 'agency']
 
 interface UpgradePlanBody {
   plan?: string
+}
+
+interface UpdateProfileBody {
+  name?: string
 }
 
 function errorMessage(error: unknown): string {
@@ -46,6 +50,22 @@ clientRoutes.get('/me', requireAuth, async (c) => {
     if (error instanceof Error && error.message === 'Client not found') {
       return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
     }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+clientRoutes.patch('/me', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const body = await c.req.json<UpdateProfileBody>()
+
+  if (!body.name || !body.name.trim()) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'name is required' }, 400)
+  }
+
+  try {
+    const client = await updateClientProfile(clientId, body.name.trim())
+    return c.json<ApiResponse<ClientRecord>>({ success: true, data: client }, 200)
+  } catch (error) {
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }
 })

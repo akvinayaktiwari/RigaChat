@@ -37,6 +37,16 @@ export async function getClient(clientId: string): Promise<ClientRecord> {
   return client
 }
 
+export async function updateClientProfile(clientId: string, name: string): Promise<ClientRecord> {
+  try {
+    return await updateClient(clientId, { name })
+  } catch (error) {
+    throw new Error(
+      `Failed to update profile for client ${clientId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
 export async function upgradeClientPlan(
   clientId: string,
   plan: ClientRecord['plan']
