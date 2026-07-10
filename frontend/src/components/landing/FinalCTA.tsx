@@ -57,9 +57,13 @@ export default function FinalCTA() {
         </div>
 
         {/* Integration micro icons */}
-        <div className="mt-20 flex flex-wrap justify-center gap-8 md:gap-10 opacity-30 hover:opacity-100 transition-opacity duration-500">
+        <div className="mt-20 flex flex-wrap justify-center gap-8 md:gap-10">
           {integrationIcons.map((item, index) => (
-            <div key={index} className="flex flex-col items-center gap-2" title={item.label}>
+            <div
+              key={index}
+              className="flex flex-col items-center gap-2 opacity-30 hover:opacity-100 transition-opacity duration-300"
+              title={item.label}
+            >
               <item.Icon className="w-8 h-8 text-white stroke-[1.5]" />
               <span className="text-[10px] font-bold uppercase tracking-wider text-outline-variant select-none hidden md:block">
                 {item.label}
