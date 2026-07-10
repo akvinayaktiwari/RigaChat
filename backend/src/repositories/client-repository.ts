@@ -1,4 +1,4 @@
-import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand, PutCommand, QueryCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import type { ClientRecord } from '../types/index.js'
 
@@ -110,6 +110,49 @@ export async function removeClientCRMConnection(clientId: string): Promise<void>
   } catch (error) {
     throw new Error(
       `Failed to remove CRM connection for client ${clientId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
+export async function removeClientWhatsAppConnection(clientId: string): Promise<void> {
+  try {
+    await dynamoClient.send(
+      new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { clientId },
+        UpdateExpression: 'REMOVE whatsappConnection SET updatedAt = :updatedAt',
+        ExpressionAttributeValues: { ':updatedAt': new Date().toISOString() },
+      })
+    )
+  } catch (error) {
+    throw new Error(
+      `Failed to remove WhatsApp connection for client ${clientId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
+export async function getConnectedWhatsAppClients(): Promise<ClientRecord[]> {
+  try {
+    const clients: ClientRecord[] = []
+    let exclusiveStartKey: Record<string, unknown> | undefined
+
+    do {
+      const result = await dynamoClient.send(
+        new ScanCommand({
+          TableName: TABLE_NAME,
+          FilterExpression: 'whatsappConnection.connected = :connected',
+          ExpressionAttributeValues: { ':connected': true },
+          ExclusiveStartKey: exclusiveStartKey,
+        })
+      )
+      clients.push(...((result.Items as ClientRecord[] | undefined) ?? []))
+      exclusiveStartKey = result.LastEvaluatedKey
+    } while (exclusiveStartKey)
+
+    return clients
+  } catch (error) {
+    throw new Error(
+      `Failed to scan for WhatsApp-connected clients: ${error instanceof Error ? error.message : String(error)}`
     )
   }
 }
