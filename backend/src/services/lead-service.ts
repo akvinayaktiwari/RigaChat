@@ -37,8 +37,12 @@ export async function captureLead(input: CreateLeadInput): Promise<Lead> {
 
     await markLeadCaptured(input.botId, input.conversationId)
 
-    // Fire-and-forget: WhatsApp notification never blocks or fails lead capture.
-    sendLeadNotification(input.clientId, `Name: ${lead.name}\nPhone: ${lead.phone}\nSource: ${lead.sourceUrl}`).catch(
+    // Never fails lead capture (sendLeadNotification always resolves, never
+    // throws) — but must be awaited, not truly fire-and-forget: AWS Lambda
+    // freezes the execution environment as soon as the handler's response
+    // promise resolves, so an un-awaited async call here would be aborted
+    // mid-flight before the KMS decrypt / Gupshup request ever completed.
+    await sendLeadNotification(input.clientId, `Name: ${lead.name}\nPhone: ${lead.phone}\nSource: ${lead.sourceUrl}`).catch(
       (err) => console.error('WhatsApp notification error:', err)
     )
 

@@ -36,11 +36,15 @@ export async function captureFormLead(input: CreateFormLeadInput): Promise<FormL
     console.error('CRM sync error:', err)
   })
 
-  // Fire-and-forget: WhatsApp notification never blocks or fails lead capture.
+  // Never fails lead capture (sendLeadNotification always resolves, never
+  // throws) — but must be awaited, not truly fire-and-forget: AWS Lambda
+  // freezes the execution environment as soon as the handler's response
+  // promise resolves, so an un-awaited async call here would be aborted
+  // mid-flight before the KMS decrypt / Gupshup request ever completed.
   const fieldsSummary = Object.entries(input.customFields)
     .map(([key, value]) => `${key}: ${value}`)
     .join('\n')
-  sendLeadNotification(input.clientId, `${fieldsSummary}\nSource: ${input.sourceUrl}`).catch((err) => {
+  await sendLeadNotification(input.clientId, `${fieldsSummary}\nSource: ${input.sourceUrl}`).catch((err) => {
     console.error('WhatsApp notification error:', err)
   })
 

@@ -1,6 +1,6 @@
 import { gupshupProvider } from '../providers/gupshup-provider.js'
 import { decrypt, encrypt } from '../lib/kms.js'
-import type { WhatsAppCredentials, WhatsAppProvider } from '../lib/whatsapp-provider.js'
+import type { WhatsAppCredentials, WhatsAppProvider, WhatsAppSendResult } from '../lib/whatsapp-provider.js'
 import {
   getClientById,
   getConnectedWhatsAppClients,
@@ -36,20 +36,23 @@ async function sendWithRetry(
   message: string,
   provider: WhatsAppProvider,
   credentials: WhatsAppCredentials
-): Promise<void> {
+): Promise<WhatsAppSendResult> {
   let attempts = 0
+  let lastResult: WhatsAppSendResult = { success: false, error: 'No send attempt made' }
 
   while (attempts < MAX_RETRY_ATTEMPTS) {
     attempts++
-    const result = await provider.sendMessage(to, message, credentials)
+    lastResult = await provider.sendMessage(to, message, credentials)
 
-    if (result.success) return
-    if (!result.retryable) return
+    if (lastResult.success) return lastResult
+    if (!lastResult.retryable) return lastResult
 
     if (attempts < MAX_RETRY_ATTEMPTS) {
       await sleep(RETRY_DELAY_MS * attempts)
     }
   }
+
+  return lastResult
 }
 
 export async function connectGupshup(clientId: string, input: ConnectGupshupInput): Promise<void> {
@@ -83,10 +86,16 @@ export async function getWhatsAppStatus(clientId: string): Promise<Omit<WhatsApp
 export async function sendLeadNotification(clientId: string, leadSummary: string): Promise<void> {
   try {
     const client = await getClientById(clientId)
-    if (!client?.whatsappConnection?.connected) return
+    if (!client?.whatsappConnection?.connected) {
+      console.log('WhatsApp notification skipped: not connected')
+      return
+    }
 
     const provider = getProvider(client.whatsappConnection.provider)
-    if (!provider) return
+    if (!provider) {
+      console.log(`WhatsApp notification skipped: unknown provider ${client.whatsappConnection.provider}`)
+      return
+    }
 
     const apiKey = await decrypt(client.whatsappConnection.apiKeyEncrypted)
     const credentials: WhatsAppCredentials = {
@@ -95,12 +104,16 @@ export async function sendLeadNotification(clientId: string, leadSummary: string
       sourceNumber: client.whatsappConnection.sourceNumber,
     }
 
-    await sendWithRetry(
+    console.log('WhatsApp notification sending to:', client.whatsappConnection.notificationNumber)
+
+    const result = await sendWithRetry(
       client.whatsappConnection.notificationNumber,
       `New lead captured!\n\n${leadSummary}`,
       provider,
       credentials
     )
+
+    console.log('WhatsApp notification result:', result)
   } catch (error) {
     console.error('WhatsApp lead notification failed:', error)
   }
