@@ -66,6 +66,10 @@
   border-top: 1px solid #e5e7eb;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
   background-color: #F8FAFC;
@@ -141,4 +145,16 @@ body {
   font-weight: 600;
   background-color: #1E293B;
   border-left: 4px solid #6366F1;
+}
+
+/* Legal page PDF export: hide site chrome, print only the document body */
+@media print {
+  .landing-page nav,
+  .landing-page footer {
+    display: none !important;
+  }
+
+  .landing-page main {
+    padding-top: 0 !important;
+  }
 }

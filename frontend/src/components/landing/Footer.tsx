@@ -3,22 +3,19 @@ import { Share2, Mail } from 'lucide-react'
 export default function Footer() {
   const links = {
     product: [
-      { label: 'Features', href: '#features' },
-      { label: 'Pricing', href: '#pricing' },
+      { label: 'Features', href: '/#features' },
+      { label: 'Pricing', href: '/#pricing' },
       { label: 'Dashboard', href: '/dashboard' },
-      { label: 'Product Tour', href: '#' },
+      { label: 'WhatsApp Automation', href: '/#whatsapp' },
     ],
     company: [
-      { label: 'About Us', href: '#' },
-      { label: 'Careers', href: '#' },
-      { label: 'Blog', href: '#' },
-      { label: 'Press', href: '#' },
+      { label: 'About Us', href: '/about-us' },
+      { label: 'Careers', href: 'mailto:admin@drsyeta.in' },
     ],
     support: [
-      { label: 'Help Center', href: '#' },
-      { label: 'Community', href: '#' },
-      { label: 'Contact Us', href: '#' },
-      { label: 'System Status', href: '#' },
+      { label: 'Help Center', href: '/help' },
+      { label: 'Contact Us', href: '/contact' },
+      { label: 'System Status', href: '/system-status' },
     ],
   }
 
@@ -35,8 +32,8 @@ export default function Footer() {
               <span className="font-extrabold text-xl tracking-tight text-on-surface dark:text-white">BeepBoop</span>
             </div>
             <p className="text-on-surface-variant dark:text-outline-variant text-sm max-w-sm leading-relaxed">
-              The next generation of AI-powered customer relationship management. Join 35,000+ businesses growing
-              faster with BeepBoop.
+              AI chatbot that captures leads, sends WhatsApp alerts, and syncs to your CRM automatically. Built for
+              businesses that never want to miss a lead.
             </p>
             <div className="flex gap-3">
               <a
@@ -48,7 +45,7 @@ export default function Footer() {
                 <Share2 className="w-4.5 h-4.5" />
               </a>
               <a
-                href="#"
+                href="mailto:admin@drsyeta.in"
                 className="w-10 h-10 rounded-full bg-white/50 hover:bg-white dark:bg-white/10 dark:hover:bg-white/20 flex items-center justify-center text-primary transition-all hover:-translate-y-0.5 border border-outline-variant/20 shadow-sm"
                 aria-label="Email BeepBoop Support"
                 id="footer-email-link"
@@ -103,17 +100,14 @@ export default function Footer() {
         {/* Footer bottom */}
         <div className="mt-16 pt-8 border-t border-outline-variant/10 flex flex-col sm:flex-row justify-between items-center gap-6">
           <p className="text-on-surface-variant dark:text-outline-variant text-sm">
-            © 2026 BeepBoop. All rights reserved.
+            © 2026 BeepBoop by Drsyeta Corp. All rights reserved.
           </p>
           <div className="flex gap-8 text-sm text-on-surface-variant dark:text-outline-variant font-medium">
-            <a href="#" className="hover:text-primary transition-colors">
-              Legal
-            </a>
-            <a href="#" className="hover:text-primary transition-colors">
+            <a href="/privacy-policy" className="hover:text-primary transition-colors">
               Privacy Policy
             </a>
-            <a href="#" className="hover:text-primary transition-colors">
-              Cookie Settings
+            <a href="/terms-of-service" className="hover:text-primary transition-colors">
+              Terms of Service
             </a>
           </div>
         </div>

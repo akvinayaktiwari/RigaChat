@@ -1,16 +1,16 @@
 import { useNavigate } from 'react-router-dom'
-import { Sparkles, ShoppingCart, Mail, Workflow, Cpu, Database, Network } from 'lucide-react'
+import { Sparkles, MessageSquare, Bot, Users, RefreshCw, FileText, BarChart2 } from 'lucide-react'
 
 export default function FinalCTA() {
   const navigate = useNavigate()
 
   const integrationIcons = [
-    { Icon: Network, label: 'API Integrations' },
-    { Icon: ShoppingCart, label: 'E-Commerce (Shopify)' },
-    { Icon: Mail, label: 'Email Marketing' },
-    { Icon: Workflow, label: 'Automations' },
-    { Icon: Cpu, label: 'AI Processors' },
-    { Icon: Database, label: 'Data Warehouse' },
+    { Icon: MessageSquare, label: 'WhatsApp' },
+    { Icon: Bot, label: 'AI Chatbot' },
+    { Icon: Users, label: 'Lead CRM' },
+    { Icon: RefreshCw, label: 'Zoho Sync' },
+    { Icon: FileText, label: 'Forms' },
+    { Icon: BarChart2, label: 'Reports' },
   ]
 
   return (
@@ -24,17 +24,18 @@ export default function FinalCTA() {
         {/* Sparkle badge */}
         <div className="inline-flex items-center gap-1.5 bg-white/10 text-white/90 border border-white/20 px-3.5 py-1.5 rounded-full mb-6">
           <Sparkles className="w-3.5 h-3.5 text-yellow-300 fill-yellow-300 animate-spin-slow" />
-          <span className="text-[10px] font-bold uppercase tracking-wider">Start Growing Instantly</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider">AI Chatbot + WhatsApp + CRM</span>
         </div>
 
         {/* Heading */}
         <h2 className="text-4xl md:text-5xl font-extrabold text-white mb-4 max-w-3xl leading-tight">
-          Start capturing leads today.
+          Never miss a lead. Ever.
         </h2>
 
         {/* Subtext */}
         <p className="text-lg text-inverse-on-surface/80 mb-8 max-w-xl">
-          Set up your AI chatbot in under 5 minutes. No code required.
+          BeepBoop captures leads 24/7 with AI, alerts you instantly on WhatsApp, and syncs everything to your CRM
+          automatically.
         </p>
 
         {/* Action button */}
@@ -49,7 +50,7 @@ export default function FinalCTA() {
 
           {/* Bullet proofs */}
           <div className="flex items-center gap-4 text-outline-variant font-semibold text-xs uppercase tracking-widest mt-2">
-            <span>Free 14-day trial</span>
+            <span>Free to start</span>
             <span className="w-1.5 h-1.5 bg-outline-variant rounded-full" />
             <span>No credit card required</span>
           </div>
@@ -61,7 +62,7 @@ export default function FinalCTA() {
             <div key={index} className="flex flex-col items-center gap-2" title={item.label}>
               <item.Icon className="w-8 h-8 text-white stroke-[1.5]" />
               <span className="text-[10px] font-bold uppercase tracking-wider text-outline-variant select-none hidden md:block">
-                {item.label.split(' ')[0]}
+                {item.label}
               </span>
             </div>
           ))}

@@ -22,21 +22,6 @@ export default function Testimonials() {
     },
   ]
 
-  const microReviews = [
-    {
-      quote: 'LOVE this app! Helped sales and engagement instantly.',
-      brand: 'The Cake Planner 🇺🇸',
-    },
-    {
-      quote: 'Absolutely recommend for the level of reporting.',
-      brand: 'MONTBLANC LMDM 🇦🇺',
-    },
-    {
-      quote: 'Really increase conversion rate! Strong recommend.',
-      brand: 'ÓRTTU 🇺🇸',
-    },
-  ]
-
   return (
     <section className="py-24 px-6 lg:px-8 bg-background" id="testimonials">
       <div className="max-w-7xl mx-auto">
@@ -85,20 +70,6 @@ export default function Testimonials() {
                 </div>
               </div>
             </motion.div>
-          ))}
-        </div>
-
-        {/* Bento Grid Micro Reviews */}
-        <div className="grid sm:grid-cols-3 gap-6 mt-10">
-          {microReviews.map((micro, idx) => (
-            <div
-              key={idx}
-              className="p-6 bg-surface-container-low/60 rounded-2xl border border-outline-variant/15 flex flex-col justify-between"
-              id={`testimonial-micro-${idx}`}
-            >
-              <p className="italic text-on-surface-variant text-sm leading-relaxed mb-4">"{micro.quote}"</p>
-              <p className="font-bold text-xs text-on-surface/90 uppercase tracking-wider">{micro.brand}</p>
-            </div>
           ))}
         </div>
       </div>
