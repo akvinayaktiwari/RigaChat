@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Rocket, Link as LinkIcon, ExternalLink, CheckCircle2, MessageCircle, TrendingUp, Zap, Globe, Compass } from 'lucide-react'
+import { Rocket, Link as LinkIcon, CheckCircle2, MessageCircle, TrendingUp, Zap, Globe, Compass } from 'lucide-react'
 import Navbar from '../components/landing/Navbar'
 import Footer from '../components/landing/Footer'
 import DemoModal from '../components/landing/modals/DemoModal'
@@ -16,9 +16,6 @@ interface FounderInfo {
   role: string
   description: string
   avatarGradient: string
-  github: string
-  linkedin: string
-  twitter: string
 }
 
 const STATS: StatItem[] = [
@@ -30,24 +27,18 @@ const STATS: StatItem[] = [
 
 const FOUNDERS: FounderInfo[] = [
   {
-    name: 'Vinayak Tiwari',
-    role: 'Founder & Builder',
-    description:
-      'Built BeepBoop to help businesses capture every lead automatically. Full-stack engineer at Drsyeta Corp, Bangalore.',
-    avatarGradient: 'from-purple-600 to-indigo-500',
-    github: 'akvinayaktiwari',
-    linkedin: 'akvinayaktiwari',
-    twitter: 'akvinayaktiwari',
-  },
-  {
     name: 'Adarsh Jee Pandey',
     role: 'Co-Founder & Performance Marketer',
     description:
       'Drives growth and customer acquisition for BeepBoop. Performance marketer at Drsyeta Corp, Bangalore.',
     avatarGradient: 'from-emerald-600 to-teal-500',
-    github: 'adarshgpandey',
-    linkedin: 'adarshgpandey',
-    twitter: 'adarshgpandey',
+  },
+  {
+    name: 'Vinayak Tiwari',
+    role: 'Co-Founder & Builder',
+    description:
+      'Built BeepBoop to help businesses capture every lead automatically. Full-stack engineer at Drsyeta Corp, Bangalore.',
+    avatarGradient: 'from-purple-600 to-indigo-500',
   },
 ]
 
@@ -216,40 +207,6 @@ function StatsSection() {
   )
 }
 
-function FounderSocialLinks({ founder }: { founder: FounderInfo }) {
-  return (
-    <div className="flex gap-2">
-      <a
-        href={`https://github.com/${founder.github}`}
-        target="_blank"
-        rel="noreferrer"
-        className="w-8 h-8 rounded-full bg-surface-container-low hover:bg-primary hover:text-white flex items-center justify-center text-on-surface-variant border border-outline-variant/20 transition-all"
-        aria-label={`${founder.name}'s GitHub`}
-      >
-        <ExternalLink className="w-3.5 h-3.5" />
-      </a>
-      <a
-        href={`https://linkedin.com/in/${founder.linkedin}`}
-        target="_blank"
-        rel="noreferrer"
-        className="w-8 h-8 rounded-full bg-surface-container-low hover:bg-primary hover:text-white flex items-center justify-center text-on-surface-variant border border-outline-variant/20 transition-all"
-        aria-label={`${founder.name}'s LinkedIn`}
-      >
-        <ExternalLink className="w-3.5 h-3.5" />
-      </a>
-      <a
-        href={`https://twitter.com/${founder.twitter}`}
-        target="_blank"
-        rel="noreferrer"
-        className="w-8 h-8 rounded-full bg-surface-container-low hover:bg-primary hover:text-white flex items-center justify-center text-on-surface-variant border border-outline-variant/20 transition-all"
-        aria-label={`${founder.name}'s Twitter`}
-      >
-        <ExternalLink className="w-3.5 h-3.5" />
-      </a>
-    </div>
-  )
-}
-
 function FounderCard({ founder }: { founder: FounderInfo }) {
   return (
     <div className="bg-white border border-outline-variant/30 rounded-2xl p-6 shadow-xs hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col items-center text-center">
@@ -261,8 +218,6 @@ function FounderCard({ founder }: { founder: FounderInfo }) {
       <h4 className="font-bold text-base text-on-surface leading-tight">{founder.name}</h4>
       <p className="text-xs text-outline font-semibold tracking-wider uppercase mt-1">{founder.role}</p>
       <p className="text-xs md:text-sm text-on-surface-variant mt-3 leading-relaxed">{founder.description}</p>
-      <div className="h-px bg-outline-variant/30 w-full my-4" />
-      <FounderSocialLinks founder={founder} />
     </div>
   )
 }
