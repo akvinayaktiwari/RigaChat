@@ -29,6 +29,12 @@ import Help from './src/pages/Help'
 import Privacy from './src/pages/Privacy'
 import Terms from './src/pages/Terms'
 import Status from './src/pages/Status'
+import Features from './src/pages/Features'
+import Chatbot from './src/pages/features/Chatbot'
+import WhatsAppFeature from './src/pages/features/WhatsApp'
+import Crm from './src/pages/features/Crm'
+import Forms from './src/pages/features/Forms'
+import Careers from './src/pages/Careers'
 
 function App() {
   return (
@@ -48,6 +54,12 @@ function App() {
         <Route path="/privacy-policy" element={<Privacy />} />
         <Route path="/terms-of-service" element={<Terms />} />
         <Route path="/system-status" element={<Status />} />
+        <Route path="/features" element={<Features />} />
+        <Route path="/features/chatbot" element={<Chatbot />} />
+        <Route path="/features/whatsapp" element={<WhatsAppFeature />} />
+        <Route path="/features/crm" element={<Crm />} />
+        <Route path="/features/forms" element={<Forms />} />
+        <Route path="/careers" element={<Careers />} />
         <Route
           path="/dashboard"
           element={

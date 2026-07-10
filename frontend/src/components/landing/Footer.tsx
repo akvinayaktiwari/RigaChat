@@ -3,14 +3,15 @@ import { Share2, Mail } from 'lucide-react'
 export default function Footer() {
   const links = {
     product: [
-      { label: 'Features', href: '/#features' },
-      { label: 'Pricing', href: '/#pricing' },
+      { label: 'Features', href: '/features' },
+      { label: 'AI Chatbot', href: '/features/chatbot' },
+      { label: 'WhatsApp Automation', href: '/features/whatsapp' },
+      { label: 'Lead CRM', href: '/features/crm' },
       { label: 'Dashboard', href: '/dashboard' },
-      { label: 'WhatsApp Automation', href: '/#whatsapp' },
     ],
     company: [
       { label: 'About Us', href: '/about-us' },
-      { label: 'Careers', href: 'mailto:admin@drsyeta.in' },
+      { label: 'Careers', href: '/careers' },
     ],
     support: [
       { label: 'Help Center', href: '/help' },
