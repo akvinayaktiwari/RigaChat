@@ -16,7 +16,7 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
   const [activeSection, setActiveSection] = useState('')
 
   useEffect(() => {
-    const sections = ['features', 'whatsapp', 'knowledge', 'pricing']
+    const sections = ['features', 'knowledge', 'whatsapp', 'testimonials', 'pricing']
 
     function handleScroll() {
       const scrollPosition = window.scrollY + 100
@@ -65,6 +65,13 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
                 Features
               </a>
               <a
+                href="#knowledge"
+                className={activeSection === 'knowledge' ? NAV_ACTIVE_CLASS : NAV_INACTIVE_CLASS}
+                id="nav-link-knowledge"
+              >
+                Knowledge Base
+              </a>
+              <a
                 href="#whatsapp"
                 className={activeSection === 'whatsapp' ? NAV_ACTIVE_CLASS : NAV_INACTIVE_CLASS}
                 id="nav-link-whatsapp"
@@ -72,11 +79,11 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
                 WhatsApp
               </a>
               <a
-                href="#knowledge"
-                className={activeSection === 'knowledge' ? NAV_ACTIVE_CLASS : NAV_INACTIVE_CLASS}
-                id="nav-link-knowledge"
+                href="#testimonials"
+                className={activeSection === 'testimonials' ? NAV_ACTIVE_CLASS : NAV_INACTIVE_CLASS}
+                id="nav-link-testimonials"
               >
-                Knowledge Base
+                Testimonials
               </a>
               <a
                 href="#pricing"
