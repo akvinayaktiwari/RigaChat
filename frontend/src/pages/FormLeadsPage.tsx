@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ClipboardList, X } from 'lucide-react'
-import { getFormById, getFormLeads } from '../services/api'
+import { ArrowLeft, CheckCircle2, ClipboardList, X, XCircle } from 'lucide-react'
+import { getFormById, getFormLeads, getIntegrationStatus } from '../services/api'
 import type { FormConfig, FormLead } from '../types/index'
 
 function formatRelativeDate(date: Date): string {
@@ -19,6 +19,31 @@ function formatRelativeDate(date: Date): string {
 
 function getFields(lead: FormLead): Record<string, string> {
   return typeof lead.customFields === 'string' ? {} : lead.customFields
+}
+
+function SyncBadge({ lead }: { lead: FormLead }) {
+  if (lead.crmSynced === true) {
+    return (
+      <span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-1 rounded-full flex items-center gap-1 w-fit">
+        <CheckCircle2 size={12} />
+        Synced
+      </span>
+    )
+  }
+
+  if (lead.crmSynced === false && lead.crmSyncError) {
+    return (
+      <span
+        className="bg-red-100 text-red-600 text-xs px-2 py-1 rounded-full flex items-center gap-1 w-fit"
+        title={lead.crmSyncError}
+      >
+        <XCircle size={12} />
+        Sync failed
+      </span>
+    )
+  }
+
+  return <span className="bg-slate-100 text-slate-500 text-xs px-2 py-1 rounded-full w-fit">Not synced</span>
 }
 
 function TableSkeleton() {
@@ -46,17 +71,21 @@ export default function FormLeadsPage() {
   const [leads, setLeads] = useState<FormLead[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<FormLead | null>(null)
+  const [crmConnected, setCrmConnected] = useState(false)
 
   useEffect(() => {
     if (!formId) {
       setLoading(false)
       return
     }
-    Promise.all([getFormById(formId), getFormLeads(formId)]).then(([formRes, leadsRes]) => {
-      if (formRes.success && formRes.data) setForm(formRes.data)
-      setLeads(leadsRes.data ?? [])
-      setLoading(false)
-    })
+    Promise.all([getFormById(formId), getFormLeads(formId), getIntegrationStatus()]).then(
+      ([formRes, leadsRes, crmRes]) => {
+        if (formRes.success && formRes.data) setForm(formRes.data)
+        setLeads(leadsRes.data ?? [])
+        setCrmConnected(Boolean(crmRes.success && crmRes.data?.connected))
+        setLoading(false)
+      }
+    )
   }, [formId])
 
   const weekAgo = new Date()
@@ -124,6 +153,9 @@ export default function FormLeadsPage() {
                   </th>
                 ))}
                 <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Date</th>
+                {crmConnected && (
+                  <th className="text-left px-4 py-3 font-medium whitespace-nowrap bg-slate-50">CRM Sync</th>
+                )}
                 <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Actions</th>
               </tr>
             </thead>
@@ -140,6 +172,11 @@ export default function FormLeadsPage() {
                     <td className="px-4 py-3 text-slate-400 text-sm whitespace-nowrap">
                       {formatRelativeDate(new Date(lead.createdAt))}
                     </td>
+                    {crmConnected && (
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <SyncBadge lead={lead} />
+                      </td>
+                    )}
                     <td className="px-4 py-3">
                       <button
                         type="button"
