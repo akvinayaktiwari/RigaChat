@@ -2,6 +2,7 @@ import type {
   ApiResponse,
   BotConfig,
   ClientRecord,
+  ConnectWhatsAppInput,
   CRMConnection,
   CreateBotInput,
   CreateFormInput,
@@ -13,6 +14,7 @@ import type {
   ResyncResult,
   SetupBotResult,
   UpdateKBInput,
+  WhatsAppConnection,
 } from '../types/index'
 
 const BASE_URL = import.meta.env.VITE_API_URL
@@ -191,4 +193,18 @@ export function disconnectCRM(): Promise<ApiResponse<{ success: boolean }>> {
 export function connectZoho(): void {
   if (!authToken) return
   window.location.href = `${BASE_URL}/api/integrations/zoho/connect?token=${encodeURIComponent(authToken)}`
+}
+
+// WhatsApp Integration API
+
+export function getWhatsAppStatus(): Promise<ApiResponse<WhatsAppConnection | null>> {
+  return apiClient<WhatsAppConnection | null>('/api/integrations/whatsapp/status')
+}
+
+export function connectWhatsApp(data: ConnectWhatsAppInput): Promise<ApiResponse<{ success: boolean }>> {
+  return apiClient<{ success: boolean }>('/api/integrations/whatsapp/connect', 'POST', data)
+}
+
+export function disconnectWhatsApp(): Promise<ApiResponse<{ success: boolean }>> {
+  return apiClient<{ success: boolean }>('/api/integrations/whatsapp/disconnect', 'DELETE')
 }

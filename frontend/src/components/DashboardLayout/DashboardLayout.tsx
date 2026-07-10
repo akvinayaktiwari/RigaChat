@@ -6,6 +6,7 @@ const NAV_LINKS = [
   { to: '/dashboard/bots', label: 'Chatbots', icon: 'smart_toy', end: false },
   { to: '/dashboard/forms', label: 'Forms', icon: 'list_alt', end: false },
   { to: '/dashboard/leads', label: 'Leads', icon: 'group', end: false },
+  { to: '/dashboard/whatsapp', label: 'WhatsApp', icon: 'chat', end: false },
   { to: '/dashboard/settings', label: 'Settings', icon: 'settings', end: false },
 ]
 
@@ -21,6 +22,7 @@ function getPageTitle(pathname: string): string {
   if (pathname === '/dashboard/leads') return 'Leads'
   if (/^\/dashboard\/leads\/[^/]+$/.test(pathname)) return 'Lead Detail'
   if (pathname.startsWith('/dashboard/kb')) return 'Knowledge Base'
+  if (pathname === '/dashboard/whatsapp') return 'WhatsApp'
   if (pathname === '/dashboard/settings') return 'Settings'
   return 'Dashboard'
 }
@@ -77,16 +79,6 @@ export function DashboardLayout() {
         </nav>
 
         <div className="space-y-4">
-          {/* Coming Soon: WhatsApp Automation */}
-          <div className="rounded-2xl border border-[#334155]/60 bg-[#1E293B]/60 p-4 opacity-60">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-bold text-slate-300">WhatsApp Automation</span>
-              <span className="text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
-                Coming Soon
-              </span>
-            </div>
-          </div>
-
           {/* User footer */}
           <div className="pt-4 border-t border-[#1E293B]">
             <div className="bg-[#1E293B] border border-[#334155]/60 rounded-2xl p-4 flex items-center gap-3">

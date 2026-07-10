@@ -16,6 +16,7 @@ import LeadsPage from './src/pages/LeadsPage'
 import LeadDetailPage from './src/pages/LeadDetailPage'
 import KnowledgeBasePage from './src/pages/KnowledgeBasePage'
 import Settings from './src/pages/Settings'
+import WhatsApp from './src/pages/WhatsApp'
 import FormsPage from './src/pages/FormsPage'
 import NewFormPage from './src/pages/NewFormPage'
 import FormDetailPage from './src/pages/FormDetailPage'
@@ -54,6 +55,7 @@ function App() {
           <Route path="leads" element={<LeadsPage />} />
           <Route path="leads/:leadId" element={<LeadDetailPage />} />
           <Route path="kb/:botId" element={<KnowledgeBasePage />} />
+          <Route path="whatsapp" element={<WhatsApp />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>
