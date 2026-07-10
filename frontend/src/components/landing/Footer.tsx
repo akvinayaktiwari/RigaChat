@@ -15,7 +15,7 @@ export default function Footer() {
     support: [
       { label: 'Help Center', href: '/help' },
       { label: 'Contact Us', href: '/contact' },
-      { label: 'System Status', href: '/status' },
+      { label: 'System Status', href: '/system-status' },
     ],
   }
 

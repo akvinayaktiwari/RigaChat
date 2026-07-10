@@ -47,7 +47,7 @@ function App() {
         <Route path="/help" element={<Help />} />
         <Route path="/privacy-policy" element={<Privacy />} />
         <Route path="/terms-of-service" element={<Terms />} />
-        <Route path="/status" element={<Status />} />
+        <Route path="/system-status" element={<Status />} />
         <Route
           path="/dashboard"
           element={
