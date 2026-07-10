@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import Navbar from '../components/landing/Navbar'
 import Hero from '../components/landing/Hero'
-import SocialProof from '../components/landing/SocialProof'
 import FeatureOne from '../components/landing/FeatureOne'
 import FeatureTwo from '../components/landing/FeatureTwo'
+import WhatsAppSection from '../components/landing/WhatsAppSection'
 import Testimonials from '../components/landing/Testimonials'
 import Pricing from '../components/landing/Pricing'
 import FinalCTA from '../components/landing/FinalCTA'
@@ -18,9 +18,9 @@ export default function LandingPage() {
     <div className="landing-page bg-background">
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
       <Hero onOpenDemo={() => setIsDemoOpen(true)} />
-      <SocialProof />
       <FeatureOne />
       <FeatureTwo />
+      <WhatsAppSection />
       <Testimonials />
       <Pricing />
       <FinalCTA />

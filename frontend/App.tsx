@@ -23,6 +23,12 @@ import FormDetailPage from './src/pages/FormDetailPage'
 import FormLeadsPage from './src/pages/FormLeadsPage'
 import FormTestPage from './src/pages/FormTestPage'
 import FormTestPreviewPage from './src/pages/FormTestPreviewPage'
+import About from './src/pages/About'
+import Contact from './src/pages/Contact'
+import Help from './src/pages/Help'
+import Privacy from './src/pages/Privacy'
+import Terms from './src/pages/Terms'
+import Status from './src/pages/Status'
 
 function App() {
   return (
@@ -36,6 +42,12 @@ function App() {
         <Route path="/form-test" element={<FormTestPage />} />
         <Route path="/form-test/preview" element={<FormTestPreviewPage />} />
         <Route path="/" element={<LandingPage />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route path="/help" element={<Help />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/status" element={<Status />} />
         <Route
           path="/dashboard"
           element={

@@ -6,19 +6,16 @@ export default function Footer() {
       { label: 'Features', href: '#features' },
       { label: 'Pricing', href: '#pricing' },
       { label: 'Dashboard', href: '/dashboard' },
-      { label: 'WhatsApp Automation', href: '#' },
+      { label: 'WhatsApp Automation', href: '#whatsapp' },
     ],
     company: [
-      { label: 'About Us', href: '#' },
-      { label: 'Careers', href: '#' },
-      { label: 'Blog', href: '#' },
-      { label: 'Press', href: '#' },
+      { label: 'About Us', href: '/about' },
+      { label: 'Careers', href: 'mailto:admin@drsyeta.in' },
     ],
     support: [
-      { label: 'Help Center', href: '#' },
-      { label: 'Community', href: '#' },
-      { label: 'Contact Us', href: 'mailto:admin@drsyeta.in' },
-      { label: 'System Status', href: '#' },
+      { label: 'Help Center', href: '/help' },
+      { label: 'Contact Us', href: '/contact' },
+      { label: 'System Status', href: '/status' },
     ],
   }
 
@@ -103,17 +100,14 @@ export default function Footer() {
         {/* Footer bottom */}
         <div className="mt-16 pt-8 border-t border-outline-variant/10 flex flex-col sm:flex-row justify-between items-center gap-6">
           <p className="text-on-surface-variant dark:text-outline-variant text-sm">
-            © 2026 BeepBoop. All rights reserved.
+            © 2026 BeepBoop by Drsyeta Corp. All rights reserved.
           </p>
           <div className="flex gap-8 text-sm text-on-surface-variant dark:text-outline-variant font-medium">
-            <a href="#" className="hover:text-primary transition-colors">
-              Legal
-            </a>
-            <a href="#" className="hover:text-primary transition-colors">
+            <a href="/privacy" className="hover:text-primary transition-colors">
               Privacy Policy
             </a>
-            <a href="#" className="hover:text-primary transition-colors">
-              Cookie Settings
+            <a href="/terms" className="hover:text-primary transition-colors">
+              Terms of Service
             </a>
           </div>
         </div>

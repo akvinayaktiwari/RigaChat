@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Menu, X, ArrowRight, MessageSquare, Compass, ShieldCheck } from 'lucide-react'
+import { Menu, X, ArrowRight, MessageSquare } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 
 interface NavbarProps {
@@ -26,14 +26,8 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-8">
-              <a href="#" className="text-sm font-semibold text-primary border-b-2 border-primary py-1.5 px-0.5" id="nav-link-product">
-                Product
-              </a>
-              <a href="#features" className="text-sm font-semibold text-on-surface-variant hover:text-primary transition-colors py-1.5" id="nav-link-solutions">
-                Solutions
-              </a>
-              <a href="#testimonials" className="text-sm font-semibold text-on-surface-variant hover:text-primary transition-colors py-1.5" id="nav-link-pricing">
-                Testimonials
+              <a href="#features" className="text-sm font-semibold text-primary border-b-2 border-primary py-1.5 px-0.5" id="nav-link-product">
+                Features
               </a>
               <a href="#pricing" className="text-sm font-semibold text-on-surface-variant hover:text-primary transition-colors py-1.5" id="nav-link-pricing-section">
                 Pricing
@@ -105,28 +99,12 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
                 <p className="text-xs font-bold text-outline uppercase tracking-wider">Navigation</p>
                 <div className="flex flex-col gap-4">
                   <a
-                    href="/"
+                    href="#features"
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-3 text-lg font-bold text-primary py-2 border-b border-outline-variant/10"
                     id="mobile-nav-product"
                   >
-                    <MessageSquare className="w-5 h-5" /> Product
-                  </a>
-                  <a
-                    href="#features"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 text-lg font-semibold text-on-surface hover:text-primary py-2 border-b border-outline-variant/10 transition-colors"
-                    id="mobile-nav-solutions"
-                  >
-                    <Compass className="w-5 h-5" /> Solutions
-                  </a>
-                  <a
-                    href="#testimonials"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 text-lg font-semibold text-on-surface hover:text-primary py-2 border-b border-outline-variant/10 transition-colors"
-                    id="mobile-nav-testimonials"
-                  >
-                    <ShieldCheck className="w-5 h-5" /> Testimonials
+                    <MessageSquare className="w-5 h-5" /> Features
                   </a>
                 </div>
               </div>

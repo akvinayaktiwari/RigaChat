@@ -17,16 +17,16 @@ const PLANS: PlanCard[] = [
     id: 'starter',
     name: 'Starter',
     price: '₹1,999',
-    description: 'Perfect for small businesses getting started with AI chat',
+    description: 'Perfect for small businesses getting started',
     features: [
-      '1 AI chatbot',
-      '500 conversations/month',
-      'Built-in CRM (50 leads)',
-      'Knowledge base (10 entries)',
-      'Email notifications',
-      'Website widget embed',
+      '1 AI Chatbot',
+      '500 Monthly Leads',
+      'Built-in Lead CRM',
+      'WhatsApp Lead Notifications',
+      'Form Builder',
+      'Website Widget Embed',
     ],
-    ctaLabel: 'Get started',
+    ctaLabel: 'Get Started',
   },
   {
     id: 'growth',
@@ -34,14 +34,14 @@ const PLANS: PlanCard[] = [
     price: '₹5,499',
     description: 'For growing teams that need more power',
     features: [
-      '3 AI chatbots',
-      '2,000 conversations/month',
-      'Full CRM pipeline',
-      'Lead qualification flows',
-      'Analytics dashboard',
-      'WhatsApp handoff (coming soon)',
+      '3 AI Chatbots',
+      '2,000 Monthly Leads',
+      'Built-in Lead CRM',
+      'WhatsApp Notifications + Weekly Reports',
+      'Zoho CRM Integration',
+      'Advanced Analytics',
     ],
-    ctaLabel: 'Start free trial',
+    ctaLabel: 'Start Free Trial',
     popular: true,
   },
   {
@@ -50,13 +50,14 @@ const PLANS: PlanCard[] = [
     price: '₹14,999',
     description: 'For agencies managing multiple clients',
     features: [
-      'Unlimited chatbots',
-      'White label branding',
-      'Client sub-accounts',
-      'Priority support',
-      'Webhook integrations',
+      'Unlimited Chatbots',
+      'Unlimited Leads',
+      'White Label Branding',
+      'All Integrations',
+      'Priority Support',
+      'Custom API Access',
     ],
-    ctaLabel: 'Contact sales',
+    ctaLabel: 'Contact Sales',
   },
 ]
 
@@ -110,7 +111,7 @@ export default function Pricing() {
 
               {plan.id === 'agency' ? (
                 <a
-                  href="mailto:sales@beepboop.drsyeta.in"
+                  href="mailto:admin@drsyeta.in"
                   className="mt-8 block text-center border border-outline text-on-surface font-semibold px-6 py-3 rounded-xl hover:bg-surface-container transition-colors"
                   id="pricing-cta-agency"
                 >
