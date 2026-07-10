@@ -128,7 +128,7 @@ function PolicyHeader({ onDownload }: { onDownload: () => void }) {
         </div>
         <button
           onClick={onDownload}
-          className="flex items-center justify-center gap-2 px-6 py-3.5 bg-white hover:bg-surface-container-low text-primary font-semibold border border-outline-variant/50 hover:border-primary/30 rounded-xl hover:shadow-xs transition-all cursor-pointer shadow-xs self-start md:self-center"
+          className="print:hidden flex items-center justify-center gap-2 px-6 py-3.5 bg-white hover:bg-surface-container-low text-primary font-semibold border border-outline-variant/50 hover:border-primary/30 rounded-xl hover:shadow-xs transition-all cursor-pointer shadow-xs self-start md:self-center"
           id="download-policy-btn"
         >
           <Download className="w-4 h-4" />
@@ -141,7 +141,7 @@ function PolicyHeader({ onDownload }: { onDownload: () => void }) {
 
 function TocSidebar({ activeSection, onNavigate }: { activeSection: string; onNavigate: (id: string) => void }) {
   return (
-    <aside className="lg:col-span-3 lg:sticky lg:top-28">
+    <aside className="print:hidden lg:col-span-3 lg:sticky lg:top-28">
       <div className="lg:hidden relative w-full mb-6">
         <select
           value={activeSection}
@@ -405,7 +405,10 @@ export default function Privacy() {
   }
 
   function handleDownload() {
-    alert('Preparing your BeepBoop legal document. The PDF will download automatically shortly.')
+    const previousTitle = document.title
+    document.title = 'BeepBoop - Privacy Policy'
+    window.print()
+    document.title = previousTitle
   }
 
   return (
@@ -418,7 +421,7 @@ export default function Privacy() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 max-w-7xl mx-auto items-start">
           <TocSidebar activeSection={activeSection} onNavigate={handleNavigate} />
 
-          <article className="lg:col-span-9 space-y-16 max-w-3xl">
+          <article className="lg:col-span-9 print:col-span-12 space-y-16 max-w-3xl print:max-w-none">
             <CollectSection />
             <UsageSection />
             <StorageSection />

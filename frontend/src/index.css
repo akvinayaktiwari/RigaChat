@@ -142,3 +142,15 @@ body {
   background-color: #1E293B;
   border-left: 4px solid #6366F1;
 }
+
+/* Legal page PDF export: hide site chrome, print only the document body */
+@media print {
+  .landing-page nav,
+  .landing-page footer {
+    display: none !important;
+  }
+
+  .landing-page main {
+    padding-top: 0 !important;
+  }
+}
