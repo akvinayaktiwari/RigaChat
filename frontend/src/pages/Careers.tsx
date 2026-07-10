@@ -53,9 +53,13 @@ const BENEFIT_CARDS: BenefitCard[] = [
 ]
 
 const ROLE_CARDS: RoleCard[] = [
-  { icon: <Code2 className="w-5 h-5" />, title: 'Full Stack Engineer', tags: ['Remote', 'TypeScript', 'Node.js', 'React'] },
-  { icon: <Megaphone className="w-5 h-5" />, title: 'Performance Marketing Manager', tags: ['Remote', 'Meta Ads', 'Google Ads', 'Real Estate'] },
-  { icon: <MessageSquare className="w-5 h-5" />, title: 'Customer Success Manager', tags: ['Remote', 'SaaS', 'Onboarding', 'WhatsApp'] },
+  { icon: <Code2 className="w-5 h-5" />, title: 'Full Stack Engineer', tags: ['Remote', 'Intern', 'TypeScript', 'Node.js', 'React'] },
+  {
+    icon: <Megaphone className="w-5 h-5" />,
+    title: 'Performance Marketing Manager',
+    tags: ['Remote', 'Intern', 'Meta Ads', 'Google Ads', 'Real Estate'],
+  },
+  { icon: <MessageSquare className="w-5 h-5" />, title: 'Customer Success Manager', tags: ['Remote', 'Intern', 'SaaS', 'Onboarding', 'WhatsApp'] },
 ]
 
 function CareersHero() {
