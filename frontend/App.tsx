@@ -15,7 +15,7 @@ import BotDetailPage from './src/pages/BotDetailPage'
 import LeadsPage from './src/pages/LeadsPage'
 import LeadDetailPage from './src/pages/LeadDetailPage'
 import KnowledgeBasePage from './src/pages/KnowledgeBasePage'
-import SettingsPage from './src/pages/SettingsPage'
+import Settings from './src/pages/Settings'
 import FormsPage from './src/pages/FormsPage'
 import NewFormPage from './src/pages/NewFormPage'
 import FormDetailPage from './src/pages/FormDetailPage'
@@ -54,7 +54,7 @@ function App() {
           <Route path="leads" element={<LeadsPage />} />
           <Route path="leads/:leadId" element={<LeadDetailPage />} />
           <Route path="kb/:botId" element={<KnowledgeBasePage />} />
-          <Route path="settings" element={<SettingsPage />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>
       <ToastContainer />
