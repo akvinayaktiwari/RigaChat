@@ -172,3 +172,10 @@ export interface CRMConnection {
   connectedAt: string
   tokenExpiry: string
 }
+
+export interface Preferences {
+  emailNotifications: boolean
+  desktopAlerts: boolean
+  weeklySummary: boolean
+  leadAssignmentAlerts: boolean
+}

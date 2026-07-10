@@ -126,6 +126,14 @@ export function getMe(): Promise<ApiResponse<ClientRecord>> {
   return apiClient<ClientRecord>('/api/clients/me')
 }
 
+export function updateProfile(name: string): Promise<ApiResponse<ClientRecord>> {
+  return apiClient<ClientRecord>('/api/clients/me', 'PATCH', { name })
+}
+
+export function updateClientPlan(plan: ClientRecord['plan']): Promise<ApiResponse<ClientRecord>> {
+  return apiClient<ClientRecord>('/api/clients/me/plan', 'PATCH', { plan })
+}
+
 // Auth API
 
 export function confirmSignup(username: string): Promise<ApiResponse<null>> {
