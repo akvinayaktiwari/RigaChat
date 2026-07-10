@@ -18,6 +18,22 @@ function parseFormLead(lead: FormLead): FormLead {
   }
 }
 
+// customFields can arrive as a parsed object, a JSON string, or a
+// double-encoded string (e.g. from a hand-crafted request body), so
+// notification message building needs to tolerate all three shapes.
+function parseCustomFields(raw: unknown): Record<string, string> {
+  if (typeof raw === 'object' && raw !== null) {
+    return raw as Record<string, string>
+  }
+  try {
+    const once = JSON.parse(raw as string)
+    if (typeof once === 'object') return once
+    return JSON.parse(once)
+  } catch {
+    return {}
+  }
+}
+
 export async function captureFormLead(input: CreateFormLeadInput): Promise<FormLead> {
   await getPublicConfig(input.formId)
 
@@ -41,7 +57,7 @@ export async function captureFormLead(input: CreateFormLeadInput): Promise<FormL
   // freezes the execution environment as soon as the handler's response
   // promise resolves, so an un-awaited async call here would be aborted
   // mid-flight before the KMS decrypt / Gupshup request ever completed.
-  const fieldsSummary = Object.entries(input.customFields)
+  const fieldsSummary = Object.entries(parseCustomFields(input.customFields))
     .map(([key, value]) => `${key}: ${value}`)
     .join('\n')
   await sendLeadNotification(input.clientId, `${fieldsSummary}\nSource: ${input.sourceUrl}`).catch((err) => {
