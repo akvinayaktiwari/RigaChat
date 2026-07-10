@@ -46,7 +46,7 @@ function App() {
         <Route path="/contact" element={<Contact />} />
         <Route path="/help" element={<Help />} />
         <Route path="/privacy-policy" element={<Privacy />} />
-        <Route path="/terms" element={<Terms />} />
+        <Route path="/terms-of-service" element={<Terms />} />
         <Route path="/status" element={<Status />} />
         <Route
           path="/dashboard"
