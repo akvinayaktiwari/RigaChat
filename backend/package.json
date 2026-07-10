@@ -11,6 +11,7 @@
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.1083.0",
     "@aws-sdk/client-dynamodb": "^3.658.0",
+    "@aws-sdk/client-kms": "^3.1084.0",
     "@aws-sdk/lib-dynamodb": "^3.658.0",
     "@hono/node-server": "^1.13.0",
     "@pinecone-database/pinecone": "^3.0.3",

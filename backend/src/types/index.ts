@@ -91,6 +91,16 @@ export interface CRMConnection {
   connectedAt: string
 }
 
+export interface WhatsAppConnection {
+  provider: 'gupshup'
+  connected: boolean
+  apiKeyEncrypted: string
+  appName: string
+  sourceNumber: string
+  notificationNumber: string
+  connectedAt: string
+}
+
 export interface ClientRecord {
   clientId: string
   email: string
@@ -98,6 +108,7 @@ export interface ClientRecord {
   authProvider: 'google'
   plan: 'starter' | 'growth' | 'agency'
   crmConnection?: CRMConnection
+  whatsappConnection?: WhatsAppConnection
   createdAt: string
   updatedAt: string
 }

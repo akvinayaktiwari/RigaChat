@@ -173,6 +173,22 @@ export interface CRMConnection {
   tokenExpiry: string
 }
 
+export interface WhatsAppConnection {
+  provider: 'gupshup'
+  connected: boolean
+  appName: string
+  sourceNumber: string
+  notificationNumber: string
+  connectedAt: string
+}
+
+export interface ConnectWhatsAppInput {
+  apiKey: string
+  appName: string
+  sourceNumber: string
+  notificationNumber: string
+}
+
 export interface Preferences {
   emailNotifications: boolean
   desktopAlerts: boolean
