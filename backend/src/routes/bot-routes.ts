@@ -51,6 +51,17 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+function userFacingErrorMessage(error: unknown): string {
+  const isPermissionError =
+    error instanceof Error &&
+    (error.message.includes('not authorized') ||
+      error.message.includes('AccessDenied') ||
+      error.message.includes('sqs:') ||
+      error.message.includes('arn:aws'))
+
+  return isPermissionError ? 'Service configuration error. Please contact support.' : 'Failed to start indexing. Please try again.'
+}
+
 botRoutes.post('/setup', requireAuth, async (c) => {
   const body = await c.req.json<SetupBotBody>()
 
@@ -73,7 +84,8 @@ botRoutes.post('/setup', requireAuth, async (c) => {
     })
     return c.json<ApiResponse<typeof result>>({ success: true, data: result }, 201)
   } catch (error) {
-    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+    console.error('Bot setup error:', error)
+    return c.json<ApiResponse<null>>({ success: false, error: userFacingErrorMessage(error) }, 500)
   }
 })
 
@@ -167,7 +179,8 @@ botRoutes.post('/:botId/regenerate-suggestions', requireAuth, async (c) => {
     if (error instanceof Error && error.message === 'Bot not found') {
       return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
     }
-    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+    console.error('Regenerate suggestions error:', error)
+    return c.json<ApiResponse<null>>({ success: false, error: userFacingErrorMessage(error) }, 500)
   }
 })
 
@@ -198,7 +211,8 @@ botRoutes.post('/:botId/index', requireAuth, async (c) => {
     if (error instanceof Error && error.message === 'Invalid URL') {
       return c.json<ApiResponse<null>>({ success: false, error: error.message }, 400)
     }
-    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+    console.error('Indexing error:', error)
+    return c.json<ApiResponse<null>>({ success: false, error: userFacingErrorMessage(error) }, 500)
   }
 })
 
@@ -218,7 +232,8 @@ botRoutes.post('/:botId/confirm-index', requireAuth, async (c) => {
     if (error instanceof Error && error.message === 'Bot not found') {
       return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
     }
-    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+    console.error('Indexing error:', error)
+    return c.json<ApiResponse<null>>({ success: false, error: userFacingErrorMessage(error) }, 500)
   }
 })
 

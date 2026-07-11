@@ -228,8 +228,8 @@ export default function NewBotPage() {
       } else {
         setLaunchStep('indexing')
       }
-    } catch (error) {
-      setLaunchError(error instanceof Error ? error.message : 'Failed to launch chatbot')
+    } catch {
+      setLaunchError('Something went wrong. Please try again.')
       setLaunchStep('form')
     }
   }
@@ -239,8 +239,8 @@ export default function NewBotPage() {
     try {
       await confirmBotIndexing(botId, jobId)
       setLaunchStep('indexing')
-    } catch (error) {
-      setLaunchError(error instanceof Error ? error.message : 'Failed to confirm indexing')
+    } catch {
+      setLaunchError('Something went wrong. Please try again.')
     }
   }
 
