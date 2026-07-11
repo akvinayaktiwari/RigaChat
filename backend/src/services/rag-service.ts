@@ -6,16 +6,20 @@ import { getPublicBotConfig } from '../repositories/bot-repository.js'
 import { generateAndPrewarmSuggestions } from './suggestion-service.js'
 import type { Chunk } from '../types/index.js'
 
-// Fire and forget — suggestions regenerate in the background and never block
-// the KB upsert response. Looks up botName itself since callers here only
-// have botId in scope.
-function triggerSuggestionPrewarm(botId: string, kbContent: string): void {
-  getPublicBotConfig(botId)
-    .then((bot) => (bot ? generateAndPrewarmSuggestions(botId, kbContent, bot.name) : null))
-    .then((result) => {
-      if (result) console.log(`Suggestions generated for bot ${botId}:`, result)
-    })
-    .catch((error) => console.error(`Suggestion generation failed for bot ${botId}:`, error))
+// Awaited (not fire-and-forget) — Lambda can freeze the execution environment
+// immediately after the HTTP response is sent, killing any unawaited promise
+// before it runs. Looks up botName itself since callers here only have botId
+// in scope. Never throws — bot KB indexing must succeed even if suggestion
+// generation fails.
+async function runSuggestionPrewarm(botId: string, kbContent: string): Promise<void> {
+  try {
+    const bot = await getPublicBotConfig(botId)
+    if (!bot) return
+    const result = await generateAndPrewarmSuggestions(botId, kbContent, bot.name)
+    console.log(`Suggestions generated for bot ${botId}:`, result)
+  } catch (error) {
+    console.error(`Suggestion generation failed for bot ${botId}:`, error)
+  }
 }
 
 export async function indexWebsite(
@@ -45,8 +49,7 @@ export async function indexWebsite(
 
     await upsertChunks(chunks, embeddings)
 
-    // Fire and forget — suggestions generate in background, never blocks KB upsert response
-    triggerSuggestionPrewarm(botId, chunks.map((chunk) => chunk.text).join('\n\n'))
+    await runSuggestionPrewarm(botId, chunks.map((chunk) => chunk.text).join('\n\n'))
 
     return { pagesIndexed: pages.length, chunksIndexed: chunks.length }
   } catch (error) {
@@ -80,8 +83,7 @@ export async function indexKnowledgeBaseEntry(
 
     await upsertChunks(chunks, embeddings)
 
-    // Fire and forget — suggestions generate in background, never blocks KB upsert response
-    triggerSuggestionPrewarm(botId, combinedText)
+    await runSuggestionPrewarm(botId, combinedText)
   } catch (error) {
     throw new Error(
       `Failed to index knowledge base entry ${entryId} for bot ${botId}: ${error instanceof Error ? error.message : String(error)}`
