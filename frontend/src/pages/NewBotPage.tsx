@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
   Check,
-  CheckCircle2,
   DollarSign,
   Home,
   Loader2,
@@ -11,8 +10,9 @@ import {
   Phone,
   User,
 } from 'lucide-react'
-import { setupBot } from '../services/api'
+import { confirmBotIndexing, setupBot, startBotIndexing } from '../services/api'
 import { Toggle } from '../components/Toggle'
+import { IndexingProgress } from '../components/IndexingProgress'
 import type { BotConfig, LeadFormField } from '../types/index'
 
 const TOTAL_STEPS = 4
@@ -72,11 +72,7 @@ const INITIAL_FORM_DATA: FormData = {
   budgetRangeEnabled: true,
 }
 
-interface LaunchResult {
-  pagesIndexed: number
-  chunksIndexed: number
-  botId: string
-}
+type LaunchStep = 'form' | 'creating' | 'confirmation_required' | 'indexing'
 
 interface StepErrors {
   name?: string
@@ -141,9 +137,11 @@ export default function NewBotPage() {
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM_DATA)
   const [errors, setErrors] = useState<StepErrors>({})
-  const [isLaunching, setIsLaunching] = useState(false)
-  const [launchSuccess, setLaunchSuccess] = useState(false)
-  const [launchResult, setLaunchResult] = useState<LaunchResult | null>(null)
+  const [launchStep, setLaunchStep] = useState<LaunchStep>('form')
+  const [botId, setBotId] = useState<string | null>(null)
+  const [jobId, setJobId] = useState<string | null>(null)
+  const [totalPages, setTotalPages] = useState(0)
+  const [selectedPages, setSelectedPages] = useState(0)
   const [launchError, setLaunchError] = useState<string | null>(null)
 
   function update<K extends keyof FormData>(key: K, value: FormData[K]) {
@@ -186,7 +184,7 @@ export default function NewBotPage() {
   }
 
   async function handleLaunch() {
-    setIsLaunching(true)
+    setLaunchStep('creating')
     setLaunchError(null)
 
     const enabledFields = formData.leadFormFields.filter((field) => {
@@ -206,20 +204,43 @@ export default function NewBotPage() {
         leadFormFields: enabledFields,
       })
 
-      if (res.success && res.data) {
-        setLaunchSuccess(true)
-        setLaunchResult({
-          pagesIndexed: res.data.pagesIndexed,
-          chunksIndexed: res.data.chunksIndexed,
-          botId: res.data.bot.botId,
-        })
+      if (!res.success || !res.data) {
+        setLaunchError(res.error ?? 'Failed to create chatbot')
+        setLaunchStep('form')
+        return
+      }
+
+      const newBotId = res.data.bot.botId
+      setBotId(newBotId)
+
+      const indexRes = await startBotIndexing(newBotId, formData.websiteUrl)
+      if (!indexRes.success || !indexRes.data) {
+        setLaunchError(indexRes.error ?? 'Bot created, but indexing failed to start')
+        setLaunchStep('form')
+        return
+      }
+
+      if (indexRes.data.status === 'confirmation_required') {
+        setJobId(indexRes.data.jobId)
+        setTotalPages(indexRes.data.totalPages)
+        setSelectedPages(indexRes.data.selectedPages ?? 50)
+        setLaunchStep('confirmation_required')
       } else {
-        setLaunchError(res.error ?? 'Failed to launch chatbot')
+        setLaunchStep('indexing')
       }
     } catch (error) {
       setLaunchError(error instanceof Error ? error.message : 'Failed to launch chatbot')
-    } finally {
-      setIsLaunching(false)
+      setLaunchStep('form')
+    }
+  }
+
+  async function handleConfirmIndexing() {
+    if (!botId || !jobId) return
+    try {
+      await confirmBotIndexing(botId, jobId)
+      setLaunchStep('indexing')
+    } catch (error) {
+      setLaunchError(error instanceof Error ? error.message : 'Failed to confirm indexing')
     }
   }
 
@@ -249,40 +270,29 @@ export default function NewBotPage() {
         </div>
       </div>
 
-      {!launchSuccess && <StepIndicator currentStep={currentStep} />}
+      {launchStep === 'form' && <StepIndicator currentStep={currentStep} />}
 
       <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100 mt-6">
-        {launchSuccess && launchResult ? (
-          <div className="flex flex-col items-center text-center py-6">
-            <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mb-4">
-              <CheckCircle2 className="text-emerald-600" size={40} />
+        {launchStep === 'indexing' && botId ? (
+          <div className="py-6">
+            <div className="flex flex-col items-center text-center mb-6">
+              <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center mb-4">
+                <Loader2 className="text-indigo-600 animate-spin" size={32} />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-800">Building Your Chatbot</h2>
+              <p className="text-slate-500 mt-2">We&apos;re crawling your site and indexing content</p>
             </div>
-            <h2 className="text-2xl font-bold text-slate-800">Your Chatbot is Live! 🎉</h2>
-            <p className="text-slate-500 mt-2">
-              Scanned {launchResult.pagesIndexed} pages and indexed {launchResult.chunksIndexed} knowledge chunks
-            </p>
-            <div className="flex items-center gap-3 mt-6">
-              <button
-                type="button"
-                onClick={() => navigate('/dashboard/bots')}
-                className="border border-slate-200 text-slate-600 px-6 py-3 rounded-xl hover:bg-slate-50 transition-colors"
-              >
-                View My Chatbots
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate(`/dashboard/kb/${launchResult.botId}`)}
-                className="bg-indigo-600 text-white px-6 py-3 rounded-xl hover:bg-indigo-700 transition-colors"
-              >
-                Add Knowledge Base
-              </button>
-            </div>
+            <IndexingProgress
+              botId={botId}
+              onComplete={() => navigate(`/dashboard/bots/${botId}`)}
+              onError={(err) => setLaunchError(err)}
+            />
+            {launchError && <p className="text-sm text-red-500 mt-3 text-center">{launchError}</p>}
           </div>
-        ) : isLaunching ? (
+        ) : launchStep === 'creating' || launchStep === 'confirmation_required' ? (
           <div className="flex flex-col items-center text-center py-12">
             <Loader2 className="animate-spin text-indigo-600" size={48} />
-            <p className="text-slate-500 text-sm mt-2">Scanning your website...</p>
-            <p className="text-slate-400 text-xs mt-1">This may take 20-30 seconds</p>
+            <p className="text-slate-500 text-sm mt-2">Creating your bot...</p>
           </div>
         ) : (
           <>
@@ -518,7 +528,7 @@ export default function NewBotPage() {
         )}
       </div>
 
-      {!launchSuccess && !isLaunching && (
+      {launchStep === 'form' && (
         <div className="flex items-center justify-between mt-6">
           {currentStep > 1 ? (
             <button
@@ -540,6 +550,33 @@ export default function NewBotPage() {
               Next &rarr;
             </button>
           )}
+        </div>
+      )}
+
+      {launchStep === 'confirmation_required' && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-lg max-w-md w-full">
+            <h2 className="font-bold text-slate-800 text-lg">Large Website Detected</h2>
+            <p className="text-sm text-slate-500 mt-2">
+              Found {totalPages} pages. We will index the {selectedPages} most relevant pages.
+            </p>
+            <div className="flex items-center justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard/bots')}
+                className="border border-slate-200 text-slate-600 px-4 py-2 rounded-xl text-sm hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmIndexing}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm hover:bg-indigo-700 transition-colors"
+              >
+                Continue with {selectedPages} pages
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

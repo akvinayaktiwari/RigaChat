@@ -15,7 +15,8 @@ import {
   X,
   Zap,
 } from 'lucide-react'
-import { deleteBot, getMyBots, resyncBot } from '../services/api'
+import { confirmBotIndexing, deleteBot, getMyBots, startBotIndexing } from '../services/api'
+import { IndexingProgress } from '../components/IndexingProgress'
 import type { BotConfig } from '../types/index'
 
 const WIDGET_TRIGGER_LABELS: Record<BotConfig['widgetTrigger'], string> = {
@@ -62,8 +63,8 @@ export default function BotsPage() {
   const [selectedBotForEmbed, setSelectedBotForEmbed] = useState<BotConfig | null>(null)
   const [botToDelete, setBotToDelete] = useState<BotConfig | null>(null)
   const [copySuccess, setCopySuccess] = useState(false)
-  const [resyncingBotId, setResyncingBotId] = useState<string | null>(null)
-  const [resyncSuccessBotId, setResyncSuccessBotId] = useState<string | null>(null)
+  const [startingResyncBotId, setStartingResyncBotId] = useState<string | null>(null)
+  const [indexingBotId, setIndexingBotId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
@@ -90,18 +91,32 @@ export default function BotsPage() {
   }
 
   async function handleResync(bot: BotConfig) {
-    setResyncingBotId(bot.botId)
+    setStartingResyncBotId(bot.botId)
     try {
-      const res = await resyncBot(bot.botId, bot.websiteUrl)
-      if (res.success) {
-        setResyncSuccessBotId(bot.botId)
-        setTimeout(() => setResyncSuccessBotId(null), 2000)
+      const res = await startBotIndexing(bot.botId, bot.websiteUrl)
+      if (res.success && res.data) {
+        // Large-site confirmation is a no-op here — the list view has no
+        // per-card dialog, so auto-confirm the top 50 pages rather than
+        // leaving the job silently stuck awaiting confirmation.
+        if (res.data.status === 'confirmation_required') {
+          await confirmBotIndexing(bot.botId, res.data.jobId)
+        }
+        setIndexingBotId(bot.botId)
       }
     } catch (error) {
       console.error('Failed to resync bot:', error)
     } finally {
-      setResyncingBotId(null)
+      setStartingResyncBotId(null)
     }
+  }
+
+  function handleResyncComplete() {
+    setIndexingBotId(null)
+    getMyBots().then((res) => setBots(res.data ?? []))
+  }
+
+  function handleResyncError(botId: string, error: string) {
+    console.error(`Resync failed for bot ${botId}:`, error)
   }
 
   async function handleCopyEmbed() {
@@ -213,18 +228,24 @@ export default function BotsPage() {
                   <button
                     type="button"
                     onClick={() => handleResync(bot)}
-                    disabled={resyncingBotId === bot.botId}
+                    disabled={startingResyncBotId === bot.botId || indexingBotId === bot.botId}
                     title="Resync website content"
                     className="text-slate-400 hover:text-indigo-600 transition-colors p-2 disabled:opacity-50"
                   >
-                    {resyncSuccessBotId === bot.botId ? (
-                      <Check size={14} className="text-emerald-600" />
-                    ) : (
-                      <RefreshCw size={14} className={resyncingBotId === bot.botId ? 'animate-spin' : ''} />
-                    )}
+                    <RefreshCw size={14} className={startingResyncBotId === bot.botId ? 'animate-spin' : ''} />
                   </button>
                 </div>
               </div>
+
+              {indexingBotId === bot.botId && (
+                <div className="mb-4">
+                  <IndexingProgress
+                    botId={bot.botId}
+                    onComplete={handleResyncComplete}
+                    onError={(err) => handleResyncError(bot.botId, err)}
+                  />
+                </div>
+              )}
 
               <button
                 type="button"

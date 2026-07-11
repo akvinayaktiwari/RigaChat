@@ -9,7 +9,7 @@ import {
   updateIndexingJob,
 } from '../repositories/bot-repository.js'
 import { deleteChunksByBotId } from '../repositories/vector-repository.js'
-import { indexWebsite, reindexBot } from './rag-service.js'
+import { reindexBot } from './rag-service.js'
 import { scanWebsite } from './crawler-service.js'
 import { enqueueCrawlerJob } from '../lib/sqs.js'
 import type { BotConfig, IndexingJob } from '../types/index.js'
@@ -36,28 +36,23 @@ interface CreateBotInput {
   leadFormFields: BotConfig['leadFormFields']
 }
 
-export async function setupBot(
-  input: CreateBotInput
-): Promise<{ bot: BotConfig; pagesIndexed: number; chunksIndexed: number }> {
+export async function setupBot(input: CreateBotInput): Promise<{ bot: BotConfig }> {
   const botId = uuidv4()
 
-  const bot = await createBot({
-    botId,
-    clientId: input.clientId,
-    name: input.name,
-    websiteUrl: input.websiteUrl,
-    greetingMessage: input.greetingMessage,
-    brandColor: input.brandColor,
-    leadTriggerAfterMessages: input.leadTriggerAfterMessages,
-    leadFormFields: input.leadFormFields,
-    widgetTrigger: input.widgetTrigger,
-  })
-
   try {
-    const { pagesIndexed, chunksIndexed } = await indexWebsite(botId, input.websiteUrl)
-    return { bot, pagesIndexed, chunksIndexed }
+    const bot = await createBot({
+      botId,
+      clientId: input.clientId,
+      name: input.name,
+      websiteUrl: input.websiteUrl,
+      greetingMessage: input.greetingMessage,
+      brandColor: input.brandColor,
+      leadTriggerAfterMessages: input.leadTriggerAfterMessages,
+      leadFormFields: input.leadFormFields,
+      widgetTrigger: input.widgetTrigger,
+    })
+    return { bot }
   } catch (error) {
-    await deleteBot(botId, input.clientId)
     throw new Error(
       `Failed to set up bot for client ${input.clientId}: ${error instanceof Error ? error.message : String(error)}`
     )
