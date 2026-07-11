@@ -129,6 +129,14 @@ export interface ClientRecord {
   updatedAt: string
 }
 
+export interface CacheQueryResult {
+  hit: boolean
+  data?: {
+    answer: string
+    similarity: number
+  }
+}
+
 export interface ConversationRecord {
   botId: string
   conversationId: string

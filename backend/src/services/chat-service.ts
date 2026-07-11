@@ -1,8 +1,10 @@
 import { v4 as uuidv4 } from 'uuid'
 import { appendMessage, createConversation, getConversation } from '../repositories/conversation-repository.js'
 import { retrieveContext } from './rag-service.js'
-import { streamChatResponse } from './openai-service.js'
+import { generateEmbedding, streamChatResponse } from './openai-service.js'
 import { getPublicConfig } from './bot-service.js'
+import { queryCacheNamespace } from '../repositories/vector-repository.js'
+import { saveToCache } from './cache-service.js'
 import type { ConversationMessage } from '../types/index.js'
 
 interface StartConversationInput {
@@ -44,6 +46,30 @@ export async function startConversation(
   }
 }
 
+async function* singleChunkGenerator(text: string): AsyncGenerator<string> {
+  yield text
+}
+
+// Wraps the LLM generator to accumulate the full answer as it streams out,
+// then writes it to cache once the last chunk has been yielded. Awaiting the
+// cache write here (rather than firing it off separately) keeps it inside the
+// still-open response stream, so Lambda can't freeze the execution
+// environment before it completes — the same class of bug fixed earlier for
+// suggestion pre-warming.
+async function* streamAndCache(
+  botId: string,
+  question: string,
+  questionEmbedding: number[],
+  upstream: AsyncGenerator<string>
+): AsyncGenerator<string> {
+  let fullAnswer = ''
+  for await (const chunk of upstream) {
+    fullAnswer += chunk
+    yield chunk
+  }
+  await saveToCache(botId, question, fullAnswer, questionEmbedding)
+}
+
 export async function streamMessage(input: SendMessageInput): Promise<AsyncGenerator<string>> {
   const conversation = await getConversation(input.botId, input.conversationId)
   if (!conversation) {
@@ -58,6 +84,14 @@ export async function streamMessage(input: SendMessageInput): Promise<AsyncGener
   await appendMessage(input.botId, input.conversationId, userMessage)
 
   const botConfig = await getPublicConfig(input.botId)
+  const queryEmbedding = await generateEmbedding(input.message)
+
+  const cacheResult = await queryCacheNamespace(input.botId, queryEmbedding)
+  if (cacheResult.hit && cacheResult.data) {
+    console.log(`Cache hit for bot ${input.botId}, similarity: ${cacheResult.data.similarity}`)
+    return singleChunkGenerator(cacheResult.data.answer)
+  }
+
   const contextChunks = await retrieveContext(input.botId, input.message)
 
   const systemPrompt = `You are a helpful assistant for this business.
@@ -65,13 +99,15 @@ Keep responses concise and helpful.
 Always be polite and professional.`
 
   // The assistant's response is saved after streaming completes, handled in the route layer.
-  return streamChatResponse({
+  const upstream = streamChatResponse({
     systemPrompt,
     contextChunks,
     conversationHistory: conversation.messages,
     userMessage: input.message,
     botName: botConfig.name,
   })
+
+  return streamAndCache(input.botId, input.message, queryEmbedding, upstream)
 }
 
 export async function saveAssistantMessage(

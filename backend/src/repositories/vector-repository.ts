@@ -1,5 +1,6 @@
+import { v4 as uuidv4 } from 'uuid'
 import { getIndex } from '../lib/pinecone.js'
-import type { Chunk, SimilarityResult, SuggestedQuestion } from '../types/index.js'
+import type { CacheQueryResult, Chunk, SimilarityResult, SuggestedQuestion } from '../types/index.js'
 
 const UPSERT_BATCH_SIZE = 100
 // text-embedding-3-small cosine similarity for genuinely relevant natural-language
@@ -10,6 +11,13 @@ const MIN_SIMILARITY_SCORE = 0.2
 // text-embedding-3-small always returns 1536-dimension vectors.
 const EMBEDDING_DIMENSION = 1536
 const SUGGESTION_CACHE_NAMESPACE_SUFFIX = '-cache'
+// Cache hits must be near-duplicate questions, not just loosely related ones —
+// unlike KB chunk retrieval (0.2 floor), a false-positive cache hit serves a
+// wrong answer outright rather than just weak context, so this floor is much
+// higher. Verbatim suggested-question clicks land at ~1.0; genuine paraphrases
+// of the same question typically land 0.90+. This is a judgment call, not a
+// value specified anywhere else in the codebase — tune if false hits/misses show up.
+const CACHE_HIT_THRESHOLD = 0.9
 
 interface VectorRecord {
   id: string
@@ -156,5 +164,61 @@ export async function deleteSuggestedQuestionsCache(botId: string): Promise<void
     await index.deleteMany({ botId: { $eq: botId }, source: { $eq: 'suggested' } })
   } catch (error) {
     console.error(`Failed to delete suggested question cache for bot ${botId}:`, error)
+  }
+}
+
+export async function queryCacheNamespace(
+  botId: string,
+  queryEmbedding: number[]
+): Promise<CacheQueryResult> {
+  try {
+    const index = getIndex().namespace(`${botId}${SUGGESTION_CACHE_NAMESPACE_SUFFIX}`)
+    const response = await index.query({
+      vector: queryEmbedding,
+      topK: 1,
+      filter: { botId: { $eq: botId } },
+      includeMetadata: true,
+    })
+
+    const [best] = response.matches ?? []
+    const similarity = best?.score ?? 0
+    const answer = typeof best?.metadata?.answer === 'string' ? best.metadata.answer : null
+
+    if (!answer || similarity < CACHE_HIT_THRESHOLD) {
+      return { hit: false }
+    }
+
+    return { hit: true, data: { answer, similarity } }
+  } catch (error) {
+    console.error(`Failed to query suggestion cache for bot ${botId}:`, error)
+    return { hit: false }
+  }
+}
+
+export async function upsertConversationCache(
+  botId: string,
+  question: string,
+  answer: string,
+  questionEmbedding: number[]
+): Promise<boolean> {
+  try {
+    const index = getIndex().namespace(`${botId}${SUGGESTION_CACHE_NAMESPACE_SUFFIX}`)
+    await index.upsert([
+      {
+        id: `conversation-${uuidv4()}-${botId}`,
+        values: questionEmbedding,
+        metadata: {
+          question,
+          answer,
+          botId,
+          createdAt: new Date().toISOString(),
+          source: 'conversation',
+        },
+      },
+    ])
+    return true
+  } catch (error) {
+    console.error(`Failed to cache conversation answer for bot ${botId}:`, error)
+    return false
   }
 }
