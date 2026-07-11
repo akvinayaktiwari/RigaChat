@@ -64,8 +64,9 @@ export async function generateAndPrewarmSuggestions(
 
 export async function getKbContentForBot(botId: string): Promise<string> {
   try {
-    const chunks = await getRepresentativeChunks(botId, 20)
-    return chunks.join('\n')
+    const chunks = await getRepresentativeChunks(botId, 40)
+    const content = chunks.join('\n')
+    return content.slice(0, 6000)
   } catch {
     return ''
   }

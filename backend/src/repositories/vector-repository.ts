@@ -98,7 +98,7 @@ export async function deleteChunksByBotId(botId: string): Promise<void> {
   }
 }
 
-export async function getRepresentativeChunks(botId: string, topK: number = 20): Promise<string[]> {
+export async function getRepresentativeChunks(botId: string, topK: number = 40): Promise<string[]> {
   try {
     const index = getIndex()
     // No specific query intent here — we want a broad sample of this bot's
