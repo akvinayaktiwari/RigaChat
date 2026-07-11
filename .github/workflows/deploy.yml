@@ -55,7 +55,10 @@ jobs:
             --arg whatsapp_provider "${{ vars.WHATSAPP_PROVIDER }}" \
             --arg whatsapp_master_number "${{ secrets.WHATSAPP_MASTER_NUMBER }}" \
             --arg whatsapp_kms_key_id "${{ secrets.WHATSAPP_KMS_KEY_ID }}" \
-            '. + {WHATSAPP_PROVIDER: $whatsapp_provider, WHATSAPP_MASTER_NUMBER: $whatsapp_master_number, WHATSAPP_KMS_KEY_ID: $whatsapp_kms_key_id}')
+            --arg redis_provider "${{ vars.REDIS_PROVIDER }}" \
+            --arg upstash_redis_rest_url "${{ secrets.UPSTASH_REDIS_REST_URL }}" \
+            --arg upstash_redis_rest_token "${{ secrets.UPSTASH_REDIS_REST_TOKEN }}" \
+            '. + {WHATSAPP_PROVIDER: $whatsapp_provider, WHATSAPP_MASTER_NUMBER: $whatsapp_master_number, WHATSAPP_KMS_KEY_ID: $whatsapp_kms_key_id, REDIS_PROVIDER: $redis_provider, UPSTASH_REDIS_REST_URL: $upstash_redis_rest_url, UPSTASH_REDIS_REST_TOKEN: $upstash_redis_rest_token}')
           aws lambda update-function-configuration \
             --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
             --region ${{ secrets.AWS_REGION }} \
@@ -89,7 +92,10 @@ jobs:
             --arg whatsapp_provider "${{ vars.WHATSAPP_PROVIDER }}" \
             --arg whatsapp_master_number "${{ secrets.WHATSAPP_MASTER_NUMBER }}" \
             --arg whatsapp_kms_key_id "${{ secrets.WHATSAPP_KMS_KEY_ID }}" \
-            '. + {WHATSAPP_PROVIDER: $whatsapp_provider, WHATSAPP_MASTER_NUMBER: $whatsapp_master_number, WHATSAPP_KMS_KEY_ID: $whatsapp_kms_key_id}')
+            --arg redis_provider "${{ vars.REDIS_PROVIDER }}" \
+            --arg upstash_redis_rest_url "${{ secrets.UPSTASH_REDIS_REST_URL }}" \
+            --arg upstash_redis_rest_token "${{ secrets.UPSTASH_REDIS_REST_TOKEN }}" \
+            '. + {WHATSAPP_PROVIDER: $whatsapp_provider, WHATSAPP_MASTER_NUMBER: $whatsapp_master_number, WHATSAPP_KMS_KEY_ID: $whatsapp_kms_key_id, REDIS_PROVIDER: $redis_provider, UPSTASH_REDIS_REST_URL: $upstash_redis_rest_url, UPSTASH_REDIS_REST_TOKEN: $upstash_redis_rest_token}')
           aws lambda update-function-configuration \
             --function-name ${{ secrets.LAMBDA_STREAMING_FUNCTION_NAME }} \
             --region ${{ secrets.AWS_REGION }} \
