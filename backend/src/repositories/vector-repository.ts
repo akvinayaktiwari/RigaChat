@@ -1,5 +1,5 @@
 import { getIndex } from '../lib/pinecone.js'
-import type { Chunk, SimilarityResult } from '../types/index.js'
+import type { Chunk, SimilarityResult, SuggestedQuestion } from '../types/index.js'
 
 const UPSERT_BATCH_SIZE = 100
 // text-embedding-3-small cosine similarity for genuinely relevant natural-language
@@ -7,6 +7,9 @@ const UPSERT_BATCH_SIZE = 100
 // discarded real matches (observed 0.25-0.30 scores for on-topic content) before
 // the LLM ever saw them, so retrieval always came back empty.
 const MIN_SIMILARITY_SCORE = 0.2
+// text-embedding-3-small always returns 1536-dimension vectors.
+const EMBEDDING_DIMENSION = 1536
+const SUGGESTION_CACHE_NAMESPACE_SUFFIX = '-cache'
 
 interface VectorRecord {
   id: string
@@ -92,5 +95,66 @@ export async function deleteChunksByBotId(botId: string): Promise<void> {
     throw new Error(
       `Failed to delete chunks for bot ${botId}: ${error instanceof Error ? error.message : String(error)}`
     )
+  }
+}
+
+export async function getRepresentativeChunks(botId: string, topK: number = 20): Promise<string[]> {
+  try {
+    const index = getIndex()
+    // No specific query intent here — we want a broad sample of this bot's
+    // knowledge base, not chunks relevant to any one topic, so a zero vector
+    // is used purely to satisfy Pinecone's required `vector` field while the
+    // botId metadata filter does all the real scoping.
+    const response = await index.query({
+      vector: new Array(EMBEDDING_DIMENSION).fill(0),
+      topK,
+      filter: { botId: { $eq: botId } },
+      includeMetadata: true,
+    })
+
+    return (response.matches ?? [])
+      .map((match) => (typeof match.metadata?.text === 'string' ? match.metadata.text : ''))
+      .filter((text): text is string => text.length > 0)
+  } catch (error) {
+    console.error(`Failed to fetch representative chunks for bot ${botId}:`, error)
+    return []
+  }
+}
+
+export async function upsertSuggestedQuestionCache(
+  botId: string,
+  question: SuggestedQuestion,
+  questionEmbedding: number[]
+): Promise<boolean> {
+  try {
+    const index = getIndex().namespace(`${botId}${SUGGESTION_CACHE_NAMESPACE_SUFFIX}`)
+    await index.upsert([
+      {
+        id: `suggested-${question.id}-${botId}`,
+        values: questionEmbedding,
+        metadata: {
+          question: question.question,
+          answer: question.answer,
+          botId,
+          createdAt: new Date().toISOString(),
+          source: 'suggested',
+          emoji: question.emoji,
+          category: question.category,
+        },
+      },
+    ])
+    return true
+  } catch (error) {
+    console.error(`Failed to cache suggested question ${question.id} for bot ${botId}:`, error)
+    return false
+  }
+}
+
+export async function deleteSuggestedQuestionsCache(botId: string): Promise<void> {
+  try {
+    const index = getIndex().namespace(`${botId}${SUGGESTION_CACHE_NAMESPACE_SUFFIX}`)
+    await index.deleteMany({ botId: { $eq: botId }, source: { $eq: 'suggested' } })
+  } catch (error) {
+    console.error(`Failed to delete suggested question cache for bot ${botId}:`, error)
   }
 }

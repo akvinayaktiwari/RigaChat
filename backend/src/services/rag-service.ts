@@ -2,7 +2,21 @@ import { v4 as uuidv4 } from 'uuid'
 import { generateEmbedding } from './openai-service.js'
 import { crawlWebsite, chunkText } from './crawler-service.js'
 import { upsertChunks, similaritySearch, deleteChunksByBotId } from '../repositories/vector-repository.js'
+import { getPublicBotConfig } from '../repositories/bot-repository.js'
+import { generateAndPrewarmSuggestions } from './suggestion-service.js'
 import type { Chunk } from '../types/index.js'
+
+// Fire and forget — suggestions regenerate in the background and never block
+// the KB upsert response. Looks up botName itself since callers here only
+// have botId in scope.
+function triggerSuggestionPrewarm(botId: string, kbContent: string): void {
+  getPublicBotConfig(botId)
+    .then((bot) => (bot ? generateAndPrewarmSuggestions(botId, kbContent, bot.name) : null))
+    .then((result) => {
+      if (result) console.log(`Suggestions generated for bot ${botId}:`, result)
+    })
+    .catch((error) => console.error(`Suggestion generation failed for bot ${botId}:`, error))
+}
 
 export async function indexWebsite(
   botId: string,
@@ -30,6 +44,9 @@ export async function indexWebsite(
     }
 
     await upsertChunks(chunks, embeddings)
+
+    // Fire and forget — suggestions generate in background, never blocks KB upsert response
+    triggerSuggestionPrewarm(botId, chunks.map((chunk) => chunk.text).join('\n\n'))
 
     return { pagesIndexed: pages.length, chunksIndexed: chunks.length }
   } catch (error) {
@@ -62,6 +79,9 @@ export async function indexKnowledgeBaseEntry(
     }
 
     await upsertChunks(chunks, embeddings)
+
+    // Fire and forget — suggestions generate in background, never blocks KB upsert response
+    triggerSuggestionPrewarm(botId, combinedText)
   } catch (error) {
     throw new Error(
       `Failed to index knowledge base entry ${entryId} for bot ${botId}: ${error instanceof Error ? error.message : String(error)}`

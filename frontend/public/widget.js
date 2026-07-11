@@ -25,7 +25,9 @@
     isLoading: false,
     leadCaptured: false,
     botConfig: null,
-    started: false
+    started: false,
+    suggestions: [],
+    showSuggestions: true
   };
   var shadowRoot = null;
   var els = {};
@@ -108,7 +110,13 @@
     '#ciq-send:hover{opacity:.9}' +
     '#ciq-send:disabled{opacity:.4;cursor:default}' +
     '@media (max-width:480px){#ciq-window{width:calc(100vw - 24px);right:12px}' +
-    '#ciq-bubble{bottom:12px;right:12px}}';
+    '#ciq-bubble{bottom:12px;right:12px}}' +
+    '#ciq-suggestions{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 12px 16px}' +
+    '.ciq-chip{display:flex;align-items:center;gap:6px;padding:8px 12px;background:#fff;' +
+    'border:1px solid #e5e7eb;border-radius:999px;font-size:13px;color:#111827;cursor:pointer;' +
+    'transition:background .2s,border-color .2s,color .2s;box-shadow:0 1px 2px rgba(0,0,0,.04)}' +
+    '.ciq-chip:hover{background:#f9fafb;border-color:var(--brand);color:var(--brand)}' +
+    '.ciq-chip-text{font-weight:500}';
   var BUBBLE_ICON =
     '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
     '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="white"/></svg>';
@@ -133,6 +141,7 @@
     '<button id="ciq-close" aria-label="Close chat">✕</button>' +
     '</div>' +
     '<div id="ciq-messages"></div>' +
+    '<div id="ciq-suggestions"></div>' +
     '<div id="ciq-lead-form" class="ciq-hidden">' +
     '<p>Please share your details and we\'ll be in touch.</p>' +
     '<input id="ciq-lead-name" type="text" placeholder="Your Name" required />' +
@@ -177,6 +186,7 @@
       els.botName = shadowRoot.getElementById('ciq-bot-name-text');
       els.close = shadowRoot.getElementById('ciq-close');
       els.messages = shadowRoot.getElementById('ciq-messages');
+      els.suggestions = shadowRoot.getElementById('ciq-suggestions');
       els.leadForm = shadowRoot.getElementById('ciq-lead-form');
       els.leadError = shadowRoot.getElementById('ciq-lead-error');
       els.leadSubmit = shadowRoot.getElementById('ciq-lead-submit');
@@ -186,6 +196,7 @@
       els.botName.textContent = botName;
       els.avatar.textContent = (botName || 'AI').trim().substring(0, 2).toUpperCase();
       els.bubble.classList.add('ciq-hidden');
+      pickSuggestions();
       bindEvents();
       applyTrigger();
     } catch (e) {
@@ -194,6 +205,43 @@
   }
   function showBubble() {
     if (els.bubble) els.bubble.classList.remove('ciq-hidden');
+  }
+  function pickSuggestions() {
+    var pool = (state.botConfig.suggestedQuestions || []).slice();
+    for (var i = pool.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = pool[i];
+      pool[i] = pool[j];
+      pool[j] = tmp;
+    }
+    state.suggestions = pool.slice(0, 4);
+  }
+  function renderSuggestions() {
+    els.suggestions.innerHTML = '';
+    if (!state.showSuggestions || !state.suggestions.length) return;
+    state.suggestions.forEach(function (s) {
+      var chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'ciq-chip';
+      var emojiSpan = document.createElement('span');
+      emojiSpan.textContent = s.emoji || '';
+      var textSpan = document.createElement('span');
+      textSpan.className = 'ciq-chip-text';
+      textSpan.textContent = s.question;
+      chip.appendChild(emojiSpan);
+      chip.appendChild(textSpan);
+      chip.addEventListener('click', function () {
+        handleSuggestionClick(s);
+      });
+      els.suggestions.appendChild(chip);
+    });
+  }
+  function handleSuggestionClick(s) {
+    state.showSuggestions = false;
+    renderSuggestions();
+    state.messages.push({ role: 'user', text: s.question });
+    addMessage('user', s.question);
+    sendMessage(s.question);
   }
   function applyTrigger() {
     var trigger = state.botConfig.widgetTrigger;
@@ -307,6 +355,7 @@
         var greeting = json.data.greeting || state.botConfig.greetingMessage || '';
         state.messages.push({ role: 'bot', text: greeting });
         addMessage('bot', greeting);
+        renderSuggestions();
       })
       .catch(function () {
         addMessage('bot', 'Something went wrong. Please try again.');
@@ -316,6 +365,8 @@
     var text = (els.input.value || '').trim();
     if (!text || state.isLoading || !state.conversationId) return;
     els.input.value = '';
+    state.showSuggestions = false;
+    renderSuggestions();
     state.messages.push({ role: 'user', text: text });
     addMessage('user', text);
     sendMessage(text);
