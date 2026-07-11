@@ -237,6 +237,28 @@ function normalizePageFactsField(value: string | string[]): string {
   return Array.isArray(value) ? value.join('\n') : value
 }
 
+function repairJson(raw: string): string {
+  let text = stripMarkdownFences(raw).trim()
+
+  // Find the last complete property before truncation
+  // by finding the last valid closing brace position
+  const lastBrace = text.lastIndexOf('}')
+  if (lastBrace === -1) return text
+
+  // Truncate anything after the last closing brace
+  text = text.slice(0, lastBrace + 1)
+
+  // Fix common GPT truncation: unclosed string values
+  // Count unmatched quotes
+  const quoteCount = (text.match(/(?<!\\)"/g) ?? []).length
+  if (quoteCount % 2 !== 0) {
+    // Find last property and close it
+    text = text.replace(/,?\s*"[^"]*$/, '') + '}'
+  }
+
+  return text
+}
+
 export async function extractPageFacts(
   pageText: string,
   pageTitle: string,
@@ -254,7 +276,19 @@ export async function extractPageFacts(
       temperature: 0,
     })
 
-    const parsed: unknown = JSON.parse(stripMarkdownFences(response))
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(stripMarkdownFences(response))
+    } catch {
+      // Attempt repair on malformed JSON
+      try {
+        parsed = JSON.parse(repairJson(stripMarkdownFences(response)))
+        console.log('JSON repaired for page:', pageTitle)
+      } catch {
+        throw new Error('Fact extraction returned unparseable JSON')
+      }
+    }
+
     if (!isPageFacts(parsed)) {
       throw new Error('Fact extraction returned an unexpected shape')
     }
