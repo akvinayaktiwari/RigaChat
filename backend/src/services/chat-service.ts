@@ -111,9 +111,16 @@ export async function streamMessage(input: SendMessageInput): Promise<AsyncGener
 
   const contextChunks = await retrieveContext(input.botId, input.message, queryEmbedding)
 
-  const systemPrompt = `You are ${botConfig.name}, a helpful AI assistant.
-Answer questions concisely using only the provided context. Keep responses under 3 sentences when possible.
-If you cannot answer from the context, say so briefly.`
+  const systemPrompt = `You are ${botConfig.name}, an AI assistant for this business. Your job is to help visitors understand what this business offers.
+
+STRICT RULES — follow these without exception:
+1. Only answer using information from the provided context. Never add information not in the context.
+2. If the context does not contain the answer, say exactly: "I don't have that information right now. Would you like to speak with our team?"
+3. Never contradict information you provided earlier in this conversation.
+4. Never make up prices, fees, availability, or contact details.
+5. If asked something outside this business's scope, politely redirect to what this business does.
+
+Keep responses concise — under 4 sentences when possible. Be helpful and professional.`
 
   // The assistant's response is saved after streaming completes, handled in the route layer.
   const upstream = streamChatResponse({

@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { crawlPagesParallel, chunkWithContext, chunkFacts } from './crawler-service.js'
 import { extractPageFacts, generateEmbeddingsBatch } from './openai-service.js'
 import { upsertChunks } from '../repositories/vector-repository.js'
-import { getPublicBotConfig, updateIndexingJob } from '../repositories/bot-repository.js'
+import { claimCrawlerJob, getPublicBotConfig, updateIndexingJob } from '../repositories/bot-repository.js'
 import { generateAndPrewarmSuggestions } from './suggestion-service.js'
 import type { CrawlerJobMessage } from '../lib/sqs.js'
 import type { Chunk } from '../types/index.js'
@@ -140,12 +140,16 @@ async function prewarmSuggestionsForJob(botId: string, chunks: Chunk[]): Promise
 }
 
 export async function processCrawlerJob(job: CrawlerJobMessage): Promise<void> {
-  try {
-    await updateIndexingJob(job.botId, job.clientId, {
-      status: 'processing',
-      startedAt: new Date().toISOString(),
-    })
+  // Idempotency check — only one Lambda processes this job. SQS's at-least-once
+  // delivery can invoke this twice for the same message; this atomic conditional
+  // write ensures only the first invocation transitions 'queued' -> 'processing'.
+  const claimed = await claimCrawlerJob(job.botId, job.clientId, job.jobId)
+  if (!claimed) {
+    console.log(`Job ${job.jobId} already claimed by another invocation — skipping duplicate`)
+    return // SQS will not retry since no error thrown
+  }
 
+  try {
     console.log(`Starting crawl for bot ${job.botId}: ${job.urls.length} pages`)
 
     const { chunks, pageCount } = await crawlAndChunk(job)

@@ -127,6 +127,39 @@ export async function updateIndexingJob(
   }
 }
 
+// Atomic claim to guard against SQS at-least-once delivery causing two
+// concurrent Lambda invocations to both crawl and upsert the same job.
+// Only one invocation's conditional write can succeed in transitioning
+// status 'queued' -> 'processing'; the loser gets ConditionalCheckFailedException
+// and must skip, not throw (a thrown error would make SQS retry, which is
+// the same duplicate-processing problem this exists to prevent).
+export async function claimCrawlerJob(botId: string, clientId: string, jobId: string): Promise<boolean> {
+  try {
+    await dynamoClient.send(
+      new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { clientId, botId },
+        UpdateExpression: 'SET indexingJob.#status = :processing, indexingJob.startedAt = :now',
+        ConditionExpression: 'indexingJob.jobId = :jobId AND indexingJob.#status = :queued',
+        ExpressionAttributeNames: { '#status': 'status' },
+        ExpressionAttributeValues: {
+          ':processing': 'processing',
+          ':queued': 'queued',
+          ':jobId': jobId,
+          ':now': new Date().toISOString(),
+        },
+      })
+    )
+    return true
+  } catch (error) {
+    if (error instanceof Error && error.name === 'ConditionalCheckFailedException') {
+      return false
+    }
+    console.error(`Failed to claim crawler job ${jobId} for bot ${botId}:`, error)
+    return false
+  }
+}
+
 export async function getPublicBotConfig(botId: string): Promise<BotConfig | null> {
   try {
     const result = await dynamoClient.send(

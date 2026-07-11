@@ -1,5 +1,6 @@
 import * as cheerio from 'cheerio'
 import fetch from 'node-fetch'
+import { XMLParser } from 'fast-xml-parser'
 import { generateChatCompletion } from './openai-service.js'
 
 interface CrawlResult {
@@ -188,15 +189,93 @@ export function extractLinks(html: string, baseUrl: string): string[] {
   return Array.from(links)
 }
 
+interface SitemapUrlEntry {
+  loc?: string
+}
+
+interface ParsedSitemap {
+  urlset?: { url?: SitemapUrlEntry | SitemapUrlEntry[] }
+  sitemapindex?: { sitemap?: SitemapUrlEntry | SitemapUrlEntry[] }
+}
+
+const SITEMAP_FETCH_TIMEOUT_MS = 5_000
+const MAX_SITEMAP_URLS = 200
+const SITEMAP_PATHS = ['/sitemap.xml', '/sitemap_index.xml', '/sitemap.txt']
+
+async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Awaited<ReturnType<typeof fetch>>> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { signal: controller.signal })
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+function extractSitemapXmlUrls(xmlText: string): string[] {
+  const parsed = new XMLParser().parse(xmlText) as ParsedSitemap
+  const raw = parsed.urlset?.url ?? parsed.sitemapindex?.sitemap ?? []
+  const entries = Array.isArray(raw) ? raw : [raw]
+  return entries.map((entry) => entry?.loc).filter((loc): loc is string => typeof loc === 'string')
+}
+
+function filterSitemapUrls(urls: string[], baseUrl: string): string[] {
+  const baseHostname = new URL(baseUrl).hostname
+  const filtered = urls.filter((url) => {
+    try {
+      const parsed = new URL(url)
+      if (parsed.hostname !== baseHostname) return false
+      if (NON_CONTENT_EXTENSIONS.some((ext) => parsed.pathname.toLowerCase().endsWith(ext))) return false
+      if (SKIP_URL_PATTERNS.some((pattern) => parsed.pathname.toLowerCase().includes(pattern))) return false
+      return true
+    } catch {
+      return false
+    }
+  })
+  return filtered.slice(0, MAX_SITEMAP_URLS)
+}
+
+async function fetchSitemap(baseUrl: string): Promise<string[]> {
+  const root = baseUrl.replace(/\/$/, '')
+
+  for (const path of SITEMAP_PATHS) {
+    try {
+      const response = await fetchWithTimeout(`${root}${path}`, SITEMAP_FETCH_TIMEOUT_MS)
+      if (!response.ok) continue
+
+      const text = await response.text()
+      const urls = path.endsWith('.txt')
+        ? text.split('\n').map((line) => line.trim()).filter(Boolean)
+        : extractSitemapXmlUrls(text)
+
+      if (urls.length > 0) return filterSitemapUrls(urls, baseUrl)
+    } catch (error) {
+      console.error(`Sitemap fetch failed for ${root}${path}:`, error)
+    }
+  }
+
+  return []
+}
+
 export async function scanWebsite(baseUrl: string): Promise<ScanResult> {
+  const sitemapUrls = await fetchSitemap(baseUrl)
+
   const html = await fetchHtml(baseUrl)
-  const allLinks = extractLinks(html, baseUrl)
-  const prioritized = prioritizeUrls(allLinks)
+  const htmlUrls = extractLinks(html, baseUrl)
+
+  const allUrls = [...new Set([...sitemapUrls, ...htmlUrls])].filter((url) => url !== baseUrl)
+  const prioritized = prioritizeUrls(allUrls)
+
   const total = prioritized.length + 1
+  const selectedPages = [baseUrl, ...prioritized.slice(0, MAX_PAGES - 1)]
+
+  console.log(
+    `URL discovery: ${sitemapUrls.length} from sitemap, ${htmlUrls.length} from HTML, ${prioritized.length} unique after dedup, ${selectedPages.length} selected`
+  )
 
   return {
     totalPages: total,
-    selectedPages: [baseUrl, ...prioritized.slice(0, MAX_PAGES - 1)],
+    selectedPages,
     requiresConfirmation: total > MAX_PAGES,
   }
 }

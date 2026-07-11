@@ -20,6 +20,7 @@
     "aws-jwt-verify": "^4.0.1",
     "cheerio": "^1.0.0",
     "dotenv": "^16.4.5",
+    "fast-xml-parser": "^5.10.0",
     "hono": "^4.6.0",
     "node-fetch": "^3.3.2",
     "openai": "^4.63.0",
