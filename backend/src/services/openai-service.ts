@@ -106,12 +106,6 @@ export async function* streamChatResponse(params: StreamChatParams): AsyncGenera
 
   const fullSystemPrompt = `${systemPrompt}
 
-You are ${botName}, a helpful assistant.
-Only answer using the context provided below.
-If the answer is not in the context, respond with:
-'I don't have that information right now. Would you like to speak with our team?'
-Do not make up any information.
-
 Context:
 ${contextChunks.join('\n\n')}`
 
@@ -127,7 +121,7 @@ ${contextChunks.join('\n\n')}`
     const stream = await openaiClient.chat.completions.create({
       model: 'gpt-4o-mini',
       stream: true,
-      max_tokens: 1000,
+      max_tokens: 300,
       messages,
     })
 

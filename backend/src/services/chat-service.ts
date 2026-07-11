@@ -83,10 +83,15 @@ export async function streamMessage(input: SendMessageInput): Promise<AsyncGener
   }
   await appendMessage(input.botId, input.conversationId, userMessage)
 
-  const botConfig = await getPublicConfig(input.botId)
-  const queryEmbedding = await generateEmbedding(input.message)
+  const t0 = Date.now()
+
+  const [queryEmbedding, botConfig] = await Promise.all([
+    generateEmbedding(input.message),
+    getPublicConfig(input.botId),
+  ])
 
   const cacheResult = await queryCacheNamespace(input.botId, queryEmbedding)
+  console.log(`Pre-LLM total: ${Date.now() - t0}ms`)
   if (cacheResult.hit && cacheResult.data) {
     console.log(`Cache hit for bot ${input.botId}, similarity: ${cacheResult.data.similarity}`)
     return singleChunkGenerator(cacheResult.data.answer)
@@ -94,9 +99,9 @@ export async function streamMessage(input: SendMessageInput): Promise<AsyncGener
 
   const contextChunks = await retrieveContext(input.botId, input.message, queryEmbedding)
 
-  const systemPrompt = `You are a helpful assistant for this business.
-Keep responses concise and helpful.
-Always be polite and professional.`
+  const systemPrompt = `You are ${botConfig.name}, a helpful AI assistant.
+Answer questions concisely using only the provided context. Keep responses under 3 sentences when possible.
+If you cannot answer from the context, say so briefly.`
 
   // The assistant's response is saved after streaming completes, handled in the route layer.
   const upstream = streamChatResponse({
