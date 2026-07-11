@@ -18,6 +18,9 @@ const SUGGESTION_CACHE_NAMESPACE_SUFFIX = '-cache'
 // of the same question typically land 0.90+. This is a judgment call, not a
 // value specified anywhere else in the codebase — tune if false hits/misses show up.
 const CACHE_HIT_THRESHOLD = 0.9
+// Cached conversation answers older than this are never served — they stay in
+// Pinecone (free tier, no delete needed) but drop out of query results once stale.
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 interface VectorRecord {
   id: string
@@ -176,7 +179,10 @@ export async function queryCacheNamespace(
     const response = await index.query({
       vector: queryEmbedding,
       topK: 1,
-      filter: { botId: { $eq: botId } },
+      filter: {
+        botId: { $eq: botId },
+        createdAt: { $gte: new Date(Date.now() - CACHE_TTL_MS).toISOString() },
+      },
       includeMetadata: true,
     })
 
