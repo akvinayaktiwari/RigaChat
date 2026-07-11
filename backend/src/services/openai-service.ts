@@ -205,6 +205,11 @@ interface PageFacts {
   paragraphs: string
 }
 
+interface RawPageFacts {
+  facts: string | string[]
+  paragraphs: string | string[]
+}
+
 const FACT_EXTRACTION_MIN_LENGTH = 200
 const FACT_EXTRACTION_INPUT_CHARS = 3000
 const FACT_EXTRACTION_MAX_TOKENS = 1000
@@ -214,19 +219,22 @@ Extract information from this business webpage that a customer would want to kno
 
 Return a JSON object with exactly two fields:
 {
-  "facts": "Key facts as bullet points. Each bullet = one specific piece of information. Examples: pricing, hours, location, features, contact details, policies, specifications. Only facts explicitly stated on the page.",
-  "paragraphs": "Clean readable paragraphs. Remove navigation, footers, cookie notices, legal boilerplate, social media buttons. Keep only meaningful business content. Write in clear complete sentences."
+  "facts": "Key facts as a single string with each fact on its own line starting with a dash. Example:\\n- Location: Whitefield, Bangalore\\n- Price: Starting ₹1.2 Cr\\n- Configurations: 2BHK, 3BHK, 4BHK\\nOnly facts explicitly stated on the page.",
+  "paragraphs": "Clean readable paragraphs as a single string. Remove navigation, footers, cookie notices, legal boilerplate. Keep only meaningful business content in complete sentences."
 }
 
 Return ONLY the JSON object. No markdown. No preamble.`
 
-function isPageFacts(value: unknown): value is PageFacts {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as PageFacts).facts === 'string' &&
-    typeof (value as PageFacts).paragraphs === 'string'
-  )
+function isPageFacts(value: unknown): value is RawPageFacts {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  const hasFacts = typeof v.facts === 'string' || Array.isArray(v.facts)
+  const hasParagraphs = typeof v.paragraphs === 'string' || Array.isArray(v.paragraphs)
+  return hasFacts && hasParagraphs
+}
+
+function normalizePageFactsField(value: string | string[]): string {
+  return Array.isArray(value) ? value.join('\n') : value
 }
 
 export async function extractPageFacts(
@@ -250,7 +258,15 @@ export async function extractPageFacts(
     if (!isPageFacts(parsed)) {
       throw new Error('Fact extraction returned an unexpected shape')
     }
-    return parsed
+
+    const result: PageFacts = {
+      facts: normalizePageFactsField(parsed.facts),
+      paragraphs: normalizePageFactsField(parsed.paragraphs),
+    }
+    console.log(
+      `Facts extracted for "${pageTitle}": ${result.facts ? 'yes' : 'no'}, paragraphs: ${result.paragraphs.length} chars`
+    )
+    return result
   } catch (error) {
     console.error('Fact extraction failed:', error)
     return { facts: '', paragraphs: pageText }
