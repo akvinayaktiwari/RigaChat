@@ -91,9 +91,13 @@ export async function indexKnowledgeBaseEntry(
   }
 }
 
-export async function retrieveContext(botId: string, query: string): Promise<string[]> {
+export async function retrieveContext(
+  botId: string,
+  query: string,
+  existingEmbedding?: number[]
+): Promise<string[]> {
   try {
-    const queryEmbedding = await generateEmbedding(query)
+    const queryEmbedding = existingEmbedding ?? (await generateEmbedding(query))
     const results = await similaritySearch(botId, queryEmbedding, 5)
     return results.map((result) => result.text)
   } catch (error) {

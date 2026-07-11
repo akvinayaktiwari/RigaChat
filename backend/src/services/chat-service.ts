@@ -92,7 +92,7 @@ export async function streamMessage(input: SendMessageInput): Promise<AsyncGener
     return singleChunkGenerator(cacheResult.data.answer)
   }
 
-  const contextChunks = await retrieveContext(input.botId, input.message)
+  const contextChunks = await retrieveContext(input.botId, input.message, queryEmbedding)
 
   const systemPrompt = `You are a helpful assistant for this business.
 Keep responses concise and helpful.
