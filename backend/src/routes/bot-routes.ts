@@ -9,7 +9,8 @@ import {
   setupBot,
   updateBotConfig,
 } from '../services/bot-service.js'
-import type { ApiResponse, BotConfig } from '../types/index.js'
+import { generateAndPrewarmSuggestions, getKbContentForBot } from '../services/suggestion-service.js'
+import type { ApiResponse, BotConfig, PrewarmResult } from '../types/index.js'
 
 interface AuthEnv {
   Variables: {
@@ -131,6 +132,34 @@ botRoutes.delete('/:botId', requireAuth, async (c) => {
   try {
     await removeBot(botId, clientId)
     return c.json<ApiResponse<{ message: string }>>({ success: true, data: { message: 'Bot deleted' } }, 200)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Bot not found') {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+botRoutes.post('/:botId/regenerate-suggestions', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const botId = c.req.param('botId')
+
+  try {
+    const bot = await getBotConfig(botId, clientId)
+    const kbContent = await getKbContentForBot(botId)
+
+    if (!kbContent) {
+      return c.json<ApiResponse<null>>(
+        { success: false, error: 'No knowledge base found. Add website content before generating suggestions.' },
+        400
+      )
+    }
+
+    const result = await generateAndPrewarmSuggestions(botId, kbContent, bot.name)
+    return c.json<ApiResponse<{ message: string; result: PrewarmResult }>>(
+      { success: true, data: { message: 'Suggestions regenerated successfully', result } },
+      200
+    )
   } catch (error) {
     if (error instanceof Error && error.message === 'Bot not found') {
       return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)

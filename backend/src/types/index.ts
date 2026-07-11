@@ -26,8 +26,24 @@ export interface BotConfig {
   leadTriggerAfterMessages: number
   leadFormFields: LeadFormField[]
   widgetTrigger: 'immediate' | 'delay_5s' | 'scroll_50' | 'exit_intent'
+  suggestedQuestions?: SuggestedQuestion[]
   createdAt: string
   updatedAt: string
+}
+
+export interface SuggestedQuestion {
+  id: string
+  question: string
+  answer: string
+  emoji: string
+  category: 'pricing' | 'features' | 'support' | 'general' | 'contact'
+  order: number
+}
+
+export interface PrewarmResult {
+  generated: number
+  prewarmSuccess: number
+  prewarmFailed: number
 }
 
 export interface LeadFormField {
@@ -111,6 +127,14 @@ export interface ClientRecord {
   whatsappConnection?: WhatsAppConnection
   createdAt: string
   updatedAt: string
+}
+
+export interface CacheQueryResult {
+  hit: boolean
+  data?: {
+    answer: string
+    similarity: number
+  }
 }
 
 export interface ConversationRecord {

@@ -73,7 +73,7 @@ export async function getPublicConfig(botId: string): Promise<BotConfig> {
   if (!bot) {
     throw new Error('Bot not found')
   }
-  return bot
+  return { ...bot, suggestedQuestions: bot.suggestedQuestions ?? [] }
 }
 
 export async function updateBotConfig(
