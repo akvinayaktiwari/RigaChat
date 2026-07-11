@@ -9,6 +9,7 @@ export interface CrawlerJobMessage {
   clientId: string
   urls: string[]
   useAICleaning: boolean
+  botName: string
 }
 
 export async function enqueueCrawlerJob(job: CrawlerJobMessage): Promise<void> {

@@ -261,3 +261,83 @@ export function chunkTextSemantic(
 export function chunkText(text: string, _chunkSize: number = 400, _overlap: number = 50): string[] {
   return chunkTextSemantic(text)
 }
+
+const CONTEXT_PREFIX_MAX_LENGTH = 80
+const CONTEXT_PREFIX_FIELD_MAX_LENGTH = CONTEXT_PREFIX_MAX_LENGTH / 2
+const OPTIMAL_CHUNK_WORDS = 150
+const CHUNK_OVERLAP_SENTENCES = 1
+const MIN_FACT_CHUNK_WORDS = 3
+const FACTS_PER_CHUNK = 5
+
+function buildContextPrefix(botName: string, pageTitle: string): string {
+  const clean = (value: string) =>
+    value
+      .replace(/[^a-zA-Z0-9\s-]/g, '')
+      .trim()
+      .slice(0, CONTEXT_PREFIX_FIELD_MAX_LENGTH)
+
+  return `[${clean(botName)}] [${clean(pageTitle)}]: `
+}
+
+export function chunkWithContext(
+  text: string,
+  botName: string,
+  pageTitle: string,
+  wordsPerChunk: number = OPTIMAL_CHUNK_WORDS
+): string[] {
+  if (text.length === 0) return []
+
+  const prefix = buildContextPrefix(botName, pageTitle)
+
+  const sentences = text
+    .replace(/([.!?])\s+/g, '$1|||')
+    .split('|||')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 20)
+    .filter((s) => s.split(' ').length >= 3)
+
+  if (sentences.length === 0) return []
+
+  const chunks: string[] = []
+  let currentSentences: string[] = []
+  let currentWordCount = 0
+
+  for (const sentence of sentences) {
+    const wordCount = sentence.split(' ').length
+
+    if (currentWordCount + wordCount > wordsPerChunk && currentSentences.length > 0) {
+      chunks.push(prefix + currentSentences.join(' '))
+      currentSentences = currentSentences.slice(-CHUNK_OVERLAP_SENTENCES)
+      currentWordCount = currentSentences.join(' ').split(' ').length
+    }
+
+    currentSentences.push(sentence)
+    currentWordCount += wordCount
+  }
+
+  if (currentSentences.length > 0) {
+    chunks.push(prefix + currentSentences.join(' '))
+  }
+
+  return chunks.filter((c) => c.split(' ').length >= MIN_CHUNK_WORDS)
+}
+
+export function chunkFacts(facts: string, botName: string, pageTitle: string): string[] {
+  if (facts.length === 0) return []
+
+  const prefix = buildContextPrefix(botName, pageTitle)
+
+  const lines = facts
+    .split(/\n|•|-/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 20)
+    .filter((l) => l.split(' ').length >= MIN_FACT_CHUNK_WORDS)
+
+  const chunks: string[] = []
+  for (let i = 0; i < lines.length; i += FACTS_PER_CHUNK) {
+    const group = lines.slice(i, i + FACTS_PER_CHUNK)
+    chunks.push(prefix + group.join('. '))
+  }
+
+  return chunks
+}

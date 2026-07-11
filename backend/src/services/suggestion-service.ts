@@ -75,11 +75,20 @@ export async function generateAndPrewarmSuggestions(
   }
 }
 
+const MAX_FACT_SENTENCES = 8
+const KB_CONTENT_MAX_CHARS = 12000
+
+// Chunks written with a "[BotName] [Page Title]: " context prefix that also
+// bundle several short bullet-style facts (few sentences, joined with ". ")
+// are the fact chunks from chunkFacts() — denser, more direct signal than
+// prose paragraphs, so they're surfaced first for suggestion generation.
 export async function getKbContentForBot(botId: string): Promise<string> {
   try {
-    const chunks = await getRepresentativeChunks(botId, 40)
-    const content = chunks.join('\n')
-    return content.slice(0, 6000)
+    const chunks = await getRepresentativeChunks(botId, 60)
+    const factChunks = chunks.filter((c) => c.includes(']: ') && c.split('.').length <= MAX_FACT_SENTENCES)
+    const paraChunks = chunks.filter((c) => !factChunks.includes(c))
+    const ordered = [...factChunks, ...paraChunks]
+    return ordered.join('\n').slice(0, KB_CONTENT_MAX_CHARS)
   } catch {
     return ''
   }

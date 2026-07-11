@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid'
-import { crawlPagesParallel, chunkTextSemantic } from './crawler-service.js'
-import { generateEmbeddingsBatch } from './openai-service.js'
+import { crawlPagesParallel, chunkWithContext, chunkFacts } from './crawler-service.js'
+import { extractPageFacts, generateEmbeddingsBatch } from './openai-service.js'
 import { upsertChunks } from '../repositories/vector-repository.js'
 import { getPublicBotConfig, updateIndexingJob } from '../repositories/bot-repository.js'
 import { generateAndPrewarmSuggestions } from './suggestion-service.js'
@@ -12,8 +12,49 @@ interface CrawlAndChunkResult {
   pageCount: number
 }
 
+interface EnrichedChunkResult {
+  chunks: Chunk[]
+  factsExtracted: number
+  factsSkipped: number
+}
+
+// Facts and paragraphs are chunked and embedded separately (Option C) — facts
+// give dense, high-precision hits for direct questions ("what's the price?"),
+// paragraphs preserve context for open-ended ones. Per-page GPT-4o-mini calls
+// run sequentially, not in parallel, to avoid hammering OpenAI's rate limits
+// across a 50-page crawl.
+async function buildEnrichedChunks(
+  pages: Awaited<ReturnType<typeof crawlPagesParallel>>,
+  botId: string,
+  botName: string
+): Promise<EnrichedChunkResult> {
+  const chunks: Chunk[] = []
+  let factsExtracted = 0
+  let factsSkipped = 0
+
+  for (const page of pages) {
+    const { facts, paragraphs } = await extractPageFacts(page.content, page.title, botName)
+
+    const paragraphChunks = chunkWithContext(paragraphs || page.content, botName, page.title)
+    const factChunks = chunkFacts(facts, botName, page.title)
+
+    if (factChunks.length > 0) factsExtracted++
+    else factsSkipped++
+
+    const createdAt = new Date().toISOString()
+    for (const text of [...paragraphChunks, ...factChunks]) {
+      chunks.push({ chunkId: uuidv4(), botId, text, sourceUrl: page.url, createdAt })
+    }
+  }
+
+  return { chunks, factsExtracted, factsSkipped }
+}
+
 async function crawlAndChunk(job: CrawlerJobMessage): Promise<CrawlAndChunkResult> {
-  const pages = await crawlPagesParallel(job.urls, job.useAICleaning, async (crawled, total) => {
+  // useAICleaning disabled — extractPageFacts() already removes boilerplate
+  // and returns clean paragraphs, so running cleanContentWithAI() first would
+  // just be a second, redundant GPT-4o-mini call per page.
+  const pages = await crawlPagesParallel(job.urls, false, async (crawled, total) => {
     await updateIndexingJob(job.botId, job.clientId, { crawledPages: crawled })
     console.log(`Progress: ${crawled}/${total}`)
   })
@@ -22,18 +63,11 @@ async function crawlAndChunk(job: CrawlerJobMessage): Promise<CrawlAndChunkResul
     throw new Error('No content could be extracted')
   }
 
-  const chunks: Chunk[] = []
-  for (const page of pages) {
-    for (const chunkString of chunkTextSemantic(page.content)) {
-      chunks.push({
-        chunkId: uuidv4(),
-        botId: job.botId,
-        text: chunkString,
-        sourceUrl: page.url,
-        createdAt: new Date().toISOString(),
-      })
-    }
-  }
+  const { chunks, factsExtracted, factsSkipped } = await buildEnrichedChunks(pages, job.botId, job.botName)
+  console.log(
+    `Chunks built: ${chunks.length} total (${factsExtracted} pages with facts extracted, ${factsSkipped} pages without facts)`
+  )
+
   return { chunks, pageCount: pages.length }
 }
 
