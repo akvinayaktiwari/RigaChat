@@ -18,22 +18,56 @@ interface EnrichedChunkResult {
   factsSkipped: number
 }
 
+type CrawledPage = Awaited<ReturnType<typeof crawlPagesParallel>>[number]
+type PageFactsResult = Awaited<ReturnType<typeof extractPageFacts>>
+
+const FACT_EXTRACTION_BATCH_SIZE = 5
+
+// gpt-4o-mini's rate limit is 500 RPM. 5 concurrent calls per batch leaves
+// safe headroom for multiple bots indexing at once — 10 was considered but
+// risks 429s under concurrent load.
+async function extractFactsBatch(pages: CrawledPage[], botName: string): Promise<PageFactsResult[]> {
+  const results: PageFactsResult[] = []
+
+  for (let i = 0; i < pages.length; i += FACT_EXTRACTION_BATCH_SIZE) {
+    const batch = pages.slice(i, i + FACT_EXTRACTION_BATCH_SIZE)
+    const batchResults = await Promise.allSettled(
+      batch.map((page) => extractPageFacts(page.content, page.title, botName))
+    )
+    for (const result of batchResults) {
+      if (result.status === 'fulfilled') {
+        results.push(result.value)
+      } else {
+        console.error('Fact extraction failed in batch:', result.reason)
+        results.push({ facts: '', paragraphs: '' })
+      }
+    }
+  }
+
+  return results
+}
+
 // Facts and paragraphs are chunked and embedded separately (Option C) — facts
 // give dense, high-precision hits for direct questions ("what's the price?"),
-// paragraphs preserve context for open-ended ones. Per-page GPT-4o-mini calls
-// run sequentially, not in parallel, to avoid hammering OpenAI's rate limits
-// across a 50-page crawl.
+// paragraphs preserve context for open-ended ones.
 async function buildEnrichedChunks(
-  pages: Awaited<ReturnType<typeof crawlPagesParallel>>,
+  pages: CrawledPage[],
   botId: string,
   botName: string
 ): Promise<EnrichedChunkResult> {
+  const t0 = Date.now()
+  const allFacts = await extractFactsBatch(pages, botName)
+  console.log(
+    `Fact extraction complete: ${pages.length} pages in ${Date.now() - t0}ms (batch size: ${FACT_EXTRACTION_BATCH_SIZE})`
+  )
+
   const chunks: Chunk[] = []
   let factsExtracted = 0
   let factsSkipped = 0
 
-  for (const page of pages) {
-    const { facts, paragraphs } = await extractPageFacts(page.content, page.title, botName)
+  for (let i = 0; i < pages.length; i++) {
+    const page = pages[i]
+    const { facts, paragraphs } = allFacts[i]
 
     const paragraphChunks = chunkWithContext(paragraphs || page.content, botName, page.title)
     const factChunks = chunkFacts(facts, botName, page.title)
