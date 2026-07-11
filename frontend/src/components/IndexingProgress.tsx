@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertCircle, Check, Loader2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
 import { getBotIndexingStatus, startBotIndexing } from '../services/api'
 import type { IndexingJob } from '../types/index'
 
@@ -14,6 +15,7 @@ const POLL_INTERVAL_MS = 3000
 type Status = IndexingJob['status']
 
 export function IndexingProgress({ botId, onComplete, onError }: IndexingProgressProps) {
+  const navigate = useNavigate()
   const [job, setJob] = useState<IndexingJob | null>(null)
   const [status, setStatus] = useState<Status>('pending')
   const [retrying, setRetrying] = useState(false)
@@ -34,8 +36,10 @@ export function IndexingProgress({ botId, onComplete, onError }: IndexingProgres
       setJob(res.data)
       setStatus(res.data.status)
       if (res.data.status === 'complete') {
+        // Don't auto-fire onComplete here — the celebration screen below
+        // gives the user a choice of next action; onComplete fires when
+        // they click "View My Chatbot" instead.
         stopPolling()
-        onComplete?.()
       } else if (res.data.status === 'failed') {
         stopPolling()
         onError?.(res.data.error ?? 'Indexing failed')
@@ -66,11 +70,28 @@ export function IndexingProgress({ botId, onComplete, onError }: IndexingProgres
 
   if (status === 'complete') {
     return (
-      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-2">
-        <Check size={18} className="text-emerald-600 shrink-0" />
-        <span className="text-sm font-bold text-emerald-700">
-          Knowledge base ready — {job?.totalChunks ?? 0} chunks indexed
-        </span>
+      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 text-center">
+        <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <CheckCircle className="w-8 h-8 text-emerald-600" />
+        </div>
+        <h3 className="font-bold text-slate-800 text-xl mb-2">Your Chatbot is Live! 🎉</h3>
+        <p className="text-sm text-slate-500 mb-6">{job?.totalChunks ?? 0} knowledge chunks indexed</p>
+        <div className="flex items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => onComplete?.()}
+            className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-colors"
+          >
+            View My Chatbot
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate(`/dashboard/kb/${botId}`)}
+            className="border border-slate-200 text-slate-800 px-6 py-3 rounded-xl font-bold hover:bg-slate-50 transition-colors"
+          >
+            Add More Content
+          </button>
+        </div>
       </div>
     )
   }
