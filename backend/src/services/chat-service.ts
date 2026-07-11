@@ -4,6 +4,7 @@ import { retrieveContext } from './rag-service.js'
 import { generateEmbedding, streamChatResponse } from './openai-service.js'
 import { getPublicConfig } from './bot-service.js'
 import { queryCacheNamespace } from '../repositories/vector-repository.js'
+import { getCachedAnswer, setCachedAnswer } from '../repositories/redis-repository.js'
 import { saveToCache } from './cache-service.js'
 import type { ConversationMessage } from '../types/index.js'
 
@@ -67,6 +68,8 @@ async function* streamAndCache(
     fullAnswer += chunk
     yield chunk
   }
+  // Redis write is faster (same region) — save there before the Pinecone write.
+  await setCachedAnswer(question, botId, fullAnswer)
   await saveToCache(botId, question, fullAnswer, questionEmbedding)
 }
 
@@ -84,6 +87,14 @@ export async function streamMessage(input: SendMessageInput): Promise<AsyncGener
   await appendMessage(input.botId, input.conversationId, userMessage)
 
   const t0 = Date.now()
+
+  // Layer 1: Redis exact answer cache (Mumbai ~1ms)
+  const redisAnswer = await getCachedAnswer(input.message, input.botId)
+  if (redisAnswer) {
+    console.log('Answer cache hit (Redis)')
+    console.log(`Pre-LLM total: ${Date.now() - t0}ms`)
+    return singleChunkGenerator(redisAnswer)
+  }
 
   const [queryEmbedding, botConfig] = await Promise.all([
     generateEmbedding(input.message),

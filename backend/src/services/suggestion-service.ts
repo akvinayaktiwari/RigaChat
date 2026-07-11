@@ -5,6 +5,7 @@ import {
   upsertSuggestedQuestionCache,
 } from '../repositories/vector-repository.js'
 import { getPublicBotConfig, updateBot } from '../repositories/bot-repository.js'
+import { setCachedAnswer } from '../repositories/redis-repository.js'
 import type { PrewarmResult, SuggestedQuestion } from '../types/index.js'
 
 const EMPTY_RESULT: PrewarmResult = { generated: 0, prewarmSuccess: 0, prewarmFailed: 0 }
@@ -34,6 +35,13 @@ async function prewarmAllQuestions(
   return { success, failed }
 }
 
+async function prewarmRedisAnswers(botId: string, questions: SuggestedQuestion[]): Promise<void> {
+  for (const question of questions) {
+    await setCachedAnswer(question.question, botId, question.answer)
+  }
+  console.log(`Redis answer cache pre-warmed for bot ${botId}: ${questions.length} questions`)
+}
+
 async function saveSuggestionsToBot(botId: string, questions: SuggestedQuestion[]): Promise<void> {
   const bot = await getPublicBotConfig(botId)
   if (!bot) return
@@ -54,6 +62,11 @@ export async function generateAndPrewarmSuggestions(
 
     const { success, failed } = await prewarmAllQuestions(botId, questions)
     console.log(`Pre-warm complete for bot ${botId}: ${success} success, ${failed} failed`)
+
+    // Pre-warm Redis answer cache for instant chip responses — suggested
+    // question clicks then hit Redis at ~1ms instead of Pinecone at ~400ms,
+    // with zero LLM call and zero OpenAI embedding call.
+    await prewarmRedisAnswers(botId, questions)
 
     return { generated: questions.length, prewarmSuccess: success, prewarmFailed: failed }
   } catch (error) {

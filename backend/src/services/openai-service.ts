@@ -1,5 +1,6 @@
 import type OpenAI from 'openai'
 import { openaiClient } from '../lib/openai.js'
+import { getCachedEmbedding, setCachedEmbedding } from '../repositories/redis-repository.js'
 import type { ConversationMessage, SuggestedQuestion } from '../types/index.js'
 
 interface StreamChatParams {
@@ -88,12 +89,27 @@ ${kbContent}`
 }
 
 export async function generateEmbedding(text: string): Promise<number[]> {
+  // Check Redis first (Mumbai ~1ms)
+  const cached = await getCachedEmbedding(text)
+  if (cached) {
+    console.log('Embedding cache hit (Redis)')
+    return cached
+  }
+
   try {
+    // Cache miss — call OpenAI (~800ms)
     const response = await openaiClient.embeddings.create({
       model: 'text-embedding-3-small',
       input: text,
     })
-    return response.data[0].embedding
+    const embedding = response.data[0].embedding
+
+    // Save to Redis for next time (fire and forget)
+    setCachedEmbedding(text, embedding).catch((err) =>
+      console.error('Embedding cache write failed:', err)
+    )
+
+    return embedding
   } catch (error) {
     throw new Error(
       `Failed to generate embedding: ${error instanceof Error ? error.message : String(error)}`
