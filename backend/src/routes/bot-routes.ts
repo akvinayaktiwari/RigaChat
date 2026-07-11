@@ -85,6 +85,18 @@ botRoutes.post('/setup', requireAuth, async (c) => {
     return c.json<ApiResponse<typeof result>>({ success: true, data: result }, 201)
   } catch (error) {
     console.error('Bot setup error:', error)
+    if (error instanceof Error && error.message === 'SCAN_FAILED') {
+      return c.json<ApiResponse<null>>(
+        { success: false, error: 'Could not reach website. Please check the URL and try again.' },
+        500
+      )
+    }
+    if (error instanceof Error && error.message === 'ENQUEUE_FAILED') {
+      return c.json<ApiResponse<null>>(
+        { success: false, error: 'Failed to start website indexing. Please try again.' },
+        500
+      )
+    }
     return c.json<ApiResponse<null>>({ success: false, error: userFacingErrorMessage(error) }, 500)
   }
 })
@@ -231,6 +243,12 @@ botRoutes.post('/:botId/confirm-index', requireAuth, async (c) => {
   } catch (error) {
     if (error instanceof Error && error.message === 'Bot not found') {
       return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
+    }
+    if (error instanceof Error && error.message === 'ENQUEUE_FAILED') {
+      return c.json<ApiResponse<null>>(
+        { success: false, error: 'Failed to queue indexing job. Please try again.' },
+        500
+      )
     }
     console.error('Indexing error:', error)
     return c.json<ApiResponse<null>>({ success: false, error: userFacingErrorMessage(error) }, 500)

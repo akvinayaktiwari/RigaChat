@@ -36,26 +36,96 @@ interface CreateBotInput {
   leadFormFields: BotConfig['leadFormFields']
 }
 
-export async function setupBot(input: CreateBotInput): Promise<{ bot: BotConfig }> {
+interface SetupBotResult {
+  bot: BotConfig
+  status: 'confirmation_required' | 'queued'
+  jobId: string
+  totalPages: number
+  selectedPages?: number
+}
+
+// deleteBot() already throws on real DynamoDB failures (relied on by the
+// intentional "delete my bot" route). This wrapper is only for
+// compensating cleanup after a mid-setup failure, where a cleanup error
+// must not mask or crash the original failure being reported to the user.
+async function safeDeleteBot(botId: string, clientId: string): Promise<void> {
+  try {
+    await deleteBot(botId, clientId)
+  } catch (error) {
+    console.error(`Failed to clean up orphaned bot ${botId}:`, error)
+  }
+}
+
+export async function setupBot(input: CreateBotInput): Promise<SetupBotResult> {
   const botId = uuidv4()
 
+  const bot = await createBot({
+    botId,
+    clientId: input.clientId,
+    name: input.name,
+    websiteUrl: input.websiteUrl,
+    greetingMessage: input.greetingMessage,
+    brandColor: input.brandColor,
+    leadTriggerAfterMessages: input.leadTriggerAfterMessages,
+    leadFormFields: input.leadFormFields,
+    widgetTrigger: input.widgetTrigger,
+  })
+
+  let scan
   try {
-    const bot = await createBot({
-      botId,
-      clientId: input.clientId,
-      name: input.name,
-      websiteUrl: input.websiteUrl,
-      greetingMessage: input.greetingMessage,
-      brandColor: input.brandColor,
-      leadTriggerAfterMessages: input.leadTriggerAfterMessages,
-      leadFormFields: input.leadFormFields,
-      widgetTrigger: input.widgetTrigger,
-    })
-    return { bot }
+    scan = await scanWebsite(input.websiteUrl)
   } catch (error) {
-    throw new Error(
-      `Failed to set up bot for client ${input.clientId}: ${error instanceof Error ? error.message : String(error)}`
-    )
+    await safeDeleteBot(botId, input.clientId)
+    console.error(`Website scan failed during setup for bot ${botId}:`, error)
+    throw new Error('SCAN_FAILED')
+  }
+
+  const jobId = uuidv4()
+
+  if (scan.requiresConfirmation) {
+    await updateIndexingJob(botId, input.clientId, {
+      jobId,
+      status: 'confirmation_required',
+      websiteUrl: input.websiteUrl,
+      totalPages: scan.totalPages,
+      selectedPages: MAX_AUTO_QUEUE_PAGES,
+      crawledPages: 0,
+      totalChunks: 0,
+      queuedAt: new Date().toISOString(),
+    })
+    return {
+      bot,
+      status: 'confirmation_required',
+      jobId,
+      totalPages: scan.totalPages,
+      selectedPages: MAX_AUTO_QUEUE_PAGES,
+    }
+  }
+
+  await updateIndexingJob(botId, input.clientId, {
+    jobId,
+    status: 'queued',
+    websiteUrl: input.websiteUrl,
+    totalPages: scan.totalPages,
+    selectedPages: scan.selectedPages.length,
+    crawledPages: 0,
+    totalChunks: 0,
+    queuedAt: new Date().toISOString(),
+  })
+
+  try {
+    await enqueueCrawlerJob({ jobId, botId, clientId: input.clientId, urls: scan.selectedPages, useAICleaning: true })
+  } catch (error) {
+    await safeDeleteBot(botId, input.clientId)
+    console.error(`Failed to enqueue crawler job during setup for bot ${botId}:`, error)
+    throw new Error('ENQUEUE_FAILED')
+  }
+
+  return {
+    bot,
+    status: 'queued',
+    jobId,
+    totalPages: scan.totalPages,
   }
 }
 
@@ -191,7 +261,15 @@ export async function confirmIndexingJob(
     selectedPages: urls.length,
     queuedAt: new Date().toISOString(),
   })
-  await enqueueCrawlerJob({ jobId, botId, clientId, urls, useAICleaning: true })
+
+  try {
+    await enqueueCrawlerJob({ jobId, botId, clientId, urls, useAICleaning: true })
+  } catch (error) {
+    // User already confirmed they want this bot — keep the record so they can retry,
+    // don't delete it like the initial setup flow does.
+    console.error(`Failed to enqueue crawler job on confirm for bot ${botId}:`, error)
+    throw new Error('ENQUEUE_FAILED')
+  }
 
   return { status: 'queued', message: 'Indexing started' }
 }
