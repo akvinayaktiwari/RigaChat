@@ -9,10 +9,12 @@ import type {
   CreateKBEntryInput,
   FormConfig,
   FormLead,
+  IndexingJob,
   KnowledgeBaseEntry,
   Lead,
   ResyncResult,
   SetupBotResult,
+  StartIndexingResult,
   UpdateKBInput,
   WhatsAppConnection,
 } from '../types/index'
@@ -77,6 +79,21 @@ export function deleteBot(botId: string): Promise<ApiResponse<{ message: string 
 
 export function resyncBot(botId: string, websiteUrl: string): Promise<ApiResponse<ResyncResult>> {
   return apiClient<ResyncResult>(`/api/bots/${botId}/resync`, 'POST', { websiteUrl })
+}
+
+export function startBotIndexing(botId: string, url: string): Promise<ApiResponse<StartIndexingResult>> {
+  return apiClient<StartIndexingResult>(`/api/bots/${botId}/index`, 'POST', { url })
+}
+
+export function confirmBotIndexing(
+  botId: string,
+  jobId: string
+): Promise<ApiResponse<{ status: 'queued'; message: string }>> {
+  return apiClient<{ status: 'queued'; message: string }>(`/api/bots/${botId}/confirm-index`, 'POST', { jobId })
+}
+
+export function getBotIndexingStatus(botId: string): Promise<ApiResponse<IndexingJob | { status: 'none' }>> {
+  return apiClient<IndexingJob | { status: 'none' }>(`/api/bots/${botId}/index-status`)
 }
 
 // Lead API

@@ -27,8 +27,23 @@ export interface BotConfig {
   leadFormFields: LeadFormField[]
   widgetTrigger: 'immediate' | 'delay_5s' | 'scroll_50' | 'exit_intent'
   suggestedQuestions?: SuggestedQuestion[]
+  indexingJob?: IndexingJob
   createdAt: string
   updatedAt: string
+}
+
+export interface IndexingJob {
+  jobId: string
+  status: 'pending' | 'queued' | 'processing' | 'complete' | 'failed' | 'confirmation_required'
+  websiteUrl: string
+  totalPages: number
+  selectedPages: number
+  crawledPages: number
+  totalChunks: number
+  queuedAt: string
+  startedAt?: string
+  completedAt?: string
+  error?: string
 }
 
 export interface SuggestedQuestion {

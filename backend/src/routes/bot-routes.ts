@@ -1,12 +1,15 @@
 import { Hono } from 'hono'
 import { requireAuth } from '../lib/cognito.js'
 import {
+  confirmIndexingJob,
   getBotConfig,
   getClientBots,
+  getIndexingStatus,
   getPublicConfig,
   removeBot,
   resyncBot,
   setupBot,
+  startIndexingJob,
   updateBotConfig,
 } from '../services/bot-service.js'
 import { generateAndPrewarmSuggestions, getKbContentForBot } from '../services/suggestion-service.js'
@@ -160,6 +163,72 @@ botRoutes.post('/:botId/regenerate-suggestions', requireAuth, async (c) => {
       { success: true, data: { message: 'Suggestions regenerated successfully', result } },
       200
     )
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Bot not found') {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+interface IndexBotBody {
+  url?: string
+}
+
+interface ConfirmIndexBody {
+  jobId?: string
+}
+
+botRoutes.post('/:botId/index', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const botId = c.req.param('botId')
+  const body = await c.req.json<IndexBotBody>()
+
+  if (!body.url) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'url is required' }, 400)
+  }
+
+  try {
+    const result = await startIndexingJob(botId, clientId, body.url)
+    return c.json<ApiResponse<typeof result>>({ success: true, data: result }, 200)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Bot not found') {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
+    }
+    if (error instanceof Error && error.message === 'Invalid URL') {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 400)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+botRoutes.post('/:botId/confirm-index', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const botId = c.req.param('botId')
+  const body = await c.req.json<ConfirmIndexBody>()
+
+  if (!body.jobId) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'jobId is required' }, 400)
+  }
+
+  try {
+    const result = await confirmIndexingJob(botId, clientId, body.jobId)
+    return c.json<ApiResponse<typeof result>>({ success: true, data: result }, 200)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Bot not found') {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+botRoutes.get('/:botId/index-status', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const botId = c.req.param('botId')
+
+  try {
+    const status = await getIndexingStatus(botId, clientId)
+    return c.json<ApiResponse<typeof status>>({ success: true, data: status }, 200)
   } catch (error) {
     if (error instanceof Error && error.message === 'Bot not found') {
       return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)

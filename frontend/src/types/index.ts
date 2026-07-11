@@ -113,6 +113,37 @@ export interface ResyncResult {
   chunksIndexed: number
 }
 
+export type IndexingStatus =
+  | 'none'
+  | 'pending'
+  | 'queued'
+  | 'processing'
+  | 'complete'
+  | 'failed'
+  | 'confirmation_required'
+
+export interface IndexingJob {
+  jobId: string
+  status: IndexingStatus
+  websiteUrl: string
+  totalPages: number
+  selectedPages: number
+  crawledPages: number
+  totalChunks: number
+  queuedAt: string
+  startedAt?: string
+  completedAt?: string
+  error?: string
+}
+
+export interface StartIndexingResult {
+  status: 'confirmation_required' | 'queued'
+  jobId: string
+  totalPages: number
+  message: string
+  selectedPages?: number
+}
+
 export interface CreateKBEntryInput {
   botId: string
   title: string
