@@ -1,6 +1,6 @@
 import { DeleteCommand, GetCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
-import type { BotConfig } from '../types/index.js'
+import type { BotConfig, IndexingJob } from '../types/index.js'
 
 const TABLE_NAME = getTableName('bots')
 
@@ -104,6 +104,25 @@ export async function deleteBot(botId: string, clientId: string): Promise<void> 
   } catch (error) {
     throw new Error(
       `Failed to delete bot ${botId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
+export async function updateIndexingJob(
+  botId: string,
+  clientId: string,
+  updates: Partial<IndexingJob>
+): Promise<void> {
+  try {
+    const bot = await getBotById(botId, clientId)
+    const merged: IndexingJob = {
+      ...(bot?.indexingJob as IndexingJob | undefined),
+      ...updates,
+    } as IndexingJob
+    await updateBot(botId, clientId, { indexingJob: merged })
+  } catch (error) {
+    throw new Error(
+      `Failed to update indexing job for bot ${botId}: ${error instanceof Error ? error.message : String(error)}`
     )
   }
 }

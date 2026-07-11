@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid'
-import { generateEmbedding } from './openai-service.js'
-import { crawlWebsite, chunkText } from './crawler-service.js'
+import { generateEmbedding, generateEmbeddingsBatch } from './openai-service.js'
+import { chunkText, crawlPagesParallel, scanWebsite } from './crawler-service.js'
 import { upsertChunks, similaritySearch, deleteChunksByBotId } from '../repositories/vector-repository.js'
 import { getPublicBotConfig } from '../repositories/bot-repository.js'
 import { generateAndPrewarmSuggestions } from './suggestion-service.js'
@@ -27,7 +27,10 @@ export async function indexWebsite(
   websiteUrl: string
 ): Promise<{ pagesIndexed: number; chunksIndexed: number }> {
   try {
-    const pages = await crawlWebsite(websiteUrl)
+    const scan = await scanWebsite(websiteUrl)
+    const pages = await crawlPagesParallel(scan.selectedPages, true, (crawled, total) => {
+      console.log(`Crawling: ${crawled}/${total} pages`)
+    })
 
     const chunks: Chunk[] = []
     for (const page of pages) {
@@ -42,10 +45,7 @@ export async function indexWebsite(
       }
     }
 
-    const embeddings: number[][] = []
-    for (const chunk of chunks) {
-      embeddings.push(await generateEmbedding(chunk.text))
-    }
+    const embeddings = await generateEmbeddingsBatch(chunks.map((chunk) => chunk.text))
 
     await upsertChunks(chunks, embeddings)
 
@@ -76,10 +76,7 @@ export async function indexKnowledgeBaseEntry(
       createdAt: new Date().toISOString(),
     }))
 
-    const embeddings: number[][] = []
-    for (const chunk of chunks) {
-      embeddings.push(await generateEmbedding(chunk.text))
-    }
+    const embeddings = await generateEmbeddingsBatch(chunks.map((chunk) => chunk.text))
 
     await upsertChunks(chunks, embeddings)
 

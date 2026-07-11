@@ -58,7 +58,8 @@ jobs:
             --arg redis_provider "${{ vars.REDIS_PROVIDER }}" \
             --arg upstash_redis_rest_url "${{ secrets.UPSTASH_REDIS_REST_URL }}" \
             --arg upstash_redis_rest_token "${{ secrets.UPSTASH_REDIS_REST_TOKEN }}" \
-            '. + {WHATSAPP_PROVIDER: $whatsapp_provider, WHATSAPP_MASTER_NUMBER: $whatsapp_master_number, WHATSAPP_KMS_KEY_ID: $whatsapp_kms_key_id, REDIS_PROVIDER: $redis_provider, UPSTASH_REDIS_REST_URL: $upstash_redis_rest_url, UPSTASH_REDIS_REST_TOKEN: $upstash_redis_rest_token}')
+            --arg sqs_crawler_queue_url "${{ secrets.SQS_CRAWLER_QUEUE_URL }}" \
+            '. + {WHATSAPP_PROVIDER: $whatsapp_provider, WHATSAPP_MASTER_NUMBER: $whatsapp_master_number, WHATSAPP_KMS_KEY_ID: $whatsapp_kms_key_id, REDIS_PROVIDER: $redis_provider, UPSTASH_REDIS_REST_URL: $upstash_redis_rest_url, UPSTASH_REDIS_REST_TOKEN: $upstash_redis_rest_token, SQS_CRAWLER_QUEUE_URL: $sqs_crawler_queue_url}')
           aws lambda update-function-configuration \
             --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
             --region ${{ secrets.AWS_REGION }} \
@@ -95,7 +96,8 @@ jobs:
             --arg redis_provider "${{ vars.REDIS_PROVIDER }}" \
             --arg upstash_redis_rest_url "${{ secrets.UPSTASH_REDIS_REST_URL }}" \
             --arg upstash_redis_rest_token "${{ secrets.UPSTASH_REDIS_REST_TOKEN }}" \
-            '. + {WHATSAPP_PROVIDER: $whatsapp_provider, WHATSAPP_MASTER_NUMBER: $whatsapp_master_number, WHATSAPP_KMS_KEY_ID: $whatsapp_kms_key_id, REDIS_PROVIDER: $redis_provider, UPSTASH_REDIS_REST_URL: $upstash_redis_rest_url, UPSTASH_REDIS_REST_TOKEN: $upstash_redis_rest_token}')
+            --arg sqs_crawler_queue_url "${{ secrets.SQS_CRAWLER_QUEUE_URL }}" \
+            '. + {WHATSAPP_PROVIDER: $whatsapp_provider, WHATSAPP_MASTER_NUMBER: $whatsapp_master_number, WHATSAPP_KMS_KEY_ID: $whatsapp_kms_key_id, REDIS_PROVIDER: $redis_provider, UPSTASH_REDIS_REST_URL: $upstash_redis_rest_url, UPSTASH_REDIS_REST_TOKEN: $upstash_redis_rest_token, SQS_CRAWLER_QUEUE_URL: $sqs_crawler_queue_url}')
           aws lambda update-function-configuration \
             --function-name ${{ secrets.LAMBDA_STREAMING_FUNCTION_NAME }} \
             --region ${{ secrets.AWS_REGION }} \
@@ -156,6 +158,76 @@ jobs:
 
       - name: Deployment success
         run: echo "Backend deployed successfully at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+  deploy-crawler-lambda:
+    runs-on: ubuntu-latest
+    needs: [deploy-backend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Build
+        working-directory: backend
+        run: npm run build
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Zip build output
+        run: cd backend/dist && zip -r ../function.zip index.js
+
+      - name: Deploy to crawler Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ secrets.LAMBDA_CRAWLER_FUNCTION_NAME }} \
+            --zip-file fileb://backend/function.zip \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Wait for crawler Lambda update
+        run: |
+          aws lambda wait function-updated \
+            --function-name ${{ secrets.LAMBDA_CRAWLER_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Update crawler Lambda environment variables
+        run: |
+          MERGED_ENV=$(aws lambda get-function-configuration \
+            --function-name ${{ secrets.LAMBDA_CRAWLER_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }} \
+            --query 'Environment.Variables' --output json | jq \
+            --arg whatsapp_provider "${{ vars.WHATSAPP_PROVIDER }}" \
+            --arg whatsapp_master_number "${{ secrets.WHATSAPP_MASTER_NUMBER }}" \
+            --arg whatsapp_kms_key_id "${{ secrets.WHATSAPP_KMS_KEY_ID }}" \
+            --arg redis_provider "${{ vars.REDIS_PROVIDER }}" \
+            --arg upstash_redis_rest_url "${{ secrets.UPSTASH_REDIS_REST_URL }}" \
+            --arg upstash_redis_rest_token "${{ secrets.UPSTASH_REDIS_REST_TOKEN }}" \
+            --arg sqs_crawler_queue_url "${{ secrets.SQS_CRAWLER_QUEUE_URL }}" \
+            '. + {WHATSAPP_PROVIDER: $whatsapp_provider, WHATSAPP_MASTER_NUMBER: $whatsapp_master_number, WHATSAPP_KMS_KEY_ID: $whatsapp_kms_key_id, REDIS_PROVIDER: $redis_provider, UPSTASH_REDIS_REST_URL: $upstash_redis_rest_url, UPSTASH_REDIS_REST_TOKEN: $upstash_redis_rest_token, SQS_CRAWLER_QUEUE_URL: $sqs_crawler_queue_url}')
+          aws lambda update-function-configuration \
+            --function-name ${{ secrets.LAMBDA_CRAWLER_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }} \
+            --environment "{\"Variables\":$MERGED_ENV}"
+
+      - name: Wait for crawler Lambda environment update
+        run: |
+          aws lambda wait function-updated \
+            --function-name ${{ secrets.LAMBDA_CRAWLER_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Deployment success
+        run: echo "Crawler Lambda deployed successfully at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
   deploy-frontend:
     runs-on: ubuntu-latest

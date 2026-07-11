@@ -6,10 +6,24 @@ import {
   getBotsByClientId,
   getPublicBotConfig,
   updateBot,
+  updateIndexingJob,
 } from '../repositories/bot-repository.js'
 import { deleteChunksByBotId } from '../repositories/vector-repository.js'
-import { indexWebsite, reindexBot } from './rag-service.js'
-import type { BotConfig } from '../types/index.js'
+import { reindexBot } from './rag-service.js'
+import { scanWebsite } from './crawler-service.js'
+import { enqueueCrawlerJob } from '../lib/sqs.js'
+import type { BotConfig, IndexingJob } from '../types/index.js'
+
+const MAX_AUTO_QUEUE_PAGES = 50
+
+function isValidUrl(url: string): boolean {
+  try {
+    new URL(url)
+    return true
+  } catch {
+    return false
+  }
+}
 
 interface CreateBotInput {
   clientId: string
@@ -22,28 +36,23 @@ interface CreateBotInput {
   leadFormFields: BotConfig['leadFormFields']
 }
 
-export async function setupBot(
-  input: CreateBotInput
-): Promise<{ bot: BotConfig; pagesIndexed: number; chunksIndexed: number }> {
+export async function setupBot(input: CreateBotInput): Promise<{ bot: BotConfig }> {
   const botId = uuidv4()
 
-  const bot = await createBot({
-    botId,
-    clientId: input.clientId,
-    name: input.name,
-    websiteUrl: input.websiteUrl,
-    greetingMessage: input.greetingMessage,
-    brandColor: input.brandColor,
-    leadTriggerAfterMessages: input.leadTriggerAfterMessages,
-    leadFormFields: input.leadFormFields,
-    widgetTrigger: input.widgetTrigger,
-  })
-
   try {
-    const { pagesIndexed, chunksIndexed } = await indexWebsite(botId, input.websiteUrl)
-    return { bot, pagesIndexed, chunksIndexed }
+    const bot = await createBot({
+      botId,
+      clientId: input.clientId,
+      name: input.name,
+      websiteUrl: input.websiteUrl,
+      greetingMessage: input.greetingMessage,
+      brandColor: input.brandColor,
+      leadTriggerAfterMessages: input.leadTriggerAfterMessages,
+      leadFormFields: input.leadFormFields,
+      widgetTrigger: input.widgetTrigger,
+    })
+    return { bot }
   } catch (error) {
-    await deleteBot(botId, input.clientId)
     throw new Error(
       `Failed to set up bot for client ${input.clientId}: ${error instanceof Error ? error.message : String(error)}`
     )
@@ -98,6 +107,102 @@ export async function resyncBot(
   const bot = await getBotById(botId, clientId)
   if (!bot) throw new Error('Bot not found')
   return reindexBot(botId, websiteUrl)
+}
+
+interface StartIndexingResult {
+  status: 'confirmation_required' | 'queued'
+  jobId: string
+  totalPages: number
+  message: string
+  selectedPages?: number
+}
+
+export async function startIndexingJob(
+  botId: string,
+  clientId: string,
+  url: string
+): Promise<StartIndexingResult> {
+  if (!isValidUrl(url)) {
+    throw new Error('Invalid URL')
+  }
+  const bot = await getBotById(botId, clientId)
+  if (!bot) throw new Error('Bot not found')
+
+  const scan = await scanWebsite(url)
+  const jobId = uuidv4()
+
+  if (scan.requiresConfirmation) {
+    await updateIndexingJob(botId, clientId, {
+      jobId,
+      status: 'confirmation_required',
+      websiteUrl: url,
+      totalPages: scan.totalPages,
+      selectedPages: MAX_AUTO_QUEUE_PAGES,
+      crawledPages: 0,
+      totalChunks: 0,
+      queuedAt: new Date().toISOString(),
+    })
+    return {
+      status: 'confirmation_required',
+      jobId,
+      totalPages: scan.totalPages,
+      selectedPages: MAX_AUTO_QUEUE_PAGES,
+      message: `Found ${scan.totalPages} pages. We will crawl the ${MAX_AUTO_QUEUE_PAGES} most relevant pages. Click confirm to proceed.`,
+    }
+  }
+
+  await updateIndexingJob(botId, clientId, {
+    jobId,
+    status: 'queued',
+    websiteUrl: url,
+    totalPages: scan.totalPages,
+    selectedPages: scan.selectedPages.length,
+    crawledPages: 0,
+    totalChunks: 0,
+    queuedAt: new Date().toISOString(),
+  })
+  await enqueueCrawlerJob({ jobId, botId, clientId, urls: scan.selectedPages, useAICleaning: true })
+
+  return {
+    status: 'queued',
+    jobId,
+    totalPages: scan.totalPages,
+    message: `Indexing ${scan.totalPages} pages...`,
+  }
+}
+
+export async function confirmIndexingJob(
+  botId: string,
+  clientId: string,
+  jobId: string
+): Promise<{ status: 'queued'; message: string }> {
+  const bot = await getBotById(botId, clientId)
+  if (!bot) throw new Error('Bot not found')
+  if (bot.indexingJob?.jobId !== jobId) throw new Error('Job not found')
+  if (bot.indexingJob.status !== 'confirmation_required') {
+    throw new Error('Job is not awaiting confirmation')
+  }
+
+  const scan = await scanWebsite(bot.indexingJob.websiteUrl)
+  const urls = scan.selectedPages.slice(0, MAX_AUTO_QUEUE_PAGES)
+
+  await updateIndexingJob(botId, clientId, {
+    status: 'queued',
+    selectedPages: urls.length,
+    queuedAt: new Date().toISOString(),
+  })
+  await enqueueCrawlerJob({ jobId, botId, clientId, urls, useAICleaning: true })
+
+  return { status: 'queued', message: 'Indexing started' }
+}
+
+export async function getIndexingStatus(
+  botId: string,
+  clientId: string
+): Promise<IndexingJob | { status: 'none' }> {
+  const bot = await getBotById(botId, clientId)
+  if (!bot) throw new Error('Bot not found')
+  return bot.indexingJob ?? { status: 'none' }
 }
 
 export async function removeBot(botId: string, clientId: string): Promise<void> {

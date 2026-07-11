@@ -1,8 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Check, Code, Copy, Loader2, RefreshCw, Trash2 } from 'lucide-react'
-import { deleteBot, getBotById, resyncBot, updateBot } from '../services/api'
-import type { BotConfig } from '../types/index'
+import { confirmBotIndexing, deleteBot, getBotById, getBotIndexingStatus, startBotIndexing, updateBot } from '../services/api'
+import type { BotConfig, IndexingJob } from '../types/index'
+
+type LocalIndexingStatus = 'idle' | 'scanning' | IndexingJob['status']
+
+const POLL_INTERVAL_MS = 3000
 
 const WIDGET_TRIGGER_OPTIONS: { value: BotConfig['widgetTrigger']; label: string }[] = [
   { value: 'immediate', label: 'Immediately' },
@@ -57,12 +61,24 @@ export default function BotDetailPage() {
   const [bot, setBot] = useState<BotConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [resyncing, setResyncing] = useState(false)
   const [resyncUrl, setResyncUrl] = useState('')
-  const [resyncResult, setResyncResult] = useState<{ pagesIndexed: number; chunksIndexed: number } | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [copySuccess, setCopySuccess] = useState(false)
+
+  const [indexingStatus, setIndexingStatus] = useState<LocalIndexingStatus>('idle')
+  const [indexingJob, setIndexingJob] = useState<IndexingJob | null>(null)
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
+  const [pendingJob, setPendingJob] = useState<{ jobId: string; totalPages: number; selectedPages: number } | null>(
+    null
+  )
+  const pollingRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) window.clearInterval(pollingRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     if (!botId) {
@@ -94,20 +110,65 @@ export default function BotDetailPage() {
     }
   }
 
-  async function handleResync() {
+  function startPolling() {
+    if (pollingRef.current) window.clearInterval(pollingRef.current)
+    pollingRef.current = window.setInterval(async () => {
+      if (!botId) return
+      const res = await getBotIndexingStatus(botId)
+      if (!res.success || !res.data) return
+
+      setIndexingStatus(res.data.status)
+      if ('jobId' in res.data) setIndexingJob(res.data)
+
+      if (res.data.status === 'complete' || res.data.status === 'failed') {
+        if (pollingRef.current) window.clearInterval(pollingRef.current)
+        pollingRef.current = null
+        if (res.data.status === 'complete') {
+          const refreshed = await getBotById(botId)
+          if (refreshed.success && refreshed.data) setBot(refreshed.data)
+        }
+      }
+    }, POLL_INTERVAL_MS)
+  }
+
+  async function handleStartIndexing() {
     if (!botId || !resyncUrl.trim()) return
-    setResyncing(true)
-    setResyncResult(null)
+    setIndexingStatus('scanning')
+    setIndexingJob(null)
     try {
-      const res = await resyncBot(botId, resyncUrl.trim())
-      if (res.success && res.data) {
-        setResyncResult({ pagesIndexed: res.data.pagesIndexed, chunksIndexed: res.data.chunksIndexed })
-        setResyncUrl('')
+      const res = await startBotIndexing(botId, resyncUrl.trim())
+      if (!res.success || !res.data) {
+        setIndexingStatus('failed')
+        return
+      }
+      if (res.data.status === 'confirmation_required') {
+        setPendingJob({
+          jobId: res.data.jobId,
+          totalPages: res.data.totalPages,
+          selectedPages: res.data.selectedPages ?? 50,
+        })
+        setShowConfirmDialog(true)
+        setIndexingStatus('confirmation_required')
+      } else {
+        setIndexingStatus('queued')
+        startPolling()
       }
     } catch (error) {
-      console.error('Failed to resync website:', error)
-    } finally {
-      setResyncing(false)
+      console.error('Failed to start indexing:', error)
+      setIndexingStatus('failed')
+    }
+  }
+
+  async function handleConfirmIndexing() {
+    if (!botId || !pendingJob) return
+    setShowConfirmDialog(false)
+    try {
+      await confirmBotIndexing(botId, pendingJob.jobId)
+      setIndexingStatus('queued')
+      startPolling()
+    } catch (error) {
+      console.error('Failed to confirm indexing:', error)
+      setIndexingStatus('failed')
     }
   }
 
@@ -324,18 +385,43 @@ export default function BotDetailPage() {
 
               <button
                 type="button"
-                onClick={handleResync}
-                disabled={resyncing || !resyncUrl.trim()}
+                onClick={handleStartIndexing}
+                disabled={indexingStatus === 'scanning' || indexingStatus === 'queued' || indexingStatus === 'processing' || !resyncUrl.trim()}
                 className="w-full border border-amber-400 text-amber-600 hover:bg-amber-50 px-4 py-2 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {resyncing && <Loader2 size={16} className="animate-spin" />}
-                {resyncing ? 'Resyncing...' : 'Resync Website'}
+                {(indexingStatus === 'scanning' || indexingStatus === 'queued' || indexingStatus === 'processing') && (
+                  <Loader2 size={16} className="animate-spin" />
+                )}
+                {indexingStatus === 'scanning' ? 'Scanning...' : 'Resync Website'}
               </button>
 
-              {resyncResult && (
-                <p className="text-emerald-600 text-sm mt-3">
-                  Resynced — {resyncResult.pagesIndexed} pages, {resyncResult.chunksIndexed} chunks indexed
-                </p>
+              {indexingStatus !== 'idle' && indexingStatus !== 'confirmation_required' && (
+                <div className="bg-slate-50 rounded-xl p-4 mt-4">
+                  <p className="font-bold text-slate-800 text-sm">Building Knowledge Base...</p>
+                  <div className="bg-slate-200 rounded-full h-2 w-full mt-3">
+                    <div
+                      className="bg-indigo-600 rounded-full h-2 transition-all"
+                      style={{
+                        width: `${
+                          indexingJob && indexingJob.selectedPages > 0
+                            ? Math.min(100, (indexingJob.crawledPages / indexingJob.selectedPages) * 100)
+                            : 0
+                        }%`,
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2">
+                    {(indexingStatus === 'scanning' || indexingStatus === 'queued') && 'Scanning pages...'}
+                    {indexingStatus === 'processing' &&
+                      indexingJob &&
+                      `${indexingJob.crawledPages} of ${indexingJob.selectedPages} pages processed`}
+                    {indexingStatus === 'complete' &&
+                      indexingJob &&
+                      `✓ Complete — ${indexingJob.totalChunks} knowledge chunks indexed`}
+                    {indexingStatus === 'failed' &&
+                      `✗ Failed: ${indexingJob?.error ?? 'Unknown error'}`}
+                  </p>
+                </div>
               )}
             </div>
 
@@ -359,6 +445,37 @@ export default function BotDetailPage() {
           </div>
         </div>
       </div>
+
+      {showConfirmDialog && pendingJob && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 max-w-md w-full shadow-xl">
+            <h2 className="font-bold text-slate-800 text-lg">Large Website Detected</h2>
+            <p className="text-sm text-slate-500 mt-2">
+              We found {pendingJob.totalPages} pages on this website. We will crawl the {pendingJob.selectedPages}{' '}
+              most relevant pages to build your knowledge base.
+            </p>
+            <div className="flex items-center justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowConfirmDialog(false)
+                  setIndexingStatus('idle')
+                }}
+                className="border border-slate-200 text-slate-600 px-4 py-2 rounded-xl text-sm hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmIndexing}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm hover:bg-indigo-700 transition-colors"
+              >
+                Continue with {pendingJob.selectedPages} pages
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

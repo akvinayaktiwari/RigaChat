@@ -3,6 +3,8 @@ import { handle, streamHandle } from 'hono/aws-lambda'
 import type { LambdaEvent } from 'hono/aws-lambda'
 import { app } from './src/routes/index.js'
 import { sendWeeklyReportsForAllClients } from './src/services/whatsapp-service.js'
+import { processCrawlerJob } from './src/services/crawler-worker-service.js'
+import type { CrawlerJobMessage } from './src/lib/sqs.js'
 
 // Lambda Function URL only supports one invocation mode (BUFFERED or RESPONSE_STREAM)
 // per function, so this same bundle is deployed to two separate Lambda functions:
@@ -35,9 +37,25 @@ interface ScheduledEvent {
   'detail-type'?: string
 }
 
+// The crawler worker Lambda (rigachat-crawler) shares this same bundle and
+// entry point, triggered by the SQS event source mapping instead of a
+// Function URL. batch-size is 1, so a single record is expected per invoke.
+interface SQSTriggerEvent {
+  Records?: Array<{ eventSource?: string; body: string }>
+}
+
 const bufferedHandler = handle(app)
 
-export const handler = async (event: LambdaEvent | ScheduledEvent, lambdaContext?: Parameters<typeof bufferedHandler>[1]) => {
+export const handler = async (
+  event: LambdaEvent | ScheduledEvent | SQSTriggerEvent,
+  lambdaContext?: Parameters<typeof bufferedHandler>[1]
+) => {
+  if ('Records' in event && event.Records?.[0]?.eventSource === 'aws:sqs') {
+    const job = JSON.parse(event.Records[0].body) as CrawlerJobMessage
+    await processCrawlerJob(job)
+    return { statusCode: 200 }
+  }
+
   if ('source' in event && event.source === 'aws.events' && event['detail-type'] === 'whatsapp-weekly-report') {
     await sendWeeklyReportsForAllClients()
     return

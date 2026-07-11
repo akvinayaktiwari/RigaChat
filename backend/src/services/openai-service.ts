@@ -117,6 +117,52 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   }
 }
 
+const EMBEDDING_BATCH_SIZE = 100
+
+async function embedBatch(texts: string[]): Promise<number[][]> {
+  const response = await openaiClient.embeddings.create({
+    model: 'text-embedding-3-small',
+    input: texts,
+  })
+  return response.data.map((item) => item.embedding)
+}
+
+export async function generateEmbeddingsBatch(texts: string[]): Promise<number[][]> {
+  try {
+    const results: number[][] = []
+    for (let i = 0; i < texts.length; i += EMBEDDING_BATCH_SIZE) {
+      const batch = texts.slice(i, i + EMBEDDING_BATCH_SIZE)
+      results.push(...(await embedBatch(batch)))
+    }
+    return results
+  } catch (error) {
+    throw new Error(
+      `Failed to generate batch embeddings: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
+interface ChatCompletionParams {
+  systemPrompt: string
+  userPrompt: string
+  maxTokens: number
+  temperature: number
+}
+
+export async function generateChatCompletion(params: ChatCompletionParams): Promise<string> {
+  const { systemPrompt, userPrompt, maxTokens, temperature } = params
+  const response = await openaiClient.chat.completions.create({
+    model: 'gpt-4o-mini',
+    max_tokens: maxTokens,
+    temperature,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+  })
+  return response.choices[0]?.message?.content ?? ''
+}
+
 export async function* streamChatResponse(params: StreamChatParams): AsyncGenerator<string> {
   const { systemPrompt, contextChunks, conversationHistory, userMessage, botName } = params
 
