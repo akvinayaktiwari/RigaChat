@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid'
-import { generateEmbedding, generateEmbeddingsBatch } from './openai-service.js'
-import { chunkText, chunkWithContext, crawlPagesParallel, scanWebsite } from './crawler-service.js'
+import { extractPageFacts, generateEmbedding, generateEmbeddingsBatch } from './openai-service.js'
+import { chunkFacts, chunkWithContext, crawlPagesParallel, scanWebsite } from './crawler-service.js'
 import { upsertChunks, similaritySearch, deleteChunksByBotId } from '../repositories/vector-repository.js'
 import { getPublicBotConfig } from '../repositories/bot-repository.js'
 import { generateAndPrewarmSuggestions } from './suggestion-service.js'
@@ -28,20 +28,26 @@ export async function indexWebsite(
 ): Promise<{ pagesIndexed: number; chunksIndexed: number }> {
   try {
     const scan = await scanWebsite(websiteUrl)
-    const pages = await crawlPagesParallel(scan.selectedPages, true, (crawled, total) => {
+    // useAICleaning disabled — extractPageFacts() below already removes
+    // boilerplate and returns clean paragraphs, so cleanContentWithAI()
+    // first would just be a second, redundant GPT-4o-mini call per page.
+    const pages = await crawlPagesParallel(scan.selectedPages, false, (crawled, total) => {
       console.log(`Crawling: ${crawled}/${total} pages`)
     })
 
+    const botConfig = await getPublicBotConfig(botId)
+    const botName = botConfig?.name ?? botId
+
     const chunks: Chunk[] = []
     for (const page of pages) {
-      for (const chunkString of chunkText(page.content)) {
-        chunks.push({
-          chunkId: uuidv4(),
-          botId,
-          text: chunkString,
-          sourceUrl: page.url,
-          createdAt: new Date().toISOString(),
-        })
+      const { facts, paragraphs } = await extractPageFacts(page.content, page.title, botName)
+
+      const paragraphChunks = chunkWithContext(paragraphs || page.content, botName, page.title)
+      const factChunks = chunkFacts(facts, botName, page.title)
+
+      const createdAt = new Date().toISOString()
+      for (const text of [...paragraphChunks, ...factChunks]) {
+        chunks.push({ chunkId: uuidv4(), botId, text, sourceUrl: page.url, createdAt })
       }
     }
 

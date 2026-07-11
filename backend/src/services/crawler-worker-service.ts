@@ -51,7 +51,10 @@ async function buildEnrichedChunks(
 }
 
 async function crawlAndChunk(job: CrawlerJobMessage): Promise<CrawlAndChunkResult> {
-  const pages = await crawlPagesParallel(job.urls, job.useAICleaning, async (crawled, total) => {
+  // useAICleaning disabled — extractPageFacts() already removes boilerplate
+  // and returns clean paragraphs, so running cleanContentWithAI() first would
+  // just be a second, redundant GPT-4o-mini call per page.
+  const pages = await crawlPagesParallel(job.urls, false, async (crawled, total) => {
     await updateIndexingJob(job.botId, job.clientId, { crawledPages: crawled })
     console.log(`Progress: ${crawled}/${total}`)
   })
