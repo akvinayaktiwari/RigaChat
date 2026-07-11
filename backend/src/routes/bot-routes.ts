@@ -112,7 +112,8 @@ botRoutes.get('/public/:botId', async (c) => {
 
   try {
     const bot = await getPublicConfig(botId)
-    return c.json<ApiResponse<BotConfig>>({ success: true, data: bot }, 200)
+    const { clientId, ...publicBot } = bot
+    return c.json<ApiResponse<typeof publicBot>>({ success: true, data: publicBot }, 200)
   } catch (error) {
     if (error instanceof Error && error.message === 'Bot not found') {
       return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
