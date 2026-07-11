@@ -98,7 +98,7 @@ export async function retrieveContext(
 ): Promise<string[]> {
   try {
     const queryEmbedding = existingEmbedding ?? (await generateEmbedding(query))
-    const results = await similaritySearch(botId, queryEmbedding, 5)
+    const results = await similaritySearch(botId, queryEmbedding, 3)
     return results.map((result) => result.text)
   } catch (error) {
     throw new Error(
