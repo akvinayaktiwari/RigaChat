@@ -70,6 +70,7 @@ async function* streamAndCache(
   }
   // Redis write is faster (same region) — save there before the Pinecone write.
   await setCachedAnswer(question, botId, fullAnswer)
+  console.log(`Cache write complete for bot ${botId}, message length: ${fullAnswer.length} chars`)
   await saveToCache(botId, question, fullAnswer, questionEmbedding)
 }
 

@@ -30,6 +30,7 @@ export async function setCachedEmbedding(
     const redis = getRedisProvider()
     const key = `emb:${hashText(text)}`
     await redis.set(key, JSON.stringify(embedding), EMBEDDING_TTL)
+    console.log(`Redis embedding cached: ${key}`)
   } catch (err) {
     console.error('Failed to cache embedding:', err)
   }
@@ -57,6 +58,7 @@ export async function setCachedAnswer(
     const redis = getRedisProvider()
     const key = `ans:${botId}:${hashText(text)}`
     await redis.set(key, answer, ANSWER_TTL)
+    console.log(`Redis answer cached: ${key}`)
   } catch (err) {
     console.error('Failed to cache answer:', err)
   }

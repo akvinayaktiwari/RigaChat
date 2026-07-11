@@ -167,6 +167,11 @@ export async function deleteSuggestedQuestionsCache(botId: string): Promise<void
     const index = getIndex().namespace(`${botId}${SUGGESTION_CACHE_NAMESPACE_SUFFIX}`)
     await index.deleteMany({ botId: { $eq: botId }, source: { $eq: 'suggested' } })
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (message.includes('not found') || message.includes('404')) {
+      console.log('No existing cache vectors to delete, skipping')
+      return
+    }
     console.error(`Failed to delete suggested question cache for bot ${botId}:`, error)
   }
 }
