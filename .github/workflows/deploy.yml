@@ -107,6 +107,42 @@ jobs:
             --function-name ${{ secrets.LAMBDA_STREAMING_FUNCTION_NAME }} \
             --region ${{ secrets.AWS_REGION }}
 
+      - name: Deploy to crawler Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ secrets.LAMBDA_CRAWLER_FUNCTION_NAME }} \
+            --zip-file fileb://backend/function.zip \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Wait for crawler Lambda update
+        run: |
+          aws lambda wait function-updated \
+            --function-name ${{ secrets.LAMBDA_CRAWLER_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Update crawler Lambda environment variables
+        run: |
+          MERGED_ENV=$(aws lambda get-function-configuration \
+            --function-name ${{ secrets.LAMBDA_CRAWLER_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }} \
+            --query 'Environment.Variables' --output json | jq \
+            --arg sqs_url "${{ secrets.SQS_CRAWLER_QUEUE_URL }}" \
+            --arg crawler_name "${{ secrets.LAMBDA_CRAWLER_FUNCTION_NAME }}" \
+            '. + {
+              SQS_CRAWLER_QUEUE_URL: $sqs_url,
+              LAMBDA_CRAWLER_FUNCTION_NAME: $crawler_name
+            }')
+          aws lambda update-function-configuration \
+            --function-name ${{ secrets.LAMBDA_CRAWLER_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }} \
+            --environment "{\"Variables\":$MERGED_ENV}"
+
+      - name: Wait for crawler Lambda environment update
+        run: |
+          aws lambda wait function-updated \
+            --function-name ${{ secrets.LAMBDA_CRAWLER_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }}
+
       - name: Health check main Lambda
         run: |
           RESPONSE=$(curl -s -o /tmp/health.json -w "%{http_code}" "${{ secrets.BACKEND_URL }}/api/bots/health-check/config")
