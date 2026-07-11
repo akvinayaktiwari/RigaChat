@@ -26,7 +26,19 @@ const FACT_EXTRACTION_BATCH_SIZE = 5
 // gpt-4o-mini's rate limit is 500 RPM. 5 concurrent calls per batch leaves
 // safe headroom for multiple bots indexing at once — 10 was considered but
 // risks 429s under concurrent load.
-async function extractFactsBatch(pages: CrawledPage[], botName: string): Promise<PageFactsResult[]> {
+//
+// Progress reporting: crawledPages already sits at pages.length (the crawl
+// phase's ceiling) when this runs. selectedPages gets doubled by the caller
+// before this starts, so crawledPages can keep climbing from N to 2N here
+// instead of resetting backward — the frontend's crawledPages/selectedPages
+// bar then moves forward through both phases instead of freezing (or worse,
+// visibly rewinding) during fact extraction.
+async function extractFactsBatch(
+  pages: CrawledPage[],
+  botName: string,
+  botId: string,
+  clientId: string
+): Promise<PageFactsResult[]> {
   const results: PageFactsResult[] = []
 
   for (let i = 0; i < pages.length; i += FACT_EXTRACTION_BATCH_SIZE) {
@@ -42,6 +54,7 @@ async function extractFactsBatch(pages: CrawledPage[], botName: string): Promise
         results.push({ facts: '', paragraphs: '' })
       }
     }
+    await updateIndexingJob(botId, clientId, { crawledPages: pages.length + results.length })
   }
 
   return results
@@ -53,10 +66,11 @@ async function extractFactsBatch(pages: CrawledPage[], botName: string): Promise
 async function buildEnrichedChunks(
   pages: CrawledPage[],
   botId: string,
+  clientId: string,
   botName: string
 ): Promise<EnrichedChunkResult> {
   const t0 = Date.now()
-  const allFacts = await extractFactsBatch(pages, botName)
+  const allFacts = await extractFactsBatch(pages, botName, botId, clientId)
   console.log(
     `Fact extraction complete: ${pages.length} pages in ${Date.now() - t0}ms (batch size: ${FACT_EXTRACTION_BATCH_SIZE})`
   )
@@ -97,7 +111,17 @@ async function crawlAndChunk(job: CrawlerJobMessage): Promise<CrawlAndChunkResul
     throw new Error('No content could be extracted')
   }
 
-  const { chunks, factsExtracted, factsSkipped } = await buildEnrichedChunks(pages, job.botId, job.botName)
+  // Double the denominator so the progress bar has room to keep climbing
+  // through fact extraction instead of freezing (or rewinding) at the crawl
+  // phase's ceiling. Restored to the true page count once the job completes.
+  await updateIndexingJob(job.botId, job.clientId, { selectedPages: pages.length * 2 })
+
+  const { chunks, factsExtracted, factsSkipped } = await buildEnrichedChunks(
+    pages,
+    job.botId,
+    job.clientId,
+    job.botName
+  )
   console.log(
     `Chunks built: ${chunks.length} total (${factsExtracted} pages with facts extracted, ${factsSkipped} pages without facts)`
   )
@@ -133,6 +157,7 @@ export async function processCrawlerJob(job: CrawlerJobMessage): Promise<void> {
     await updateIndexingJob(job.botId, job.clientId, {
       status: 'complete',
       crawledPages: pageCount,
+      selectedPages: pageCount,
       totalChunks: chunks.length,
       completedAt: new Date().toISOString(),
     })
