@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid'
 import { generateEmbedding, generateEmbeddingsBatch } from './openai-service.js'
-import { chunkText, crawlPagesParallel, scanWebsite } from './crawler-service.js'
+import { chunkText, chunkWithContext, crawlPagesParallel, scanWebsite } from './crawler-service.js'
 import { upsertChunks, similaritySearch, deleteChunksByBotId } from '../repositories/vector-repository.js'
 import { getPublicBotConfig } from '../repositories/bot-repository.js'
 import { generateAndPrewarmSuggestions } from './suggestion-service.js'
@@ -67,8 +67,10 @@ export async function indexKnowledgeBaseEntry(
 ): Promise<void> {
   try {
     const combinedText = `${title}\n\n${content}`
+    const botConfig = await getPublicBotConfig(botId)
+    const botName = botConfig?.name ?? botId
 
-    const chunks: Chunk[] = chunkText(combinedText).map((chunkString) => ({
+    const chunks: Chunk[] = chunkWithContext(combinedText, botName, 'Knowledge Base').map((chunkString) => ({
       chunkId: uuidv4(),
       botId,
       text: chunkString,

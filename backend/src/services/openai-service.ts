@@ -200,6 +200,63 @@ ${contextChunks.join('\n\n')}`
   }
 }
 
+interface PageFacts {
+  facts: string
+  paragraphs: string
+}
+
+const FACT_EXTRACTION_MIN_LENGTH = 200
+const FACT_EXTRACTION_INPUT_CHARS = 3000
+const FACT_EXTRACTION_MAX_TOKENS = 1000
+
+const FACT_EXTRACTION_SYSTEM_PROMPT = `You are a content analyzer for an AI chatbot.
+Extract information from this business webpage that a customer would want to know.
+
+Return a JSON object with exactly two fields:
+{
+  "facts": "Key facts as bullet points. Each bullet = one specific piece of information. Examples: pricing, hours, location, features, contact details, policies, specifications. Only facts explicitly stated on the page.",
+  "paragraphs": "Clean readable paragraphs. Remove navigation, footers, cookie notices, legal boilerplate, social media buttons. Keep only meaningful business content. Write in clear complete sentences."
+}
+
+Return ONLY the JSON object. No markdown. No preamble.`
+
+function isPageFacts(value: unknown): value is PageFacts {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as PageFacts).facts === 'string' &&
+    typeof (value as PageFacts).paragraphs === 'string'
+  )
+}
+
+export async function extractPageFacts(
+  pageText: string,
+  pageTitle: string,
+  botName: string
+): Promise<PageFacts> {
+  if (pageText.length < FACT_EXTRACTION_MIN_LENGTH) {
+    return { facts: '', paragraphs: pageText }
+  }
+
+  try {
+    const response = await generateChatCompletion({
+      systemPrompt: FACT_EXTRACTION_SYSTEM_PROMPT,
+      userPrompt: `Business: ${botName}\nPage: ${pageTitle}\n\nContent:\n${pageText.slice(0, FACT_EXTRACTION_INPUT_CHARS)}`,
+      maxTokens: FACT_EXTRACTION_MAX_TOKENS,
+      temperature: 0,
+    })
+
+    const parsed: unknown = JSON.parse(stripMarkdownFences(response))
+    if (!isPageFacts(parsed)) {
+      throw new Error('Fact extraction returned an unexpected shape')
+    }
+    return parsed
+  } catch (error) {
+    console.error('Fact extraction failed:', error)
+    return { facts: '', paragraphs: pageText }
+  }
+}
+
 export async function generateSuggestedQuestions(
   kbContent: string,
   botName: string

@@ -114,7 +114,14 @@ export async function setupBot(input: CreateBotInput): Promise<SetupBotResult> {
   })
 
   try {
-    await enqueueCrawlerJob({ jobId, botId, clientId: input.clientId, urls: scan.selectedPages, useAICleaning: true })
+    await enqueueCrawlerJob({
+      jobId,
+      botId,
+      clientId: input.clientId,
+      urls: scan.selectedPages,
+      useAICleaning: true,
+      botName: bot.name ?? botId,
+    })
   } catch (error) {
     await safeDeleteBot(botId, input.clientId)
     console.error(`Failed to enqueue crawler job during setup for bot ${botId}:`, error)
@@ -231,7 +238,14 @@ export async function startIndexingJob(
     totalChunks: 0,
     queuedAt: new Date().toISOString(),
   })
-  await enqueueCrawlerJob({ jobId, botId, clientId, urls: scan.selectedPages, useAICleaning: true })
+  await enqueueCrawlerJob({
+    jobId,
+    botId,
+    clientId,
+    urls: scan.selectedPages,
+    useAICleaning: true,
+    botName: bot.name ?? botId,
+  })
 
   return {
     status: 'queued',
@@ -263,7 +277,7 @@ export async function confirmIndexingJob(
   })
 
   try {
-    await enqueueCrawlerJob({ jobId, botId, clientId, urls, useAICleaning: true })
+    await enqueueCrawlerJob({ jobId, botId, clientId, urls, useAICleaning: true, botName: bot.name ?? botId })
   } catch (error) {
     // User already confirmed they want this bot — keep the record so they can retry,
     // don't delete it like the initial setup flow does.
