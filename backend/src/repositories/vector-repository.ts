@@ -148,6 +148,7 @@ export async function upsertSuggestedQuestionCache(
           answer: question.answer,
           botId,
           createdAt: new Date().toISOString(),
+          createdAtMs: Date.now(),
           source: 'suggested',
           emoji: question.emoji,
           category: question.category,
@@ -181,7 +182,9 @@ export async function queryCacheNamespace(
       topK: 1,
       filter: {
         botId: { $eq: botId },
-        createdAt: { $gte: new Date(Date.now() - CACHE_TTL_MS).toISOString() },
+        // Pinecone metadata range filters ($gte/$lte) require a numeric value —
+        // an ISO date string here throws PineconeBadRequestError2 at query time.
+        createdAtMs: { $gte: Date.now() - CACHE_TTL_MS },
       },
       includeMetadata: true,
     })
@@ -218,6 +221,7 @@ export async function upsertConversationCache(
           answer,
           botId,
           createdAt: new Date().toISOString(),
+          createdAtMs: Date.now(),
           source: 'conversation',
         },
       },
