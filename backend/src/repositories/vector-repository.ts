@@ -67,22 +67,67 @@ export async function upsertChunks(chunks: Chunk[], embeddings: number[][]): Pro
   }
 }
 
+// Fetch more candidates than we'll actually use, so MMR has room to trade off
+// a lower-scored-but-distinct chunk against a higher-scored near-duplicate.
+const MMR_FETCH_COUNT = 10
+// Higher = more weight on query similarity, lower = more weight on diversity
+// from already-selected chunks. 0.7 favors relevance while still discounting
+// near-duplicates — a judgment call, not a value derived from data.
+const MMR_LAMBDA = 0.7
+
+// No embeddings available at this stage (Pinecone doesn't return them by
+// default and fetching them separately isn't worth the round trip) — word
+// overlap (Jaccard similarity on words >3 chars) is a cheap, good-enough
+// proxy for "are these two chunks saying the same thing."
+function textSimilarity(a: string, b: string): number {
+  const wordsA = new Set(a.toLowerCase().split(/\s+/).filter((w) => w.length > 3))
+  const wordsB = new Set(b.toLowerCase().split(/\s+/).filter((w) => w.length > 3))
+  const intersection = [...wordsA].filter((w) => wordsB.has(w))
+  const union = new Set([...wordsA, ...wordsB])
+  return union.size === 0 ? 0 : intersection.length / union.size
+}
+
+function applyMMR(candidates: SimilarityResult[], topN: number): SimilarityResult[] {
+  if (candidates.length <= topN) return candidates
+
+  const selected: SimilarityResult[] = [candidates[0]]
+  const remaining = candidates.slice(1)
+
+  while (selected.length < topN && remaining.length > 0) {
+    let bestScore = -Infinity
+    let bestIndex = 0
+
+    remaining.forEach((candidate, index) => {
+      const maxSim = Math.max(...selected.map((sel) => textSimilarity(candidate.text, sel.text)))
+      const mmrScore = MMR_LAMBDA * candidate.score - (1 - MMR_LAMBDA) * maxSim
+      if (mmrScore > bestScore) {
+        bestScore = mmrScore
+        bestIndex = index
+      }
+    })
+
+    selected.push(remaining.splice(bestIndex, 1)[0])
+  }
+
+  return selected
+}
+
 export async function similaritySearch(
   botId: string,
   queryEmbedding: number[],
-  topK: number = 5
+  topN: number = 5
 ): Promise<SimilarityResult[]> {
   try {
     const index = getIndex()
 
     const response = await index.query({
       vector: queryEmbedding,
-      topK,
+      topK: MMR_FETCH_COUNT,
       filter: { botId: { $eq: botId } },
       includeMetadata: true,
     })
 
-    return (response.matches ?? [])
+    const candidates = (response.matches ?? [])
       .filter((match) => (match.score ?? 0) >= MIN_SIMILARITY_SCORE)
       .map((match) => ({
         chunkId: String(match.metadata?.chunkId ?? match.id),
@@ -91,6 +136,8 @@ export async function similaritySearch(
         score: match.score ?? 0,
       }))
       .sort((a, b) => b.score - a.score)
+
+    return applyMMR(candidates, topN)
   } catch (error) {
     throw new Error(
       `Failed to run similarity search for bot ${botId}: ${error instanceof Error ? error.message : String(error)}`
