@@ -21,6 +21,12 @@ function isValidHexColor(value: string): boolean {
   return HEX_COLOR_REGEX.test(value)
 }
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
+
+function isValidEmail(value: string): boolean {
+  return EMAIL_REGEX.test(value)
+}
+
 function getEmbedSnippet(botId: string): string {
   const cdnUrl = import.meta.env.VITE_CDN_URL
   return `<!-- BeepBoop Widget -->
@@ -95,12 +101,14 @@ export default function BotDetailPage() {
     if (!bot || !botId) return
     setSaving(true)
     try {
+      const trimmedSupportEmail = (bot.supportEmail ?? '').trim()
       const res = await updateBot(botId, {
         name: bot.name,
         greetingMessage: bot.greetingMessage,
         brandColor: bot.brandColor,
         widgetTrigger: bot.widgetTrigger,
         leadTriggerAfterMessages: bot.leadTriggerAfterMessages,
+        supportEmail: trimmedSupportEmail && isValidEmail(trimmedSupportEmail) ? trimmedSupportEmail : undefined,
       })
       if (res.success && res.data) setBot(res.data)
     } catch (error) {
@@ -254,6 +262,23 @@ export default function BotDetailPage() {
                   onChange={(e) => setBot({ ...bot, greetingMessage: e.target.value })}
                   className={inputClasses}
                 />
+              </div>
+
+              <div>
+                <label className={labelClasses}>Support Email</label>
+                <input
+                  type="email"
+                  value={bot.supportEmail || ''}
+                  onChange={(e) => setBot({ ...bot, supportEmail: e.target.value })}
+                  placeholder="Auto-detected from your website"
+                  className={inputClasses}
+                />
+                <p className="mt-1.5 text-xs text-slate-400">
+                  Detected automatically during setup. Visitors can contact this address directly from the chatbot.
+                </p>
+                {bot.supportEmail && !isValidEmail(bot.supportEmail.trim()) && (
+                  <p className="mt-1.5 text-xs text-red-500">Please enter a valid email address.</p>
+                )}
               </div>
 
               <div>

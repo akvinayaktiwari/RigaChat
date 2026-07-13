@@ -26,6 +26,7 @@ export interface BotConfig {
   leadTriggerAfterMessages: number
   leadFormFields: LeadFormField[]
   widgetTrigger: 'immediate' | 'delay_5s' | 'scroll_50' | 'exit_intent'
+  supportEmail?: string
   createdAt: string
   updatedAt: string
 }
