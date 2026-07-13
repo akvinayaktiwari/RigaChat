@@ -1,6 +1,16 @@
 (function () {
   'use strict';
   var BACKEND_URL = '__BACKEND_URL__';
+  var SS_WIDGET_STATE = 'beepboop_widget_state';
+  var SS_LEAD_CAPTURED = 'beepboop_lead_captured';
+  var SS_LEAD_DATA = 'beepboop_lead_data';
+  var SS_CONV_ID = 'beepboop_conv_id';
+  function ssGet(key) {
+    try { return sessionStorage.getItem(key); } catch (e) { return null; }
+  }
+  function ssSet(key, val) {
+    try { sessionStorage.setItem(key, val); } catch (e) { /* ignore */ }
+  }
   function getBotId() {
     var scripts = document.getElementsByTagName('script');
     for (var i = 0; i < scripts.length; i++) {
@@ -27,7 +37,14 @@
     botConfig: null,
     started: false,
     suggestions: [],
-    showSuggestions: true
+    showSuggestions: true,
+    unreadCount: 0,
+    leadFields: [],
+    leadValues: {},
+    leadCardIndex: -1,
+    leadSequenceActive: false,
+    leadSequenceDone: false,
+    maximized: false
   };
   var shadowRoot = null;
   var els = {};
@@ -36,38 +53,34 @@
     ':host{all:initial;--brand:__BRAND__}' +
     '*{box-sizing:border-box;font-family:"Inter",Arial,sans-serif;margin:0;padding:0}' +
     '.ciq-hidden{display:none!important}' +
-    '#ciq-bubble{position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;' +
-    'background:linear-gradient(135deg,#6366f1,#4f46e5);box-shadow:0 8px 32px rgba(99,102,241,.35);' +
+    '#ciq-bubble{position:fixed;bottom:20px;right:20px;width:60px;height:60px;border-radius:50%;' +
+    'background:var(--brand);box-shadow:0 8px 24px rgba(0,0,0,.25);' +
     'z-index:999999;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;padding:0;' +
-    'transition:transform .2s cubic-bezier(0.34,1.56,0.64,1)}' +
-    '#ciq-bubble:hover{transform:scale(1.08)}' +
-    '#ciq-bubble:active{transform:scale(.95)}' +
-    '.ciq-ping{position:absolute;top:-2px;right:-2px;width:14px;height:14px;display:flex}' +
-    '.ciq-ping-outer{position:absolute;display:inline-flex;height:100%;width:100%;border-radius:50%;' +
-    'background:#eab308;opacity:.75;animation:ciq-ping 1.4s cubic-bezier(0,0,.2,1) infinite}' +
-    '.ciq-ping-inner{position:relative;display:inline-flex;height:14px;width:14px;border-radius:50%;background:#ca8a04}' +
-    '@keyframes ciq-ping{75%,100%{transform:scale(2);opacity:0}}' +
-    '#ciq-bubble.ciq-open .ciq-ping{display:none}' +
-    '#ciq-window{position:fixed;bottom:90px;right:24px;width:360px;height:500px;background:#fff;' +
+    'transform:scale(0);opacity:0;pointer-events:none;transition:transform .2s ease,opacity .2s ease}' +
+    '#ciq-bubble.ciq-show{transform:scale(1);opacity:1;pointer-events:auto}' +
+    '#ciq-bubble:hover{filter:brightness(1.08)}' +
+    '#ciq-bubble:active{filter:brightness(.95)}' +
+    '#ciq-bubble-icon{font-size:28px;color:#fff;line-height:1}' +
+    '#ciq-bubble-badge{position:absolute;top:-4px;left:-4px;min-width:18px;height:18px;padding:0 4px;' +
+    'border-radius:9px;background:#ef4444;color:#fff;font-size:11px;font-weight:700;' +
+    'display:flex;align-items:center;justify-content:center;line-height:1}' +
+    '#ciq-window{position:fixed;bottom:96px;right:20px;width:420px;height:650px;background:#fff;' +
     'border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.15);border:1px solid #e5e7eb;z-index:999998;' +
-    'display:flex;flex-direction:column;overflow:hidden;transform-origin:bottom right;transform:scale(.85);' +
-    'opacity:0;pointer-events:none;transition:transform .35s cubic-bezier(0.34,1.56,0.64,1),opacity .25s ease}' +
+    'display:flex;flex-direction:column;overflow:hidden;transform-origin:bottom right;transform:scale(.95);' +
+    'opacity:0;pointer-events:none;transition:transform .2s ease,opacity .2s ease}' +
     '#ciq-window.ciq-open{transform:scale(1);opacity:1;pointer-events:auto}' +
     '#ciq-header{background:var(--brand);padding:16px;display:flex;align-items:center;gap:12px}' +
-    '#ciq-avatar-wrap{position:relative;flex-shrink:0;width:40px;height:40px}' +
-    '#ciq-avatar{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.1);' +
-    'border:1.5px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;' +
-    'font-weight:700;font-size:14px;color:#fff}' +
-    '#ciq-online-dot{position:absolute;bottom:0;right:0;width:12px;height:12px;background:#4ade80;' +
-    'border:2px solid var(--brand);border-radius:50%}' +
+    '#ciq-avatar{flex-shrink:0;width:36px;height:36px;border-radius:50%;background:var(--brand);' +
+    'border:1.5px solid rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center;' +
+    'font-weight:700;font-size:13px;color:#fff}' +
     '#ciq-header-info{flex:1;min-width:0}' +
-    '#ciq-bot-name{font-weight:700;font-size:13px;color:#fff;display:flex;align-items:center;gap:4px;' +
-    'white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-    '#ciq-subtitle{font-size:11px;color:rgba(255,255,255,.8);margin-top:2px}' +
-    '#ciq-close{flex-shrink:0;width:28px;height:28px;background:transparent;border:none;' +
-    'color:rgba(255,255,255,.8);cursor:pointer;font-size:14px;border-radius:50%;' +
-    'display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s}' +
-    '#ciq-close:hover{background:rgba(255,255,255,.1);color:#fff}' +
+    '#ciq-bot-name{font-weight:700;font-size:14px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+    '#ciq-subtitle{font-size:12px;color:rgba(255,255,255,.8);margin-top:2px}' +
+    '#ciq-header-actions{display:flex;align-items:center;gap:4px;flex-shrink:0}' +
+    '.ciq-icon-btn{width:32px;height:32px;flex-shrink:0;background:transparent;border:none;' +
+    'color:#fff;cursor:pointer;border-radius:50%;display:flex;align-items:center;justify-content:center;' +
+    'padding:0;transition:opacity .15s}' +
+    '.ciq-icon-btn:hover{opacity:.8}' +
     '#ciq-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;' +
     'background:rgba(249,250,251,.3)}' +
     '#ciq-messages::-webkit-scrollbar{width:4px}' +
@@ -89,71 +102,97 @@
     '.ciq-typing span:nth-child(2){animation-delay:.2s}' +
     '.ciq-typing span:nth-child(3){animation-delay:.4s}' +
     '@keyframes bb-bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}' +
-    '#ciq-lead-form{padding:16px;background:#f9fafb;border-top:1px solid #e5e7eb}' +
-    '#ciq-lead-form p{font-size:13px;color:#374151;margin:0 0 10px 0}' +
-    '#ciq-lead-form input{width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:10px;' +
-    'font-size:13px;outline:none;margin-bottom:8px}' +
-    '#ciq-lead-form input:focus{border-color:var(--brand)}' +
-    '#ciq-lead-submit{width:100%;padding:10px;background:linear-gradient(135deg,#6366f1,#4f46e5);' +
-    'color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;' +
-    'transition:opacity .15s}' +
-    '#ciq-lead-submit:hover{opacity:.92}' +
-    '#ciq-lead-error{color:#ef4444;font-size:12px;margin-top:8px}' +
+    '.ciq-lead-card{position:relative;padding-right:20px}' +
+    '.ciq-lead-card-label{font-size:13px;font-weight:600;margin-bottom:8px}' +
+    '.ciq-lead-card-row{display:flex;gap:6px}' +
+    '.ciq-lead-card-input{flex:1;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;' +
+    'font-size:13px;outline:none;background:#fff}' +
+    '.ciq-lead-card-input:focus{border-color:var(--brand)}' +
+    '.ciq-lead-card-input:disabled{background:#f3f4f6;color:#9ca3af}' +
+    '.ciq-lead-card-submit{width:32px;height:32px;flex-shrink:0;border:none;border-radius:8px;' +
+    'background:var(--brand);color:#fff;font-size:15px;cursor:pointer;display:flex;align-items:center;' +
+    'justify-content:center;transition:opacity .15s}' +
+    '.ciq-lead-card-submit:disabled{opacity:.4;cursor:default}' +
+    '.ciq-lead-card-skip{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;' +
+    'border:1px solid #e5e7eb;background:#fff;color:#6b7280;font-size:12px;line-height:1;cursor:pointer;' +
+    'display:flex;align-items:center;justify-content:center}' +
     '#ciq-input-area{display:flex;padding:12px;gap:8px;background:#fff;border-top:1px solid #e5e7eb}' +
     '#ciq-input{flex:1;padding:10px 16px;border:1px solid #e5e7eb;border-radius:12px;font-size:14px;' +
     'background:#f9fafb;outline:none}' +
     '#ciq-input:focus{border-color:var(--brand)}' +
     '#ciq-input::placeholder{color:#6b7280}' +
-    '#ciq-send{width:40px;height:40px;background:linear-gradient(135deg,#6366f1,#4f46e5);border:none;' +
+    '#ciq-input:disabled{background:#f3f4f6;color:#9ca3af;cursor:not-allowed}' +
+    '#ciq-send{width:40px;height:40px;background:var(--brand);border:none;' +
     'border-radius:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;' +
     'transition:opacity .15s}' +
     '#ciq-send:hover{opacity:.9}' +
     '#ciq-send:disabled{opacity:.4;cursor:default}' +
-    '@media (max-width:480px){#ciq-window{width:calc(100vw - 24px);right:12px}' +
-    '#ciq-bubble{bottom:12px;right:12px}}' +
+    '#ciq-input-hint{font-size:11px;color:#9ca3af;text-align:center;padding:0 12px 8px 12px}' +
+    '#ciq-footer{font-size:11px;color:#9ca3af;text-align:center;padding:6px 12px 10px 12px}' +
     '#ciq-suggestions{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 12px 16px}' +
     '.ciq-chip{display:flex;align-items:center;gap:6px;padding:8px 12px;background:#fff;' +
     'border:1px solid #e5e7eb;border-radius:999px;font-size:13px;color:#111827;cursor:pointer;' +
     'transition:background .2s,border-color .2s,color .2s;box-shadow:0 1px 2px rgba(0,0,0,.04)}' +
     '.ciq-chip:hover{background:#f9fafb;border-color:var(--brand);color:var(--brand)}' +
     '.ciq-chip-text{font-weight:500}';
-  var BUBBLE_ICON =
-    '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-    '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="white"/></svg>';
   var SEND_ICON =
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
     '<line x1="22" y1="2" x2="11" y2="13" stroke="white" stroke-width="2"/>' +
     '<polygon points="22 2 15 22 11 13 2 9 22 2" fill="white"/></svg>';
-  var SPARKLES_ICON =
-    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-    '<path d="M12 2l1.5 6.5L20 10l-6.5 1.5L12 18l-1.5-6.5L4 10l6.5-1.5L12 2z" fill="#fde047"/></svg>';
+  var BUBBLE_CHAT_ICON =
+    '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+    '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" ' +
+    'stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '</svg>';
+  var BUBBLE_CLOSE_ICON =
+    '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+    '<line x1="18" y1="6" x2="6" y2="18" stroke="white" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<line x1="6" y1="6" x2="18" y2="18" stroke="white" stroke-width="2.5" stroke-linecap="round"/>' +
+    '</svg>';
+  var BACK_ICON =
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+    'stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">' +
+    '<path d="M19 12H5M12 19l-7-7 7-7"/></svg>';
+  var EXPAND_ICON =
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+    'stroke-linecap="round" xmlns="http://www.w3.org/2000/svg">' +
+    '<path d="M15 3 L21 3 L21 9"/><path d="M9 21 L3 21 L3 15"/>' +
+    '<path d="M21 3 L14 10"/><path d="M3 21 L10 14"/></svg>';
+  var COMPRESS_ICON =
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+    'stroke-linecap="round" xmlns="http://www.w3.org/2000/svg">' +
+    '<path d="M14 10 L20 4"/><path d="M4 20 L10 14"/>' +
+    '<path d="M20 4 L20 9 M20 4 L15 4"/><path d="M4 20 L4 15 M4 20 L9 20"/></svg>';
+  var REFRESH_ICON =
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+    '<path d="M23 4v6h-6M1 20v-6h6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   var SHELL_HTML =
-    '<button id="ciq-bubble" aria-label="Open chat">' + BUBBLE_ICON +
-    '<span class="ciq-ping"><span class="ciq-ping-outer"></span><span class="ciq-ping-inner"></span></span>' +
+    '<button id="ciq-bubble" aria-label="Open chat">' +
+    '<span id="ciq-bubble-icon"></span>' +
+    '<span id="ciq-bubble-badge" class="ciq-hidden">0</span>' +
     '</button>' +
     '<div id="ciq-window">' +
     '<div id="ciq-header">' +
-    '<div id="ciq-avatar-wrap"><div id="ciq-avatar"></div><span id="ciq-online-dot"></span></div>' +
+    '<button id="ciq-back" class="ciq-icon-btn" aria-label="Minimize chat">' + BACK_ICON + '</button>' +
+    '<div id="ciq-avatar"></div>' +
     '<div id="ciq-header-info">' +
-    '<div id="ciq-bot-name"><span id="ciq-bot-name-text"></span>' + SPARKLES_ICON + '</div>' +
-    '<div id="ciq-subtitle">Powered by BeepBoop</div>' +
+    '<div id="ciq-bot-name"></div>' +
+    '<div id="ciq-subtitle">AI Assistant</div>' +
     '</div>' +
-    '<button id="ciq-close" aria-label="Close chat">✕</button>' +
+    '<div id="ciq-header-actions">' +
+    '<button id="ciq-refresh" class="ciq-icon-btn" aria-label="Start new conversation">' + REFRESH_ICON + '</button>' +
+    '<button id="ciq-expand" class="ciq-icon-btn" aria-label="Expand chat">' + EXPAND_ICON + '</button>' +
+    '</div>' +
     '</div>' +
     '<div id="ciq-messages"></div>' +
     '<div id="ciq-suggestions"></div>' +
-    '<div id="ciq-lead-form" class="ciq-hidden">' +
-    '<p>Please share your details and we\'ll be in touch.</p>' +
-    '<input id="ciq-lead-name" type="text" placeholder="Your Name" required />' +
-    '<input id="ciq-lead-phone" type="tel" placeholder="Phone Number" required />' +
-    '<input id="ciq-lead-email" type="email" placeholder="Email Address" required />' +
-    '<input id="ciq-lead-property" type="text" placeholder="Property Interest (optional)" />' +
-    '<input id="ciq-lead-budget" type="text" placeholder="Budget Range (optional)" />' +
-    '<button id="ciq-lead-submit">Send</button>' +
-    '<div id="ciq-lead-error" class="ciq-hidden"></div></div>' +
     '<div id="ciq-input-area">' +
     '<input id="ciq-input" type="text" placeholder="Type a message..." />' +
-    '<button id="ciq-send" aria-label="Send message">' + SEND_ICON + '</button></div></div>';
+    '<button id="ciq-send" aria-label="Send message">' + SEND_ICON + '</button></div>' +
+    '<div id="ciq-input-hint" class="ciq-hidden">Please fill in the details above to continue</div>' +
+    '<div id="ciq-footer">Powered by VyostraAI</div>' +
+    '</div>';
   function init() {
     fetch(BACKEND_URL + '/api/bots/public/' + encodeURIComponent(botId))
       .then(function (res) { return res.json(); })
@@ -165,6 +204,20 @@
       .catch(function () {
         /* exit silently, never break the host site */
       });
+  }
+  function restoreSessionState() {
+    if (ssGet(SS_LEAD_CAPTURED) === 'true') {
+      state.leadCaptured = true;
+      state.leadSequenceDone = true;
+    }
+    var storedLeadData = ssGet(SS_LEAD_DATA);
+    if (storedLeadData) {
+      try {
+        var parsed = JSON.parse(storedLeadData);
+        state.leadValues = parsed.values || {};
+        if (parsed.done) state.leadSequenceDone = true;
+      } catch (e) { /* ignore malformed storage */ }
+    }
   }
   function mount() {
     try {
@@ -181,30 +234,66 @@
         shadowRoot.appendChild(container.firstChild);
       }
       els.bubble = shadowRoot.getElementById('ciq-bubble');
+      els.bubbleBadge = shadowRoot.getElementById('ciq-bubble-badge');
+      els.bubbleIcon = shadowRoot.getElementById('ciq-bubble-icon');
+      els.bubbleIcon.innerHTML = BUBBLE_CHAT_ICON;
       els.window = shadowRoot.getElementById('ciq-window');
       els.avatar = shadowRoot.getElementById('ciq-avatar');
-      els.botName = shadowRoot.getElementById('ciq-bot-name-text');
-      els.close = shadowRoot.getElementById('ciq-close');
+      els.botName = shadowRoot.getElementById('ciq-bot-name');
+      els.back = shadowRoot.getElementById('ciq-back');
+      els.refresh = shadowRoot.getElementById('ciq-refresh');
+      els.expand = shadowRoot.getElementById('ciq-expand');
       els.messages = shadowRoot.getElementById('ciq-messages');
       els.suggestions = shadowRoot.getElementById('ciq-suggestions');
-      els.leadForm = shadowRoot.getElementById('ciq-lead-form');
-      els.leadError = shadowRoot.getElementById('ciq-lead-error');
-      els.leadSubmit = shadowRoot.getElementById('ciq-lead-submit');
       els.input = shadowRoot.getElementById('ciq-input');
       els.send = shadowRoot.getElementById('ciq-send');
+      els.inputHint = shadowRoot.getElementById('ciq-input-hint');
       var botName = state.botConfig.name || '';
       els.botName.textContent = botName;
       els.avatar.textContent = (botName || 'AI').trim().substring(0, 2).toUpperCase();
-      els.bubble.classList.add('ciq-hidden');
+      state.leadFields = (state.botConfig.leadFormFields || []).slice();
+      restoreSessionState();
       pickSuggestions();
       bindEvents();
-      applyTrigger();
+      applyResponsiveSize();
+      window.addEventListener('resize', handleResize);
+      var storedWidgetState = ssGet(SS_WIDGET_STATE);
+      if (storedWidgetState === 'open' || storedWidgetState === 'maximized') {
+        els.bubbleIcon.innerHTML = BUBBLE_CLOSE_ICON;
+        if (storedWidgetState === 'maximized') {
+          state.maximized = true;
+          applyMaximizedSize();
+          els.expand.innerHTML = COMPRESS_ICON;
+          els.expand.setAttribute('aria-label', 'Compress chat');
+        } else {
+          applyResponsiveSize();
+        }
+        state.isOpen = true;
+        els.window.classList.add('ciq-open');
+        if (!state.started) {
+          state.started = true;
+          startConversation();
+        }
+      } else if (storedWidgetState === 'bubble') {
+        showBubble();
+      } else {
+        applyTrigger();
+      }
     } catch (e) {
       /* never break the host site */
     }
   }
   function showBubble() {
-    if (els.bubble) els.bubble.classList.remove('ciq-hidden');
+    if (els.bubble) els.bubble.classList.add('ciq-show');
+  }
+  function updateBubbleBadge() {
+    if (!els.bubbleBadge) return;
+    if (state.unreadCount > 0) {
+      els.bubbleBadge.textContent = String(state.unreadCount);
+      els.bubbleBadge.classList.remove('ciq-hidden');
+    } else {
+      els.bubbleBadge.classList.add('ciq-hidden');
+    }
   }
   function pickSuggestions() {
     var pool = (state.botConfig.suggestedQuestions || []).slice();
@@ -278,27 +367,106 @@
     showBubble();
   }
   function bindEvents() {
-    els.bubble.addEventListener('click', openChat);
-    els.close.addEventListener('click', closeChat);
+    els.bubble.addEventListener('click', function() {
+      if (state.isOpen) {
+        goToBubble();
+      } else {
+        openChat();
+      }
+    });
+    els.back.addEventListener('click', goToBubble);
+    els.refresh.addEventListener('click', handleRefresh);
+    els.expand.addEventListener('click', handleExpandToggle);
     els.send.addEventListener('click', handleSend);
     els.input.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') handleSend();
     });
-    els.leadSubmit.addEventListener('click', handleLeadSubmit);
   }
   function openChat() {
+    state.maximized = false;
+    applyResponsiveSize();
+    els.expand.innerHTML = EXPAND_ICON;
+    els.expand.setAttribute('aria-label', 'Expand chat');
     state.isOpen = true;
+    ssSet(SS_WIDGET_STATE, 'open');
     els.window.classList.add('ciq-open');
-    els.bubble.classList.add('ciq-open');
+    els.bubbleIcon.innerHTML = BUBBLE_CLOSE_ICON;
+    state.unreadCount = 0;
+    updateBubbleBadge();
     if (!state.started) {
       state.started = true;
       startConversation();
     }
   }
-  function closeChat() {
+  function goToBubble() {
     state.isOpen = false;
+    ssSet(SS_WIDGET_STATE, 'bubble');
     els.window.classList.remove('ciq-open');
-    els.bubble.classList.remove('ciq-open');
+    els.bubbleIcon.innerHTML = BUBBLE_CHAT_ICON;
+    els.bubble.classList.add('ciq-show');
+  }
+  function handleExpandToggle() {
+    if (state.maximized) {
+      state.maximized = false;
+      ssSet(SS_WIDGET_STATE, 'open');
+      applyResponsiveSize();
+      els.expand.innerHTML = EXPAND_ICON;
+      els.expand.setAttribute('aria-label', 'Expand chat');
+    } else {
+      state.maximized = true;
+      ssSet(SS_WIDGET_STATE, 'maximized');
+      applyMaximizedSize();
+      els.expand.innerHTML = COMPRESS_ICON;
+      els.expand.setAttribute('aria-label', 'Compress chat');
+    }
+  }
+  function applyMaximizedSize() {
+    els.window.style.width = '680px';
+    els.window.style.height = '85vh';
+    els.window.style.bottom = '96px';
+    els.window.style.right = '20px';
+    els.window.style.top = '';
+    els.window.style.left = '';
+  }
+  var resizeTimer = null;
+  function handleResize() {
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(applyResponsiveSize, 150);
+  }
+  function applyResponsiveSize() {
+    var w = window.innerWidth;
+    els.window.style.top = '';
+    els.window.style.left = '';
+    if (w > 480) {
+      els.window.style.width = '420px';
+      els.window.style.height = '650px';
+      els.window.style.bottom = '96px';
+      els.window.style.right = '20px';
+      els.window.style.borderRadius = '';
+    } else if (w >= 380) {
+      els.window.style.width = 'calc(100vw - 32px)';
+      els.window.style.height = '580px';
+      els.window.style.bottom = '96px';
+      els.window.style.right = '20px';
+      els.window.style.borderRadius = '';
+    } else {
+      els.window.style.width = '100vw';
+      els.window.style.height = '100vh';
+      els.window.style.bottom = '0';
+      els.window.style.right = '0';
+      els.window.style.borderRadius = '0';
+    }
+  }
+  function handleRefresh() {
+    els.messages.textContent = '';
+    state.messages = [];
+    state.conversationId = null;
+    state.started = false;
+    state.showSuggestions = true;
+    state.leadCardIndex = -1;
+    state.leadSequenceActive = false;
+    updateInputLock(false);
+    startConversation();
   }
   function scrollToBottom() {
     els.messages.scrollTop = els.messages.scrollHeight;
@@ -325,6 +493,10 @@
     bubble.appendChild(timeEl);
     els.messages.appendChild(bubble);
     scrollToBottom();
+    if (role === 'bot' && !state.isOpen) {
+      state.unreadCount++;
+      updateBubbleBadge();
+    }
     return bubble;
   }
   function addTypingIndicator() {
@@ -352,6 +524,7 @@
       .then(function (json) {
         if (!json || !json.success || !json.data) throw new Error('start failed');
         state.conversationId = json.data.conversationId;
+        ssSet(SS_CONV_ID, state.conversationId);
         var greeting = json.data.greeting || state.botConfig.greetingMessage || '';
         state.messages.push({ role: 'bot', text: greeting });
         addMessage('bot', greeting);
@@ -363,7 +536,7 @@
   }
   function handleSend() {
     var text = (els.input.value || '').trim();
-    if (!text || state.isLoading || !state.conversationId) return;
+    if (!text || state.isLoading || !state.conversationId || els.input.disabled) return;
     els.input.value = '';
     state.showSuggestions = false;
     renderSuggestions();
@@ -413,13 +586,12 @@
       });
   }
   function checkLeadTrigger() {
-    if (state.leadCaptured) return;
+    if (state.leadCaptured || state.leadSequenceDone || state.leadSequenceActive || !state.leadFields.length) return;
     fetch(BACKEND_URL + '/api/chat/lead-trigger/' + encodeURIComponent(botId) + '/' + encodeURIComponent(state.conversationId))
       .then(function (res) { return res.json(); })
       .then(function (json) {
         if (json && json.success && json.data && json.data.shouldCapture) {
-          els.leadForm.classList.remove('ciq-hidden');
-          scrollToBottom();
+          startLeadSequence();
         }
       })
       .catch(function () {
@@ -433,46 +605,155 @@
       })
       .join('\n');
   }
-  function handleLeadSubmit() {
-    var name = shadowRoot.getElementById('ciq-lead-name').value.trim();
-    var phone = shadowRoot.getElementById('ciq-lead-phone').value.trim();
-    var email = shadowRoot.getElementById('ciq-lead-email').value.trim();
-    var propertyInterest = shadowRoot.getElementById('ciq-lead-property').value.trim();
-    var budgetRange = shadowRoot.getElementById('ciq-lead-budget').value.trim();
-    els.leadError.classList.add('ciq-hidden');
-    if (!name || !phone || !email) {
-      els.leadError.textContent = 'Please fill in your name, phone, and email.';
-      els.leadError.classList.remove('ciq-hidden');
+  function updateInputLock(locked) {
+    els.input.disabled = locked;
+    els.send.disabled = locked;
+    if (locked) {
+      els.inputHint.classList.remove('ciq-hidden');
+    } else {
+      els.inputHint.classList.add('ciq-hidden');
+    }
+  }
+  function validateFieldValue(field, value) {
+    var v = (value || '').trim();
+    if (!v) return false;
+    if (field.type === 'email') return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
+    if (field.type === 'phone') return /^\+?[0-9]{10,}$/.test(v);
+    if (field.fieldId === 'name') return /^[a-zA-Z\s]{2,}$/.test(v);
+    if (field.type === 'select') return !!(field.options && field.options.indexOf(v) !== -1);
+    return v.length >= 1;
+  }
+  function persistLeadValues() {
+    ssSet(SS_LEAD_DATA, JSON.stringify({ values: state.leadValues, done: state.leadSequenceDone }));
+  }
+  function startLeadSequence() {
+    state.leadSequenceActive = true;
+    state.leadCardIndex = 0;
+    renderLeadCard();
+  }
+  function finalizeCardUI(refs) {
+    refs.input.disabled = true;
+    refs.submit.disabled = true;
+    if (refs.skip && refs.skip.parentNode) {
+      refs.skip.parentNode.removeChild(refs.skip);
+    }
+  }
+  function advanceLeadSequence() {
+    state.leadCardIndex++;
+    renderLeadCard();
+  }
+  function renderLeadCard() {
+    if (state.leadCardIndex >= state.leadFields.length) {
+      state.leadSequenceActive = false;
+      state.leadSequenceDone = true;
+      persistLeadValues();
+      updateInputLock(false);
+      postLeadIfNeeded();
       return;
     }
-    els.leadSubmit.disabled = true;
+    var field = state.leadFields[state.leadCardIndex];
+    var required = field.required === true;
+    updateInputLock(required);
+    var bubble = document.createElement('div');
+    bubble.className = 'ciq-msg-bot ciq-lead-card';
+    var refs = {};
+    var label = document.createElement('div');
+    label.className = 'ciq-lead-card-label';
+    label.textContent = field.label || '';
+    bubble.appendChild(label);
+    var row = document.createElement('div');
+    row.className = 'ciq-lead-card-row';
+    var inputEl;
+    if (field.type === 'select' && field.options && field.options.length) {
+      inputEl = document.createElement('select');
+      inputEl.className = 'ciq-lead-card-input';
+      var placeholderOpt = document.createElement('option');
+      placeholderOpt.value = '';
+      placeholderOpt.textContent = 'Select...';
+      inputEl.appendChild(placeholderOpt);
+      field.options.forEach(function (opt) {
+        var o = document.createElement('option');
+        o.value = opt;
+        o.textContent = opt;
+        inputEl.appendChild(o);
+      });
+    } else {
+      inputEl = document.createElement('input');
+      inputEl.className = 'ciq-lead-card-input';
+      inputEl.type = field.type === 'email' ? 'email' : field.type === 'phone' ? 'tel' : 'text';
+      inputEl.placeholder = field.label || '';
+    }
+    var submitBtn = document.createElement('button');
+    submitBtn.type = 'button';
+    submitBtn.className = 'ciq-lead-card-submit';
+    submitBtn.disabled = true;
+    submitBtn.setAttribute('aria-label', 'Submit');
+    submitBtn.textContent = '→';
+    refs.input = inputEl;
+    refs.submit = submitBtn;
+    var validate = function () {
+      submitBtn.disabled = !validateFieldValue(field, inputEl.value);
+    };
+    inputEl.addEventListener('keyup', validate);
+    inputEl.addEventListener('change', validate);
+    submitBtn.addEventListener('click', function () {
+      if (!validateFieldValue(field, inputEl.value)) return;
+      state.leadValues[field.fieldId] = inputEl.value.trim();
+      persistLeadValues();
+      finalizeCardUI(refs);
+      advanceLeadSequence();
+    });
+    row.appendChild(inputEl);
+    row.appendChild(submitBtn);
+    bubble.appendChild(row);
+    if (!required) {
+      var skipBtn = document.createElement('button');
+      skipBtn.type = 'button';
+      skipBtn.className = 'ciq-lead-card-skip';
+      skipBtn.setAttribute('aria-label', 'Skip');
+      skipBtn.textContent = '×';
+      refs.skip = skipBtn;
+      skipBtn.addEventListener('click', function () {
+        var v = inputEl.value.trim();
+        state.leadValues[field.fieldId] = validateFieldValue(field, v) ? v : null;
+        persistLeadValues();
+        finalizeCardUI(refs);
+        advanceLeadSequence();
+      });
+      bubble.appendChild(skipBtn);
+    }
+    els.messages.appendChild(bubble);
+    scrollToBottom();
+  }
+  function postLeadIfNeeded() {
+    var payload = {};
+    var hasValue = false;
+    Object.keys(state.leadValues).forEach(function (k) {
+      var v = state.leadValues[k];
+      if (v !== null && v !== undefined && v !== '') {
+        payload[k] = v;
+        hasValue = true;
+      }
+    });
+    if (!hasValue) return;
+    payload.botId = botId;
+    payload.conversationId = state.conversationId;
+    payload.chatTranscript = buildTranscript();
+    payload.sourceUrl = window.location.href;
     fetch(BACKEND_URL + '/api/leads', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        botId: botId,
-        conversationId: state.conversationId,
-        name: name,
-        phone: phone,
-        email: email,
-        propertyInterest: propertyInterest || undefined,
-        budgetRange: budgetRange || undefined,
-        chatTranscript: buildTranscript(),
-        sourceUrl: window.location.href
-      })
+      body: JSON.stringify(payload)
     })
       .then(function (res) { return res.json(); })
       .then(function (json) {
-        els.leadSubmit.disabled = false;
         if (!json || !json.success) throw new Error('lead submit failed');
         state.leadCaptured = true;
-        els.leadForm.classList.add('ciq-hidden');
-        addMessage('bot', 'Thanks! Our team will be in touch shortly.');
+        ssSet(SS_LEAD_CAPTURED, 'true');
+        addMessage('bot', "Thanks! We'll be in touch.");
       })
       .catch(function () {
-        els.leadSubmit.disabled = false;
-        els.leadError.textContent = 'Something went wrong. Please try again.';
-        els.leadError.classList.remove('ciq-hidden');
+        /* silent fail, never surface an error for lead capture */
       });
   }
   if (document.readyState === 'loading') {
