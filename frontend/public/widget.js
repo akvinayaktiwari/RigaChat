@@ -167,6 +167,17 @@
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
     '<path d="M23 4v6h-6M1 20v-6h6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
     '<path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var MAIL_ICON =
+    '<svg width="16" height="16" viewBox="0 0 24 24"' +
+    ' fill="none" xmlns="http://www.w3.org/2000/svg">' +
+    '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9' +
+    ' 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"' +
+    ' stroke="white" stroke-width="2"' +
+    ' stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<polyline points="22,6 12,13 2,6"' +
+    ' stroke="white" stroke-width="2"' +
+    ' stroke-linecap="round" stroke-linejoin="round"/>' +
+    '</svg>';
   var SHELL_HTML =
     '<button id="ciq-bubble" aria-label="Open chat">' +
     '<span id="ciq-bubble-icon"></span>' +
@@ -182,6 +193,7 @@
     '</div>' +
     '<div id="ciq-header-actions">' +
     '<button id="ciq-refresh" class="ciq-icon-btn" aria-label="Start new conversation">' + REFRESH_ICON + '</button>' +
+    '<button id="ciq-mail" class="ciq-icon-btn ciq-hidden" aria-label="Email support">' + MAIL_ICON + '</button>' +
     '<button id="ciq-expand" class="ciq-icon-btn" aria-label="Expand chat">' + EXPAND_ICON + '</button>' +
     '</div>' +
     '</div>' +
@@ -243,6 +255,7 @@
       els.back = shadowRoot.getElementById('ciq-back');
       els.refresh = shadowRoot.getElementById('ciq-refresh');
       els.expand = shadowRoot.getElementById('ciq-expand');
+      els.mail = shadowRoot.getElementById('ciq-mail');
       els.messages = shadowRoot.getElementById('ciq-messages');
       els.suggestions = shadowRoot.getElementById('ciq-suggestions');
       els.input = shadowRoot.getElementById('ciq-input');
@@ -251,6 +264,9 @@
       var botName = state.botConfig.name || '';
       els.botName.textContent = botName;
       els.avatar.textContent = (botName || 'AI').trim().substring(0, 2).toUpperCase();
+      if (state.botConfig.supportEmail) {
+        els.mail.classList.remove('ciq-hidden');
+      }
       state.leadFields = (state.botConfig.leadFormFields || []).slice();
       restoreSessionState();
       pickSuggestions();
@@ -377,6 +393,18 @@
     els.back.addEventListener('click', goToBubble);
     els.refresh.addEventListener('click', handleRefresh);
     els.expand.addEventListener('click', handleExpandToggle);
+    els.mail.addEventListener('click', function() {
+      var email = state.botConfig.supportEmail;
+      if (!email) return;
+      var botName = state.botConfig.name || 'Support';
+      var subject = encodeURIComponent(
+        'Support Request — ' + botName
+      );
+      window.open(
+        'mailto:' + email + '?subject=' + subject,
+        '_blank'
+      );
+    });
     els.send.addEventListener('click', handleSend);
     els.input.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') handleSend();
