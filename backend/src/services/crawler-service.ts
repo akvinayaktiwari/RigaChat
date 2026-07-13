@@ -401,6 +401,29 @@ export function chunkWithContext(
   return chunks.filter((c) => c.split(' ').length >= MIN_CHUNK_WORDS)
 }
 
+const SUPPORT_EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g
+const SUPPORT_EMAIL_PREFIX_BLOCKLIST = ['noreply@', 'no-reply@', 'example@', 'test@']
+const SUPPORT_EMAIL_DOMAIN_BLOCKLIST = ['example.com', 'test.com', 'domain.com']
+const SUPPORT_EMAIL_PRIORITY_PREFIXES = ['support@', 'contact@', 'info@', 'hello@', 'help@']
+
+export function extractSupportEmail(pages: string[]): string | null {
+  const matches = pages.join('\n').match(SUPPORT_EMAIL_REGEX) ?? []
+  const uniqueEmails = Array.from(new Set(matches.map((email) => email.toLowerCase())))
+
+  const validEmails = uniqueEmails.filter((email) => {
+    if (SUPPORT_EMAIL_PREFIX_BLOCKLIST.some((prefix) => email.startsWith(prefix))) return false
+    const domain = email.split('@')[1] ?? ''
+    return !SUPPORT_EMAIL_DOMAIN_BLOCKLIST.includes(domain)
+  })
+
+  for (const prefix of SUPPORT_EMAIL_PRIORITY_PREFIXES) {
+    const match = validEmails.find((email) => email.startsWith(prefix))
+    if (match) return match
+  }
+
+  return validEmails[0] ?? null
+}
+
 export function chunkFacts(facts: string, botName: string, pageTitle: string): string[] {
   if (facts.length === 0) return []
 

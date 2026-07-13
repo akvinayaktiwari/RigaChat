@@ -157,3 +157,27 @@ Hallucination prevention:
   "If context does not contain the answer,
    say so clearly"
   Never remove this instruction
+
+
+Git Commit Rule:
+After every completed and tested feature, run:
+  git add .
+  git commit -m "<type>: <short description>"
+
+Commit message format:
+  feat: add support email extraction in crawler
+  feat: add mail icon to widget header
+  fix: widget bubble icon toggle
+  chore: update BotConfig types for supportEmail
+
+Commit types:
+  feat     → new feature
+  fix      → bug fix
+  chore    → config, types, cleanup
+  refactor → code restructure, no behavior change
+
+Never commit:
+  - Broken or untested code
+  - .env or .env.local files
+  - node_modules/
+  - dist/

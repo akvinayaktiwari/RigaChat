@@ -183,7 +183,11 @@ export async function resyncBot(
 ): Promise<{ pagesIndexed: number; chunksIndexed: number }> {
   const bot = await getBotById(botId, clientId)
   if (!bot) throw new Error('Bot not found')
-  return reindexBot(botId, websiteUrl)
+  const result = await reindexBot(botId, websiteUrl)
+  if (result.supportEmail) {
+    await updateBot(botId, clientId, { supportEmail: result.supportEmail })
+  }
+  return result
 }
 
 interface StartIndexingResult {

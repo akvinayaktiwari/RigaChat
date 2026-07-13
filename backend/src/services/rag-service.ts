@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid'
 import { extractPageFacts, generateEmbedding, generateEmbeddingsBatch } from './openai-service.js'
-import { chunkFacts, chunkWithContext, crawlPagesParallel, scanWebsite } from './crawler-service.js'
+import { chunkFacts, chunkWithContext, crawlPagesParallel, extractSupportEmail, scanWebsite } from './crawler-service.js'
 import { upsertChunks, similaritySearch, deleteChunksByBotId } from '../repositories/vector-repository.js'
 import { getPublicBotConfig } from '../repositories/bot-repository.js'
 import { generateAndPrewarmSuggestions } from './suggestion-service.js'
@@ -25,7 +25,7 @@ async function runSuggestionPrewarm(botId: string, kbContent: string): Promise<v
 export async function indexWebsite(
   botId: string,
   websiteUrl: string
-): Promise<{ pagesIndexed: number; chunksIndexed: number }> {
+): Promise<{ pagesIndexed: number; chunksIndexed: number; supportEmail: string | null }> {
   try {
     const scan = await scanWebsite(websiteUrl)
     // useAICleaning disabled — extractPageFacts() below already removes
@@ -34,6 +34,8 @@ export async function indexWebsite(
     const pages = await crawlPagesParallel(scan.selectedPages, false, (crawled, total) => {
       console.log(`Crawling: ${crawled}/${total} pages`)
     })
+
+    const supportEmail = extractSupportEmail(pages.map((page) => page.content))
 
     const botConfig = await getPublicBotConfig(botId)
     const botName = botConfig?.name ?? botId
@@ -57,7 +59,7 @@ export async function indexWebsite(
 
     await runSuggestionPrewarm(botId, chunks.map((chunk) => chunk.text).join('\n\n'))
 
-    return { pagesIndexed: pages.length, chunksIndexed: chunks.length }
+    return { pagesIndexed: pages.length, chunksIndexed: chunks.length, supportEmail }
   } catch (error) {
     throw new Error(
       `Failed to index website ${websiteUrl} for bot ${botId}: ${error instanceof Error ? error.message : String(error)}`
@@ -115,7 +117,7 @@ export async function retrieveContext(
 export async function reindexBot(
   botId: string,
   websiteUrl: string
-): Promise<{ pagesIndexed: number; chunksIndexed: number }> {
+): Promise<{ pagesIndexed: number; chunksIndexed: number; supportEmail: string | null }> {
   try {
     await deleteChunksByBotId(botId)
     return await indexWebsite(botId, websiteUrl)

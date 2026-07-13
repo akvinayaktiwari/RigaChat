@@ -1,8 +1,8 @@
 import { v4 as uuidv4 } from 'uuid'
-import { crawlPagesParallel, chunkWithContext, chunkFacts } from './crawler-service.js'
+import { crawlPagesParallel, chunkWithContext, chunkFacts, extractSupportEmail } from './crawler-service.js'
 import { extractPageFacts, generateEmbeddingsBatch } from './openai-service.js'
 import { upsertChunks } from '../repositories/vector-repository.js'
-import { claimCrawlerJob, getPublicBotConfig, updateIndexingJob } from '../repositories/bot-repository.js'
+import { claimCrawlerJob, getPublicBotConfig, updateBot, updateIndexingJob } from '../repositories/bot-repository.js'
 import { generateAndPrewarmSuggestions } from './suggestion-service.js'
 import type { CrawlerJobMessage } from '../lib/sqs.js'
 import type { Chunk } from '../types/index.js'
@@ -10,6 +10,7 @@ import type { Chunk } from '../types/index.js'
 interface CrawlAndChunkResult {
   chunks: Chunk[]
   pageCount: number
+  supportEmail: string | null
 }
 
 interface EnrichedChunkResult {
@@ -126,7 +127,9 @@ async function crawlAndChunk(job: CrawlerJobMessage): Promise<CrawlAndChunkResul
     `Chunks built: ${chunks.length} total (${factsExtracted} pages with facts extracted, ${factsSkipped} pages without facts)`
   )
 
-  return { chunks, pageCount: pages.length }
+  const supportEmail = extractSupportEmail(pages.map((page) => page.content))
+
+  return { chunks, pageCount: pages.length, supportEmail }
 }
 
 async function prewarmSuggestionsForJob(botId: string, chunks: Chunk[]): Promise<void> {
@@ -152,7 +155,7 @@ export async function processCrawlerJob(job: CrawlerJobMessage): Promise<void> {
   try {
     console.log(`Starting crawl for bot ${job.botId}: ${job.urls.length} pages`)
 
-    const { chunks, pageCount } = await crawlAndChunk(job)
+    const { chunks, pageCount, supportEmail } = await crawlAndChunk(job)
 
     console.log(`Embedding ${chunks.length} chunks in batch`)
     const embeddings = await generateEmbeddingsBatch(chunks.map((c) => c.text))
@@ -165,6 +168,10 @@ export async function processCrawlerJob(job: CrawlerJobMessage): Promise<void> {
       totalChunks: chunks.length,
       completedAt: new Date().toISOString(),
     })
+
+    if (supportEmail) {
+      await updateBot(job.botId, job.clientId, { supportEmail })
+    }
 
     console.log(`Indexing complete: ${chunks.length} chunks`)
 
