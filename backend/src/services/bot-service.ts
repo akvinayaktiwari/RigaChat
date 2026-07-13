@@ -162,13 +162,15 @@ export async function getPublicConfig(botId: string): Promise<BotConfig> {
   return { ...bot, suggestedQuestions: bot.suggestedQuestions ?? [] }
 }
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
+
 export async function updateBotConfig(
   botId: string,
   clientId: string,
   updates: Partial<Omit<BotConfig, 'botId' | 'clientId' | 'createdAt'>>
 ): Promise<BotConfig> {
   const sanitizedUpdates = { ...updates }
-  if (sanitizedUpdates.supportEmail === '') {
+  if (sanitizedUpdates.supportEmail === '' || (sanitizedUpdates.supportEmail && !EMAIL_REGEX.test(sanitizedUpdates.supportEmail))) {
     delete sanitizedUpdates.supportEmail
   }
 
