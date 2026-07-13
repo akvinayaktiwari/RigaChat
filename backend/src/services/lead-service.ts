@@ -12,9 +12,9 @@ interface CreateLeadInput {
   botId: string
   clientId: string
   conversationId: string
-  name: string
-  phone: string
-  email: string
+  name?: string
+  phone?: string
+  email?: string
   propertyInterest?: string
   budgetRange?: string
   chatTranscript: string
@@ -26,9 +26,9 @@ export async function captureLead(input: CreateLeadInput): Promise<Lead> {
     const lead = await createLead({
       botId: input.botId,
       clientId: input.clientId,
-      name: input.name,
-      phone: input.phone,
-      email: input.email,
+      ...(input.name ? { name: input.name } : {}),
+      ...(input.phone ? { phone: input.phone } : {}),
+      ...(input.email ? { email: input.email } : {}),
       propertyInterest: input.propertyInterest,
       budgetRange: input.budgetRange,
       chatTranscript: input.chatTranscript,
@@ -37,12 +37,19 @@ export async function captureLead(input: CreateLeadInput): Promise<Lead> {
 
     await markLeadCaptured(input.botId, input.conversationId)
 
+    const contactLines = [
+      lead.name ? `Name: ${lead.name}` : null,
+      lead.phone ? `Phone: ${lead.phone}` : null,
+      lead.email ? `Email: ${lead.email}` : null,
+      `Source: ${lead.sourceUrl}`,
+    ].filter((line): line is string => line !== null)
+
     // Never fails lead capture (sendLeadNotification always resolves, never
     // throws) — but must be awaited, not truly fire-and-forget: AWS Lambda
     // freezes the execution environment as soon as the handler's response
     // promise resolves, so an un-awaited async call here would be aborted
     // mid-flight before the KMS decrypt / Gupshup request ever completed.
-    await sendLeadNotification(input.clientId, `Name: ${lead.name}\nPhone: ${lead.phone}\nSource: ${lead.sourceUrl}`).catch(
+    await sendLeadNotification(input.clientId, contactLines.join('\n')).catch(
       (err) => console.error('WhatsApp notification error:', err)
     )
 

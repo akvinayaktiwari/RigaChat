@@ -36,9 +36,16 @@ function errorMessage(error: unknown): string {
 leadRoutes.post('/', async (c) => {
   const body = await c.req.json<CaptureLeadBody>()
 
-  if (!body.botId || !body.conversationId || !body.name || !body.phone || !body.email) {
+  if (!body.botId || !body.conversationId || !body.sourceUrl) {
     return c.json<ApiResponse<null>>(
-      { success: false, error: 'botId, conversationId, name, phone, and email are required' },
+      { success: false, error: 'botId, conversationId, and sourceUrl are required' },
+      400
+    )
+  }
+
+  if (!body.name && !body.phone && !body.email) {
+    return c.json<ApiResponse<null>>(
+      { success: false, error: 'At least one contact field (name, phone, or email) is required.' },
       400
     )
   }
@@ -56,7 +63,7 @@ leadRoutes.post('/', async (c) => {
       propertyInterest: body.propertyInterest,
       budgetRange: body.budgetRange,
       chatTranscript: body.chatTranscript ?? '',
-      sourceUrl: body.sourceUrl ?? '',
+      sourceUrl: body.sourceUrl,
     })
 
     return c.json<ApiResponse<Lead>>({ success: true, data: lead }, 201)
