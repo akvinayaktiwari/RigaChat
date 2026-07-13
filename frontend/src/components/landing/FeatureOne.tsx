@@ -23,7 +23,7 @@ export default function FeatureOne() {
 
           {/* Description */}
           <p className="text-lg text-on-surface-variant leading-relaxed">
-            Your website never sleeps. BeepBoop&apos;s AI chatbot engages visitors 24/7, answers their questions, and
+            Your website never sleeps. BeepBoop&apos;s AI Agent engages visitors 24/7, answers their questions, and
             captures their contact details automatically.
           </p>
 

@@ -4,7 +4,7 @@ export default function Footer() {
   const links = {
     product: [
       { label: 'Features', href: '/features' },
-      { label: 'AI Chatbot', href: '/features/chatbot' },
+      { label: 'AI Agent', href: '/features/chatbot' },
       { label: 'WhatsApp Automation', href: '/features/whatsapp' },
       { label: 'Lead CRM', href: '/features/crm' },
       { label: 'Dashboard', href: '/dashboard' },
@@ -33,7 +33,7 @@ export default function Footer() {
               <span className="font-extrabold text-xl tracking-tight text-on-surface dark:text-white">BeepBoop</span>
             </div>
             <p className="text-on-surface-variant dark:text-outline-variant text-sm max-w-sm leading-relaxed">
-              AI chatbot that captures leads, sends WhatsApp alerts, and syncs to your CRM automatically. Built for
+              AI Agent that captures leads, sends WhatsApp alerts, and syncs to your CRM automatically. Built for
               businesses that never want to miss a lead.
             </p>
             <div className="flex gap-3">

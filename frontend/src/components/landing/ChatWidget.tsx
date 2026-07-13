@@ -54,10 +54,10 @@ export default function ChatWidget() {
 
     if (userText.includes('feature') || userText.includes('core') || userText.includes('do') || userText.includes('how')) {
       reply =
-        'BeepBoop deploys an AI chatbot on your website that answers visitor questions 24/7, qualifies leads automatically, and syncs every conversation straight into your built-in CRM.'
+        'BeepBoop deploys an AI Agent on your website that answers visitor questions 24/7, qualifies leads automatically, and syncs every conversation straight into your built-in CRM.'
     } else if (userText.includes('pricing') || userText.includes('cost') || userText.includes('plan')) {
       reply =
-        'BeepBoop starts with a 14-day free trial. Plans start at ₹1,999/month with a full AI chatbot, built-in CRM, knowledge base, and website widget embed!'
+        'BeepBoop starts with a 14-day free trial. Plans start at ₹1,999/month with a full AI Agent, built-in CRM, knowledge base, and website widget embed!'
     } else if (userText.includes('agent') || userText.includes('sales') || userText.includes('human')) {
       reply =
         'Sure! Let me forward you to our Sales team. Since our live agents are currently supporting other inquiries, please leave your email so they can reach out in under 10 minutes!'

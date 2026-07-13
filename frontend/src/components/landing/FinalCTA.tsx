@@ -6,7 +6,7 @@ export default function FinalCTA() {
 
   const integrationIcons = [
     { Icon: MessageSquare, label: 'WhatsApp' },
-    { Icon: Bot, label: 'AI Chatbot' },
+    { Icon: Bot, label: 'AI Agent' },
     { Icon: Users, label: 'Lead CRM' },
     { Icon: RefreshCw, label: 'Zoho Sync' },
     { Icon: FileText, label: 'Forms' },
@@ -24,7 +24,7 @@ export default function FinalCTA() {
         {/* Sparkle badge */}
         <div className="inline-flex items-center gap-1.5 bg-white/10 text-white/90 border border-white/20 px-3.5 py-1.5 rounded-full mb-6">
           <Sparkles className="w-3.5 h-3.5 text-yellow-300 fill-yellow-300 animate-spin-slow" />
-          <span className="text-[10px] font-bold uppercase tracking-wider">AI Chatbot + WhatsApp + CRM</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider">AI Agent + WhatsApp + CRM</span>
         </div>
 
         {/* Heading */}

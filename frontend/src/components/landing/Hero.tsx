@@ -31,7 +31,7 @@ export default function Hero({ onOpenDemo }: HeroProps) {
 
           {/* Heading */}
           <h1 className="text-5xl md:text-6xl font-extrabold text-on-background tracking-tight leading-[1.1]">
-            The AI Chatbot that turns website visitors into{' '}
+            The AI Agent that turns website visitors into{' '}
             <span className="text-primary bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
               leads.
             </span>

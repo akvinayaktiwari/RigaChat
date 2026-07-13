@@ -19,7 +19,7 @@ const PLANS: PlanCard[] = [
     price: '₹1,999',
     description: 'Perfect for small businesses getting started',
     features: [
-      '1 AI Chatbot',
+      '1 AI Agent',
       '500 Monthly Leads',
       'Built-in Lead CRM',
       'WhatsApp Lead Notifications',
@@ -34,7 +34,7 @@ const PLANS: PlanCard[] = [
     price: '₹5,499',
     description: 'For growing teams that need more power',
     features: [
-      '3 AI Chatbots',
+      '3 AI Agents',
       '2,000 Monthly Leads',
       'Built-in Lead CRM',
       'WhatsApp Notifications + Weekly Reports',
