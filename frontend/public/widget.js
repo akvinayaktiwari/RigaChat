@@ -203,7 +203,7 @@
     '<input id="ciq-input" type="text" placeholder="Type a message..." />' +
     '<button id="ciq-send" aria-label="Send message">' + SEND_ICON + '</button></div>' +
     '<div id="ciq-input-hint" class="ciq-hidden">Please fill in the details above to continue</div>' +
-    '<div id="ciq-footer">Powered by VyostraAI</div>' +
+    '<div id="ciq-footer">Powered by <a href="https://beepboop.drsyeta.in">VyostraAI</a></div>' +
     '</div>';
   function init() {
     fetch(BACKEND_URL + '/api/bots/public/' + encodeURIComponent(botId))
