@@ -130,3 +130,30 @@ Frontend:
 - External CRM integrations (Phase 2)
 - Multi-language support (Phase 2)
 - File upload of any kind (Phase 2)
+
+##RAG quality standards for BeepBoop:
+
+Indexing:
+  Reindex after any significant content change
+  Verify chunk count after reindex
+  Clean up stale Pinecone entries before reindex
+  Wait for Pinecone propagation (can take 30-60s)
+
+Retrieval settings:
+  topK: 5 (not 3)
+  Candidate pool: 10 before MMR
+  MMR lambda: 0.7 (diversity weight)
+  Similarity threshold: 0.7
+
+Testing after reindex:
+  Always test with novel phrasings
+  not the same wording used during indexing
+  Pinecone semantic cache can return stale
+  results for semantically similar queries
+
+Hallucination prevention:
+  System prompt must explicitly state:
+  "Only answer from provided context"
+  "If context does not contain the answer,
+   say so clearly"
+  Never remove this instruction
