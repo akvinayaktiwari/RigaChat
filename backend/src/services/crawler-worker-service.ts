@@ -127,7 +127,7 @@ async function crawlAndChunk(job: CrawlerJobMessage): Promise<CrawlAndChunkResul
     `Chunks built: ${chunks.length} total (${factsExtracted} pages with facts extracted, ${factsSkipped} pages without facts)`
   )
 
-  const supportEmail = extractSupportEmail(pages.map((page) => page.content))
+  const supportEmail = extractSupportEmail(pages.map((page) => page.fullPageText))
 
   return { chunks, pageCount: pages.length, supportEmail }
 }

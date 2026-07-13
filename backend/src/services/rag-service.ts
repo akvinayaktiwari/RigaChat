@@ -35,7 +35,7 @@ export async function indexWebsite(
       console.log(`Crawling: ${crawled}/${total} pages`)
     })
 
-    const supportEmail = extractSupportEmail(pages.map((page) => page.content))
+    const supportEmail = extractSupportEmail(pages.map((page) => page.fullPageText))
 
     const botConfig = await getPublicBotConfig(botId)
     const botName = botConfig?.name ?? botId

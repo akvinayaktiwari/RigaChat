@@ -8,6 +8,7 @@ interface CrawlResult {
   title: string
   content: string
   crawledAt: string
+  fullPageText: string
 }
 
 interface ScanResult {
@@ -147,6 +148,16 @@ export async function crawlPage(
   useAICleaning: boolean = false
 ): Promise<CrawlResult | null> {
   const html = await fetchHtml(url)
+  // Derived from the raw HTML (not cheerio's $('body').text()) so support
+  // emails in nav/footer/header survive REMOVE_SELECTORS below, and so tag
+  // boundaries become whitespace — cheerio's .text() concatenates adjacent
+  // text nodes with no separator, which can glue trailing words from one
+  // element onto an email in the next (e.g. "...you.hello@credvest.com").
+  const fullPageText = html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+
   const $ = cheerio.load(html)
   $(REMOVE_SELECTORS).remove()
 
@@ -159,7 +170,7 @@ export async function crawlPage(
 
   if (content.length < MIN_CONTENT_LENGTH) return null
 
-  return { url, title, content, crawledAt: new Date().toISOString() }
+  return { url, title, content, crawledAt: new Date().toISOString(), fullPageText }
 }
 
 export function extractLinks(html: string, baseUrl: string): string[] {
