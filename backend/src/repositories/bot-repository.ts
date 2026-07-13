@@ -63,6 +63,9 @@ export async function updateBot(
 ): Promise<BotConfig> {
   const now = new Date().toISOString()
   const fields: Record<string, unknown> = { ...updates, updatedAt: now }
+  if (fields.supportEmail === '') {
+    delete fields.supportEmail
+  }
 
   const updateExpressionParts: string[] = []
   const expressionAttributeNames: Record<string, string> = {}

@@ -167,8 +167,13 @@ export async function updateBotConfig(
   clientId: string,
   updates: Partial<Omit<BotConfig, 'botId' | 'clientId' | 'createdAt'>>
 ): Promise<BotConfig> {
+  const sanitizedUpdates = { ...updates }
+  if (sanitizedUpdates.supportEmail === '') {
+    delete sanitizedUpdates.supportEmail
+  }
+
   try {
-    return await updateBot(botId, clientId, updates)
+    return await updateBot(botId, clientId, sanitizedUpdates)
   } catch (error) {
     throw new Error(
       `Failed to update bot ${botId}: ${error instanceof Error ? error.message : String(error)}`
