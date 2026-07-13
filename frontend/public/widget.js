@@ -64,7 +64,7 @@
     '#ciq-bubble-badge{position:absolute;top:-4px;left:-4px;min-width:18px;height:18px;padding:0 4px;' +
     'border-radius:9px;background:#ef4444;color:#fff;font-size:11px;font-weight:700;' +
     'display:flex;align-items:center;justify-content:center;line-height:1}' +
-    '#ciq-window{position:fixed;bottom:96px;right:20px;width:420px;height:650px;background:#fff;' +
+    '#ciq-window{position:fixed;bottom:96px;right:20px;width:min(420px, calc(100vw - 32px));height:650px;background:#fff;' +
     'border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.15);border:1px solid #e5e7eb;z-index:999998;' +
     'display:flex;flex-direction:column;overflow:hidden;transform-origin:bottom right;transform:scale(.95);' +
     'opacity:0;pointer-events:none;transition:transform .2s ease,opacity .2s ease}' +
@@ -421,6 +421,9 @@
     els.bubbleIcon.innerHTML = BUBBLE_CLOSE_ICON;
     state.unreadCount = 0;
     updateBubbleBadge();
+    if (window.innerWidth <= 380) {
+      els.bubble.style.display = 'none';
+    }
     if (!state.started) {
       state.started = true;
       startConversation();
@@ -432,6 +435,7 @@
     els.window.classList.remove('ciq-open');
     els.bubbleIcon.innerHTML = BUBBLE_CHAT_ICON;
     els.bubble.classList.add('ciq-show');
+    els.bubble.style.display = '';
   }
   function handleExpandToggle() {
     if (state.maximized) {
@@ -463,26 +467,28 @@
   }
   function applyResponsiveSize() {
     var w = window.innerWidth;
-    els.window.style.top = '';
-    els.window.style.left = '';
+    var win = els.window;
+    if (!win) return;
+    win.style.top = '';
+    win.style.left = '';
     if (w > 480) {
-      els.window.style.width = '420px';
-      els.window.style.height = '650px';
-      els.window.style.bottom = '96px';
-      els.window.style.right = '20px';
-      els.window.style.borderRadius = '';
+      win.style.width = '420px';
+      win.style.height = '650px';
+      win.style.bottom = '96px';
+      win.style.right = '20px';
+      win.style.borderRadius = '';
     } else if (w >= 380) {
-      els.window.style.width = 'calc(100vw - 32px)';
-      els.window.style.height = '580px';
-      els.window.style.bottom = '96px';
-      els.window.style.right = '20px';
-      els.window.style.borderRadius = '';
+      win.style.width = 'calc(100vw - 32px)';
+      win.style.height = '580px';
+      win.style.bottom = '96px';
+      win.style.right = '20px';
+      win.style.borderRadius = '';
     } else {
-      els.window.style.width = '100vw';
-      els.window.style.height = '100vh';
-      els.window.style.bottom = '0';
-      els.window.style.right = '0';
-      els.window.style.borderRadius = '0';
+      win.style.width = '100vw';
+      win.style.height = '100vh';
+      win.style.bottom = '0';
+      win.style.right = '0';
+      win.style.borderRadius = '0';
     }
   }
   function handleRefresh() {
