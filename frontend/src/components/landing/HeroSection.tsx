@@ -17,14 +17,14 @@ export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
   const navigate = useNavigate()
 
   return (
-    <section className="relative min-h-screen flex items-center pt-28 pb-20 px-4">
+    <section className="relative min-h-screen flex items-center pt-20 pb-12 sm:pt-24 sm:pb-16 px-4">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-32 left-1/4 w-96 h-96 bg-violet-200/30 rounded-full blur-3xl" />
         <div className="absolute top-48 right-1/4 w-80 h-80 bg-pink-200/25 rounded-full blur-3xl" />
         <div className="absolute bottom-32 left-1/3 w-64 h-64 bg-sky-200/20 rounded-full blur-3xl" />
       </div>
 
-      <div className="relative max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+      <div className="relative max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
         <div>
           <div className="inline-flex items-center gap-2 bg-violet-50 border border-violet-100 text-violet-700 text-xs font-semibold px-3.5 py-1.5 rounded-full mb-6">
             <span className="w-1.5 h-1.5 bg-violet-500 rounded-full inline-block animate-pulse" />
@@ -49,14 +49,14 @@ export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
           <div className="flex flex-col sm:flex-row gap-3 mb-10">
             <button
               onClick={() => navigate('/signup')}
-              className="inline-flex items-center justify-center gap-2 text-white font-semibold bg-linear-to-r from-violet-600 to-purple-500 px-6 py-3.5 rounded-xl hover:opacity-90 transition-opacity shadow-lg shadow-violet-200/70 text-sm"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-white font-semibold bg-linear-to-r from-violet-600 to-purple-500 px-6 py-3.5 rounded-xl hover:opacity-90 transition-opacity shadow-lg shadow-violet-200/70 text-sm"
             >
               Start free — no card needed
               <ArrowRight className="w-4 h-4" />
             </button>
             <button
               onClick={onOpenDemo}
-              className="inline-flex items-center justify-center gap-2 text-gray-700 font-semibold bg-white border border-gray-200 px-6 py-3.5 rounded-xl hover:bg-gray-50 transition-colors text-sm shadow-sm"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-gray-700 font-semibold bg-white border border-gray-200 px-6 py-3.5 rounded-xl hover:bg-gray-50 transition-colors text-sm shadow-sm"
             >
               Watch 2-min demo
             </button>
@@ -86,7 +86,7 @@ export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
           </div>
         </div>
 
-        <div className="hidden lg:flex justify-end">
+        <div className="flex justify-center lg:justify-end mt-8 lg:mt-0">
           <ChatWidget />
         </div>
       </div>
