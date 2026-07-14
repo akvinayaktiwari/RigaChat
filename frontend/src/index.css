@@ -47,6 +47,23 @@
   }
 }
 
+/* VyostraAI landing page design system vars (design.md). Kept distinct from
+   the --color-* tokens above (Tailwind v4 theme tokens that generate bg-primary
+   etc. utilities) since the components below reference exact violet/purple
+   Tailwind classes directly rather than these vars. */
+:root {
+  --primary: #7c3aed;
+  --primary-foreground: #ffffff;
+  --secondary: #f5f3ff;
+  --secondary-foreground: #5b21b6;
+  --muted: #f8f8fc;
+  --muted-foreground: #6b7280;
+  --border: rgba(0, 0, 0, 0.07);
+  --input-background: #f5f5fa;
+  --ring: #c4b5fd;
+  --radius: 1rem;
+}
+
 /* CTA gradient: indigo only, matches the dashboard's primary color */
 .cta-accent {
   background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
