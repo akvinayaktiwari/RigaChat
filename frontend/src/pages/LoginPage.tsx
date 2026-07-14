@@ -1,14 +1,12 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { AlertCircle, Check, Eye, EyeOff, Loader2, MessageSquare } from 'lucide-react'
+import { AlertCircle, CheckCircle, Eye, EyeOff, Loader2, MessageSquare } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 
-const FEATURE_BULLETS = [
-  'Train on your website in minutes',
-  'Built-in CRM for every lead',
-  'Works on any website',
-]
+const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
+
+const FEATURE_PILLS = ['RAG-powered AI', 'Built-in CRM', 'WhatsApp alerts']
 
 function GoogleIcon() {
   return (
@@ -35,40 +33,36 @@ function GoogleIcon() {
 
 function BrandPanel() {
   return (
-    <div className="hidden lg:flex flex-col justify-between bg-linear-to-br from-indigo-900 to-indigo-700 h-full p-12 text-white">
-      <div />
-      <div>
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-12 h-12 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center">
-            <MessageSquare size={24} />
-          </div>
-          <span className="text-2xl font-extrabold tracking-tight">BeepBoop</span>
-        </div>
-
-        <h2 className="text-3xl font-bold leading-tight max-w-sm">
-          Turn website visitors into leads with AI-powered conversations
-        </h2>
-
-        <ul className="mt-8 space-y-4">
-          {FEATURE_BULLETS.map((bullet) => (
-            <li key={bullet} className="flex items-center gap-3">
-              <span className="w-5 h-5 rounded-full bg-white/15 flex items-center justify-center shrink-0">
-                <Check size={12} />
-              </span>
-              <span className="text-indigo-100 text-sm">{bullet}</span>
-            </li>
-          ))}
-        </ul>
+    <div className="hidden lg:flex flex-col items-center justify-center bg-linear-to-br from-violet-600 via-purple-600 to-indigo-700 h-full p-12 text-white text-center">
+      <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-6">
+        <MessageSquare className="w-8 h-8 text-white" />
       </div>
 
-      <p className="text-indigo-300 text-xs">© 2026 BeepBoop by Drsyeta Corp</p>
+      <span className="text-4xl font-extrabold text-white" style={JAKARTA_FONT}>
+        VyostraAI
+      </span>
+      <p className="text-white/70 text-lg mt-3 mb-10">AI chatbots with native CRM</p>
+
+      <div className="flex flex-col items-center">
+        {FEATURE_PILLS.map((pill) => (
+          <div
+            key={pill}
+            className="bg-white/10 border border-white/20 text-white text-sm px-5 py-2.5 rounded-full mb-3 flex items-center gap-2"
+          >
+            <CheckCircle className="w-4 h-4 text-emerald-300" />
+            {pill}
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-12 text-white/40 text-xs text-center">Trusted by 500+ businesses in India</p>
     </div>
   )
 }
 
 const inputClasses =
-  'w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all'
-const labelClasses = 'block text-sm font-medium text-slate-700 mb-2'
+  'w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 bg-white outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors'
+const labelClasses = 'block text-sm font-medium text-gray-700 mb-1.5'
 
 export default function LoginPage() {
   const { login, signIn } = useAuth()
@@ -94,30 +88,43 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 grid lg:grid-cols-2">
-      <BrandPanel />
+    <div className="min-h-screen flex">
+      <div className="hidden lg:block lg:w-1/2">
+        <BrandPanel />
+      </div>
 
-      <div className="bg-white flex items-center justify-center p-8 lg:p-12">
-        <div className="max-w-md w-full">
-          <h1 className="text-2xl font-bold text-slate-800">Welcome back</h1>
-          <p className="text-slate-500 text-sm mt-1">Sign in to your BeepBoop account</p>
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white min-h-screen">
+        <div className="w-full max-w-sm">
+          <div className="flex items-center gap-3 mb-8 lg:hidden">
+            <div className="w-9 h-9 bg-linear-to-br from-violet-600 to-purple-500 rounded-xl flex items-center justify-center shrink-0">
+              <MessageSquare className="w-4.5 h-4.5 text-white" />
+            </div>
+            <span className="font-bold text-lg text-gray-900" style={JAKARTA_FONT}>
+              VyostraAI
+            </span>
+          </div>
+
+          <h1 className="font-extrabold text-2xl text-gray-900 mb-2" style={JAKARTA_FONT}>
+            Welcome back
+          </h1>
+          <p className="text-sm text-gray-500 mb-8">Sign in to your VyostraAI dashboard</p>
 
           <button
             type="button"
             onClick={login}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer shadow-sm mt-8"
+            className="w-full flex items-center justify-center gap-3 border border-gray-200 rounded-xl py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors bg-white mb-5"
           >
             <GoogleIcon />
             Continue with Google
           </button>
 
-          <div className="flex items-center gap-4 mt-6">
-            <hr className="flex-1 border-slate-200" />
-            <span className="text-slate-400 text-sm">or</span>
-            <hr className="flex-1 border-slate-200" />
+          <div className="flex items-center gap-3 mb-5">
+            <hr className="flex-1 h-px bg-gray-100 border-0" />
+            <span className="text-xs text-gray-400">or</span>
+            <hr className="flex-1 h-px bg-gray-100 border-0" />
           </div>
 
-          <form onSubmit={handleSubmit} className="mt-6">
+          <form onSubmit={handleSubmit}>
             <div>
               <label className={labelClasses}>Email address</label>
               <input
@@ -132,7 +139,12 @@ export default function LoginPage() {
             </div>
 
             <div className="mt-4">
-              <label className={labelClasses}>Password</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-medium text-gray-700">Password</label>
+                <a href="#" className="text-xs text-violet-600 hover:text-violet-700">
+                  Forgot password?
+                </a>
+              </div>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
@@ -146,7 +158,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                   title={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -164,17 +176,17 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-6 bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full mt-6 bg-linear-to-r from-violet-600 to-purple-500 text-white py-3 rounded-xl font-semibold text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading && <Loader2 size={16} className="animate-spin" />}
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
 
-          <p className="text-center mt-6 text-slate-500 text-sm">
+          <p className="text-center mt-6 text-sm text-gray-500">
             Don&apos;t have an account?{' '}
-            <Link to="/signup" className="text-indigo-600 font-medium hover:text-indigo-700">
-              Create account
+            <Link to="/signup" className="font-semibold text-violet-600 hover:text-violet-700">
+              Sign up
             </Link>
           </p>
         </div>
