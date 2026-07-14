@@ -18,6 +18,8 @@ import { Toggle } from '../components/Toggle'
 import { IndexingProgress } from '../components/IndexingProgress'
 import type { BotConfig, LeadFormField } from '../types/index'
 
+const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
+
 const TOTAL_STEPS = 4
 const STEP_LABELS = ['Website', 'Appearance', 'Lead Form', 'Review']
 
@@ -81,6 +83,8 @@ const FLOW_OPTIONS: {
   },
 ]
 
+const PRESET_COLORS = ['#7c3aed', '#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#0f172a']
+
 const WEBSITE_URL_REGEX = /^https?:\/\/[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+(\/.*)?$/
 
 function isValidWebsiteUrl(value: string): boolean {
@@ -126,10 +130,15 @@ function isValidHexColor(value: string): boolean {
 }
 
 const inputClasses =
-  'w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all'
-const inputErrorClasses = 'border-red-400 focus:ring-red-400'
-const labelClasses = 'block text-sm font-medium text-slate-700 mb-2'
-const hintClasses = 'text-xs text-slate-400 mt-1'
+  'w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 bg-white outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors'
+const inputErrorClasses = 'border-red-400 focus:border-red-400 focus:ring-red-100'
+const labelClasses = 'block text-sm font-medium text-gray-700 mb-1.5'
+const hintClasses = 'text-xs text-gray-400 mt-1'
+
+const primaryButtonClasses =
+  'bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold rounded-xl shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed'
+const secondaryButtonClasses =
+  'bg-white text-gray-700 font-medium rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors'
 
 function StepIndicator({ currentStep }: { currentStep: number }) {
   return (
@@ -144,25 +153,23 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
             <div className="flex flex-col items-center">
               <div
                 className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold ${
-                  isDone
-                    ? 'bg-emerald-500 text-white'
-                    : isActive
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-200 text-slate-400'
+                  isDone || isActive
+                    ? 'bg-violet-600 text-white'
+                    : 'border-2 border-gray-200 text-gray-400 bg-white'
                 }`}
               >
                 {isDone ? <Check size={16} /> : stepNum}
               </div>
               <span
                 className={`text-xs mt-2 ${
-                  isActive ? 'text-indigo-600 font-medium' : isDone ? 'text-emerald-600' : 'text-slate-400'
+                  isActive ? 'text-violet-700 font-medium' : isDone ? 'text-violet-600' : 'text-gray-400'
                 }`}
               >
                 {label}
               </span>
             </div>
             {i < STEP_LABELS.length - 1 && (
-              <div className={`h-0.5 flex-1 mx-2 ${isDone ? 'bg-emerald-500' : 'bg-slate-200'}`} />
+              <div className={`h-0.5 flex-1 mx-2 ${isDone ? 'bg-violet-600' : 'bg-gray-200'}`} />
             )}
           </div>
         )
@@ -312,27 +319,31 @@ export default function NewBotPage() {
           type="button"
           onClick={() => navigate('/dashboard/bots')}
           title="Back to Chatbots"
-          className="text-slate-500 hover:text-slate-800 transition-colors"
+          className="text-gray-500 hover:text-gray-800 transition-colors"
         >
           <ArrowLeft size={20} />
         </button>
         <div>
-          <h1 className="font-bold text-2xl text-slate-800">Create New Chatbot</h1>
-          <p className="text-sm text-slate-500">Set up your AI chatbot in minutes</p>
+          <h1 className="font-extrabold text-2xl text-gray-900" style={JAKARTA_FONT}>
+            Create New Chatbot
+          </h1>
+          <p className="text-sm text-gray-500">Set up your AI chatbot in minutes</p>
         </div>
       </div>
 
       {launchStep === 'form' && <StepIndicator currentStep={currentStep} />}
 
-      <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100 mt-6">
+      <div className="bg-white rounded-2xl p-8 shadow-sm border border-black/5 mt-6">
         {launchStep === 'indexing' && botId ? (
           <div className="py-6">
             <div className="flex flex-col items-center text-center mb-6">
-              <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center mb-4">
-                <Loader2 className="text-indigo-600 animate-spin" size={32} />
+              <div className="w-16 h-16 rounded-full bg-violet-50 flex items-center justify-center mb-4">
+                <Loader2 className="text-violet-600 animate-spin" size={32} />
               </div>
-              <h2 className="text-2xl font-bold text-slate-800">Building Your Chatbot</h2>
-              <p className="text-slate-500 mt-2">We&apos;re crawling your site and indexing content</p>
+              <h2 className="text-2xl font-bold text-gray-900" style={JAKARTA_FONT}>
+                Building Your Chatbot
+              </h2>
+              <p className="text-gray-500 mt-2">We&apos;re crawling your site and indexing content</p>
             </div>
             <IndexingProgress
               botId={botId}
@@ -343,8 +354,8 @@ export default function NewBotPage() {
           </div>
         ) : launchStep === 'creating' || launchStep === 'confirmation_required' ? (
           <div className="flex flex-col items-center text-center py-12">
-            <Loader2 className="animate-spin text-indigo-600" size={48} />
-            <p className="text-slate-500 text-sm mt-2">Creating your bot...</p>
+            <Loader2 className="animate-spin text-violet-600" size={48} />
+            <p className="text-gray-500 text-sm mt-2">Creating your bot...</p>
           </div>
         ) : (
           <>
@@ -367,8 +378,10 @@ export default function NewBotPage() {
                 </div>
 
                 <div>
-                  <h2 className="font-bold text-lg text-slate-800">How do you want to train your bot?</h2>
-                  <p className="text-sm text-slate-500 mt-1 mb-4">You can always add more content later.</p>
+                  <h2 className="font-bold text-xl text-gray-900 mb-2" style={JAKARTA_FONT}>
+                    How do you want to train your bot?
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1 mb-4">You can always add more content later.</p>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {FLOW_OPTIONS.map((option) => {
@@ -392,8 +405,10 @@ export default function NewBotPage() {
                             {option.badge}
                           </span>
                           <Icon className="text-violet-600 mb-3" size={28} />
-                          <p className="font-semibold text-slate-800">{option.title}</p>
-                          <p className="text-sm text-slate-500 mt-1">{option.description}</p>
+                          <p className="font-semibold text-gray-900" style={JAKARTA_FONT}>
+                            {option.title}
+                          </p>
+                          <p className="text-sm text-gray-500 mt-1">{option.description}</p>
                         </button>
                       )
                     })}
@@ -443,21 +458,38 @@ export default function NewBotPage() {
               <div className="space-y-6">
                 <div>
                   <label className={labelClasses}>Brand Color</label>
+
+                  <div className="flex items-center gap-2.5 mb-3">
+                    {PRESET_COLORS.map((preset) => {
+                      const isSelected = formData.brandColor.toLowerCase() === preset.toLowerCase()
+                      return (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => update('brandColor', preset)}
+                          aria-label={`Use color ${preset}`}
+                          className={`w-8 h-8 rounded-full transition-all ${
+                            isSelected ? 'ring-2 ring-violet-600 ring-offset-2' : 'hover:scale-105'
+                          }`}
+                          style={{ backgroundColor: preset }}
+                        />
+                      )
+                    })}
+                  </div>
+
                   <div className="flex items-center gap-3">
                     <input
                       type="color"
                       value={isValidHexColor(formData.brandColor) ? formData.brandColor : '#6366f1'}
                       onChange={(e) => update('brandColor', e.target.value)}
-                      className="w-12 h-12 rounded-xl cursor-pointer border-0"
-                      aria-label="Brand color picker"
+                      className="w-12 h-12 rounded-xl cursor-pointer border-0 shrink-0"
+                      aria-label="Custom brand color picker"
                     />
                     <input
                       type="text"
                       value={formData.brandColor}
                       onChange={(e) => update('brandColor', e.target.value)}
-                      className={`flex-1 px-4 py-3 border rounded-xl text-sm ${
-                        errors.brandColor ? 'border-red-400' : 'border-slate-200'
-                      }`}
+                      className={`flex-1 ${inputClasses} ${errors.brandColor ? inputErrorClasses : ''}`}
                     />
                   </div>
                   {errors.brandColor && <p className="text-xs text-red-500 mt-1">{errors.brandColor}</p>}
@@ -471,14 +503,14 @@ export default function NewBotPage() {
                         key={option.value}
                         type="button"
                         onClick={() => update('widgetTrigger', option.value)}
-                        className={`text-left border rounded-xl p-4 cursor-pointer hover:border-indigo-300 transition-all ${
+                        className={`text-left rounded-xl p-4 transition-all ${
                           formData.widgetTrigger === option.value
-                            ? 'border-indigo-500 bg-indigo-50'
-                            : 'border-slate-200'
+                            ? 'border-2 border-violet-600 bg-violet-50'
+                            : 'border border-gray-200 hover:border-violet-300'
                         }`}
                       >
-                        <p className="text-sm font-medium text-slate-800">{option.title}</p>
-                        <p className="text-xs text-slate-500 mt-1">{option.description}</p>
+                        <p className="text-sm font-medium text-gray-900">{option.title}</p>
+                        <p className="text-xs text-gray-500 mt-1">{option.description}</p>
                       </button>
                     ))}
                   </div>
@@ -503,8 +535,10 @@ export default function NewBotPage() {
 
             {currentStep === 3 && (
               <div>
-                <h2 className="font-bold text-lg text-slate-800">Configure Lead Form Fields</h2>
-                <p className="text-sm text-slate-500 mt-1 mb-5">
+                <h2 className="font-bold text-xl text-gray-900 mb-2" style={JAKARTA_FONT}>
+                  Configure Lead Form Fields
+                </h2>
+                <p className="text-sm text-gray-500 mt-1 mb-5">
                   These fields will be shown to visitors when your chatbot captures a lead
                 </p>
 
@@ -522,22 +556,24 @@ export default function NewBotPage() {
                     return (
                       <div
                         key={field.fieldId}
-                        className="bg-slate-50 rounded-xl p-4 flex items-center justify-between"
+                        className="bg-gray-50 rounded-xl p-4 flex items-center justify-between"
                       >
                         <div className="flex items-center gap-3">
-                          <Icon size={18} className="text-slate-500" />
-                          <span className="text-sm font-medium text-slate-800">{field.label}</span>
+                          <Icon size={18} className="text-gray-500" />
+                          <span className="text-sm font-medium text-gray-900">{field.label}</span>
                         </div>
 
                         {!isOptionalField ? (
-                          <span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-1 rounded-full">
+                          <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold px-2.5 py-1 rounded-full">
                             Required
                           </span>
                         ) : (
                           <div className="flex items-center gap-3">
                             <span
-                              className={`text-xs px-2 py-1 rounded-full ${
-                                isEnabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'
+                              className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                                isEnabled
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : 'bg-gray-100 text-gray-500 border-gray-200'
                               }`}
                             >
                               {isEnabled ? 'Enabled' : 'Disabled'}
@@ -565,58 +601,60 @@ export default function NewBotPage() {
 
             {currentStep === 4 && (
               <div>
-                <h2 className="font-bold text-lg text-slate-800 mb-4">Review and Launch</h2>
+                <h2 className="font-bold text-xl text-gray-900 mb-4" style={JAKARTA_FONT}>
+                  Review and Launch
+                </h2>
 
-                <div className="bg-slate-50 rounded-2xl p-6 space-y-4">
+                <div className="bg-gray-50 rounded-2xl p-6 space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-500">Chatbot Name</span>
-                    <span className="text-sm font-bold text-slate-800">{formData.name}</span>
+                    <span className="text-sm text-gray-500">Chatbot Name</span>
+                    <span className="text-sm font-bold text-gray-900">{formData.name}</span>
                   </div>
-                  <div className="h-px bg-slate-200" />
+                  <div className="h-px bg-gray-100" />
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-500">Training source</span>
+                    <span className="text-sm text-gray-500">Training source</span>
                     {flowType === 'kb_only' ? (
                       <span className="text-violet-600 font-medium text-sm">Knowledge Base only</span>
                     ) : (
                       <span className="text-sm text-gray-700">{formData.websiteUrl}</span>
                     )}
                   </div>
-                  <div className="h-px bg-slate-200" />
+                  <div className="h-px bg-gray-100" />
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-500">Brand Color</span>
-                    <span className="flex items-center gap-2 text-sm font-bold text-slate-800">
+                    <span className="text-sm text-gray-500">Brand Color</span>
+                    <span className="flex items-center gap-2 text-sm font-bold text-gray-900">
                       <span
-                        className="w-5 h-5 rounded-full border border-slate-200"
+                        className="w-5 h-5 rounded-full border border-gray-200"
                         style={{ backgroundColor: formData.brandColor }}
                       />
                       {formData.brandColor}
                     </span>
                   </div>
-                  <div className="h-px bg-slate-200" />
+                  <div className="h-px bg-gray-100" />
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-500">Widget Trigger</span>
-                    <span className="text-sm font-bold text-slate-800">
+                    <span className="text-sm text-gray-500">Widget Trigger</span>
+                    <span className="text-sm font-bold text-gray-900">
                       {WIDGET_TRIGGER_LABELS[formData.widgetTrigger]}
                     </span>
                   </div>
-                  <div className="h-px bg-slate-200" />
+                  <div className="h-px bg-gray-100" />
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-500">Lead Capture</span>
-                    <span className="text-sm font-bold text-slate-800">
+                    <span className="text-sm text-gray-500">Lead Capture</span>
+                    <span className="text-sm font-bold text-gray-900">
                       After {formData.leadTriggerAfterMessages} messages
                     </span>
                   </div>
-                  <div className="h-px bg-slate-200" />
+                  <div className="h-px bg-gray-100" />
                   <div className="flex items-center justify-between gap-4">
-                    <span className="text-sm text-slate-500 shrink-0">Lead Form Fields</span>
-                    <span className="text-sm font-bold text-slate-800 text-right">{enabledFieldLabels}</span>
+                    <span className="text-sm text-gray-500 shrink-0">Lead Form Fields</span>
+                    <span className="text-sm font-bold text-gray-900 text-right">{enabledFieldLabels}</span>
                   </div>
                 </div>
 
                 <button
                   type="button"
                   onClick={handleLaunch}
-                  className="w-full mt-6 bg-indigo-600 text-white py-4 rounded-xl font-semibold text-lg hover:bg-indigo-700 transition-colors"
+                  className={`w-full mt-6 py-4 text-lg ${primaryButtonClasses}`}
                 >
                   Launch Chatbot 🚀
                 </button>
@@ -631,11 +669,7 @@ export default function NewBotPage() {
       {launchStep === 'form' && (
         <div className="flex items-center justify-between mt-6">
           {currentStep > 1 ? (
-            <button
-              type="button"
-              onClick={handleBack}
-              className="border border-slate-200 text-slate-600 px-6 py-3 rounded-xl hover:bg-slate-50 transition-colors"
-            >
+            <button type="button" onClick={handleBack} className={`px-6 py-3 text-sm ${secondaryButtonClasses}`}>
               &larr; Back
             </button>
           ) : (
@@ -646,11 +680,7 @@ export default function NewBotPage() {
               type="button"
               onClick={handleNext}
               disabled={isNextDisabled}
-              className={`px-6 py-3 rounded-xl transition-colors ${
-                isNextDisabled
-                  ? 'bg-indigo-300 text-white cursor-not-allowed'
-                  : 'bg-indigo-600 text-white hover:bg-indigo-700'
-              }`}
+              className={`px-6 py-3 text-sm ${primaryButtonClasses}`}
             >
               Next &rarr;
             </button>
@@ -659,24 +689,26 @@ export default function NewBotPage() {
       )}
 
       {launchStep === 'confirmation_required' && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-lg max-w-md w-full">
-            <h2 className="font-bold text-slate-800 text-lg">Large Website Detected</h2>
-            <p className="text-sm text-slate-500 mt-2">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl shadow-black/8 border border-gray-100 p-6 max-w-md w-full">
+            <h2 className="font-bold text-xl text-gray-900 mb-4" style={JAKARTA_FONT}>
+              Large Website Detected
+            </h2>
+            <p className="text-sm text-gray-500 -mt-3">
               Found {totalPages} pages. We will index the {selectedPages} most relevant pages.
             </p>
             <div className="flex items-center justify-end gap-3 mt-6">
               <button
                 type="button"
                 onClick={() => navigate('/dashboard/bots')}
-                className="border border-slate-200 text-slate-600 px-4 py-2 rounded-xl text-sm hover:bg-slate-50 transition-colors"
+                className={`px-4 py-2.5 text-sm ${secondaryButtonClasses}`}
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleConfirmIndexing}
-                className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm hover:bg-indigo-700 transition-colors"
+                className={`px-4 py-2.5 text-sm ${primaryButtonClasses}`}
               >
                 Continue with {selectedPages} pages
               </button>
