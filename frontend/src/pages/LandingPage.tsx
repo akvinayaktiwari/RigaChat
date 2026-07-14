@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react'
 import Navbar from '../components/landing/Navbar'
-import Hero from '../components/landing/Hero'
-import FeatureOne from '../components/landing/FeatureOne'
-import FeatureTwo from '../components/landing/FeatureTwo'
-import WhatsAppSection from '../components/landing/WhatsAppSection'
-import Testimonials from '../components/landing/Testimonials'
-import Pricing from '../components/landing/Pricing'
-import FinalCTA from '../components/landing/FinalCTA'
+import HeroSection from '../components/landing/HeroSection'
+import StatsBar from '../components/landing/StatsBar'
+import FeaturesSection from '../components/landing/FeaturesSection'
+import IntegrationsSection from '../components/landing/IntegrationsSection'
+import HowItWorksSection from '../components/landing/HowItWorksSection'
+import TestimonialsSection from '../components/landing/TestimonialsSection'
+import CTASection from '../components/landing/CTASection'
 import Footer from '../components/landing/Footer'
-import ChatWidget from '../components/landing/ChatWidget'
 import DemoModal from '../components/landing/modals/DemoModal'
 
 export default function LandingPage() {
@@ -24,17 +23,16 @@ export default function LandingPage() {
   }, [])
 
   return (
-    <div className="landing-page bg-background">
+    <div className="landing-page bg-white overflow-x-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
-      <Hero onOpenDemo={() => setIsDemoOpen(true)} />
-      <FeatureOne />
-      <FeatureTwo />
-      <WhatsAppSection />
-      <Testimonials />
-      <Pricing />
-      <FinalCTA />
+      <HeroSection onOpenDemo={() => setIsDemoOpen(true)} />
+      <StatsBar />
+      <FeaturesSection />
+      <IntegrationsSection />
+      <HowItWorksSection />
+      <TestimonialsSection />
+      <CTASection />
       <Footer />
-      <ChatWidget />
       <DemoModal isOpen={isDemoOpen} onClose={() => setIsDemoOpen(false)} />
     </div>
   )
