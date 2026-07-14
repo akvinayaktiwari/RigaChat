@@ -175,12 +175,15 @@ export default function DemoChat() {
   const initials = BOT_NAME.trim().slice(0, 2).toUpperCase()
 
   return (
-    <div className="relative w-full max-w-md mx-auto lg:mx-0 lg:ml-auto">
+    <div className="relative w-full max-w-105 lg:max-w-110 mx-auto lg:ml-auto">
       <div className="absolute -top-8 -right-8 w-56 h-56 bg-violet-300/25 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-8 -left-8 w-44 h-44 bg-pink-300/20 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute top-16 -left-4 w-32 h-32 bg-sky-300/15 rounded-full blur-2xl pointer-events-none" />
 
-      <div className="relative bg-white/75 backdrop-blur-2xl border border-white/80 rounded-2xl shadow-2xl shadow-violet-100/60 overflow-hidden w-full h-130 max-h-140 flex flex-col">
+      <div
+        style={{ height: '520px' }}
+        className="relative flex flex-col w-full bg-white/75 backdrop-blur-2xl border border-white/80 rounded-2xl shadow-2xl shadow-violet-100/60 overflow-hidden"
+      >
         <div className="shrink-0 bg-linear-to-r from-violet-600 to-purple-500 px-5 py-4 flex items-center gap-3">
           <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center shrink-0 text-white font-bold text-sm">
             {initials || <Bot className="w-4.5 h-4.5 text-white" />}
@@ -214,7 +217,7 @@ export default function DemoChat() {
 
         <div
           ref={messagesRef}
-          className="demo-chat-scrollbar h-64 sm:h-72 shrink-0 overflow-y-auto px-4 py-4 flex flex-col gap-3 bg-linear-to-b from-white/60 to-white/80"
+          className="demo-chat-scrollbar flex-1 min-h-0 overflow-y-auto px-4 py-4 flex flex-col gap-3 bg-linear-to-b from-white/60 to-white/80"
         >
           {messages.map((message, index) => (
             <MessageBubble key={index} message={message} />
@@ -222,20 +225,22 @@ export default function DemoChat() {
           {isLoading && <TypingIndicator />}
         </div>
 
-        {showChips && (
-          <div className="shrink-0 px-4 pb-3 flex flex-wrap gap-2">
-            {SUGGESTED_QUESTIONS.map((question) => (
-              <button
-                key={question}
-                type="button"
-                onClick={() => sendMessage(question)}
-                className="text-xs border border-violet-200 bg-white/80 text-violet-700 rounded-full px-3 py-1.5 hover:bg-violet-50 transition-colors font-medium shadow-sm cursor-pointer"
-              >
-                {question}
-              </button>
-            ))}
-          </div>
-        )}
+        <div
+          className={`shrink-0 px-4 flex flex-wrap gap-2 transition-all duration-300 ${
+            showChips ? 'opacity-100 max-h-24 pb-3' : 'opacity-0 max-h-0 pb-0 overflow-hidden pointer-events-none'
+          }`}
+        >
+          {SUGGESTED_QUESTIONS.map((question) => (
+            <button
+              key={question}
+              type="button"
+              onClick={() => sendMessage(question)}
+              className="text-xs border border-violet-200 bg-white/80 text-violet-700 rounded-full px-3 py-1.5 hover:bg-violet-50 transition-colors font-medium shadow-sm cursor-pointer"
+            >
+              {question}
+            </button>
+          ))}
+        </div>
 
         <div className="shrink-0 px-4 pb-4 pt-2 bg-white/80 border-t border-black/[0.06]">
           <div className="flex items-center gap-2 bg-gray-50/90 rounded-xl px-3.5 py-2.5 border border-gray-100 shadow-inner">
