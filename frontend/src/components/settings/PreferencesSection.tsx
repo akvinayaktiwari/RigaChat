@@ -2,6 +2,8 @@ import { AppWindow, BellRing, Calendar, Mail, ShieldAlert } from 'lucide-react'
 import { Toggle } from '../Toggle'
 import type { Preferences } from '../../types/index'
 
+const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
+
 interface PreferencesSectionProps {
   preferences: Preferences
   onToggle: (key: keyof Preferences) => void
@@ -36,16 +38,16 @@ const SETTINGS_LIST: { key: keyof Preferences; title: string; description: strin
 
 export default function PreferencesSection({ preferences, onToggle }: PreferencesSectionProps) {
   return (
-    <div className="bg-white rounded-2xl border border-outline-variant p-6 md:p-8 hover:shadow-md transition-all duration-300 h-full">
-      <div className="flex items-center gap-3 border-b border-outline-variant pb-4 mb-6">
-        <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
+    <div className="bg-white rounded-2xl border border-black/5 p-6 shadow-sm h-full">
+      <div className="flex items-center gap-3 border-b border-gray-50 pb-4 mb-6">
+        <div className="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center text-violet-600 shrink-0">
           <BellRing className="w-5 h-5" />
         </div>
         <div>
-          <h4 className="text-base font-bold text-on-surface">Preferences</h4>
-          <p className="text-[11px] text-on-surface-variant font-medium">
-            Configure notifications and tracking behavior.
-          </p>
+          <h4 className="font-bold text-lg text-gray-900" style={JAKARTA_FONT}>
+            Preferences
+          </h4>
+          <p className="text-xs text-gray-500">Configure notifications and tracking behavior.</p>
         </div>
       </div>
 
@@ -53,16 +55,14 @@ export default function PreferencesSection({ preferences, onToggle }: Preference
         {SETTINGS_LIST.map((item) => {
           const Icon = item.icon
           return (
-            <div key={item.key} className="flex items-start justify-between gap-4 group">
+            <div key={item.key} className="flex items-start justify-between gap-4">
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-on-surface-variant group-hover:text-primary transition-colors mt-0.5">
+                <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400 mt-0.5 shrink-0">
                   <Icon className="w-4 h-4" />
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-on-surface">{item.title}</p>
-                  <p className="text-[11px] text-on-surface-variant mt-1 leading-relaxed max-w-sm">
-                    {item.description}
-                  </p>
+                  <p className="text-sm font-medium text-gray-900">{item.title}</p>
+                  <p className="text-xs text-gray-500 mt-1 leading-relaxed max-w-sm">{item.description}</p>
                 </div>
               </div>
 

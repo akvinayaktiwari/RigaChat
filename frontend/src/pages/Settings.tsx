@@ -145,39 +145,38 @@ export default function Settings() {
 
   if (isLoading || !profile) {
     return (
-      <div className="space-y-10 animate-pulse">
-        <div className="h-40 bg-surface-container-low rounded-2xl" />
-        <div className="h-64 bg-surface-container-low rounded-2xl" />
+      <div className="space-y-4 animate-pulse">
+        <div className="h-40 bg-gray-100 rounded-2xl" />
+        <div className="h-64 bg-gray-100 rounded-2xl" />
       </div>
     )
   }
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-300">
-      <div>
-        <h1 className="text-xl md:text-2xl font-bold text-on-surface tracking-tight">User Profile</h1>
-        <p className="text-xs md:text-sm text-on-surface-variant mt-1">
-          Manage your personal information and profile settings.
-        </p>
-      </div>
+    <div>
+      <h1 className="font-extrabold text-2xl text-gray-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+        Settings
+      </h1>
 
-      <UserProfileSection
-        profile={{ name: profile.name, email: profile.email }}
-        onEditProfile={() => setShowEditProfile(true)}
-      />
-
-      <SubscriptionSection currentPlan={profile.plan} onSelectPlan={handleSelectPlan} />
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <PreferencesSection preferences={preferences} onToggle={handleTogglePreference} />
-        <IntegrationsSection
-          zohoStatus={zohoStatus}
-          onConnectZoho={handleConnectZoho}
-          onDisconnectZoho={handleDisconnectZoho}
+      <div className="mt-6 space-y-4">
+        <UserProfileSection
+          profile={{ name: profile.name, email: profile.email }}
+          onEditProfile={() => setShowEditProfile(true)}
         />
-      </div>
 
-      <DangerZoneSection onDeleteAccount={() => setShowDeleteConfirm(true)} />
+        <SubscriptionSection currentPlan={profile.plan} onSelectPlan={handleSelectPlan} />
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <PreferencesSection preferences={preferences} onToggle={handleTogglePreference} />
+          <IntegrationsSection
+            zohoStatus={zohoStatus}
+            onConnectZoho={handleConnectZoho}
+            onDisconnectZoho={handleDisconnectZoho}
+          />
+        </div>
+
+        <DangerZoneSection onSignOut={logout} onDeleteAccount={() => setShowDeleteConfirm(true)} />
+      </div>
 
       {showEditProfile && (
         <EditProfileModal

@@ -1,34 +1,45 @@
-import { ShieldAlert } from 'lucide-react'
+import { LogOut, Trash2 } from 'lucide-react'
+
+const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
 interface DangerZoneSectionProps {
+  onSignOut: () => void
   onDeleteAccount: () => void
 }
 
-export default function DangerZoneSection({ onDeleteAccount }: DangerZoneSectionProps) {
+export default function DangerZoneSection({ onSignOut, onDeleteAccount }: DangerZoneSectionProps) {
   return (
-    <section className="pb-12">
-      <div className="bg-rose-50/40 border border-rose-200/60 rounded-2xl p-6 md:p-8 hover:bg-rose-50/60 transition-colors duration-300">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <h4 className="text-sm font-extrabold text-rose-600 uppercase tracking-widest flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5 animate-bounce text-rose-600 shrink-0" />
-              Danger Zone
-            </h4>
-            <p className="text-xs md:text-sm text-on-surface-variant max-w-2xl leading-relaxed">
-              Deleting your account will permanently erase all active chatbots, leads, conversations, and knowledge
-              base entries. This action cannot be undone.
-            </p>
-          </div>
+    <div className="bg-red-50 border border-red-100 rounded-2xl p-6">
+      <h4 className="font-bold text-red-800" style={JAKARTA_FONT}>
+        Danger Zone
+      </h4>
 
-          <button
-            type="button"
-            onClick={onDeleteAccount}
-            className="w-full sm:w-auto px-6 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-600 focus-visible:ring-offset-2"
-          >
-            Delete Account
-          </button>
-        </div>
+      <div className="flex items-center justify-between pb-4 mb-4 mt-4 border-b border-red-100">
+        <p className="text-sm text-red-600 max-w-md">Sign out of your VyostraAI account on this device.</p>
+        <button
+          type="button"
+          onClick={onSignOut}
+          className="inline-flex items-center gap-2 bg-white text-gray-700 font-medium px-4 py-2.5 rounded-xl text-sm border border-gray-200 hover:bg-gray-50 transition-colors shrink-0"
+        >
+          <LogOut className="w-4 h-4" />
+          Sign Out
+        </button>
       </div>
-    </section>
+
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-red-600 max-w-md">
+          Deleting your account will permanently erase all active chatbots, leads, conversations, and knowledge base
+          entries. This action cannot be undone.
+        </p>
+        <button
+          type="button"
+          onClick={onDeleteAccount}
+          className="inline-flex items-center gap-2 bg-red-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm hover:bg-red-600 transition-colors shrink-0"
+        >
+          <Trash2 className="w-4 h-4" />
+          Delete Account
+        </button>
+      </div>
+    </div>
   )
 }

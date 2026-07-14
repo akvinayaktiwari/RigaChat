@@ -1,4 +1,6 @@
-import { Check, Loader2, LogOut, Plus, Share2 } from 'lucide-react'
+import { Loader2, Share2 } from 'lucide-react'
+
+const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
 interface IntegrationsSectionProps {
   zohoStatus: 'connected' | 'disconnected' | 'loading'
@@ -14,6 +16,13 @@ interface CardDef {
   onClick?: () => void
 }
 
+const STATUS_BADGES: Record<CardDef['status'], { label: string; classes: string }> = {
+  connected: { label: 'Connected', classes: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  disconnected: { label: 'Not connected', classes: 'bg-gray-100 text-gray-500 border-gray-200' },
+  loading: { label: 'Loading', classes: 'bg-gray-100 text-gray-500 border-gray-200' },
+  'coming-soon': { label: 'Coming Soon', classes: 'bg-gray-100 text-gray-500 border-gray-200' },
+}
+
 export default function IntegrationsSection({ zohoStatus, onConnectZoho, onDisconnectZoho }: IntegrationsSectionProps) {
   const cards: CardDef[] = [
     {
@@ -23,95 +32,69 @@ export default function IntegrationsSection({ zohoStatus, onConnectZoho, onDisco
       status: zohoStatus,
       onClick: () => (zohoStatus === 'connected' ? onDisconnectZoho() : onConnectZoho()),
     },
-    {
-      id: 'hubspot',
-      name: 'HubSpot',
-      description: 'Sync leads automatically',
-      status: 'coming-soon',
-    },
-    {
-      id: 'salesforce',
-      name: 'Salesforce',
-      description: 'Sync leads automatically',
-      status: 'coming-soon',
-    },
+    { id: 'hubspot', name: 'HubSpot', description: 'Sync leads automatically', status: 'coming-soon' },
+    { id: 'salesforce', name: 'Salesforce', description: 'Sync leads automatically', status: 'coming-soon' },
   ]
 
   return (
-    <div className="bg-white rounded-2xl border border-outline-variant p-6 md:p-8 hover:shadow-md transition-all duration-300 h-full">
-      <div className="flex items-center gap-3 border-b border-outline-variant pb-4 mb-6">
-        <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
+    <div className="bg-white rounded-2xl border border-black/5 p-6 shadow-sm h-full">
+      <div className="flex items-center gap-3 border-b border-gray-50 pb-4 mb-6">
+        <div className="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center text-violet-600 shrink-0">
           <Share2 className="w-5 h-5" />
         </div>
         <div>
-          <h4 className="text-base font-bold text-on-surface">Integrations</h4>
-          <p className="text-[11px] text-on-surface-variant font-medium">Link your bots directly to leading CRMs.</p>
+          <h4 className="font-bold text-lg text-gray-900" style={JAKARTA_FONT}>
+            Integrations
+          </h4>
+          <p className="text-xs text-gray-500">Link your bots directly to leading CRMs.</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
+      <div className="flex flex-col gap-3">
         {cards.map((card) => {
           const isConnected = card.status === 'connected'
           const isLoading = card.status === 'loading'
           const isComingSoon = card.status === 'coming-soon'
+          const badge = STATUS_BADGES[card.status]
+
           return (
-            <button
-              key={card.id}
-              type="button"
-              onClick={card.onClick}
-              disabled={isLoading || isComingSoon}
-              className={`h-full p-4 rounded-xl border border-outline-variant bg-white flex items-center justify-between gap-3 group transition-all duration-200 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                isLoading ? 'pointer-events-none' : ''
-              } ${isComingSoon ? 'opacity-60 cursor-not-allowed' : ''} ${
-                isConnected ? 'bg-surface-container-low border-primary/20 hover:border-primary' : 'hover:border-primary/40'
-              }`}
-            >
+            <div key={card.id} className="flex items-center justify-between p-4 rounded-xl border border-gray-100 bg-gray-50/50">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-11 h-11 shrink-0 bg-white border border-outline-variant rounded-xl flex items-center justify-center text-on-surface-variant font-bold text-sm">
+                <div className="w-10 h-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-gray-500 font-semibold text-sm shrink-0">
                   {card.name.charAt(0)}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-bold text-on-surface group-hover:text-primary transition-colors">
-                    {card.name}
-                  </p>
-                  <p className="text-[10px] text-on-surface-variant mt-0.5 truncate">{card.description}</p>
+                  <p className="font-semibold text-gray-900 text-sm">{card.name}</p>
+                  <span className={`inline-flex mt-0.5 border text-[10px] font-semibold px-2 py-0.5 rounded-full ${badge.classes}`}>
+                    {isLoading ? 'Loading…' : badge.label}
+                  </span>
                 </div>
               </div>
 
-              <div className="shrink-0">
-                {isLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-on-surface-variant" />
-                ) : isComingSoon ? (
-                  <span className="inline-flex items-center text-[9px] font-bold text-on-surface-variant bg-surface-container-low border border-outline-variant px-2.5 py-1 rounded-md uppercase tracking-wide">
-                    Coming Soon
-                  </span>
-                ) : isConnected ? (
-                  <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100 uppercase tracking-wider group-hover:bg-rose-50 group-hover:text-rose-600 group-hover:border-rose-100 transition-colors">
-                    <Check className="w-2.5 h-2.5 shrink-0 group-hover:hidden" />
-                    <span className="group-hover:hidden">Active</span>
-                    <span className="hidden group-hover:inline-flex items-center gap-1">
-                      <LogOut className="w-2.5 h-2.5" /> Disable
-                    </span>
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center text-[9px] font-bold text-on-surface-variant bg-surface-container-low border border-outline-variant px-2.5 py-1 rounded-md uppercase tracking-wide group-hover:bg-primary group-hover:text-on-primary group-hover:border-primary transition-colors">
-                    Connect
-                  </span>
-                )}
-              </div>
-            </button>
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin text-gray-400 shrink-0" />
+              ) : isComingSoon ? (
+                <span className="text-xs text-gray-400 shrink-0">Coming Soon</span>
+              ) : isConnected ? (
+                <button
+                  type="button"
+                  onClick={card.onClick}
+                  className="text-red-600 font-medium px-3 py-2 rounded-xl text-sm hover:bg-red-50 transition-colors shrink-0"
+                >
+                  Disconnect
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={card.onClick}
+                  className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-3 py-2 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity shrink-0"
+                >
+                  Connect
+                </button>
+              )}
+            </div>
           )
         })}
-
-        <div className="h-full p-4 rounded-xl border-2 border-dashed border-outline-variant bg-white opacity-60 cursor-not-allowed flex flex-col items-center justify-center gap-2 text-center">
-          <div className="w-11 h-11 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant">
-            <Plus className="w-4 h-4" />
-          </div>
-          <div>
-            <p className="text-xs font-bold text-on-surface-variant">Explore More Integrations</p>
-            <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wide mt-1">Coming Soon</p>
-          </div>
-        </div>
       </div>
     </div>
   )
