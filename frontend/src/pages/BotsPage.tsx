@@ -93,7 +93,7 @@ export default function BotsPage() {
   async function handleResync(bot: BotConfig) {
     setStartingResyncBotId(bot.botId)
     try {
-      const res = await startBotIndexing(bot.botId, bot.websiteUrl)
+      const res = await startBotIndexing(bot.botId, bot.websiteUrl ?? '')
       if (res.success && res.data) {
         // Large-site confirmation is a no-op here — the list view has no
         // per-card dialog, so auto-confirm the top 50 pages rather than
@@ -186,7 +186,9 @@ export default function BotsPage() {
 
               <div className="flex items-center gap-2 mb-2">
                 <Globe size={14} className="text-slate-400 shrink-0" />
-                <span className="text-sm text-slate-500">{truncateUrl(bot.websiteUrl)}</span>
+                <span className="text-sm text-slate-500">
+                  {bot.websiteUrl ? truncateUrl(bot.websiteUrl) : 'Knowledge Base only'}
+                </span>
               </div>
 
               <div className="flex items-center gap-2 mb-4">

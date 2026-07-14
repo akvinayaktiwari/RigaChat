@@ -574,8 +574,12 @@ export default function NewBotPage() {
                   </div>
                   <div className="h-px bg-slate-200" />
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-500">Website URL</span>
-                    <span className="text-sm font-bold text-slate-800">{formData.websiteUrl}</span>
+                    <span className="text-sm text-slate-500">Training source</span>
+                    {flowType === 'kb_only' ? (
+                      <span className="text-violet-600 font-medium text-sm">Knowledge Base only</span>
+                    ) : (
+                      <span className="text-sm text-gray-700">{formData.websiteUrl}</span>
+                    )}
                   </div>
                   <div className="h-px bg-slate-200" />
                   <div className="flex items-center justify-between">
