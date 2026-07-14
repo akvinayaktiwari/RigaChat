@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, BookOpen, Check, Code, Copy, Loader2, RefreshCw, Trash2 } from 'lucide-react'
+import { AlertTriangle, BookOpen, Check, ChevronLeft, Code, Copy, Loader2, RefreshCw, Trash2 } from 'lucide-react'
 import { confirmBotIndexing, deleteBot, getBotById, getBotIndexingStatus, startBotIndexing, updateBot } from '../services/api'
-import type { BotConfig, IndexingJob } from '../types/index'
+import type { BotConfig, BotStatus, IndexingJob } from '../types/index'
+
+const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
 type LocalIndexingStatus = 'idle' | 'scanning' | IndexingJob['status']
 
@@ -29,7 +31,7 @@ function isValidEmail(value: string): boolean {
 
 function getEmbedSnippet(botId: string): string {
   const cdnUrl = import.meta.env.VITE_CDN_URL
-  return `<!-- BeepBoop Widget -->
+  return `<!-- VyostraAI Widget -->
 <script
   src="${cdnUrl}/widget.js"
   data-bot-id="${botId}"
@@ -37,23 +39,41 @@ function getEmbedSnippet(botId: string): string {
 </script>`
 }
 
+const STATUS_BADGES: Record<'active' | 'processing' | 'crawl_failed' | 'kb_only', { label: string; classes: string }> = {
+  active: { label: 'Active', classes: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  processing: { label: 'Processing', classes: 'bg-violet-50 text-violet-700 border-violet-200' },
+  crawl_failed: { label: 'Failed', classes: 'bg-red-50 text-red-700 border-red-200' },
+  kb_only: { label: 'KB Only', classes: 'bg-blue-50 text-blue-700 border-blue-200' },
+}
+
+function getStatusBadge(status?: BotStatus): { label: string; classes: string } {
+  return STATUS_BADGES[status ?? 'active']
+}
+
 const inputClasses =
-  'w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all'
-const labelClasses = 'block text-sm font-medium text-slate-700 mb-2'
+  'w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 bg-white outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors'
+const labelClasses = 'block text-sm font-medium text-gray-700 mb-1.5'
+
+const primaryButtonClasses =
+  'bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold rounded-xl shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed'
+const secondaryButtonClasses =
+  'bg-white text-gray-700 font-medium rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors'
+const dangerButtonClasses =
+  'bg-red-500 text-white font-semibold rounded-xl hover:bg-red-600 transition-colors disabled:opacity-50'
 
 function LoadingSkeleton() {
   return (
     <div>
-      <div className="h-4 w-24 bg-slate-100 rounded animate-pulse mb-6" />
+      <div className="h-4 w-24 bg-gray-100 rounded animate-pulse mb-6" />
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        <div className="lg:col-span-3 bg-white rounded-2xl p-6 border border-slate-100 animate-pulse space-y-4">
+        <div className="lg:col-span-3 bg-white rounded-2xl p-6 border border-black/5 animate-pulse space-y-4">
           {[0, 1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-10 bg-slate-100 rounded-xl" />
+            <div key={i} className="h-10 bg-gray-100 rounded-xl" />
           ))}
         </div>
-        <div className="lg:col-span-2 bg-white rounded-2xl p-6 border border-slate-100 animate-pulse space-y-4">
-          <div className="h-10 bg-slate-100 rounded-xl" />
-          <div className="h-10 bg-slate-100 rounded-xl" />
+        <div className="lg:col-span-2 bg-white rounded-2xl p-6 border border-black/5 animate-pulse space-y-4">
+          <div className="h-10 bg-gray-100 rounded-xl" />
+          <div className="h-10 bg-gray-100 rounded-xl" />
         </div>
       </div>
     </div>
@@ -212,11 +232,11 @@ export default function BotDetailPage() {
   if (!bot || !botId) {
     return (
       <div className="flex flex-col items-center text-center py-16">
-        <p className="text-slate-800 font-medium">Bot not found</p>
+        <p className="text-gray-900 font-medium">Bot not found</p>
         <button
           type="button"
           onClick={() => navigate('/dashboard/bots')}
-          className="mt-4 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm hover:bg-indigo-700 transition-colors"
+          className={`mt-4 px-4 py-2.5 text-sm ${primaryButtonClasses}`}
         >
           Back to Chatbots
         </button>
@@ -224,20 +244,57 @@ export default function BotDetailPage() {
     )
   }
 
+  const statusBadge = getStatusBadge(bot.status)
+
   return (
     <div>
-      <button
-        type="button"
-        onClick={() => navigate('/dashboard/bots')}
-        className="flex items-center gap-1 text-slate-500 text-sm hover:text-slate-700 transition-colors"
-      >
-        <ArrowLeft size={16} />
-        Back
-      </button>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard/bots')}
+            className="flex items-center gap-1 text-gray-500 text-sm hover:text-gray-900 transition-colors mb-2"
+          >
+            <ChevronLeft size={16} />
+            All Bots
+          </button>
+          <div className="flex items-center gap-3">
+            <h1 className="font-extrabold text-2xl text-gray-900" style={JAKARTA_FONT}>
+              {bot.name}
+            </h1>
+            <span className={`border text-xs font-semibold px-2.5 py-1 rounded-full ${statusBadge.classes}`}>
+              {statusBadge.label}
+            </span>
+          </div>
+        </div>
 
-      <div className="mt-4">
-        <h1 className="text-2xl font-bold text-slate-800">{bot.name}</h1>
-        <p className="text-slate-500 text-sm">Bot Settings</p>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleStartIndexing}
+            disabled={
+              !bot.websiteUrl ||
+              indexingStatus === 'scanning' ||
+              indexingStatus === 'queued' ||
+              indexingStatus === 'processing'
+            }
+            className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm ${secondaryButtonClasses} disabled:opacity-50`}
+          >
+            <RefreshCw
+              size={14}
+              className={indexingStatus === 'scanning' || indexingStatus === 'queued' ? 'animate-spin' : ''}
+            />
+            Resync
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowDeleteModal(true)}
+            className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm ${dangerButtonClasses}`}
+          >
+            <Trash2 size={14} />
+            Delete
+          </button>
+        </div>
       </div>
 
       {bot.status === 'crawl_failed' && (
@@ -297,8 +354,10 @@ export default function BotDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
         <div className="lg:col-span-3 space-y-6">
-          <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-            <h2 className="font-semibold text-lg text-slate-800 mb-6">Configuration</h2>
+          <div className="bg-white rounded-2xl p-6 border border-black/5 shadow-sm">
+            <h2 className="font-bold text-lg text-gray-900 mb-6" style={JAKARTA_FONT}>
+              Configuration
+            </h2>
 
             <div className="space-y-4">
               <div>
@@ -345,7 +404,7 @@ export default function BotDetailPage() {
                   placeholder="Auto-detected from your website"
                   className={inputClasses}
                 />
-                <p className="mt-1.5 text-xs text-slate-400">
+                <p className="mt-1.5 text-xs text-gray-400">
                   Detected automatically during setup. Visitors can contact this address directly from the chatbot.
                 </p>
                 {bot.supportEmail && !isValidEmail(bot.supportEmail.trim()) && (
@@ -367,7 +426,7 @@ export default function BotDetailPage() {
                     type="text"
                     value={bot.brandColor}
                     onChange={(e) => setBot({ ...bot, brandColor: e.target.value })}
-                    className="flex-1 px-4 py-3 border border-slate-200 rounded-xl text-sm"
+                    className={`flex-1 ${inputClasses}`}
                   />
                 </div>
               </div>
@@ -377,7 +436,7 @@ export default function BotDetailPage() {
                 <select
                   value={bot.widgetTrigger}
                   onChange={(e) => setBot({ ...bot, widgetTrigger: e.target.value as BotConfig['widgetTrigger'] })}
-                  className={`${inputClasses} bg-white cursor-pointer`}
+                  className={`${inputClasses} cursor-pointer`}
                 >
                   {WIDGET_TRIGGER_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -409,23 +468,25 @@ export default function BotDetailPage() {
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="w-full mt-6 bg-indigo-600 text-white px-6 py-3 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className={`w-full mt-6 py-3 flex items-center justify-center gap-2 ${primaryButtonClasses}`}
             >
               {saving && <Loader2 size={16} className="animate-spin" />}
               {saving ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
 
-          <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+          <div className="bg-white rounded-2xl p-6 border border-black/5 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
-              <Code size={18} className="text-slate-500" />
-              <h2 className="font-semibold text-slate-800">Embed Code</h2>
+              <Code size={18} className="text-gray-500" />
+              <h2 className="font-bold text-lg text-gray-900" style={JAKARTA_FONT}>
+                Embed Code
+              </h2>
             </div>
-            <p className="text-slate-500 text-sm mb-4">
+            <p className="text-gray-500 text-sm mb-4">
               Paste this code before the closing &lt;/body&gt; tag on your website
             </p>
 
-            <pre className="bg-slate-900 text-emerald-400 rounded-xl p-4 font-mono text-sm overflow-x-auto">
+            <pre className="bg-gray-900 text-green-400 rounded-xl p-4 font-mono text-xs overflow-x-auto">
               {getEmbedSnippet(bot.botId)}
             </pre>
 
@@ -433,7 +494,7 @@ export default function BotDetailPage() {
               <button
                 type="button"
                 onClick={handleCopyEmbed}
-                className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 transition-colors"
+                className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm ${primaryButtonClasses}`}
               >
                 {copySuccess ? (
                   <>
@@ -451,7 +512,7 @@ export default function BotDetailPage() {
                 href={`/widget-test/preview?botId=${bot.botId}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-indigo-600 text-sm hover:underline"
+                className="text-violet-600 text-sm hover:underline"
               >
                 Test this snippet &rarr;
               </a>
@@ -460,15 +521,17 @@ export default function BotDetailPage() {
         </div>
 
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-2xl p-6 border border-red-100 shadow-sm">
-            <h2 className="text-red-600 font-semibold text-lg mb-4">Danger Zone</h2>
+          <div className="bg-red-50 border border-red-100 rounded-2xl p-6">
+            <h2 className="font-bold text-red-800 text-lg mb-4" style={JAKARTA_FONT}>
+              Danger Zone
+            </h2>
 
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <RefreshCw size={16} className="text-amber-500" />
-                <span className="font-medium text-slate-700">Resync Website</span>
+                <span className="font-medium text-gray-700">Resync Website</span>
               </div>
-              <p className="text-slate-500 text-sm mb-3">
+              <p className="text-gray-500 text-sm mb-3">
                 Re-crawl your website and rebuild the bot&apos;s knowledge from scratch
               </p>
 
@@ -493,11 +556,11 @@ export default function BotDetailPage() {
               </button>
 
               {indexingStatus !== 'idle' && indexingStatus !== 'confirmation_required' && (
-                <div className="bg-slate-50 rounded-xl p-4 mt-4">
-                  <p className="font-bold text-slate-800 text-sm">Building Knowledge Base...</p>
-                  <div className="bg-slate-200 rounded-full h-2 w-full mt-3">
+                <div className="bg-white rounded-xl p-4 mt-4 border border-red-100">
+                  <p className="font-bold text-gray-900 text-sm">Building Knowledge Base...</p>
+                  <div className="bg-gray-100 rounded-full h-2 w-full mt-3">
                     <div
-                      className="bg-indigo-600 rounded-full h-2 transition-all"
+                      className="bg-violet-600 rounded-full h-2 transition-all"
                       style={{
                         width: `${
                           indexingJob && indexingJob.selectedPages > 0
@@ -507,7 +570,7 @@ export default function BotDetailPage() {
                       }}
                     />
                   </div>
-                  <p className="text-xs text-slate-500 mt-2">
+                  <p className="text-xs text-gray-500 mt-2">
                     {(indexingStatus === 'scanning' || indexingStatus === 'queued') && 'Scanning pages...'}
                     {indexingStatus === 'processing' &&
                       indexingJob &&
@@ -527,14 +590,14 @@ export default function BotDetailPage() {
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <Trash2 size={16} className="text-red-500" />
-                <span className="font-medium text-slate-700">Delete Bot</span>
+                <span className="font-medium text-gray-700">Delete Bot</span>
               </div>
-              <p className="text-slate-500 text-sm mb-3">Permanently delete this chatbot and all associated data</p>
+              <p className="text-gray-500 text-sm mb-3">Permanently delete this chatbot and all associated data</p>
 
               <button
                 type="button"
                 onClick={() => setShowDeleteModal(true)}
-                className="w-full border border-red-300 text-red-600 hover:bg-red-50 px-4 py-2 rounded-xl transition-colors"
+                className={`w-full px-4 py-2.5 text-sm ${dangerButtonClasses}`}
               >
                 Delete Bot
               </button>
@@ -544,10 +607,12 @@ export default function BotDetailPage() {
       </div>
 
       {showConfirmDialog && pendingJob && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 max-w-md w-full shadow-xl">
-            <h2 className="font-bold text-slate-800 text-lg">Large Website Detected</h2>
-            <p className="text-sm text-slate-500 mt-2">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl shadow-black/8 border border-gray-100 p-6 max-w-md w-full">
+            <h2 className="font-bold text-xl text-gray-900 mb-4" style={JAKARTA_FONT}>
+              Large Website Detected
+            </h2>
+            <p className="text-sm text-gray-500 -mt-3">
               We found {pendingJob.totalPages} pages on this website. We will crawl the {pendingJob.selectedPages}{' '}
               most relevant pages to build your knowledge base.
             </p>
@@ -558,14 +623,14 @@ export default function BotDetailPage() {
                   setShowConfirmDialog(false)
                   setIndexingStatus('idle')
                 }}
-                className="border border-slate-200 text-slate-600 px-4 py-2 rounded-xl text-sm hover:bg-slate-50 transition-colors"
+                className={`px-4 py-2.5 text-sm ${secondaryButtonClasses}`}
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleConfirmIndexing}
-                className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm hover:bg-indigo-700 transition-colors"
+                className={`px-4 py-2.5 text-sm ${primaryButtonClasses}`}
               >
                 Continue with {pendingJob.selectedPages} pages
               </button>
@@ -575,10 +640,12 @@ export default function BotDetailPage() {
       )}
 
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <h2 className="text-lg font-bold text-slate-800">Delete {bot.name}?</h2>
-            <p className="text-sm text-slate-500 mt-2">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl shadow-black/8 border border-gray-100 p-6 max-w-sm w-full">
+            <h2 className="font-bold text-xl text-gray-900" style={JAKARTA_FONT}>
+              Delete {bot.name}?
+            </h2>
+            <p className="text-sm text-gray-500 mt-2">
               This will permanently delete the chatbot, all leads, and knowledge base entries.
             </p>
             <div className="flex items-center justify-end gap-3 mt-6">
@@ -586,7 +653,7 @@ export default function BotDetailPage() {
                 type="button"
                 onClick={() => setShowDeleteModal(false)}
                 disabled={deleting}
-                className="text-slate-600 hover:text-slate-800 transition-colors px-4 py-2 text-sm font-medium disabled:opacity-50"
+                className="text-gray-600 font-medium px-3 py-2 rounded-xl text-sm hover:bg-gray-100 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -594,7 +661,7 @@ export default function BotDetailPage() {
                 type="button"
                 onClick={handleDelete}
                 disabled={deleting}
-                className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
+                className={`px-4 py-2.5 text-sm ${dangerButtonClasses}`}
               >
                 {deleting ? 'Deleting...' : 'Delete'}
               </button>
