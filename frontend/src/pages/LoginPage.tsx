@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { AlertCircle, CheckCircle, Eye, EyeOff, Loader2, MessageSquare } from 'lucide-react'
+import { AlertCircle, CheckCircle, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
+import VyostraLogo from '../components/VyostraLogo'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -34,8 +35,8 @@ function GoogleIcon() {
 function BrandPanel() {
   return (
     <div className="hidden lg:flex flex-col items-center justify-center bg-linear-to-br from-violet-600 via-purple-600 to-indigo-700 h-full p-12 text-white text-center">
-      <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-6">
-        <MessageSquare className="w-8 h-8 text-white" />
+      <div className="mb-6">
+        <VyostraLogo size={56} animate={true} />
       </div>
 
       <span className="text-4xl font-extrabold text-white" style={JAKARTA_FONT}>
@@ -96,9 +97,7 @@ export default function LoginPage() {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white min-h-screen">
         <div className="w-full max-w-sm">
           <div className="flex items-center gap-3 mb-8 lg:hidden">
-            <div className="w-9 h-9 bg-linear-to-br from-violet-600 to-purple-500 rounded-xl flex items-center justify-center shrink-0">
-              <MessageSquare className="w-4.5 h-4.5 text-white" />
-            </div>
+            <VyostraLogo size={32} animate={true} />
             <span className="font-bold text-lg text-gray-900" style={JAKARTA_FONT}>
               VyostraAI
             </span>

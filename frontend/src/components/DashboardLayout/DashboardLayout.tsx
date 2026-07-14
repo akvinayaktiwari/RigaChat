@@ -13,6 +13,7 @@ import {
   Users,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
+import VyostraLogo from '../VyostraLogo'
 
 const NAV_LINKS: { to: string; label: string; icon: LucideIcon; end: boolean }[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -67,9 +68,7 @@ function SidebarContent({ initials, userName, userEmail, onLogout }: SidebarCont
   return (
     <>
       <div className="flex items-center gap-3 px-2 mb-10">
-        <div className="w-8 h-8 bg-linear-to-br from-violet-600 to-purple-500 rounded-xl shadow-md shadow-violet-200 flex items-center justify-center shrink-0">
-          <MessageSquare className="w-4.5 h-4.5 text-white" />
-        </div>
+        <VyostraLogo size={28} animate={true} />
         <span className="font-bold text-lg text-gray-900" style={JAKARTA_FONT}>
           VyostraAI
         </span>

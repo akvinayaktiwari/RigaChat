@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Menu, X, ArrowRight, MessageSquare } from 'lucide-react'
+import { Menu, X, ArrowRight } from 'lucide-react'
+import VyostraLogo from '../VyostraLogo'
 
 interface NavbarProps {
   onOpenDemo: () => void
@@ -19,9 +20,7 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
     <header className="fixed top-0 left-0 right-0 z-50 flex justify-center px-4 pt-4">
       <nav className="w-full max-w-6xl bg-white/80 backdrop-blur-xl border border-black/6 rounded-2xl shadow-lg shadow-black/4 px-5 py-3 flex items-center justify-between">
         <a href="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-linear-to-br from-violet-600 to-purple-500 rounded-xl flex items-center justify-center shadow-md shadow-violet-200">
-            <MessageSquare className="w-4 h-4 text-white" />
-          </div>
+          <VyostraLogo size={36} animate={true} />
           <span
             className="font-bold text-gray-900 text-lg tracking-tight"
             style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}

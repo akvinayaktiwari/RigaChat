@@ -197,6 +197,21 @@ body {
   animation: demo-chat-bounce 1s infinite;
 }
 
+/* VyostraLogo breathe glow — skipped when animate=false (e.g. on colored
+   backgrounds where drop-shadow glow isn't visible) */
+@keyframes vyostraGlowBreathe {
+  0%, 100% {
+    filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.5));
+  }
+  50% {
+    filter: drop-shadow(0 0 20px rgba(168, 85, 247, 1)) drop-shadow(0 0 40px rgba(168, 85, 247, 0.35));
+  }
+}
+
+.vyostra-logo-glow {
+  animation: vyostraGlowBreathe 2.5s ease-in-out infinite;
+}
+
 /* Legal page PDF export: hide site chrome, print only the document body */
 @media print {
   .landing-page nav,
