@@ -1,5 +1,17 @@
+import { useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Bell, Bot, FileText, LayoutDashboard, LogOut, type LucideIcon, MessageSquare, Settings, Users } from 'lucide-react'
+import {
+  Bell,
+  Bot,
+  FileText,
+  LayoutDashboard,
+  LogOut,
+  type LucideIcon,
+  Menu,
+  MessageSquare,
+  Settings,
+  Users,
+} from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 
 const NAV_LINKS: { to: string; label: string; icon: LucideIcon; end: boolean }[] = [
@@ -36,98 +48,131 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
-const navLinkClasses = (isActive: boolean): string =>
-  `w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 text-left ${
-    isActive
-      ? 'active-nav-link shadow-sm'
-      : 'text-slate-400 font-medium hover:bg-slate-800/60 hover:text-white hover:translate-x-1'
+const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
+
+function navLinkClasses(isActive: boolean): string {
+  return `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-150 ${
+    isActive ? 'bg-violet-50 text-violet-700 font-semibold' : 'text-gray-600 font-medium hover:bg-gray-50 hover:text-gray-900'
   }`
+}
+
+interface SidebarContentProps {
+  initials: string
+  userName?: string
+  userEmail?: string
+  onLogout: () => void
+}
+
+function SidebarContent({ initials, userName, userEmail, onLogout }: SidebarContentProps) {
+  return (
+    <>
+      <div className="flex items-center gap-3 px-2 mb-10">
+        <div className="w-8 h-8 bg-linear-to-br from-violet-600 to-purple-500 rounded-xl shadow-md shadow-violet-200 flex items-center justify-center shrink-0">
+          <MessageSquare className="w-4.5 h-4.5 text-white" />
+        </div>
+        <span className="font-bold text-lg text-gray-900" style={JAKARTA_FONT}>
+          VyostraAI
+        </span>
+      </div>
+
+      <nav className="flex-1 space-y-1">
+        {NAV_LINKS.map((link) => {
+          const Icon = link.icon
+          return (
+            <NavLink key={link.to} to={link.to} end={link.end} className={({ isActive }) => navLinkClasses(isActive)}>
+              {({ isActive }) => (
+                <>
+                  <Icon className={`w-4.5 h-4.5 shrink-0 ${isActive ? 'text-violet-600' : 'text-gray-400'}`} />
+                  <span>{link.label}</span>
+                </>
+              )}
+            </NavLink>
+          )
+        })}
+      </nav>
+
+      <div className="pt-4 border-t border-gray-100">
+        <div className="flex items-center gap-3 px-2 py-2">
+          <div className="w-8 h-8 rounded-full bg-linear-to-br from-violet-600 to-purple-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+            {initials}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-900 truncate">{userName}</p>
+            <p className="text-xs text-gray-500 truncate">{userEmail}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onLogout}
+            title="Logout"
+            className="text-gray-400 hover:text-gray-700 transition-colors shrink-0"
+          >
+            <LogOut className="w-4.5 h-4.5" />
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
 
 export function DashboardLayout() {
   const { user, logout } = useAuth()
   const location = useLocation()
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   const initials = user ? getInitials(user.name) : ''
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC]">
-      {/* Sidebar */}
-      <aside className="glass-sidebar fixed left-0 top-0 h-screen w-60 flex flex-col py-8 px-4 z-50">
-        <div className="flex items-center gap-3 px-2 mb-10">
-          <div className="w-10 h-10 rounded-xl cta-accent flex items-center justify-center text-white font-black text-lg shadow-sm">
-            B
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-white tracking-tight leading-tight">BeepBoop</h1>
-            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400">Conversational Agents</p>
-          </div>
-        </div>
+    <div className="min-h-screen bg-white">
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 lg:hidden"
+          onClick={() => setMobileNavOpen(false)}
+          aria-hidden="true"
+        />
+      )}
 
-        <nav className="flex-1 space-y-1">
-          {NAV_LINKS.map((link) => {
-            const Icon = link.icon
-            return (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                end={link.end}
-                className={({ isActive }) => navLinkClasses(isActive)}
-              >
-                <Icon className="w-5 h-5 shrink-0" />
-                <span className="text-sm tracking-wide">{link.label}</span>
-              </NavLink>
-            )
-          })}
-        </nav>
-
-        <div className="space-y-4">
-          {/* User footer */}
-          <div className="pt-4 border-t border-[#1E293B]">
-            <div className="bg-[#1E293B] border border-[#334155]/60 rounded-2xl p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#334155] flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
-                {initials}
-              </div>
-              <div className="flex-1 overflow-hidden">
-                <p className="text-sm font-bold text-white truncate">{user?.name}</p>
-                <p className="text-[10px] text-slate-400 truncate">{user?.email}</p>
-              </div>
-              <button
-                type="button"
-                onClick={logout}
-                title="Logout"
-                className="text-slate-400 hover:text-white transition-colors flex-shrink-0"
-              >
-                <LogOut className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        </div>
+      <aside
+        className={`fixed left-0 top-0 h-screen w-64 flex flex-col bg-white border-r border-gray-100 py-8 px-4 z-50 transform transition-transform duration-200 lg:translate-x-0 ${
+          mobileNavOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <SidebarContent initials={initials} userName={user?.name} userEmail={user?.email} onLogout={logout} />
       </aside>
 
-      {/* Header */}
-      <header className="glass-header fixed top-0 right-0 left-60 h-[60px] flex items-center justify-between px-8 z-40">
-        <h2 className="text-lg font-extrabold text-slate-800 tracking-tight">{getPageTitle(location.pathname)}</h2>
-
-        <div className="flex items-center gap-4">
+      <header className="fixed top-0 right-0 left-0 lg:left-64 h-16 bg-white border-b border-gray-100 shadow-sm flex items-center justify-between px-4 sm:px-8 z-30">
+        <div className="flex items-center gap-3 min-w-0">
           <button
             type="button"
-            className="relative w-10 h-10 flex items-center justify-center rounded-full text-slate-500 hover:text-indigo-600 hover:bg-slate-50 transition-all"
+            onClick={() => setMobileNavOpen(true)}
+            aria-label="Open menu"
+            className="lg:hidden text-gray-500 hover:text-gray-900 transition-colors shrink-0"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <h2 className="font-bold text-xl text-gray-900 truncate" style={JAKARTA_FONT}>
+            {getPageTitle(location.pathname)}
+          </h2>
+        </div>
+
+        <div className="flex items-center gap-4 shrink-0">
+          <button
+            type="button"
+            className="relative w-10 h-10 flex items-center justify-center rounded-full text-gray-500 hover:text-violet-600 hover:bg-gray-50 transition-all"
             title="Notifications"
           >
             <Bell className="w-5 h-5" />
           </button>
 
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-700 flex-shrink-0">
+            <div className="w-9 h-9 rounded-full bg-linear-to-br from-violet-600 to-purple-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
               {initials}
             </div>
-            <span className="text-sm font-bold text-slate-800 hidden md:block">{user?.name}</span>
+            <span className="text-sm font-medium text-gray-900 hidden md:block">{user?.name}</span>
           </div>
         </div>
       </header>
 
-      {/* Content */}
-      <main className="ml-60 pt-[60px] min-h-screen overflow-y-auto">
+      <main className="lg:ml-64 pt-16 min-h-screen overflow-y-auto">
         <div className="p-6">
           <Outlet />
         </div>
