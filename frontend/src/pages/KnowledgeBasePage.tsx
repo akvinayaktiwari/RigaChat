@@ -15,6 +15,7 @@ import {
 import { addKBEntry, deleteKBEntry, getKBEntries, getMyBots, updateKBEntry } from '../services/api'
 import type { KnowledgeBaseEntry } from '../types/index'
 
+const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 const PREVIEW_LENGTH = 150
 
 interface EntryFormState {
@@ -38,17 +39,23 @@ function formatRelativeDate(date: Date): string {
 }
 
 const inputClasses =
-  'w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all'
-const labelClasses = 'block text-sm font-medium text-slate-700 mb-2'
+  'w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 bg-white outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors'
+const labelClasses = 'block text-sm font-medium text-gray-700 mb-1.5'
+
+const primaryButtonClasses =
+  'bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold rounded-xl shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity disabled:opacity-50'
+const secondaryButtonClasses =
+  'bg-white text-gray-700 font-medium rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50'
+const dangerButtonClasses = 'bg-red-500 text-white font-semibold rounded-xl hover:bg-red-600 transition-colors disabled:opacity-50'
 
 function CardsSkeleton() {
   return (
-    <div className="space-y-4 mt-6">
+    <div className="flex flex-col gap-3 mt-6">
       {[0, 1, 2].map((i) => (
-        <div key={i} className="bg-white rounded-2xl p-6 border border-slate-100 animate-pulse">
-          <div className="h-5 w-48 bg-slate-200 rounded mb-3" />
-          <div className="h-4 w-full bg-slate-100 rounded mb-2" />
-          <div className="h-4 w-2/3 bg-slate-100 rounded" />
+        <div key={i} className="bg-white rounded-2xl p-5 border border-black/5 animate-pulse">
+          <div className="h-5 w-48 bg-gray-200 rounded mb-3" />
+          <div className="h-4 w-full bg-gray-100 rounded mb-2" />
+          <div className="h-4 w-2/3 bg-gray-100 rounded" />
         </div>
       ))}
     </div>
@@ -68,18 +75,20 @@ interface EntryModalProps {
 
 function EntryModal({ title, form, onChange, onCancel, onSave, saving, saveLabel, savingLabel }: EntryModalProps) {
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl mx-4 relative">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl shadow-black/8 border border-gray-100 p-6 w-full max-w-lg relative">
         <button
           type="button"
           onClick={onCancel}
           title="Close"
-          className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
         >
           <X size={20} />
         </button>
 
-        <h2 className="text-lg font-bold text-slate-800 mb-4">{title}</h2>
+        <h2 className="font-bold text-xl text-gray-900 mb-5" style={JAKARTA_FONT}>
+          {title}
+        </h2>
 
         <div className="space-y-4">
           <div>
@@ -99,25 +108,20 @@ function EntryModal({ title, form, onChange, onCancel, onSave, saving, saveLabel
               value={form.content}
               onChange={(e) => onChange({ ...form, content: e.target.value })}
               placeholder="Enter any information you want your chatbot to know. This could be pricing details, FAQs, policies, or any other information about your business."
-              className={inputClasses}
+              className={`${inputClasses} min-h-35 resize-y`}
             />
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 mt-6">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={saving}
-            className="border border-slate-200 text-slate-600 px-4 py-2 rounded-xl text-sm hover:bg-slate-50 transition-colors disabled:opacity-50"
-          >
+        <div className="flex justify-end gap-3 mt-5">
+          <button type="button" onClick={onCancel} disabled={saving} className={`px-4 py-2.5 text-sm ${secondaryButtonClasses}`}>
             Cancel
           </button>
           <button
             type="button"
             onClick={onSave}
             disabled={saving || !form.title.trim() || !form.content.trim()}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+            className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm ${primaryButtonClasses}`}
           >
             {saving && <Loader2 size={14} className="animate-spin" />}
             {saving ? savingLabel : saveLabel}
@@ -224,11 +228,11 @@ export default function KnowledgeBasePage() {
   if (!botId) {
     return (
       <div className="flex flex-col items-center text-center py-16">
-        <p className="text-slate-800 font-medium">No chatbot selected</p>
+        <p className="text-gray-900 font-medium">No chatbot selected</p>
         <button
           type="button"
           onClick={() => navigate('/dashboard/bots')}
-          className="mt-4 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm hover:bg-indigo-700 transition-colors"
+          className={`mt-4 px-4 py-2.5 text-sm ${primaryButtonClasses}`}
         >
           Back to Chatbots
         </button>
@@ -243,27 +247,29 @@ export default function KnowledgeBasePage() {
           <button
             type="button"
             onClick={() => navigate('/dashboard/bots')}
-            className="flex items-center gap-1 text-slate-500 text-sm hover:text-slate-700 transition-colors mb-2"
+            className="flex items-center gap-1 text-gray-500 text-sm hover:text-gray-900 transition-colors mb-2"
           >
             <ArrowLeft size={16} />
             Back
           </button>
-          <h1 className="font-bold text-2xl text-slate-800">Knowledge Base</h1>
-          {botName && <p className="text-slate-500 text-sm">{botName}</p>}
+          <h1 className="font-extrabold text-2xl text-gray-900" style={JAKARTA_FONT}>
+            Knowledge Base
+          </h1>
+          {botName && <p className="text-sm text-gray-500">{botName}</p>}
         </div>
         <button
           type="button"
           onClick={openAdd}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2"
+          className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm ${primaryButtonClasses}`}
         >
           <Plus size={16} />
           Add Entry
         </button>
       </div>
 
-      <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mt-4 flex items-start gap-3">
-        <Info size={18} className="text-indigo-500 shrink-0 mt-0.5" />
-        <p className="text-indigo-700 text-sm">
+      <div className="bg-violet-50 border border-violet-100 rounded-2xl p-4 mt-4 flex items-start gap-3">
+        <Info size={18} className="text-violet-500 shrink-0 mt-0.5" />
+        <p className="text-violet-700 text-sm">
           Entries added here will be used by your chatbot to answer questions not covered by your website content.
         </p>
       </div>
@@ -271,35 +277,56 @@ export default function KnowledgeBasePage() {
       {loading ? (
         <CardsSkeleton />
       ) : entries.length === 0 ? (
-        <div className="py-20 flex flex-col items-center text-center">
-          <BookOpen className="text-indigo-300 mb-4" size={64} />
-          <h2 className="text-2xl font-bold text-slate-700 mb-2">No knowledge base entries yet</h2>
-          <p className="text-slate-500 text-sm mb-6 text-center max-w-md">
-            Add information your chatbot should know that is not on your website
+        <div className="flex flex-col items-center justify-center py-16 px-4">
+          <div className="w-14 h-14 rounded-2xl bg-violet-50 flex items-center justify-center mb-4">
+            <BookOpen className="w-7 h-7 text-violet-400" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2" style={JAKARTA_FONT}>
+            No knowledge base entries
+          </h2>
+          <p className="text-sm text-gray-500 text-center max-w-xs mb-6">
+            Add your first entry to help your chatbot answer questions accurately.
           </p>
           <button
             type="button"
             onClick={openAdd}
-            className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-indigo-700 transition-colors"
+            className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm ${primaryButtonClasses}`}
           >
-            + Add Your First Entry
+            <Plus size={16} />
+            Add Entry
           </button>
         </div>
       ) : (
-        <div className="mt-6">
+        <div className="flex flex-col gap-3 mt-6">
           {entries.map((entry) => (
             <div
               key={entry.entryId}
-              className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow mb-4"
+              className="bg-white rounded-2xl border border-black/5 p-5 hover:shadow-md transition-all duration-200 flex items-start justify-between gap-4"
             >
-              <div className="flex items-center gap-3">
-                <BookOpen size={18} className="text-indigo-500 shrink-0" />
-                <h3 className="font-semibold text-slate-800 flex-1">{entry.title}</h3>
+              <div className="flex items-start gap-4 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center shrink-0">
+                  <BookOpen className="w-5 h-5 text-violet-500" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-gray-900 text-sm mb-1">{entry.title}</h3>
+                  <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed">
+                    {entry.content.length > PREVIEW_LENGTH
+                      ? `${entry.content.slice(0, PREVIEW_LENGTH)}...`
+                      : entry.content}
+                  </p>
+                  <div className="flex items-center gap-1 mt-2 text-gray-400 text-xs">
+                    <Calendar size={12} />
+                    Added {formatRelativeDate(new Date(entry.createdAt))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0">
                 <button
                   type="button"
                   onClick={() => openEdit(entry)}
                   title="Edit entry"
-                  className="text-slate-400 hover:text-indigo-600 transition-colors"
+                  className="text-gray-400 hover:text-violet-600 transition-colors p-2 rounded-lg hover:bg-gray-50"
                 >
                   <Pencil size={16} />
                 </button>
@@ -310,21 +337,10 @@ export default function KnowledgeBasePage() {
                     setShowDeleteModal(true)
                   }}
                   title="Delete entry"
-                  className="text-slate-400 hover:text-red-500 transition-colors"
+                  className="text-gray-400 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-gray-50"
                 >
                   <Trash2 size={16} />
                 </button>
-              </div>
-
-              <p className="text-slate-600 text-sm mt-2 line-clamp-2">
-                {entry.content.length > PREVIEW_LENGTH
-                  ? `${entry.content.slice(0, PREVIEW_LENGTH)}...`
-                  : entry.content}
-              </p>
-
-              <div className="flex items-center gap-1 mt-3 text-slate-400 text-xs">
-                <Calendar size={12} />
-                Added {formatRelativeDate(new Date(entry.createdAt))}
               </div>
             </div>
           ))}
@@ -358,19 +374,21 @@ export default function KnowledgeBasePage() {
       )}
 
       {showDeleteModal && entryToDelete && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <AlertTriangle className="text-red-500 mx-auto" size={32} />
-            <h2 className="text-xl font-bold text-slate-800 text-center mt-3">Delete this entry?</h2>
-            <p className="text-slate-500 text-sm text-center mt-2">
-              This will permanently remove this knowledge base entry from your chatbot.
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl shadow-black/8 border border-gray-100 p-6 max-w-sm w-full">
+            <AlertTriangle className="text-red-500 mx-auto w-10 h-10 mb-3" />
+            <h2 className="text-lg font-bold text-gray-900 text-center" style={JAKARTA_FONT}>
+              Delete this entry?
+            </h2>
+            <p className="text-sm text-gray-500 text-center mt-1">
+              This action cannot be undone.
             </p>
-            <div className="flex items-center justify-center gap-3 mt-6">
+            <div className="flex gap-3 mt-6">
               <button
                 type="button"
                 onClick={() => setShowDeleteModal(false)}
                 disabled={saving}
-                className="border border-slate-200 text-slate-600 px-4 py-2 rounded-xl text-sm hover:bg-slate-50 transition-colors disabled:opacity-50"
+                className={`flex-1 px-4 py-2.5 text-sm ${secondaryButtonClasses}`}
               >
                 Cancel
               </button>
@@ -378,7 +396,7 @@ export default function KnowledgeBasePage() {
                 type="button"
                 onClick={handleDelete}
                 disabled={saving}
-                className="bg-red-500 text-white px-4 py-2 rounded-xl text-sm hover:bg-red-600 transition-colors disabled:opacity-50"
+                className={`flex-1 px-4 py-2.5 text-sm ${dangerButtonClasses}`}
               >
                 {saving ? 'Deleting...' : 'Delete'}
               </button>
