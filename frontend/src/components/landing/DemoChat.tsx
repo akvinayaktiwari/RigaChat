@@ -10,7 +10,7 @@ const FALLBACK_GREETING = "Hi! I'm here to help. Ask me anything about VyostraAI
 const SUGGESTED_QUESTIONS = [
   'What is VyostraAI?',
   'How does pricing work?',
-  'How do I set up a chatbot?',
+  'How do I set up an AI agent?',
   'Does it work with WhatsApp?',
 ]
 

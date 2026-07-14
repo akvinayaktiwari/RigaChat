@@ -229,7 +229,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                       className="mt-6 px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90 transition-all"
                       id="view-active-chat-btn"
                     >
-                      Watch Chat Bot In Action
+                      Watch AI Agent In Action
                     </button>
                   </div>
                 )}

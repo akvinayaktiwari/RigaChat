@@ -36,7 +36,7 @@ export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
             className="text-5xl sm:text-6xl font-extrabold text-gray-900 leading-[1.1] tracking-tight mb-6"
             style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
           >
-            Deploy AI chatbots your customers{' '}
+            Deploy AI agents your customers{' '}
             <span className="bg-linear-to-r from-violet-600 to-purple-500 bg-clip-text text-transparent">
               love to talk to.
             </span>
