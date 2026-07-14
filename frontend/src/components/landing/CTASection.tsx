@@ -20,7 +20,7 @@ export default function CTASection() {
               className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight mb-5"
               style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
             >
-              Your AI chatbot is <br className="hidden sm:block" />
+              Your AI agent is <br className="hidden sm:block" />
               3 minutes away.
             </h2>
 

@@ -3,19 +3,19 @@ const STEPS = [
     step: '01',
     title: 'Create your bot',
     description:
-      'Add your website URL. Our AI crawler visits every page, extracts content, and builds your chatbot’s knowledge base in minutes.',
+      'Add your website URL. Our AI crawler visits every page, extracts content, and builds your AI agent’s knowledge base in minutes.',
   },
   {
     step: '02',
     title: 'Configure & embed',
     description:
-      'Customize your chatbot’s appearance, set up lead capture fields, and embed with one line of code. Connect WhatsApp or your CRM in one click.',
+      'Customize your AI agent’s appearance, set up lead capture fields, and embed with one line of code. Connect WhatsApp or your CRM in one click.',
   },
   {
     step: '03',
     title: 'Go live and capture leads',
     description:
-      'Your chatbot answers questions 24/7, captures leads automatically, and syncs everything to your CRM dashboard in real time.',
+      'Your AI agent answers questions 24/7, captures leads automatically, and syncs everything to your CRM dashboard in real time.',
   },
 ]
 

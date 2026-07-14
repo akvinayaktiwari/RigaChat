@@ -4,7 +4,7 @@ import { Star } from 'lucide-react'
 const TESTIMONIALS = [
   {
     quote:
-      'We set up the chatbot in under 5 minutes. It now handles 70% of our after-hours inquiries and the leads go straight into our CRM.',
+      'We set up the AI agent in under 5 minutes. It now handles 70% of our after-hours inquiries and the leads go straight into our CRM.',
     author: 'Rahul M.',
     role: 'Real Estate Developer, Bengaluru',
     avatar: 'RM',
@@ -12,7 +12,7 @@ const TESTIMONIALS = [
   },
   {
     quote:
-      'The Zoho integration alone saved us 2 hours a day. Leads from the chatbot sync automatically — no manual entry.',
+      'The Zoho integration alone saved us 2 hours a day. Leads from the AI agent sync automatically — no manual entry.',
     author: 'Priya S.',
     role: 'Marketing Head, EdTech Startup',
     avatar: 'PS',
