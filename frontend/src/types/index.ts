@@ -16,6 +16,8 @@ export interface ChannelContext {
   channel: 'web_widget'
 }
 
+export type BotStatus = 'active' | 'processing' | 'crawl_failed' | 'kb_only'
+
 export interface BotConfig {
   botId: string
   clientId: string
@@ -27,6 +29,8 @@ export interface BotConfig {
   leadFormFields: LeadFormField[]
   widgetTrigger: 'immediate' | 'delay_5s' | 'scroll_50' | 'exit_intent'
   supportEmail?: string
+  status?: BotStatus
+  crawlError?: string
   createdAt: string
   updatedAt: string
 }

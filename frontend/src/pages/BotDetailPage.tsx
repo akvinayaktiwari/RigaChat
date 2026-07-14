@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Check, Code, Copy, Loader2, RefreshCw, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, BookOpen, Check, Code, Copy, Loader2, RefreshCw, Trash2 } from 'lucide-react'
 import { confirmBotIndexing, deleteBot, getBotById, getBotIndexingStatus, startBotIndexing, updateBot } from '../services/api'
 import type { BotConfig, IndexingJob } from '../types/index'
 
@@ -79,6 +79,7 @@ export default function BotDetailPage() {
     null
   )
   const pollingRef = useRef<number | null>(null)
+  const websiteUrlInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     return () => {
@@ -104,6 +105,7 @@ export default function BotDetailPage() {
       const trimmedSupportEmail = (bot.supportEmail ?? '').trim()
       const res = await updateBot(botId, {
         name: bot.name,
+        websiteUrl: (bot.websiteUrl ?? '').trim(),
         greetingMessage: bot.greetingMessage,
         brandColor: bot.brandColor,
         widgetTrigger: bot.widgetTrigger,
@@ -238,6 +240,61 @@ export default function BotDetailPage() {
         <p className="text-slate-500 text-sm">Bot Settings</p>
       </div>
 
+      {bot.status === 'crawl_failed' && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6 mt-6">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="text-amber-500 w-5 h-5" />
+            <p className="font-semibold text-amber-800">We couldn&apos;t read your website</p>
+          </div>
+          <p className="text-sm text-amber-700 mt-1">{bot.crawlError}</p>
+          <div className="flex items-center gap-3 mt-4">
+            <button
+              type="button"
+              onClick={() => navigate(`/dashboard/kb/${botId}`)}
+              className="bg-amber-500 text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-amber-600 transition-colors"
+            >
+              Add Knowledge Base entries
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                websiteUrlInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                websiteUrlInputRef.current?.focus()
+              }}
+              className="border border-amber-300 text-amber-700 rounded-xl px-4 py-2 text-sm hover:bg-amber-100 transition-colors"
+            >
+              Try a different URL
+            </button>
+          </div>
+        </div>
+      )}
+
+      {bot.status === 'kb_only' && (
+        <div className="bg-violet-50 border border-violet-100 rounded-2xl p-5 mb-6 mt-6">
+          <div className="flex items-center gap-2">
+            <BookOpen className="text-violet-500 w-5 h-5" />
+            <p className="font-semibold text-violet-800">Knowledge Base mode</p>
+          </div>
+          <p className="text-sm text-violet-700 mt-1">
+            This bot is trained on Knowledge Base entries only. Add or edit entries to improve responses.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate(`/dashboard/kb/${botId}`)}
+            className="bg-violet-600 text-white rounded-xl px-4 py-2 text-sm font-semibold mt-4 hover:bg-violet-700 transition-colors"
+          >
+            Manage Knowledge Base
+          </button>
+        </div>
+      )}
+
+      {bot.status === 'processing' && (
+        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 mb-6 mt-6 flex items-center gap-3">
+          <Loader2 className="animate-spin text-blue-500 w-5 h-5" />
+          <p className="text-sm text-blue-700">Your website is being indexed. This usually takes 1-2 minutes.</p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
         <div className="lg:col-span-3 space-y-6">
           <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
@@ -252,6 +309,21 @@ export default function BotDetailPage() {
                   onChange={(e) => setBot({ ...bot, name: e.target.value })}
                   className={inputClasses}
                 />
+              </div>
+
+              <div>
+                <label className={labelClasses}>Website URL</label>
+                <input
+                  ref={websiteUrlInputRef}
+                  type="url"
+                  value={bot.websiteUrl ?? ''}
+                  onChange={(e) => setBot({ ...bot, websiteUrl: e.target.value })}
+                  placeholder="https://yourwebsite.com"
+                  className={inputClasses}
+                />
+                <p className="mt-1.5 text-xs text-gray-400">
+                  (Optional — leave empty to use Knowledge Base only)
+                </p>
               </div>
 
               <div>
