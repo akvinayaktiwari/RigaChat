@@ -17,7 +17,7 @@ export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
   const navigate = useNavigate()
 
   return (
-    <section className="relative min-h-screen flex items-center pt-20 pb-12 sm:pt-24 sm:pb-16 px-4">
+    <section className="relative flex items-center pt-28 pb-16 px-4">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-32 left-1/4 w-96 h-96 bg-violet-200/30 rounded-full blur-3xl" />
         <div className="absolute top-48 right-1/4 w-80 h-80 bg-pink-200/25 rounded-full blur-3xl" />
