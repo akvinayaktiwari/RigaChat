@@ -107,11 +107,11 @@ export default function DemoChat() {
   const [isLoading, setIsLoading] = useState(false)
   const [showChips, setShowChips] = useState(true)
   const [inputValue, setInputValue] = useState('')
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, isLoading])
+    messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight, behavior: 'smooth' })
+  }, [messages])
 
   useEffect(() => {
     initConversation()
@@ -175,13 +175,13 @@ export default function DemoChat() {
   const initials = BOT_NAME.trim().slice(0, 2).toUpperCase()
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full max-w-md mx-auto lg:mx-0 lg:ml-auto">
       <div className="absolute -top-8 -right-8 w-56 h-56 bg-violet-300/25 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-8 -left-8 w-44 h-44 bg-pink-300/20 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute top-16 -left-4 w-32 h-32 bg-sky-300/15 rounded-full blur-2xl pointer-events-none" />
 
-      <div className="relative bg-white/75 backdrop-blur-2xl border border-white/80 rounded-2xl shadow-2xl shadow-violet-100/60 overflow-hidden w-full min-h-[480px] max-h-[600px] flex flex-col">
-        <div className="bg-linear-to-r from-violet-600 to-purple-500 px-5 py-4 flex items-center gap-3">
+      <div className="relative bg-white/75 backdrop-blur-2xl border border-white/80 rounded-2xl shadow-2xl shadow-violet-100/60 overflow-hidden w-full h-130 max-h-140 flex flex-col">
+        <div className="shrink-0 bg-linear-to-r from-violet-600 to-purple-500 px-5 py-4 flex items-center gap-3">
           <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center shrink-0 text-white font-bold text-sm">
             {initials || <Bot className="w-4.5 h-4.5 text-white" />}
           </div>
@@ -212,16 +212,18 @@ export default function DemoChat() {
           </div>
         </div>
 
-        <div className="demo-chat-scrollbar flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3 bg-linear-to-b from-white/60 to-white/80">
+        <div
+          ref={messagesRef}
+          className="demo-chat-scrollbar h-64 sm:h-72 shrink-0 overflow-y-auto px-4 py-4 flex flex-col gap-3 bg-linear-to-b from-white/60 to-white/80"
+        >
           {messages.map((message, index) => (
             <MessageBubble key={index} message={message} />
           ))}
           {isLoading && <TypingIndicator />}
-          <div ref={messagesEndRef} />
         </div>
 
         {showChips && (
-          <div className="px-4 pb-3 flex flex-wrap gap-2">
+          <div className="shrink-0 px-4 pb-3 flex flex-wrap gap-2">
             {SUGGESTED_QUESTIONS.map((question) => (
               <button
                 key={question}
@@ -235,7 +237,7 @@ export default function DemoChat() {
           </div>
         )}
 
-        <div className="px-4 pb-4 pt-2 bg-white/80 border-t border-black/[0.06]">
+        <div className="shrink-0 px-4 pb-4 pt-2 bg-white/80 border-t border-black/[0.06]">
           <div className="flex items-center gap-2 bg-gray-50/90 rounded-xl px-3.5 py-2.5 border border-gray-100 shadow-inner">
             <input
               type="text"
