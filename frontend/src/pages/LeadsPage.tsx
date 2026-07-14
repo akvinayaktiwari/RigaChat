@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
+import type { ComponentProps } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Download, Search, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, Mail, Phone, Search, Users } from 'lucide-react'
 import { getAllLeads, getMyBots } from '../services/api'
 import type { BotConfig, Lead } from '../types/index'
 
+const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 const PAGE_SIZE = 10
 
 function formatRelativeDate(date: Date): string {
@@ -34,19 +36,35 @@ function csvEscape(value: string): string {
 
 function TableSkeleton() {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 mt-4 overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-sm border border-black/5 mt-4 overflow-hidden">
       <div className="p-4 space-y-4">
         {[0, 1, 2, 3, 4].map((i) => (
           <div key={i} className="animate-pulse grid grid-cols-5 gap-4">
-            <div className="h-4 bg-slate-100 rounded" />
-            <div className="h-4 bg-slate-100 rounded" />
-            <div className="h-4 bg-slate-100 rounded" />
-            <div className="h-4 bg-slate-100 rounded" />
-            <div className="h-4 bg-slate-100 rounded" />
+            <div className="h-4 bg-gray-100 rounded" />
+            <div className="h-4 bg-gray-100 rounded" />
+            <div className="h-4 bg-gray-100 rounded" />
+            <div className="h-4 bg-gray-100 rounded" />
+            <div className="h-4 bg-gray-100 rounded" />
           </div>
         ))}
       </div>
     </div>
+  )
+}
+
+function PaginationButton({ active, children, ...rest }: { active?: boolean } & ComponentProps<'button'>) {
+  return (
+    <button
+      type="button"
+      className={`w-9 h-9 rounded-lg text-sm transition-colors ${
+        active
+          ? 'bg-violet-600 text-white'
+          : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white'
+      }`}
+      {...rest}
+    >
+      {children}
+    </button>
   )
 }
 
@@ -95,14 +113,6 @@ export default function LeadsPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paginatedLeads = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
-  const weekAgo = new Date()
-  weekAgo.setDate(weekAgo.getDate() - 7)
-  const thisWeekCount = leads.filter((l) => new Date(l.createdAt) >= weekAgo).length
-
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const todayCount = leads.filter((l) => new Date(l.createdAt) >= today).length
-
   function handleExportCsv() {
     const headers = ['Name', 'Email', 'Phone', 'Bot', 'Date', 'Status']
     const rows = filtered.map((lead) =>
@@ -123,7 +133,7 @@ export default function LeadsPage() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'beepboop-leads.csv'
+    a.download = 'vyostra-leads.csv'
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -131,22 +141,27 @@ export default function LeadsPage() {
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h1 className="font-bold text-2xl text-slate-800">Leads</h1>
+        <div>
+          <h1 className="font-extrabold text-2xl text-gray-900" style={JAKARTA_FONT}>
+            Leads
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">All captured leads from your bots</p>
+        </div>
         <button
           type="button"
           onClick={handleExportCsv}
-          className="border border-slate-200 text-slate-600 px-4 py-2 rounded-xl text-sm flex items-center gap-2 hover:bg-slate-50 transition-colors"
+          className="bg-white text-gray-700 font-medium px-4 py-2.5 rounded-xl text-sm border border-gray-200 hover:bg-gray-50 transition-colors flex items-center gap-2"
         >
           <Download size={16} />
           Export CSV
         </button>
       </div>
 
-      <div className="flex items-center gap-3 mt-4">
+      <div className="bg-white rounded-2xl border border-black/5 p-4 mt-6 shadow-sm flex gap-3 items-center flex-wrap">
         <select
           value={selectedBotId}
           onChange={(e) => setSelectedBotId(e.target.value)}
-          className="border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-600 bg-white cursor-pointer"
+          className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 bg-white cursor-pointer min-w-48 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors"
         >
           <option value="all">All Chatbots</option>
           {bots.map((bot) => (
@@ -157,32 +172,14 @@ export default function LeadsPage() {
         </select>
 
         <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by name or email..."
-            className="border border-slate-200 rounded-xl px-4 py-2 pl-9 text-sm w-64 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-sm w-64 bg-white outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors"
           />
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3 mt-4">
-        <div className="bg-white border border-slate-100 rounded-xl px-4 py-2 text-sm">
-          <span className="text-slate-500">Total: </span>
-          <span className="font-bold text-indigo-600">{leads.length}</span>
-          <span className="text-slate-500"> leads</span>
-        </div>
-        <div className="bg-white border border-slate-100 rounded-xl px-4 py-2 text-sm">
-          <span className="text-slate-500">This week: </span>
-          <span className="font-bold text-indigo-600">{thisWeekCount}</span>
-          <span className="text-slate-500"> leads</span>
-        </div>
-        <div className="bg-white border border-slate-100 rounded-xl px-4 py-2 text-sm">
-          <span className="text-slate-500">Today: </span>
-          <span className="font-bold text-indigo-600">{todayCount}</span>
-          <span className="text-slate-500"> leads</span>
         </div>
       </div>
 
@@ -190,21 +187,22 @@ export default function LeadsPage() {
         <TableSkeleton />
       ) : filtered.length === 0 ? (
         <div className="py-16 flex flex-col items-center text-center">
-          <Users size={48} className="text-slate-300 mb-4" />
-          <p className="text-slate-800 font-medium">No leads yet</p>
-          <p className="text-slate-500 text-sm mt-1">Leads captured by your chatbots will appear here</p>
+          <Users size={48} className="text-violet-300 mb-4" />
+          <p className="font-bold text-xl text-gray-900" style={JAKARTA_FONT}>
+            No leads yet
+          </p>
+          <p className="text-sm text-gray-500 mt-2">Leads captured by your chatbots will appear here</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 mt-4 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-black/5 shadow-sm mt-6 overflow-hidden">
           <table className="w-full border-collapse">
             <thead>
-              <tr className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
-                <th className="text-left px-4 py-3 font-medium">Contact</th>
-                <th className="text-left px-4 py-3 font-medium">Phone</th>
-                <th className="text-left px-4 py-3 font-medium">Bot</th>
-                <th className="text-left px-4 py-3 font-medium">Date</th>
-                <th className="text-left px-4 py-3 font-medium">Status</th>
-                <th className="text-left px-4 py-3 font-medium">Actions</th>
+              <tr className="bg-gray-50/80 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <th className="text-left px-6 py-3.5 font-semibold">Name</th>
+                <th className="text-left px-6 py-3.5 font-semibold">Contact</th>
+                <th className="text-left px-6 py-3.5 font-semibold">Bot</th>
+                <th className="text-left px-6 py-3.5 font-semibold">Date</th>
+                <th className="text-left px-6 py-3.5 font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -212,41 +210,40 @@ export default function LeadsPage() {
                 <tr
                   key={lead.leadId}
                   onClick={() => navigate(`/dashboard/leads/${lead.leadId}?botId=${lead.botId}`)}
-                  className="border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors"
+                  className="border-b border-gray-50 hover:bg-violet-50/20 cursor-pointer transition-colors"
                 >
-                  <td className="px-4 py-3">
+                  <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-700 shrink-0">
+                      <div className="w-9 h-9 rounded-full bg-violet-100 flex items-center justify-center text-xs font-bold text-violet-700 shrink-0">
                         {getInitials(lead.name)}
                       </div>
-                      <div>
-                        <p className="font-medium text-slate-900">{lead.name}</p>
-                        <p className="text-xs text-slate-500">{lead.email}</p>
-                      </div>
+                      <span className="font-semibold text-gray-900 text-sm">{lead.name}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-slate-600 text-sm">{lead.phone}</td>
-                  <td className="px-4 py-3">
-                    <span className="bg-indigo-50 text-indigo-600 text-xs px-2 py-1 rounded-full">
+                  <td className="px-6 py-4 text-sm text-gray-500">
+                    <div className="flex items-center gap-1.5">
+                      <Phone size={12} className="text-gray-400 shrink-0" />
+                      {lead.phone}
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <Mail size={12} className="text-gray-400 shrink-0" />
+                      {lead.email}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="inline-flex bg-violet-50 text-violet-700 border border-violet-200 text-xs font-medium px-2.5 py-1 rounded-full">
                       {getBotName(lead.botId)}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-slate-400 text-sm">
-                    {formatRelativeDate(new Date(lead.createdAt))}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                      New
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
+                  <td className="px-6 py-4 text-xs text-gray-400">{formatRelativeDate(new Date(lead.createdAt))}</td>
+                  <td className="px-6 py-4">
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation()
                         navigate(`/dashboard/leads/${lead.leadId}?botId=${lead.botId}`)
                       }}
-                      className="text-indigo-600 text-sm hover:underline"
+                      className="text-gray-600 font-medium px-3 py-1.5 rounded-xl text-xs hover:bg-gray-100 transition-colors"
                     >
                       View
                     </button>
@@ -256,30 +253,26 @@ export default function LeadsPage() {
             </tbody>
           </table>
 
-          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
-            <p className="text-sm text-slate-500">
+          <div className="flex items-center justify-between px-6 py-3.5 border-t border-gray-50">
+            <p className="text-sm text-gray-500">
               Showing {(currentPage - 1) * PAGE_SIZE + 1} to{' '}
               {Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length} leads
             </p>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
-              >
-                <ChevronLeft size={14} />
-                Previous
-              </button>
-              <button
-                type="button"
+            <div className="flex items-center gap-1">
+              <PaginationButton onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>
+                <ChevronLeft size={14} className="mx-auto" />
+              </PaginationButton>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <PaginationButton key={page} active={page === currentPage} onClick={() => setCurrentPage(page)}>
+                  {page}
+                </PaginationButton>
+              ))}
+              <PaginationButton
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
               >
-                Next
-                <ChevronRight size={14} />
-              </button>
+                <ChevronRight size={14} className="mx-auto" />
+              </PaginationButton>
             </div>
           </div>
         </div>
