@@ -226,7 +226,7 @@ export default function DemoChat() {
         </div>
 
         <div
-          className={`shrink-0 px-4 flex flex-wrap gap-2 transition-all duration-300 ${
+          className={`shrink-0 px-4 flex flex-wrap gap-2 transition-all duration-300 ease-in-out ${
             showChips ? 'opacity-100 max-h-24 pb-3' : 'opacity-0 max-h-0 pb-0 overflow-hidden pointer-events-none'
           }`}
         >
