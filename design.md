@@ -508,3 +508,331 @@ frontend/src/styles/ (already exists)
 9. Mobile responsive — all grids collapse correctly
 10. shadow values must be exact (shadow-black/[0.06] not shadow-md)
 ```
+
+---
+
+## Dashboard Design System
+
+Source: VyostraAI dashboard redesign
+Applies to: All 9 dashboard pages + auth pages
+Design principle: Match landing page aesthetic
+
+---
+
+### Dashboard Colors
+
+```
+Primary:     #7c3aed (violet-600)
+Gradient:    from-violet-600 to-purple-500
+Page bg:     #ffffff
+Sidebar bg:  #fafafa (gray-50)
+Surface:     #ffffff (cards)
+Muted bg:    #f8f8fc
+Border:      rgba(0,0,0,0.07)
+Success:     #10b981 (emerald-500)
+Warning:     #f59e0b (amber-500)
+Danger:      #ef4444 (red-500)
+```
+
+---
+
+### Dashboard Typography
+
+```
+Page headings:   Plus Jakarta Sans
+                 font-extrabold text-gray-900
+Section headings: Plus Jakarta Sans
+                  font-bold text-gray-900
+Labels/body:     Inter (existing)
+Table headers:   Inter text-xs uppercase
+                 tracking-wider text-gray-500
+```
+
+---
+
+### Sidebar
+
+```
+Width:      w-64 (256px) desktop
+            hidden on mobile (drawer)
+Background: bg-white border-r border-gray-100
+
+Logo section:
+  Icon: MessageSquare w-8 h-8
+        bg-gradient-to-br from-violet-600
+        to-purple-500 rounded-xl
+        shadow-md shadow-violet-200
+  Text: "VyostraAI" font-bold text-lg
+        Plus Jakarta Sans text-gray-900
+
+Nav items:
+  Default: text-sm text-gray-600
+           font-medium px-3 py-2.5
+           rounded-xl gap-3
+           hover:bg-gray-50
+           hover:text-gray-900
+           transition-all duration-150
+
+  Active:  bg-violet-50 text-violet-700
+           font-semibold
+           border-l-0 (no left border)
+
+  Icons:   lucide-react w-4.5 h-4.5
+           text-gray-400 (default)
+           text-violet-600 (active)
+
+Bottom section:
+  User avatar: w-8 h-8 rounded-full
+               bg-gradient-to-br
+               from-violet-600 to-purple-500
+               text-white text-xs font-bold
+  User name: text-sm font-medium text-gray-900
+  User email: text-xs text-gray-500
+```
+
+---
+
+### Top Navbar
+
+```
+Height:     h-16
+Background: bg-white border-b border-gray-100
+            shadow-sm
+Content:    Page title (Plus Jakarta Sans
+            font-bold text-xl text-gray-900)
+            + right side actions
+```
+
+---
+
+### Cards
+
+```
+Base card:
+  bg-white rounded-2xl
+  border border-black/[0.05]
+  shadow-sm
+  hover:shadow-md
+  transition-all duration-200
+
+Raised card (modals/featured):
+  bg-white rounded-2xl
+  border border-gray-100
+  shadow-lg shadow-black/[0.06]
+```
+
+---
+
+### Stat Cards
+
+```
+Container: bg-white rounded-2xl p-6
+           border border-black/[0.05]
+           shadow-sm
+
+Icon container: w-12 h-12 rounded-xl
+  bg-gradient-to-br from-violet-600
+  to-purple-500 (primary stat)
+  OR bg-emerald-50 (success stat)
+  OR bg-amber-50 (warning stat)
+  flex items-center justify-center
+
+Icon: w-6 h-6 text-white (on gradient)
+      OR text-emerald-600 (on light)
+
+Value: text-3xl font-extrabold text-gray-900
+       Plus Jakarta Sans mb-1
+
+Label: text-sm text-gray-500 font-medium
+
+Trend: text-xs font-semibold mt-1
+       text-emerald-600 (positive)
+       text-red-500 (negative)
+```
+
+---
+
+### Buttons
+
+```
+Primary:
+  bg-gradient-to-r from-violet-600
+  to-purple-500 text-white font-semibold
+  px-4 py-2.5 rounded-xl text-sm
+  shadow-md shadow-violet-200/50
+  hover:opacity-90 transition-opacity
+
+Secondary:
+  bg-white text-gray-700 font-medium
+  px-4 py-2.5 rounded-xl text-sm
+  border border-gray-200
+  hover:bg-gray-50 transition-colors
+
+Danger:
+  bg-red-500 text-white font-semibold
+  px-4 py-2.5 rounded-xl text-sm
+  hover:bg-red-600 transition-colors
+
+Ghost:
+  text-gray-600 font-medium px-3 py-2
+  rounded-xl text-sm
+  hover:bg-gray-100 transition-colors
+```
+
+---
+
+### Tables
+
+```
+Wrapper: bg-white rounded-2xl
+         border border-black/[0.05]
+         overflow-hidden shadow-sm
+
+Header row:
+  bg-gray-50/80
+  text-xs font-semibold uppercase
+  tracking-wider text-gray-500
+  px-6 py-3.5
+
+Data rows:
+  border-b border-gray-50
+  hover:bg-violet-50/20
+  transition-colors duration-100
+  px-6 py-4 text-sm text-gray-700
+```
+
+---
+
+### Badges
+
+```
+Active/Live:
+  bg-emerald-50 text-emerald-700
+  border border-emerald-200
+  text-xs font-semibold px-2.5 py-1
+  rounded-full
+
+Processing:
+  bg-violet-50 text-violet-700
+  border border-violet-200
+  text-xs font-semibold px-2.5 py-1
+  rounded-full
+
+Failed/Error:
+  bg-red-50 text-red-700
+  border border-red-200
+  text-xs font-semibold px-2.5 py-1
+  rounded-full
+
+New (leads):
+  bg-blue-50 text-blue-700
+  border border-blue-200
+  text-xs font-semibold px-2.5 py-1
+  rounded-full
+```
+
+---
+
+### Form Inputs
+
+```
+Input/Select/Textarea:
+  border border-gray-200 rounded-xl
+  px-4 py-2.5 text-sm text-gray-700
+  bg-white outline-none
+  focus:border-violet-400
+  focus:ring-2 focus:ring-violet-100
+  transition-colors
+
+Label:
+  text-sm font-medium text-gray-700 mb-1.5
+
+Helper text:
+  text-xs text-gray-400 mt-1
+
+Error text:
+  text-xs text-red-500 mt-1
+```
+
+---
+
+### Modals
+
+```
+Overlay: bg-black/40 backdrop-blur-sm
+         fixed inset-0 z-50
+
+Container: bg-white rounded-2xl
+           shadow-2xl shadow-black/[0.08]
+           border border-gray-100
+           max-w-lg w-full mx-4
+           p-6
+
+Header: font-bold text-xl text-gray-900
+        Plus Jakarta Sans mb-4
+```
+
+---
+
+### Empty States
+
+```
+Container: flex flex-col items-center
+           justify-center py-16 px-4
+
+Icon: w-14 h-14 rounded-2xl
+      bg-violet-50 flex items-center
+      justify-center mb-4
+      Icon: w-7 h-7 text-violet-400
+
+Heading: text-xl font-bold text-gray-900
+         Plus Jakarta Sans mb-2
+
+Subtext: text-sm text-gray-500
+         text-center max-w-xs mb-6
+
+CTA: Primary button (see buttons above)
+```
+
+---
+
+### Page Layout
+
+```
+Each dashboard page:
+  Padding: p-6 sm:p-8
+  Max width: max-w-7xl mx-auto
+
+  Page header row:
+    flex items-center justify-between mb-8
+    Left: page title + subtitle
+    Right: primary action button
+
+  Title: text-2xl font-extrabold text-gray-900
+         Plus Jakarta Sans
+  Subtitle: text-sm text-gray-500 mt-1
+```
+
+---
+
+### Critical Rules
+
+```
+1. Plus Jakarta Sans for ALL headings,
+   page titles, stat values, modal titles
+   Use style={{ fontFamily: "'Plus Jakarta
+   Sans', sans-serif" }} on these elements
+
+2. Every primary button uses the violet
+   gradient — never solid violet bg alone
+
+3. All cards use rounded-2xl not rounded-lg
+
+4. Hover states on all interactive elements
+
+5. No hardcoded hex colors — use Tailwind
+   classes mapped to DESIGN.md values
+
+6. Mobile responsive — sidebar hidden on
+   mobile, all grids collapse correctly
+```
