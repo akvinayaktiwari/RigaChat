@@ -28,7 +28,7 @@ function isValidUrl(url: string): boolean {
 interface CreateBotInput {
   clientId: string
   name: string
-  websiteUrl: string
+  websiteUrl?: string
   greetingMessage: string
   brandColor: string
   widgetTrigger: BotConfig['widgetTrigger']
@@ -38,8 +38,8 @@ interface CreateBotInput {
 
 interface SetupBotResult {
   bot: BotConfig
-  status: 'confirmation_required' | 'queued'
-  jobId: string
+  status: 'confirmation_required' | 'queued' | 'kb_only'
+  jobId?: string
   totalPages: number
   selectedPages?: number
 }
@@ -56,8 +56,53 @@ async function safeDeleteBot(botId: string, clientId: string): Promise<void> {
   }
 }
 
+async function crawlAndEnqueueOnSetup(
+  botId: string,
+  clientId: string,
+  websiteUrl: string,
+  botName: string
+): Promise<Omit<SetupBotResult, 'bot'>> {
+  let scan
+  try {
+    scan = await scanWebsite(websiteUrl)
+  } catch (error) {
+    await safeDeleteBot(botId, clientId)
+    console.error(`Website scan failed during setup for bot ${botId}:`, error)
+    throw new Error('SCAN_FAILED')
+  }
+
+  const jobId = uuidv4()
+  const selectedPages = scan.requiresConfirmation ? MAX_AUTO_QUEUE_PAGES : scan.selectedPages.length
+
+  await updateIndexingJob(botId, clientId, {
+    jobId,
+    status: scan.requiresConfirmation ? 'confirmation_required' : 'queued',
+    websiteUrl,
+    totalPages: scan.totalPages,
+    selectedPages,
+    crawledPages: 0,
+    totalChunks: 0,
+    queuedAt: new Date().toISOString(),
+  })
+
+  if (scan.requiresConfirmation) {
+    return { status: 'confirmation_required', jobId, totalPages: scan.totalPages, selectedPages }
+  }
+
+  try {
+    await enqueueCrawlerJob({ jobId, botId, clientId, urls: scan.selectedPages, useAICleaning: true, botName })
+  } catch (error) {
+    await safeDeleteBot(botId, clientId)
+    console.error(`Failed to enqueue crawler job during setup for bot ${botId}:`, error)
+    throw new Error('ENQUEUE_FAILED')
+  }
+
+  return { status: 'queued', jobId, totalPages: scan.totalPages }
+}
+
 export async function setupBot(input: CreateBotInput): Promise<SetupBotResult> {
   const botId = uuidv4()
+  const hasWebsite = !!input.websiteUrl
 
   const bot = await createBot({
     botId,
@@ -69,71 +114,15 @@ export async function setupBot(input: CreateBotInput): Promise<SetupBotResult> {
     leadTriggerAfterMessages: input.leadTriggerAfterMessages,
     leadFormFields: input.leadFormFields,
     widgetTrigger: input.widgetTrigger,
+    status: hasWebsite ? 'processing' : 'kb_only',
   })
 
-  let scan
-  try {
-    scan = await scanWebsite(input.websiteUrl)
-  } catch (error) {
-    await safeDeleteBot(botId, input.clientId)
-    console.error(`Website scan failed during setup for bot ${botId}:`, error)
-    throw new Error('SCAN_FAILED')
+  if (!hasWebsite) {
+    return { bot, status: 'kb_only', totalPages: 0 }
   }
 
-  const jobId = uuidv4()
-
-  if (scan.requiresConfirmation) {
-    await updateIndexingJob(botId, input.clientId, {
-      jobId,
-      status: 'confirmation_required',
-      websiteUrl: input.websiteUrl,
-      totalPages: scan.totalPages,
-      selectedPages: MAX_AUTO_QUEUE_PAGES,
-      crawledPages: 0,
-      totalChunks: 0,
-      queuedAt: new Date().toISOString(),
-    })
-    return {
-      bot,
-      status: 'confirmation_required',
-      jobId,
-      totalPages: scan.totalPages,
-      selectedPages: MAX_AUTO_QUEUE_PAGES,
-    }
-  }
-
-  await updateIndexingJob(botId, input.clientId, {
-    jobId,
-    status: 'queued',
-    websiteUrl: input.websiteUrl,
-    totalPages: scan.totalPages,
-    selectedPages: scan.selectedPages.length,
-    crawledPages: 0,
-    totalChunks: 0,
-    queuedAt: new Date().toISOString(),
-  })
-
-  try {
-    await enqueueCrawlerJob({
-      jobId,
-      botId,
-      clientId: input.clientId,
-      urls: scan.selectedPages,
-      useAICleaning: true,
-      botName: bot.name ?? botId,
-    })
-  } catch (error) {
-    await safeDeleteBot(botId, input.clientId)
-    console.error(`Failed to enqueue crawler job during setup for bot ${botId}:`, error)
-    throw new Error('ENQUEUE_FAILED')
-  }
-
-  return {
-    bot,
-    status: 'queued',
-    jobId,
-    totalPages: scan.totalPages,
-  }
+  const crawl = await crawlAndEnqueueOnSetup(botId, input.clientId, input.websiteUrl as string, bot.name ?? botId)
+  return { bot, ...crawl }
 }
 
 export async function getClientBots(clientId: string): Promise<BotConfig[]> {
@@ -164,6 +153,27 @@ export async function getPublicConfig(botId: string): Promise<BotConfig> {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 
+async function handleWebsiteUrlChange(
+  botId: string,
+  clientId: string,
+  bot: BotConfig,
+  updates: Partial<Omit<BotConfig, 'botId' | 'clientId' | 'createdAt'>>
+): Promise<void> {
+  const hadWebsite = !!bot.websiteUrl
+  const hasWebsite = !!updates.websiteUrl
+
+  if (!hadWebsite && hasWebsite) {
+    updates.status = 'processing'
+    try {
+      await startIndexingJob(botId, clientId, updates.websiteUrl as string)
+    } catch (error) {
+      console.error(`Failed to start indexing after websiteUrl update for bot ${botId}:`, error)
+    }
+  } else if (hadWebsite && !hasWebsite) {
+    updates.status = 'kb_only'
+  }
+}
+
 export async function updateBotConfig(
   botId: string,
   clientId: string,
@@ -172,6 +182,12 @@ export async function updateBotConfig(
   const sanitizedUpdates = { ...updates }
   if (sanitizedUpdates.supportEmail === '' || (sanitizedUpdates.supportEmail && !EMAIL_REGEX.test(sanitizedUpdates.supportEmail))) {
     delete sanitizedUpdates.supportEmail
+  }
+
+  if ('websiteUrl' in sanitizedUpdates) {
+    const bot = await getBotById(botId, clientId)
+    if (!bot) throw new Error('Bot not found')
+    await handleWebsiteUrlChange(botId, clientId, bot, sanitizedUpdates)
   }
 
   try {

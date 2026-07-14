@@ -1,6 +1,6 @@
 import { DeleteCommand, GetCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
-import type { BotConfig, IndexingJob } from '../types/index.js'
+import type { BotConfig, BotStatus, IndexingJob } from '../types/index.js'
 
 const TABLE_NAME = getTableName('bots')
 
@@ -160,6 +160,43 @@ export async function claimCrawlerJob(botId: string, clientId: string, jobId: st
     }
     console.error(`Failed to claim crawler job ${jobId} for bot ${botId}:`, error)
     return false
+  }
+}
+
+// Sparse update — crawlError is only included in the expression when provided,
+// so a status-only transition (e.g. back to 'active') doesn't overwrite it with undefined.
+export async function updateBotCrawlStatus(
+  botId: string,
+  clientId: string,
+  status: BotStatus,
+  crawlError?: string
+): Promise<void> {
+  const expressionAttributeNames: Record<string, string> = { '#status': 'status' }
+  const expressionAttributeValues: Record<string, unknown> = {
+    ':status': status,
+    ':now': new Date().toISOString(),
+  }
+  let updateExpression = 'SET #status = :status, updatedAt = :now'
+
+  if (crawlError !== undefined) {
+    updateExpression += ', crawlError = :crawlError'
+    expressionAttributeValues[':crawlError'] = crawlError
+  }
+
+  try {
+    await dynamoClient.send(
+      new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { clientId, botId },
+        UpdateExpression: updateExpression,
+        ExpressionAttributeNames: expressionAttributeNames,
+        ExpressionAttributeValues: expressionAttributeValues,
+      })
+    )
+  } catch (error) {
+    throw new Error(
+      `Failed to update crawl status for bot ${botId}: ${error instanceof Error ? error.message : String(error)}`
+    )
   }
 }
 

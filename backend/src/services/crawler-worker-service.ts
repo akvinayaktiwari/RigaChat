@@ -2,7 +2,13 @@ import { v4 as uuidv4 } from 'uuid'
 import { crawlPagesParallel, chunkWithContext, chunkFacts, extractSupportEmail } from './crawler-service.js'
 import { extractPageFacts, generateEmbeddingsBatch } from './openai-service.js'
 import { upsertChunks } from '../repositories/vector-repository.js'
-import { claimCrawlerJob, getPublicBotConfig, updateBot, updateIndexingJob } from '../repositories/bot-repository.js'
+import {
+  claimCrawlerJob,
+  getPublicBotConfig,
+  updateBot,
+  updateBotCrawlStatus,
+  updateIndexingJob,
+} from '../repositories/bot-repository.js'
 import { generateAndPrewarmSuggestions } from './suggestion-service.js'
 import type { CrawlerJobMessage } from '../lib/sqs.js'
 import type { Chunk } from '../types/index.js'
@@ -132,6 +138,18 @@ async function crawlAndChunk(job: CrawlerJobMessage): Promise<CrawlAndChunkResul
   return { chunks, pageCount: pages.length, supportEmail }
 }
 
+const NETWORK_ERROR_PATTERNS = ['ENOTFOUND', 'ECONNREFUSED', 'ETIMEDOUT', 'EAI_AGAIN', 'fetch failed']
+
+function mapCrawlErrorMessage(message: string): string {
+  if (message === 'No content could be extracted') {
+    return "We couldn't read your website automatically. It may be built with React or another JavaScript framework that requires a browser to render."
+  }
+  if (NETWORK_ERROR_PATTERNS.some((pattern) => message.includes(pattern))) {
+    return "We couldn't reach your website. Please check the URL and try again."
+  }
+  return 'Something went wrong while reading your website. Please try again or add your content via Knowledge Base.'
+}
+
 async function prewarmSuggestionsForJob(botId: string, chunks: Chunk[]): Promise<void> {
   try {
     const bot = await getPublicBotConfig(botId)
@@ -177,11 +195,11 @@ export async function processCrawlerJob(job: CrawlerJobMessage): Promise<void> {
 
     await prewarmSuggestionsForJob(job.botId, chunks)
   } catch (error) {
-    await updateIndexingJob(job.botId, job.clientId, {
-      status: 'failed',
-      error: error instanceof Error ? error.message : String(error),
-    })
+    const message = error instanceof Error ? error.message : String(error)
+    await updateIndexingJob(job.botId, job.clientId, { status: 'failed', error: message })
+    await updateBotCrawlStatus(job.botId, job.clientId, 'crawl_failed', mapCrawlErrorMessage(message))
     console.error(`Crawl job failed for bot ${job.botId}:`, error)
-    throw error
+    // Do not rethrow — SQS retries won't fix a SPA/rendering failure, so the
+    // job must complete cleanly instead of looping forever.
   }
 }

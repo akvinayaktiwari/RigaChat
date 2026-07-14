@@ -65,8 +65,8 @@ function userFacingErrorMessage(error: unknown): string {
 botRoutes.post('/setup', requireAuth, async (c) => {
   const body = await c.req.json<SetupBotBody>()
 
-  if (!body.name || !body.websiteUrl) {
-    return c.json<ApiResponse<null>>({ success: false, error: 'name and websiteUrl are required' }, 400)
+  if (!body.name) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'name is required' }, 400)
   }
 
   const clientId = c.get('user').sub

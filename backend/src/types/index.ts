@@ -16,11 +16,13 @@ export interface ChannelContext {
   channel: 'web_widget'
 }
 
+export type BotStatus = 'active' | 'processing' | 'crawl_failed' | 'kb_only'
+
 export interface BotConfig {
   botId: string
   clientId: string
   name: string
-  websiteUrl: string
+  websiteUrl?: string
   greetingMessage: string
   brandColor: string
   leadTriggerAfterMessages: number
@@ -29,6 +31,8 @@ export interface BotConfig {
   supportEmail?: string
   suggestedQuestions?: SuggestedQuestion[]
   indexingJob?: IndexingJob
+  status?: BotStatus
+  crawlError?: string
   createdAt: string
   updatedAt: string
 }
