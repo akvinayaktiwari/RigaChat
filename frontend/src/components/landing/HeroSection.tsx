@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { ArrowRight, ChevronRight, Star } from 'lucide-react'
-import ChatWidget from './ChatWidget'
+import DemoChat from './DemoChat'
 
 interface HeroSectionProps {
   onOpenDemo: () => void
@@ -87,7 +87,7 @@ export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
         </div>
 
         <div className="flex justify-center lg:justify-end mt-8 lg:mt-0">
-          <ChatWidget />
+          <DemoChat />
         </div>
       </div>
     </section>

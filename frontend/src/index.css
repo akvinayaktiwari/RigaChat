@@ -164,6 +164,39 @@ body {
   border-left: 4px solid #6366F1;
 }
 
+/* DemoChat (hero section) — thin scrollbar + typing indicator bounce,
+   scoped separately from .custom-scrollbar since that one uses the
+   dashboard's indigo palette instead of this component's gray/violet one. */
+.demo-chat-scrollbar {
+  scrollbar-width: thin;
+}
+
+.demo-chat-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.demo-chat-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.demo-chat-scrollbar::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+  border-radius: 10px;
+}
+
+@keyframes demo-chat-bounce {
+  0%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-6px);
+  }
+}
+
+.demo-chat-dot {
+  animation: demo-chat-bounce 1s infinite;
+}
+
 /* Legal page PDF export: hide site chrome, print only the document body */
 @media print {
   .landing-page nav,
