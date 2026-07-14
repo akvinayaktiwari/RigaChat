@@ -105,13 +105,14 @@ export default function DemoChat() {
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [streamingText, setStreamingText] = useState('')
   const [showChips, setShowChips] = useState(true)
   const [inputValue, setInputValue] = useState('')
   const messagesRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight, behavior: 'smooth' })
-  }, [messages])
+  }, [messages, streamingText])
 
   useEffect(() => {
     initConversation()
@@ -132,16 +133,9 @@ export default function DemoChat() {
     setMessages([])
     setConversationId(null)
     setIsLoading(false)
+    setStreamingText('')
     setShowChips(true)
     initConversation()
-  }
-
-  function updateLastBotMessage(text: string) {
-    setMessages((prev) => {
-      const next = [...prev]
-      next[next.length - 1] = { role: 'bot', text }
-      return next
-    })
   }
 
   async function sendMessage(rawText: string) {
@@ -149,15 +143,27 @@ export default function DemoChat() {
     if (!text || isLoading || !conversationId) return
 
     setShowChips(false)
-    setMessages((prev) => [...prev, { role: 'user', text }, { role: 'bot', text: '' }])
+    setMessages((prev) => [...prev, { role: 'user', text }])
     setIsLoading(true)
+    setStreamingText('')
 
+    let finalText = ''
     try {
-      await streamChatMessage({ conversationId, message: text, onChunk: updateLastBotMessage })
-    } catch {
-      updateLastBotMessage('Something went wrong. Please try again.')
-    } finally {
+      await streamChatMessage({
+        conversationId,
+        message: text,
+        onChunk: (accumulated) => {
+          finalText = accumulated
+          setStreamingText(accumulated)
+        },
+      })
+      setMessages((prev) => [...prev, { role: 'bot', text: finalText }])
+      setStreamingText('')
       setIsLoading(false)
+    } catch {
+      setStreamingText('')
+      setIsLoading(false)
+      setMessages((prev) => [...prev, { role: 'bot', text: 'Something went wrong. Please try again.' }])
     }
   }
 
@@ -222,7 +228,10 @@ export default function DemoChat() {
           {messages.map((message, index) => (
             <MessageBubble key={index} message={message} />
           ))}
-          {isLoading && <TypingIndicator />}
+          {isLoading && streamingText === '' && <TypingIndicator />}
+          {isLoading && streamingText !== '' && (
+            <MessageBubble message={{ role: 'bot', text: streamingText }} />
+          )}
         </div>
 
         <div
