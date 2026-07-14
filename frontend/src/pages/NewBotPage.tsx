@@ -2,9 +2,12 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
+  BookOpen,
   Check,
   DollarSign,
+  Globe,
   Home,
+  Info,
   Loader2,
   Mail,
   Phone,
@@ -46,6 +49,42 @@ const FIELD_ICONS: Record<string, typeof User> = {
   email: Mail,
   propertyInterest: Home,
   budgetRange: DollarSign,
+}
+
+type FlowType = 'website' | 'kb_only'
+
+const FLOW_OPTIONS: {
+  value: FlowType
+  icon: typeof Globe
+  title: string
+  description: string
+  badge: string
+  badgeClasses: string
+}[] = [
+  {
+    value: 'website',
+    icon: Globe,
+    title: 'Train from website',
+    description:
+      'Enter your website URL. Our crawler automatically reads your pages and trains your chatbot on your content.',
+    badge: 'Recommended',
+    badgeClasses: 'bg-violet-100 text-violet-700',
+  },
+  {
+    value: 'kb_only',
+    icon: BookOpen,
+    title: 'Add manually',
+    description:
+      'Skip the crawler. Add FAQs, product details, and policies directly as knowledge base entries.',
+    badge: 'Great for SPAs',
+    badgeClasses: 'bg-gray-100 text-gray-600',
+  },
+]
+
+const WEBSITE_URL_REGEX = /^https?:\/\/[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+(\/.*)?$/
+
+function isValidWebsiteUrl(value: string): boolean {
+  return WEBSITE_URL_REGEX.test(value)
 }
 
 interface FormData {
@@ -135,6 +174,7 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
 export default function NewBotPage() {
   const navigate = useNavigate()
   const [currentStep, setCurrentStep] = useState(1)
+  const [flowType, setFlowType] = useState<FlowType>('website')
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM_DATA)
   const [errors, setErrors] = useState<StepErrors>({})
   const [launchStep, setLaunchStep] = useState<LaunchStep>('form')
@@ -155,10 +195,13 @@ export default function NewBotPage() {
       if (formData.name.trim().length < 2) {
         nextErrors.name = 'Chatbot name must be at least 2 characters'
       }
-      if (!formData.websiteUrl.trim()) {
-        nextErrors.websiteUrl = 'Website URL is required'
-      } else if (!/^https?:\/\//.test(formData.websiteUrl.trim())) {
-        nextErrors.websiteUrl = 'URL must start with http:// or https://'
+      if (flowType === 'website') {
+        const url = formData.websiteUrl.trim()
+        if (!url) {
+          nextErrors.websiteUrl = 'Website URL is required'
+        } else if (!isValidWebsiteUrl(url)) {
+          nextErrors.websiteUrl = 'Enter a valid URL starting with http:// or https://'
+        }
       }
     }
 
@@ -196,7 +239,7 @@ export default function NewBotPage() {
     try {
       const res = await setupBot({
         name: formData.name,
-        websiteUrl: formData.websiteUrl,
+        ...(flowType === 'website' ? { websiteUrl: formData.websiteUrl } : {}),
         greetingMessage: formData.greetingMessage,
         brandColor: formData.brandColor,
         widgetTrigger: formData.widgetTrigger,
@@ -211,6 +254,12 @@ export default function NewBotPage() {
       }
 
       const newBotId = res.data.bot.botId
+
+      if (flowType === 'kb_only') {
+        navigate(`/dashboard/kb/${newBotId}`)
+        return
+      }
+
       setBotId(newBotId)
 
       const indexRes = await startBotIndexing(newBotId, formData.websiteUrl)
@@ -243,6 +292,9 @@ export default function NewBotPage() {
       setLaunchError('Something went wrong. Please try again.')
     }
   }
+
+  const isNextDisabled =
+    currentStep === 1 && flowType === 'website' && !isValidWebsiteUrl(formData.websiteUrl.trim())
 
   const enabledFieldLabels = formData.leadFormFields
     .filter((field) => {
@@ -315,18 +367,62 @@ export default function NewBotPage() {
                 </div>
 
                 <div>
-                  <label className={labelClasses}>Website URL</label>
-                  <input
-                    type="url"
-                    value={formData.websiteUrl}
-                    onChange={(e) => update('websiteUrl', e.target.value)}
-                    placeholder="https://yourwebsite.com"
-                    className={`${inputClasses} ${errors.websiteUrl ? inputErrorClasses : ''}`}
-                  />
-                  {errors.websiteUrl ? (
-                    <p className="text-xs text-red-500 mt-1">{errors.websiteUrl}</p>
+                  <h2 className="font-bold text-lg text-slate-800">How do you want to train your bot?</h2>
+                  <p className="text-sm text-slate-500 mt-1 mb-4">You can always add more content later.</p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {FLOW_OPTIONS.map((option) => {
+                      const Icon = option.icon
+                      const isSelected = flowType === option.value
+
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setFlowType(option.value)}
+                          className={`relative text-left rounded-2xl p-6 transition-all ${
+                            isSelected
+                              ? 'border-2 border-violet-600 bg-violet-50 shadow-md'
+                              : 'border border-gray-200 cursor-pointer hover:border-violet-300 hover:shadow-md'
+                          }`}
+                        >
+                          <span
+                            className={`absolute top-4 right-4 text-xs font-semibold px-2 py-1 rounded-full ${option.badgeClasses}`}
+                          >
+                            {option.badge}
+                          </span>
+                          <Icon className="text-violet-600 mb-3" size={28} />
+                          <p className="font-semibold text-slate-800">{option.title}</p>
+                          <p className="text-sm text-slate-500 mt-1">{option.description}</p>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {flowType === 'website' ? (
+                    <div className="mt-4">
+                      <label className={labelClasses}>Website URL</label>
+                      <input
+                        type="url"
+                        value={formData.websiteUrl}
+                        onChange={(e) => update('websiteUrl', e.target.value)}
+                        placeholder="https://yourwebsite.com"
+                        className={`${inputClasses} ${errors.websiteUrl ? inputErrorClasses : ''}`}
+                      />
+                      {errors.websiteUrl ? (
+                        <p className="text-xs text-red-500 mt-1">{errors.websiteUrl}</p>
+                      ) : (
+                        <p className={hintClasses}>We&apos;ll crawl up to 50 pages</p>
+                      )}
+                    </div>
                   ) : (
-                    <p className={hintClasses}>We will scan this website to train your chatbot</p>
+                    <div className="mt-4 bg-violet-50 border border-violet-100 rounded-xl p-4 text-sm text-violet-700 flex gap-3">
+                      <Info size={18} className="shrink-0 mt-0.5" />
+                      <p>
+                        Your bot will be ready immediately. After setup, you&apos;ll be guided to add your first
+                        knowledge base entry.
+                      </p>
+                    </div>
                   )}
                 </div>
 
@@ -545,7 +641,12 @@ export default function NewBotPage() {
             <button
               type="button"
               onClick={handleNext}
-              className="bg-indigo-600 text-white px-6 py-3 rounded-xl hover:bg-indigo-700 transition-colors"
+              disabled={isNextDisabled}
+              className={`px-6 py-3 rounded-xl transition-colors ${
+                isNextDisabled
+                  ? 'bg-indigo-300 text-white cursor-not-allowed'
+                  : 'bg-indigo-600 text-white hover:bg-indigo-700'
+              }`}
             >
               Next &rarr;
             </button>

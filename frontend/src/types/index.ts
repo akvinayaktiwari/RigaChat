@@ -95,7 +95,7 @@ export interface ClientRecord {
 
 export interface CreateBotInput {
   name: string
-  websiteUrl: string
+  websiteUrl?: string
   greetingMessage: string
   brandColor: string
   widgetTrigger: BotConfig['widgetTrigger']
