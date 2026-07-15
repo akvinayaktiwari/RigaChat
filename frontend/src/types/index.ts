@@ -231,3 +231,51 @@ export interface Preferences {
   weeklySummary: boolean
   leadAssignmentAlerts: boolean
 }
+
+export type VoiceAgentVoice = 'alloy' | 'echo' | 'shimmer' | 'nova' | 'onyx' | 'fable'
+
+export interface VoiceAgent {
+  agentId: string
+  clientId: string
+  name: string
+  voice: VoiceAgentVoice
+  greetingMessage: string
+  websiteUrl: string
+  brandColor: string
+  widgetPosition: 'bottom-left' | 'bottom-right' | 'bottom-center'
+  maxSessionDuration: 5 | 10 | 15
+  isEnabled: boolean
+  isIndexed: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateVoiceAgentInput {
+  name: string
+  voice: VoiceAgentVoice
+  greetingMessage: string
+  websiteUrl: string
+  brandColor: string
+  widgetPosition: 'bottom-left' | 'bottom-right' | 'bottom-center'
+  maxSessionDuration: 5 | 10 | 15
+}
+
+export interface UpdateVoiceAgentInput {
+  name?: string
+  voice?: VoiceAgentVoice
+  greetingMessage?: string
+  brandColor?: string
+  widgetPosition?: 'bottom-left' | 'bottom-right' | 'bottom-center'
+  maxSessionDuration?: 5 | 10 | 15
+  isEnabled?: boolean
+}
+
+export interface VoiceAgentPublicConfig {
+  agentId: string
+  name: string
+  voice: VoiceAgentVoice
+  greetingMessage: string
+  brandColor: string
+  widgetPosition: 'bottom-left' | 'bottom-right' | 'bottom-center'
+  isEnabled: boolean
+}

@@ -9,6 +9,7 @@ import {
   type LucideIcon,
   Menu,
   MessageSquare,
+  Mic,
   Settings,
   Users,
 } from 'lucide-react'
@@ -18,6 +19,7 @@ import VyostraLogo from '../VyostraLogo'
 const NAV_LINKS: { to: string; label: string; icon: LucideIcon; end: boolean }[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/dashboard/bots', label: 'Chatbots', icon: Bot, end: false },
+  { to: '/dashboard/voice-agents', label: 'Voice Agents', icon: Mic, end: false },
   { to: '/dashboard/forms', label: 'Forms', icon: FileText, end: false },
   { to: '/dashboard/leads', label: 'Leads', icon: Users, end: false },
   { to: '/dashboard/whatsapp', label: 'WhatsApp', icon: MessageSquare, end: false },
@@ -33,6 +35,8 @@ function getPageTitle(pathname: string): string {
   if (pathname === '/dashboard/forms') return 'Forms'
   if (/^\/dashboard\/forms\/[^/]+\/leads$/.test(pathname)) return 'Form Leads'
   if (/^\/dashboard\/forms\/[^/]+$/.test(pathname)) return 'Edit Form'
+  if (pathname === '/dashboard/voice-agents/new') return 'New Voice Agent'
+  if (pathname === '/dashboard/voice-agents') return 'Voice Agents'
   if (pathname === '/dashboard/leads') return 'Leads'
   if (/^\/dashboard\/leads\/[^/]+$/.test(pathname)) return 'Lead Detail'
   if (pathname.startsWith('/dashboard/kb')) return 'Knowledge Base'
