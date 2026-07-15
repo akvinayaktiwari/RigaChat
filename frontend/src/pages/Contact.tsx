@@ -102,7 +102,7 @@ export default function Contact() {
               </div>
               <button
                 type="submit"
-                className="mt-2 inline-flex items-center justify-center gap-2 bg-primary text-white font-semibold px-6 py-3 rounded-xl hover:opacity-90 transition-opacity"
+                className="mt-2 inline-flex items-center justify-center gap-2 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-6 py-3 rounded-xl shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity"
               >
                 <Send className="w-4 h-4" />
                 Send message
