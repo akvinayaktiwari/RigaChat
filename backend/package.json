@@ -24,11 +24,13 @@
     "hono": "^4.6.0",
     "node-fetch": "^3.3.2",
     "openai": "^4.63.0",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/node": "^20.16.5",
     "@types/uuid": "^9.0.8",
+    "@types/ws": "^8.5.12",
     "esbuild": "^0.23.1",
     "nodemon": "^3.1.4",
     "ts-node": "^10.9.2",
