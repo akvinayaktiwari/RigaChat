@@ -7,6 +7,7 @@ import type {
   CreateBotInput,
   CreateFormInput,
   CreateKBEntryInput,
+  CreateVoiceAgentInput,
   FormConfig,
   FormLead,
   IndexingJob,
@@ -16,6 +17,8 @@ import type {
   SetupBotResult,
   StartIndexingResult,
   UpdateKBInput,
+  UpdateVoiceAgentInput,
+  VoiceAgent,
   WhatsAppConnection,
 } from '../types/index'
 
@@ -224,4 +227,33 @@ export function connectWhatsApp(data: ConnectWhatsAppInput): Promise<ApiResponse
 
 export function disconnectWhatsApp(): Promise<ApiResponse<{ success: boolean }>> {
   return apiClient<{ success: boolean }>('/api/integrations/whatsapp/disconnect', 'DELETE')
+}
+
+// Voice Agents
+
+export function getVoiceAgents(): Promise<ApiResponse<VoiceAgent[]>> {
+  return apiClient<VoiceAgent[]>('/api/voice-agents')
+}
+
+export function getVoiceAgent(agentId: string): Promise<ApiResponse<VoiceAgent>> {
+  return apiClient<VoiceAgent>(`/api/voice-agents/${agentId}`)
+}
+
+export function createVoiceAgent(input: CreateVoiceAgentInput): Promise<ApiResponse<VoiceAgent>> {
+  return apiClient<VoiceAgent>('/api/voice-agents', 'POST', input)
+}
+
+export function updateVoiceAgent(
+  agentId: string,
+  input: UpdateVoiceAgentInput
+): Promise<ApiResponse<VoiceAgent>> {
+  return apiClient<VoiceAgent>(`/api/voice-agents/${agentId}`, 'PATCH', input)
+}
+
+export function deleteVoiceAgent(agentId: string): Promise<ApiResponse<null>> {
+  return apiClient<null>(`/api/voice-agents/${agentId}`, 'DELETE')
+}
+
+export function setupVoiceAgent(agentId: string): Promise<ApiResponse<VoiceAgent>> {
+  return apiClient<VoiceAgent>(`/api/voice-agents/${agentId}/setup`, 'POST')
 }

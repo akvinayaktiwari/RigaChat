@@ -224,3 +224,51 @@ export interface CreateFormLeadInput {
   customFields: Record<string, string>
   sourceUrl: string
 }
+
+export type VoiceAgentVoice = 'alloy' | 'echo' | 'shimmer' | 'nova' | 'onyx' | 'fable'
+
+export interface VoiceAgent {
+  agentId: string
+  clientId: string
+  name: string
+  voice: VoiceAgentVoice
+  greetingMessage: string
+  websiteUrl: string
+  brandColor: string
+  widgetPosition: 'bottom-left' | 'bottom-right' | 'bottom-center'
+  maxSessionDuration: 5 | 10 | 15
+  isEnabled: boolean
+  isIndexed: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface VoiceSession {
+  sessionId: string
+  agentId: string
+  clientId: string
+  connectionId: string
+  status: 'connecting' | 'active' | 'ended'
+  startedAt: string
+  endedAt?: string
+}
+
+export interface VoiceConfig {
+  agentId: string
+  clientId: string
+  voice: VoiceAgentVoice
+  greetingMessage: string
+  maxSessionDuration: number
+  ragContext: string
+}
+
+export interface CreateVoiceAgentInput {
+  clientId: string
+  name: string
+  voice: VoiceAgentVoice
+  greetingMessage: string
+  websiteUrl: string
+  brandColor: string
+  widgetPosition: 'bottom-left' | 'bottom-right' | 'bottom-center'
+  maxSessionDuration: 5 | 10 | 15
+}
