@@ -47,9 +47,9 @@ export interface Lead {
   leadId: string
   botId: string
   clientId: string
-  name: string
-  phone: string
-  email: string
+  name?: string
+  phone?: string
+  email?: string
   propertyInterest?: string
   budgetRange?: string
   chatTranscript: string

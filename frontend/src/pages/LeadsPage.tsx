@@ -21,7 +21,8 @@ function formatRelativeDate(date: Date): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function getInitials(name: string): string {
+function getInitials(name: string | undefined): string {
+  if (!name) return '?'
   return name
     .split(' ')
     .map((n) => n[0])
@@ -106,7 +107,7 @@ export default function LeadsPage() {
   if (searchQuery) {
     const q = searchQuery.toLowerCase()
     filtered = filtered.filter(
-      (l) => l.name.toLowerCase().includes(q) || l.email.toLowerCase().includes(q)
+      (l) => (l.name ?? '').toLowerCase().includes(q) || (l.email ?? '').toLowerCase().includes(q)
     )
   }
 
@@ -117,9 +118,9 @@ export default function LeadsPage() {
     const headers = ['Name', 'Email', 'Phone', 'Bot', 'Date', 'Status']
     const rows = filtered.map((lead) =>
       [
-        lead.name,
-        lead.email,
-        lead.phone,
+        lead.name ?? '',
+        lead.email ?? '',
+        lead.phone ?? '',
         getBotName(lead.botId),
         new Date(lead.createdAt).toLocaleDateString(),
         'New',

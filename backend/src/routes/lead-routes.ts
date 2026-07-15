@@ -6,6 +6,7 @@ import {
   getLeadDetail,
   getLeadsForBot,
   getLeadsForClient,
+  LeadValidationError,
 } from '../services/lead-service.js'
 import type { ApiResponse, Lead } from '../types/index.js'
 
@@ -43,17 +44,10 @@ leadRoutes.post('/', async (c) => {
     )
   }
 
-  if (!body.name && !body.phone && !body.email) {
-    return c.json<ApiResponse<null>>(
-      { success: false, error: 'At least one contact field (name, phone, or email) is required.' },
-      400
-    )
-  }
-
   try {
     const bot = await getPublicConfig(body.botId)
 
-    const lead = await captureLead({
+    const lead = await captureLead(bot, {
       botId: body.botId,
       clientId: bot.clientId,
       conversationId: body.conversationId,
@@ -68,6 +62,9 @@ leadRoutes.post('/', async (c) => {
 
     return c.json<ApiResponse<Lead>>({ success: true, data: lead }, 201)
   } catch (error) {
+    if (error instanceof LeadValidationError) {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 400)
+    }
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }
 })

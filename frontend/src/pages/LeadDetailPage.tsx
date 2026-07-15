@@ -37,7 +37,8 @@ function parseTranscript(transcript: string): TranscriptLine[] {
     })
 }
 
-function getInitials(name: string): string {
+function getInitials(name: string | undefined): string {
+  if (!name) return '?'
   return name
     .split(' ')
     .map((n) => n[0])
@@ -178,8 +179,8 @@ export default function LeadDetailPage() {
           <p className="text-sm text-gray-500 text-center mb-6">{botName}</p>
 
           <div>
-            <InfoRow icon={Phone} label="Phone" value={lead.phone} />
-            <InfoRow icon={Mail} label="Email" value={lead.email} />
+            <InfoRow icon={Phone} label="Phone" value={lead.phone ?? 'Not provided'} />
+            <InfoRow icon={Mail} label="Email" value={lead.email ?? 'Not provided'} />
             <InfoRow icon={Globe} label="Source URL" value={lead.sourceUrl} />
             <InfoRow icon={Calendar} label="Date" value={formatFullDate(lead.createdAt)} />
             <InfoRow icon={BotIcon} label="Bot name" value={botName} />

@@ -6,7 +6,7 @@ import {
 } from '../repositories/lead-repository.js'
 import { markLeadCaptured } from '../repositories/conversation-repository.js'
 import { sendLeadNotification } from './whatsapp-service.js'
-import type { Lead } from '../types/index.js'
+import type { BotConfig, Lead } from '../types/index.js'
 
 interface CreateLeadInput {
   botId: string
@@ -21,7 +21,36 @@ interface CreateLeadInput {
   sourceUrl: string
 }
 
-export async function captureLead(input: CreateLeadInput): Promise<Lead> {
+export class LeadValidationError extends Error {}
+
+type LeadFieldId = 'name' | 'phone' | 'email' | 'propertyInterest' | 'budgetRange'
+
+function assertRequiredLeadFields(bot: BotConfig, input: CreateLeadInput): void {
+  if (!input.name && !input.phone && !input.email) {
+    throw new LeadValidationError(
+      'At least one contact field (name, phone, or email) is required.'
+    )
+  }
+
+  const values: Record<LeadFieldId, string | undefined> = {
+    name: input.name,
+    phone: input.phone,
+    email: input.email,
+    propertyInterest: input.propertyInterest,
+    budgetRange: input.budgetRange,
+  }
+
+  for (const field of bot.leadFormFields) {
+    const fieldId = field.fieldId as LeadFieldId
+    if (field.required && !values[fieldId]) {
+      throw new LeadValidationError(`Missing required lead field: ${field.label || field.fieldId}`)
+    }
+  }
+}
+
+export async function captureLead(bot: BotConfig, input: CreateLeadInput): Promise<Lead> {
+  assertRequiredLeadFields(bot, input)
+
   try {
     const lead = await createLead({
       botId: input.botId,
