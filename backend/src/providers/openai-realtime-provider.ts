@@ -50,7 +50,7 @@ export class OpenAIRealtimeProvider implements VoiceProvider {
     return {
       sessionId,
       agentId: config.agentId,
-      clientId: '',
+      clientId: config.clientId,
       connectionId: sessionId,
       status: 'connecting',
       startedAt: new Date().toISOString(),

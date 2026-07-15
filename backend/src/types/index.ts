@@ -255,6 +255,7 @@ export interface VoiceSession {
 
 export interface VoiceConfig {
   agentId: string
+  clientId: string
   voice: VoiceAgentVoice
   greetingMessage: string
   maxSessionDuration: number

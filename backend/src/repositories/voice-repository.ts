@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid'
 import { DeleteCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient } from './dynamo-client.js'
 import type { CreateVoiceAgentInput, VoiceAgent } from '../types/index.js'
@@ -20,7 +21,7 @@ export async function createVoiceAgent(input: CreateVoiceAgentInput): Promise<Vo
   const now = new Date().toISOString()
   const record: VoiceAgent = {
     ...input,
-    agentId: crypto.randomUUID(),
+    agentId: uuidv4(),
     isEnabled: false,
     isIndexed: false,
     createdAt: now,
