@@ -24,6 +24,7 @@ import FormLeadsPage from './src/pages/FormLeadsPage'
 import FormTestPage from './src/pages/FormTestPage'
 import FormTestPreviewPage from './src/pages/FormTestPreviewPage'
 import VoiceAgentsPage from './src/pages/VoiceAgentsPage'
+import NewVoiceAgentPage from './src/pages/NewVoiceAgentPage'
 import About from './src/pages/About'
 import Contact from './src/pages/Contact'
 import Help from './src/pages/Help'
@@ -74,14 +75,7 @@ function App() {
           <Route path="bots/new" element={<NewBotPage />} />
           <Route path="bots/:botId" element={<BotDetailPage />} />
           <Route path="voice-agents" element={<VoiceAgentsPage />} />
-          <Route
-            path="voice-agents/new"
-            element={
-              <div className="p-8">
-                <p className="text-gray-500 mt-2">New Voice Agent — coming in next step.</p>
-              </div>
-            }
-          />
+          <Route path="voice-agents/new" element={<NewVoiceAgentPage />} />
           <Route path="forms" element={<FormsPage />} />
           <Route path="forms/new" element={<NewFormPage />} />
           <Route path="forms/:formId" element={<FormDetailPage />} />
