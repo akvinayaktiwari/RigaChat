@@ -11,6 +11,7 @@ S3_BUCKET_WIDGET="${S3_BUCKET_WIDGET:-rigachat-widget}"
 CLOUDFRONT_DISTRIBUTION_ID="${CLOUDFRONT_DISTRIBUTION_ID:-E24Z9D4G4FY8PH}"
 CLOUDFRONT_WIDGET_DISTRIBUTION_ID="${CLOUDFRONT_WIDGET_DISTRIBUTION_ID:-E2KNENIBJEZYTF}"
 BACKEND_URL="${BACKEND_URL:-https://hxtvyv6kgsasppyrvyljaezeii0zxzco.lambda-url.ap-south-1.on.aws}"
+VOICE_WS_URL="${VOICE_WS_URL:-}"
 VITE_COGNITO_DOMAIN="${VITE_COGNITO_DOMAIN:-ap-south-1d7y7lw8aj.auth.ap-south-1.amazoncognito.com}"
 VITE_COGNITO_CLIENT_ID="${VITE_COGNITO_CLIENT_ID:-bia5g9e6gsb3h9n191rcvkugn}"
 VITE_COGNITO_REDIRECT_URI="${VITE_COGNITO_REDIRECT_URI:-https://beepboop.drsyeta.in/auth/callback}"
@@ -108,9 +109,23 @@ else
   sed -i "s|__BACKEND_URL__|${BACKEND_URL}|g" frontend/dist/widget.js
 fi
 
+echo "==> Step 6b: Injecting BACKEND_URL and VOICE_WS_URL into voice-widget.js..."
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  sed -i '' "s|__BACKEND_URL__|${BACKEND_URL}|g" frontend/dist/voice-widget.js
+  sed -i '' "s|__WS_URL__|${VOICE_WS_URL}|g" frontend/dist/voice-widget.js
+else
+  sed -i "s|__BACKEND_URL__|${BACKEND_URL}|g" frontend/dist/voice-widget.js
+  sed -i "s|__WS_URL__|${VOICE_WS_URL}|g" frontend/dist/voice-widget.js
+fi
+
 echo "==> Step 7: Deploying widget to S3..."
 aws s3 cp frontend/dist/widget.js \
   s3://"$S3_BUCKET_WIDGET"/widget.js \
+  --cache-control "public, max-age=3600" \
+  --region "$AWS_REGION"
+
+aws s3 cp frontend/dist/voice-widget.js \
+  s3://"$S3_BUCKET_WIDGET"/voice-widget.js \
   --cache-control "public, max-age=3600" \
   --region "$AWS_REGION"
 

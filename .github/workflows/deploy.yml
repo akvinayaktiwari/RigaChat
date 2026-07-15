@@ -195,6 +195,11 @@ jobs:
           sed -i 's|__BACKEND_URL__|${{ secrets.BACKEND_URL }}|g' frontend/dist/widget.js
           sed -i 's|__BACKEND_URL__|${{ secrets.BACKEND_URL }}|g' frontend/dist/form-widget.js
 
+      - name: Inject BACKEND_URL and VOICE_WS_URL into voice-widget.js
+        run: |
+          sed -i 's|__BACKEND_URL__|${{ secrets.BACKEND_URL }}|g' frontend/dist/voice-widget.js
+          sed -i "s|__WS_URL__|${{ secrets.VOICE_WS_URL }}|g" frontend/dist/voice-widget.js
+
       - name: Upload widget.js to S3
         run: |
           aws s3 cp frontend/dist/widget.js \
@@ -206,6 +211,13 @@ jobs:
         run: |
           aws s3 cp frontend/dist/form-widget.js \
             s3://${{ secrets.S3_BUCKET_WIDGET }}/form-widget.js \
+            --cache-control "public, max-age=3600" \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Upload voice-widget.js to S3
+        run: |
+          aws s3 cp frontend/dist/voice-widget.js \
+            s3://${{ secrets.S3_BUCKET_WIDGET }}/voice-widget.js \
             --cache-control "public, max-age=3600" \
             --region ${{ secrets.AWS_REGION }}
 
