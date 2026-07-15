@@ -439,23 +439,33 @@ export default function VoiceAgentDetailPage() {
               {getEmbedSnippet(agentId)}
             </pre>
 
-            <button
-              type="button"
-              onClick={handleCopyEmbed}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm mt-4 ${primaryButtonClasses}`}
-            >
-              {copySuccess ? (
-                <>
-                  <Check size={16} />
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <Copy size={16} />
-                  Copy Code
-                </>
-              )}
-            </button>
+            <div className="flex items-center gap-4 mt-4">
+              <button
+                type="button"
+                onClick={handleCopyEmbed}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm ${primaryButtonClasses}`}
+              >
+                {copySuccess ? (
+                  <>
+                    <Check size={16} />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy size={16} />
+                    Copy Code
+                  </>
+                )}
+              </button>
+              <a
+                href={`/voice-test/preview?agentId=${agentId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-violet-600 text-sm hover:underline"
+              >
+                Test this snippet &rarr;
+              </a>
+            </div>
           </div>
         </div>
       </div>

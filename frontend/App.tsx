@@ -26,6 +26,8 @@ import FormTestPreviewPage from './src/pages/FormTestPreviewPage'
 import VoiceAgentsPage from './src/pages/VoiceAgentsPage'
 import NewVoiceAgentPage from './src/pages/NewVoiceAgentPage'
 import VoiceAgentDetailPage from './src/pages/VoiceAgentDetailPage'
+import VoiceTestPage from './src/pages/VoiceTestPage'
+import VoiceTestPreviewPage from './src/pages/VoiceTestPreviewPage'
 import About from './src/pages/About'
 import Contact from './src/pages/Contact'
 import Help from './src/pages/Help'
@@ -50,6 +52,8 @@ function App() {
         <Route path="/widget-test/preview" element={<WidgetTestPreviewPage />} />
         <Route path="/form-test" element={<FormTestPage />} />
         <Route path="/form-test/preview" element={<FormTestPreviewPage />} />
+        <Route path="/voice-test" element={<VoiceTestPage />} />
+        <Route path="/voice-test/preview" element={<VoiceTestPreviewPage />} />
         <Route path="/" element={<LandingPage />} />
         <Route path="/about-us" element={<About />} />
         <Route path="/contact" element={<Contact />} />
