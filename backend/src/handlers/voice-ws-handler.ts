@@ -82,3 +82,5 @@ export async function voiceWsHandler(event: APIGatewayProxyWebsocketEventV2): Pr
     return { statusCode: 500 }
   }
 }
+
+export { voiceWsHandler as handler }
