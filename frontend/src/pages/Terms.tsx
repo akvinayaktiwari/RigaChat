@@ -34,14 +34,14 @@ const TERMS_SECTIONS: TermsSection[] = [
     order: '1',
     title: 'Acceptance of Terms',
     icon: 'FileCheck',
-    body: 'By using BeepBoop you agree to these terms.',
+    body: 'By using VyostraAI you agree to these terms.',
   },
   {
     id: 'section-2',
     order: '2',
     title: 'Use of Service',
     icon: 'Settings2',
-    body: 'You must provide accurate information. You are responsible for your chatbot content. Do not use BeepBoop for spam or illegal activity.',
+    body: 'You must provide accurate information. You are responsible for your chatbot content. Do not use VyostraAI for spam or illegal activity.',
   },
   {
     id: 'section-3',
@@ -62,7 +62,7 @@ const TERMS_SECTIONS: TermsSection[] = [
     order: '5',
     title: 'Limitation of Liability',
     icon: 'AlertTriangle',
-    body: 'BeepBoop is provided as-is. We are not liable for lead loss, missed notifications, or third-party service outages.',
+    body: 'VyostraAI is provided as-is. We are not liable for lead loss, missed notifications, or third-party service outages.',
   },
   {
     id: 'section-6',
@@ -101,7 +101,7 @@ function TermsHeader({ onDownload }: { onDownload: () => void }) {
           </div>
           <h1 className="text-4xl md:text-5xl font-extrabold text-on-surface tracking-tight">Terms of Service</h1>
           <p className="mt-3 text-base text-on-surface-variant max-w-xl leading-relaxed">
-            These terms govern your use of BeepBoop. By creating an account or using our chatbot, you agree to the
+            These terms govern your use of VyostraAI. By creating an account or using our chatbot, you agree to the
             terms outlined below.
           </p>
         </div>
@@ -257,7 +257,7 @@ export default function Terms() {
 
   function handleDownload() {
     const previousTitle = document.title
-    document.title = 'BeepBoop - Terms of Service'
+    document.title = 'VyostraAI - Terms of Service'
     window.print()
     document.title = previousTitle
   }

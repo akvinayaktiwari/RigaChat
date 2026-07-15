@@ -62,7 +62,7 @@ const COLLECT_BULLETS: InfoBullet[] = [
 ]
 
 const USE_BLOCKS: UseBlock[] = [
-  { icon: 'Activity', label: 'Improve Platform', text: 'To provide, maintain, and improve BeepBoop service and interface performance.' },
+  { icon: 'Activity', label: 'Improve Platform', text: 'To provide, maintain, and improve VyostraAI service and interface performance.' },
   { icon: 'Bell', label: 'Lead Alerts', text: 'To send lead notifications via WhatsApp and other integrated channels.' },
   { icon: 'RefreshCw', label: 'CRM Sync', text: 'To sync captured leads with connected CRMs including Zoho CRM.' },
   {
@@ -123,7 +123,7 @@ function PolicyHeader({ onDownload }: { onDownload: () => void }) {
           </div>
           <h1 className="text-4xl md:text-5xl font-extrabold text-on-surface tracking-tight">Privacy Policy</h1>
           <p className="mt-3 text-base text-on-surface-variant max-w-xl leading-relaxed">
-            At BeepBoop, we value your privacy. This policy explains how we collect, protect, and use your data.
+            At VyostraAI, we value your privacy. This policy explains how we collect, protect, and use your data.
           </p>
         </div>
         <button
@@ -406,7 +406,7 @@ export default function Privacy() {
 
   function handleDownload() {
     const previousTitle = document.title
-    document.title = 'BeepBoop - Privacy Policy'
+    document.title = 'VyostraAI - Privacy Policy'
     window.print()
     document.title = previousTitle
   }

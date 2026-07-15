@@ -30,14 +30,14 @@ const FOUNDERS: FounderInfo[] = [
     name: 'Adarsh Jee Pandey',
     role: 'Co-Founder & Performance Marketer',
     description:
-      'Drives growth and customer acquisition for BeepBoop. Performance marketer at Drsyeta Corp, Bangalore.',
+      'Drives growth and customer acquisition for VyostraAI. Performance marketer at Drsyeta Corp, Bangalore.',
     avatarGradient: 'from-emerald-600 to-teal-500',
   },
   {
     name: 'Vinayak Tiwari',
     role: 'Co-Founder & Builder',
     description:
-      'Built BeepBoop to help businesses capture every lead automatically. Full-stack engineer at Drsyeta Corp, Bangalore.',
+      'Built VyostraAI to help businesses capture every lead automatically. Full-stack engineer at Drsyeta Corp, Bangalore.',
     avatarGradient: 'from-purple-600 to-indigo-500',
   },
 ]
@@ -74,7 +74,7 @@ function HeroBanner() {
           </span>
         </h1>
         <p className="mt-4 text-base md:text-lg text-on-surface-variant max-w-2xl mx-auto leading-relaxed">
-          BeepBoop is an AI-powered lead generation platform built by Drsyeta Corp, Bangalore. We bridge the gap
+          VyostraAI is an AI-powered lead generation platform built by Drsyeta Corp, Bangalore. We bridge the gap
           between initial customer contact and closed deals.
         </p>
       </div>
@@ -89,8 +89,8 @@ function StoryBlockOneText() {
         Every business deserves to capture every lead.
       </h2>
       <p className="text-base md:text-lg text-on-surface-variant leading-relaxed">
-        We built BeepBoop because we saw too many businesses losing leads to slow response times, missed form
-        submissions, and disconnected tools. BeepBoop fixes that with an AI chatbot, WhatsApp automation, and CRM
+        We built VyostraAI because we saw too many businesses losing leads to slow response times, missed form
+        submissions, and disconnected tools. VyostraAI fixes that with an AI chatbot, WhatsApp automation, and CRM
         sync — all in one platform.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">

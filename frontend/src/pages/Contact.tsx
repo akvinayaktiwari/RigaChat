@@ -45,7 +45,7 @@ export default function Contact() {
               </div>
               <h3 className="text-xl font-bold text-on-surface">Technical Support</h3>
               <p className="text-sm text-on-surface-variant leading-relaxed">
-                For help with your BeepBoop account, chatbots, or integrations.
+                For help with your VyostraAI account, chatbots, or integrations.
               </p>
               <a
                 href="mailto:admin@drsyeta.in"

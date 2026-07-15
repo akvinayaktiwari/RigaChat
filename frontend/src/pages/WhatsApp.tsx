@@ -19,6 +19,11 @@ const EMPTY_FORM: ConnectWhatsAppInput = {
   notificationNumber: '',
 }
 
+const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
+const INPUT_CLASSES =
+  'w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 bg-white outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors'
+const LABEL_CLASSES = 'block text-sm font-medium text-gray-700 mb-1.5'
+
 export default function WhatsApp() {
   const toast = useToast()
 
@@ -87,34 +92,38 @@ export default function WhatsApp() {
   const isConnected = status !== 'loading' && status !== null && status.connected
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-xl md:text-2xl font-bold text-on-surface tracking-tight">WhatsApp Automation</h1>
-        <p className="text-xs md:text-sm text-on-surface-variant mt-1">
+        <h1 className="text-2xl font-extrabold text-gray-900" style={JAKARTA_FONT}>
+          WhatsApp Automation
+        </h1>
+        <p className="text-sm text-gray-500 mt-1">
           Get notified on WhatsApp the moment a lead comes in, and receive a weekly summary every Monday.
         </p>
       </div>
 
       {/* Connection card */}
-      <section className="bg-white rounded-2xl border border-outline-variant p-6 md:p-8">
-        <div className="flex items-center justify-between gap-3 border-b border-outline-variant pb-4 mb-6">
+      <section className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
+        <div className="flex items-center justify-between gap-3 border-b border-gray-50 pb-4 mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600">
+            <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 shrink-0">
               <MessageCircle className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="text-base font-bold text-on-surface">Gupshup Connection</h4>
-              <p className="text-[11px] text-on-surface-variant font-medium">
-                Your own Gupshup credentials — BeepBoop never sees or exposes your API key.
+              <h4 className="font-bold text-lg text-gray-900" style={JAKARTA_FONT}>
+                Gupshup Connection
+              </h4>
+              <p className="text-xs text-gray-500">
+                Your own Gupshup credentials — VyostraAI never sees or exposes your API key.
               </p>
             </div>
           </div>
           {status !== 'loading' && (
             <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${
+              className={`inline-flex items-center gap-1.5 border text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${
                 isConnected
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                  : 'bg-surface-container-low text-on-surface-variant border-outline-variant'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-gray-100 text-gray-500 border-gray-200'
               }`}
             >
               {isConnected && <Check className="w-3 h-3" />}
@@ -124,30 +133,28 @@ export default function WhatsApp() {
         </div>
 
         {status === 'loading' ? (
-          <div className="h-32 bg-surface-container-low rounded-xl animate-pulse" />
+          <div className="h-32 bg-gray-100 rounded-xl animate-pulse" />
         ) : isConnected && status ? (
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
               <div>
-                <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wide">App Name</p>
-                <p className="text-on-surface font-medium mt-1">{status.appName}</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">App Name</p>
+                <p className="text-gray-900 font-medium mt-1">{status.appName}</p>
               </div>
               <div>
-                <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wide">Sender Number</p>
-                <p className="text-on-surface font-medium mt-1">{status.sourceNumber}</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Sender Number</p>
+                <p className="text-gray-900 font-medium mt-1">{status.sourceNumber}</p>
               </div>
               <div>
-                <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wide">
-                  Notification Number
-                </p>
-                <p className="text-on-surface font-medium mt-1">{status.notificationNumber}</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Notification Number</p>
+                <p className="text-gray-900 font-medium mt-1">{status.notificationNumber}</p>
               </div>
             </div>
             <button
               type="button"
               onClick={handleDisconnect}
               disabled={disconnecting}
-              className="px-5 py-2 bg-surface-container-low hover:bg-rose-50 hover:text-rose-600 border border-outline-variant text-on-surface-variant font-bold text-xs rounded-xl transition-all duration-150 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              className="text-red-600 font-medium px-3 py-2 rounded-xl text-sm hover:bg-red-50 transition-colors disabled:opacity-50"
             >
               {disconnecting ? 'Disconnecting...' : 'Disconnect'}
             </button>
@@ -155,7 +162,7 @@ export default function WhatsApp() {
         ) : (
           <form onSubmit={handleConnect} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="wa-api-key" className="block text-xs font-bold text-on-surface-variant mb-2">
+              <label htmlFor="wa-api-key" className={LABEL_CLASSES}>
                 Gupshup API Key
               </label>
               <input
@@ -163,12 +170,12 @@ export default function WhatsApp() {
                 type="password"
                 value={form.apiKey}
                 onChange={(e) => setForm((prev) => ({ ...prev, apiKey: e.target.value }))}
-                className="w-full px-4 py-2.5 border border-outline-variant rounded-xl text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className={INPUT_CLASSES}
                 placeholder="sk_live_..."
               />
             </div>
             <div>
-              <label htmlFor="wa-app-name" className="block text-xs font-bold text-on-surface-variant mb-2">
+              <label htmlFor="wa-app-name" className={LABEL_CLASSES}>
                 Gupshup App Name
               </label>
               <input
@@ -176,12 +183,12 @@ export default function WhatsApp() {
                 type="text"
                 value={form.appName}
                 onChange={(e) => setForm((prev) => ({ ...prev, appName: e.target.value }))}
-                className="w-full px-4 py-2.5 border border-outline-variant rounded-xl text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                placeholder="BeepBoopBot"
+                className={INPUT_CLASSES}
+                placeholder="VyostraAIBot"
               />
             </div>
             <div>
-              <label htmlFor="wa-source-number" className="block text-xs font-bold text-on-surface-variant mb-2">
+              <label htmlFor="wa-source-number" className={LABEL_CLASSES}>
                 WhatsApp Business Number
               </label>
               <input
@@ -189,12 +196,12 @@ export default function WhatsApp() {
                 type="text"
                 value={form.sourceNumber}
                 onChange={(e) => setForm((prev) => ({ ...prev, sourceNumber: e.target.value }))}
-                className="w-full px-4 py-2.5 border border-outline-variant rounded-xl text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className={INPUT_CLASSES}
                 placeholder="917000000000"
               />
             </div>
             <div>
-              <label htmlFor="wa-notification-number" className="block text-xs font-bold text-on-surface-variant mb-2">
+              <label htmlFor="wa-notification-number" className={LABEL_CLASSES}>
                 Notification Number (receives alerts)
               </label>
               <input
@@ -202,7 +209,7 @@ export default function WhatsApp() {
                 type="text"
                 value={form.notificationNumber}
                 onChange={(e) => setForm((prev) => ({ ...prev, notificationNumber: e.target.value }))}
-                className="w-full px-4 py-2.5 border border-outline-variant rounded-xl text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className={INPUT_CLASSES}
                 placeholder="919999999999"
               />
             </div>
@@ -210,7 +217,7 @@ export default function WhatsApp() {
               <button
                 type="submit"
                 disabled={saving}
-                className="bg-primary hover:bg-primary-container text-on-primary px-5 py-2.5 rounded-xl text-sm font-bold transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                className="bg-violet-600 hover:bg-violet-700 text-white rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50"
               >
                 {saving ? 'Connecting...' : 'Connect WhatsApp'}
               </button>
@@ -220,8 +227,8 @@ export default function WhatsApp() {
       </section>
 
       {/* Tabs */}
-      <section className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
-        <div className="flex border-b border-outline-variant">
+      <section className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
+        <div className="flex border-b border-gray-50">
           {TABS.map((tab) => {
             const Icon = tab.icon
             const isActive = activeTab === tab.id
@@ -230,10 +237,10 @@ export default function WhatsApp() {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-5 py-4 text-xs font-bold border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset ${
+                className={`flex items-center gap-2 px-5 py-4 text-sm font-semibold border-b-2 transition-colors ${
                   isActive
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-on-surface-variant hover:text-on-surface'
+                    ? 'border-violet-600 text-violet-700'
+                    : 'border-transparent text-gray-500 hover:text-gray-900'
                 }`}
               >
                 <Icon className="w-4 h-4" />
@@ -243,23 +250,23 @@ export default function WhatsApp() {
           })}
         </div>
 
-        <div className="p-6 md:p-8">
+        <div className="p-6">
           {activeTab === 'lead-notifications' && (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <h4 className="text-sm font-bold text-on-surface">Instant Lead Alerts</h4>
+                <h4 className="text-sm font-bold text-gray-900">Instant Lead Alerts</h4>
                 {isConnected && (
-                  <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100 uppercase tracking-wider">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full uppercase tracking-wide">
                     <Check className="w-2.5 h-2.5" /> Active
                   </span>
                 )}
               </div>
-              <p className="text-sm text-on-surface-variant">
+              <p className="text-sm text-gray-500">
                 Every time a new lead is captured — from your chat widget or a form — we send a WhatsApp message to
                 your notification number right away, so you never miss a lead.
               </p>
-              <div className="bg-surface-container-low rounded-xl p-4 text-sm text-on-surface border border-outline-variant">
-                <p className="font-mono text-xs text-on-surface-variant mb-1">Example message</p>
+              <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 border border-gray-100">
+                <p className="font-mono text-xs text-gray-400 mb-1">Example message</p>
                 New lead captured!
                 <br />
                 Name: Adarsh
@@ -274,20 +281,20 @@ export default function WhatsApp() {
           {activeTab === 'weekly-reports' && (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <h4 className="text-sm font-bold text-on-surface">Weekly Summary</h4>
+                <h4 className="text-sm font-bold text-gray-900">Weekly Summary</h4>
                 {isConnected && (
-                  <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100 uppercase tracking-wider">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full uppercase tracking-wide">
                     <Check className="w-2.5 h-2.5" /> Active
                   </span>
                 )}
               </div>
-              <p className="text-sm text-on-surface-variant">
+              <p className="text-sm text-gray-500">
                 Every Monday at 9:00 AM IST, we send a summary of the past week's leads — broken down by chat widget
                 and forms — to your notification number.
               </p>
-              <div className="bg-surface-container-low rounded-xl p-4 text-sm text-on-surface border border-outline-variant">
-                <p className="font-mono text-xs text-on-surface-variant mb-1">Example message</p>
-                Your weekly BeepBoop report
+              <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 border border-gray-100">
+                <p className="font-mono text-xs text-gray-400 mb-1">Example message</p>
+                Your weekly VyostraAI report
                 <br />
                 New leads this week: 12
                 <br />
@@ -299,15 +306,15 @@ export default function WhatsApp() {
 
           {activeTab === 'chatbot' && (
             <div className="flex flex-col items-center justify-center text-center py-10 gap-3">
-              <div className="w-12 h-12 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant">
+              <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
                 <Lock className="w-5 h-5" />
               </div>
-              <h4 className="text-sm font-bold text-on-surface">WhatsApp Chatbot</h4>
-              <p className="text-sm text-on-surface-variant max-w-md">
+              <h4 className="text-sm font-bold text-gray-900">WhatsApp Chatbot</h4>
+              <p className="text-sm text-gray-500 max-w-md">
                 Let your AI chatbot talk to leads directly on WhatsApp, not just your website widget. This is coming
                 in a future release.
               </p>
-              <span className="inline-flex items-center text-[9px] font-bold text-on-surface-variant bg-surface-container-low border border-outline-variant px-2.5 py-1 rounded-md uppercase tracking-wide">
+              <span className="inline-flex items-center text-[10px] font-semibold text-gray-500 bg-gray-100 border border-gray-200 px-2.5 py-1 rounded-full uppercase tracking-wide">
                 Coming Soon
               </span>
             </div>
