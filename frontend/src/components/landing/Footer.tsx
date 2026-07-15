@@ -14,17 +14,17 @@ const LINK_COLUMNS = [
   {
     heading: 'Company',
     links: [
-      { label: 'About', href: '/about-us' },
+      { label: 'About Us', href: '/about-us' },
       { label: 'Blog', href: '#' },
       { label: 'Careers', href: '/careers' },
-      { label: 'Contact', href: '/contact' },
+      { label: 'Contact Us', href: '/contact' },
     ],
   },
   {
     heading: 'Legal',
     links: [
-      { label: 'Privacy', href: '/privacy-policy' },
-      { label: 'Terms', href: '/terms-of-service' },
+      { label: 'Privacy Policy', href: '/privacy-policy' },
+      { label: 'Terms of Service', href: '/terms-of-service' },
       { label: 'Security', href: '#' },
     ],
   },
