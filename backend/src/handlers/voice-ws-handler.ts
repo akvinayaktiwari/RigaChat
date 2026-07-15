@@ -1,9 +1,7 @@
 import { ApiGatewayManagementApiClient, PostToConnectionCommand } from '@aws-sdk/client-apigatewaymanagementapi'
 import type { APIGatewayProxyResultV2, APIGatewayProxyWebsocketEventV2 } from 'aws-lambda'
-import { OpenAIRealtimeProvider } from '../providers/openai-realtime-provider.js'
-import { endVoiceSession, startVoiceSession } from '../services/voice-service.js'
+import { endVoiceSession, startVoiceSession, voiceProvider as provider } from '../services/voice-service.js'
 
-const provider = new OpenAIRealtimeProvider()
 const activeSessions = new Map<string, string>()
 
 async function sendToConnection(apigw: ApiGatewayManagementApiClient, connectionId: string, data: unknown): Promise<void> {

@@ -11,7 +11,7 @@ import type { CreateVoiceAgentInput, VoiceAgent, VoiceConfig } from '../types/in
 
 const SEED_QUERY = 'Tell me about this business'
 
-const voiceProvider = new OpenAIRealtimeProvider()
+export const voiceProvider = new OpenAIRealtimeProvider()
 
 async function getOwnedVoiceAgent(agentId: string, clientId: string): Promise<VoiceAgent> {
   const agent = await getVoiceAgentByIdRecord(agentId)
