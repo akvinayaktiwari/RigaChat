@@ -112,14 +112,14 @@ jobs:
       - name: Deploy to voice WS Lambda
         run: |
           aws lambda update-function-code \
-            --function-name ${{ secrets.LAMBDA_VOICE_WS_FUNCTION_NAME }} \
+            --function-name rigachat-voice-ws \
             --zip-file fileb://backend/function.zip \
             --region ${{ secrets.AWS_REGION }}
 
       - name: Wait for voice WS Lambda update
         run: |
           aws lambda wait function-updated \
-            --function-name ${{ secrets.LAMBDA_VOICE_WS_FUNCTION_NAME }} \
+            --function-name rigachat-voice-ws \
             --region ${{ secrets.AWS_REGION }}
 
       - name: Deploy to crawler Lambda
