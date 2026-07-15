@@ -8,6 +8,7 @@ import { formRoutes } from './form-routes.js'
 import { integrationRoutes } from './integration-routes.js'
 import { kbRoutes } from './kb-routes.js'
 import { leadRoutes } from './lead-routes.js'
+import { voiceRoutes } from './voice-routes.js'
 import { webhookRoutes } from './webhooks.js'
 import type { ApiResponse } from '../types/index.js'
 
@@ -72,6 +73,17 @@ app.use('/api/forms/*', (c, next) => {
   return corsMiddleware(c, next)
 })
 
+// /api/voice-agents/public/:id and the session start/end routes are called by
+// the voice widget from any client's external website, so they need widgetCors.
+// Every other /api/voice-agents/* route is dashboard-only. Same single-dispatch
+// pattern as /api/bots/* and /api/forms/* above.
+app.use('/api/voice-agents/*', (c, next) => {
+  const isPublicRoute =
+    c.req.path.startsWith('/api/voice-agents/public/') || /^\/api\/voice-agents\/[^/]+\/session(\/[^/]+)?$/.test(c.req.path)
+  const corsMiddleware = isPublicRoute ? widgetCors : dashboardCors
+  return corsMiddleware(c, next)
+})
+
 app.options('*', (c) => c.body(null, 204))
 
 app.get('/health', (c) => {
@@ -90,6 +102,7 @@ app.route('/api/kb', kbRoutes)
 app.route('/api/clients', clientRoutes)
 app.route('/api/forms', formRoutes)
 app.route('/api/integrations', integrationRoutes)
+app.route('/api/voice-agents', voiceRoutes)
 app.route('/api/webhooks', webhookRoutes)
 
 app.notFound((c) => {

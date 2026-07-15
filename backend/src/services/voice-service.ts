@@ -1,7 +1,7 @@
 import {
   createVoiceAgent as createVoiceAgentRecord,
   deleteVoiceAgent as deleteVoiceAgentRecord,
-  getVoiceAgentById,
+  getVoiceAgentById as getVoiceAgentByIdRecord,
   getVoiceAgentsByClient,
   updateVoiceAgent as updateVoiceAgentRecord,
 } from '../repositories/voice-repository.js'
@@ -14,7 +14,7 @@ const SEED_QUERY = 'Tell me about this business'
 const voiceProvider = new OpenAIRealtimeProvider()
 
 async function getOwnedVoiceAgent(agentId: string, clientId: string): Promise<VoiceAgent> {
-  const agent = await getVoiceAgentById(agentId)
+  const agent = await getVoiceAgentByIdRecord(agentId)
   if (!agent || agent.clientId !== clientId) {
     throw new Error('Voice agent not found')
   }
@@ -35,10 +35,18 @@ export async function getVoiceAgents(clientId: string): Promise<VoiceAgent[]> {
   return await getVoiceAgentsByClient(clientId)
 }
 
+export async function getVoiceAgentById(agentId: string, clientId: string): Promise<VoiceAgent> {
+  const agent = await getVoiceAgentByIdRecord(agentId)
+  if (!agent || agent.clientId !== clientId) {
+    throw new Error('Voice agent not found')
+  }
+  return agent
+}
+
 export async function getVoiceAgentPublicConfig(
   agentId: string
 ): Promise<Pick<VoiceAgent, 'agentId' | 'name' | 'voice' | 'greetingMessage' | 'brandColor' | 'widgetPosition' | 'isEnabled'>> {
-  const agent = await getVoiceAgentById(agentId)
+  const agent = await getVoiceAgentByIdRecord(agentId)
   if (!agent) {
     throw new Error('Voice agent not found')
   }
@@ -75,7 +83,7 @@ export async function deleteVoiceAgent(agentId: string, clientId: string): Promi
 
 export async function startVoiceSession(agentId: string): Promise<{ sessionId: string }> {
   const publicConfig = await getVoiceAgentPublicConfig(agentId)
-  const agent = await getVoiceAgentById(agentId)
+  const agent = await getVoiceAgentByIdRecord(agentId)
   if (!agent) {
     throw new Error('Voice agent not found')
   }
