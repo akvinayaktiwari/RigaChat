@@ -98,6 +98,8 @@ voiceRoutes.get('/', requireAuth, async (c) => {
   }
 })
 
+// Public route — widget calls this from external client websites.
+// Security: HMAC token (VOICE_AUTH_SECRET), not Cognito JWT.
 voiceRoutes.get('/token', async (c) => {
   const agentId = c.req.query('agentId')
 

@@ -98,10 +98,6 @@ export class VoiceSession {
     }
 
     if (message.type === 'audio' && message.data) {
-      if (this.isAgentSpeaking) {
-        this.bargeIn()
-      }
-
       if (this.openaiWs.readyState === WebSocket.OPEN) {
         this.openaiWs.send(
           JSON.stringify({
@@ -146,8 +142,8 @@ export class VoiceSession {
       return
     }
 
-    if (event.type === 'response.output_audio.delta' && event.delta?.audio) {
-      this.sendToBrowser({ type: 'audio', data: event.delta.audio })
+    if (event.type === 'response.output_audio.delta' && event.delta) {
+      this.sendToBrowser({ type: 'audio', data: event.delta })
       return
     }
 
