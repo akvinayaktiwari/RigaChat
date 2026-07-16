@@ -291,8 +291,12 @@
             }
             if (!msg || !msg.type) return;
             if (msg.type === 'audio') {
+              console.log('[VoiceWidget] audio frame received, base64 length:', msg.data ? msg.data.length : msg.data);
+
               // Decode base64 PCM16 → Float32 → play via AudioContext
               var raw = atob(msg.data);
+              console.log('[VoiceWidget] decoded raw bytes:', raw.length);
+
               var pcm16 = new Int16Array(raw.length / 2);
               for (var i = 0; i < pcm16.length; i++) {
                 pcm16[i] = (raw.charCodeAt(i * 2)) | (raw.charCodeAt(i * 2 + 1) << 8);
@@ -301,11 +305,15 @@
               for (var j = 0; j < pcm16.length; j++) {
                 float32[j] = pcm16[j] / 32768.0;
               }
+
+              console.log('[VoiceWidget] AudioContext state:', state.audioContext ? state.audioContext.state : state.audioContext, 'sampleRate:', state.audioContext ? state.audioContext.sampleRate : state.audioContext);
+
               var buffer = state.audioContext.createBuffer(1, float32.length, 24000);
               buffer.copyToChannel(float32, 0);
 
               if (!state.audioQueue) { state.audioQueue = []; }
               state.audioQueue.push(buffer);
+              console.log('[VoiceWidget] queue length:', state.audioQueue.length, 'isPlaying:', state.isPlayingAudio);
               if (!state.isPlayingAudio) { playNextAudioChunk(); }
             } else if (msg.type === 'barge-in') {
               // Stop agent audio playback immediately
@@ -338,6 +346,7 @@
     }
 
     function playNextAudioChunk() {
+      console.log('[VoiceWidget] playNextAudioChunk called, queue:', state.audioQueue ? state.audioQueue.length : state.audioQueue);
       if (!state.audioQueue || state.audioQueue.length === 0) {
         state.isPlayingAudio = false;
         return;
@@ -348,8 +357,12 @@
       source.buffer = buffer;
       source.connect(state.audioContext.destination);
       state.currentSource = source;
-      source.onended = playNextAudioChunk;
+      source.onended = function () {
+        console.log('[VoiceWidget] chunk playback ended');
+        playNextAudioChunk();
+      };
       source.start();
+      console.log('[VoiceWidget] chunk playback started, duration:', buffer.duration);
     }
 
     function startAnimationLoop() {
