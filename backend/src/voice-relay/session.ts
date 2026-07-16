@@ -47,6 +47,7 @@ export class VoiceSession {
         JSON.stringify({
           type: 'session.update',
           session: {
+            type: 'session',
             voice: agentConfig.voice,
             instructions: agentConfig.instructions,
             input_audio_format: 'pcm16',
