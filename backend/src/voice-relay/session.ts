@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import WebSocket from 'ws'
 import type { VoiceAgentVoice } from '../types/index.js'
 
-const REALTIME_MODEL = 'gpt-4o-realtime-preview-2024-12-17'
+const REALTIME_MODEL = 'gpt-realtime'
 const REALTIME_URL = `wss://api.openai.com/v1/realtime?model=${REALTIME_MODEL}`
 
 const apiKey = process.env.OPENAI_API_KEY
@@ -39,7 +39,6 @@ export class VoiceSession {
     this.openaiWs = new WebSocket(REALTIME_URL, {
       headers: {
         Authorization: `Bearer ${apiKey}`,
-        'OpenAI-Beta': 'realtime=v1',
       },
     })
 
