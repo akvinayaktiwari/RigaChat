@@ -22,8 +22,7 @@ export interface VoiceAgentConfig {
 interface OpenAIRealtimeEvent {
   type: string
   response?: { id?: string }
-  delta?: string
-  transcript?: string
+  delta?: { audio?: string; transcript?: string }
   error?: { message?: string }
 }
 
@@ -48,8 +47,6 @@ export class VoiceSession {
           type: 'session.update',
           session: {
             type: 'realtime',
-            model: 'gpt-realtime',
-            modalities: ['audio', 'text'],
             instructions: agentConfig.instructions || 'You are a helpful voice assistant.',
             input_audio_format: 'pcm16',
             output_audio_format: 'pcm16',
@@ -143,13 +140,13 @@ export class VoiceSession {
       return
     }
 
-    if (event.type === 'response.audio.delta' && event.delta) {
-      this.sendToBrowser({ type: 'audio', data: event.delta })
+    if (event.type === 'response.output_audio.delta' && event.delta?.audio) {
+      this.sendToBrowser({ type: 'audio', data: event.delta.audio })
       return
     }
 
-    if (event.type === 'response.audio_transcript.delta' && event.delta) {
-      this.sendToBrowser({ type: 'transcript', text: event.delta })
+    if (event.type === 'response.output_audio_transcript.delta' && event.delta?.transcript) {
+      this.sendToBrowser({ type: 'transcript', text: event.delta.transcript })
       return
     }
 
