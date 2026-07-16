@@ -2,7 +2,7 @@
   'use strict';
   try {
     var BACKEND_URL = '__BACKEND_URL__';
-    var WS_URL = '__WS_URL__';
+    var __VOICE_RELAY_URL__ = 'wss://voice.drsyeta.in';
 
     function getAgentId() {
       var scripts = document.getElementsByTagName('script');
@@ -41,7 +41,6 @@
 
     var BAR_COUNT = 20;
     var PING_INTERVAL_MS = 20000;
-    var RECORDER_TIMESLICE_MS = 250;
 
     var CSS_TEMPLATE =
       ':host{all:initial}' +
@@ -83,11 +82,14 @@
       analyser: null,
       dataArray: null,
       source: null,
-      mediaRecorder: null,
+      scriptProcessor: null,
       ws: null,
       pingInterval: null,
       animFrame: null,
-      idleTick: 0
+      idleTick: 0,
+      audioQueue: null,
+      isPlayingAudio: false,
+      currentSource: null
     };
 
     function init() {
@@ -204,7 +206,7 @@
         .then(function (stream) {
           state.mediaStream = stream;
           setupAudioAnalysis(stream);
-          setupRecorder(stream);
+          setupPCMCapture(stream);
           connectWebSocket();
         })
         .catch(function () {
@@ -225,7 +227,10 @@
 
     function setupAudioAnalysis(stream) {
       var AudioContextCtor = window.AudioContext || window.webkitAudioContext;
-      state.audioContext = new AudioContextCtor();
+      state.audioContext = new AudioContextCtor({ sampleRate: 24000 });
+      if (state.audioContext.state === 'suspended') {
+        state.audioContext.resume();
+      }
       state.analyser = state.audioContext.createAnalyser();
       state.analyser.fftSize = 64;
       state.dataArray = new Uint8Array(state.analyser.frequencyBinCount);
@@ -233,105 +238,125 @@
       state.source.connect(state.analyser);
     }
 
-    function setupRecorder(stream) {
-      var mimeType = 'audio/webm;codecs=opus';
-      if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = 'audio/webm';
-      }
-      state.mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
-      state.mediaRecorder.ondataavailable = function (event) {
-        if (!event.data || event.data.size === 0) return;
+    function setupPCMCapture(stream) {
+      // ScriptProcessorNode: deprecated but universally supported, no blob/CSP issues
+      var CHUNK_SIZE = 4096;
+      var source = state.audioContext.createMediaStreamSource(stream);
+      state.source = source;
+
+      var processor = state.audioContext.createScriptProcessor(CHUNK_SIZE, 1, 1);
+      state.scriptProcessor = processor;
+
+      processor.onaudioprocess = function (e) {
         if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return;
-        var reader = new FileReader();
-        reader.onloadend = function () {
-          var result = reader.result || '';
-          var commaIndex = result.indexOf(',');
-          var base64Data = commaIndex !== -1 ? result.substring(commaIndex + 1) : '';
-          if (!base64Data) return;
-          try {
-            state.ws.send(JSON.stringify({ type: 'audio', data: base64Data }));
-          } catch (e) {
-            /* ignore send failures */
-          }
-        };
-        reader.readAsDataURL(event.data);
+        var input = e.inputBuffer.getChannelData(0); // Float32, native rate (24kHz)
+        var pcm = new Int16Array(input.length);
+        for (var i = 0; i < input.length; i++) {
+          var s = Math.max(-1, Math.min(1, input[i]));
+          pcm[i] = s < 0 ? s * 32768 : s * 32767;
+        }
+        var base64 = btoa(String.fromCharCode.apply(null, new Uint8Array(pcm.buffer)));
+        try {
+          state.ws.send(JSON.stringify({ type: 'audio', data: base64 }));
+        } catch (err) {
+          console.error('[VoiceWidget] send error:', err.message);
+        }
       };
+
+      source.connect(state.analyser);   // keep visualizer working
+      source.connect(processor);
+      processor.connect(state.audioContext.destination);
     }
 
     function connectWebSocket() {
-      var url = WS_URL + '?agentId=' + encodeURIComponent(agentId);
-      var ws = new WebSocket(url);
-      state.ws = ws;
+      fetch(BACKEND_URL + '/api/voice-agents/token?agentId=' + encodeURIComponent(agentId))
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          var wsUrl = __VOICE_RELAY_URL__ + '?agentId=' + encodeURIComponent(agentId) + '&token=' + data.token;
+          var ws = new WebSocket(wsUrl);
+          state.ws = ws;
 
-      ws.onopen = function () {
-        if (state.mediaRecorder && state.mediaRecorder.state === 'inactive') {
-          state.mediaRecorder.start(RECORDER_TIMESLICE_MS);
-        }
-        state.pingInterval = setInterval(function () {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'ping' }));
-          }
-        }, PING_INTERVAL_MS);
-      };
+          ws.onopen = function () {
+            console.log('[VoiceWidget] WebSocket open');
+            state.pingInterval = setInterval(function () {
+              if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+                state.ws.send(JSON.stringify({ type: 'ping' }));
+              }
+            }, PING_INTERVAL_MS);
+          };
 
-      ws.onmessage = function (event) {
-        var msg;
-        try {
-          msg = JSON.parse(event.data);
-        } catch (e) {
-          return;
-        }
-        if (!msg || !msg.type) return;
-        if (msg.type === 'audio') {
-          playAudioChunk(msg.data);
-        } else if (msg.type === 'ended') {
-          cleanup();
-          collapseWidget();
-        }
-        /* type 'transcript' and 'pong' are ignored */
-      };
+          ws.onmessage = function (event) {
+            var msg;
+            try {
+              msg = JSON.parse(event.data);
+            } catch (e) {
+              return;
+            }
+            if (!msg || !msg.type) return;
+            if (msg.type === 'audio') {
+              console.log('[VoiceWidget] audio frame received, base64 length:', msg.data && msg.data.length);
 
-      ws.onclose = function () {
-        cleanup();
-        collapseWidget();
-      };
+              // Decode base64 PCM16 → Float32 → play via AudioContext
+              var raw = atob(msg.data);
+              var pcm16 = new Int16Array(raw.length / 2);
+              for (var i = 0; i < pcm16.length; i++) {
+                pcm16[i] = (raw.charCodeAt(i * 2)) | (raw.charCodeAt(i * 2 + 1) << 8);
+              }
+              var float32 = new Float32Array(pcm16.length);
+              for (var j = 0; j < pcm16.length; j++) {
+                float32[j] = pcm16[j] / 32768.0;
+              }
 
-      ws.onerror = function () {
-        cleanup();
-        collapseWidget();
-      };
+              var buffer = state.audioContext.createBuffer(1, float32.length, 24000);
+              buffer.copyToChannel(float32, 0);
+
+              if (!state.audioQueue) { state.audioQueue = []; }
+              state.audioQueue.push(buffer);
+              if (!state.isPlayingAudio) { playNextAudioChunk(); }
+            } else if (msg.type === 'barge-in') {
+              // Stop agent audio playback immediately
+              if (state.audioQueue) { state.audioQueue = []; }
+              if (state.currentSource) {
+                try { state.currentSource.stop(); } catch (e) {}
+                state.currentSource = null;
+              }
+              console.log('[VoiceWidget] barge-in: agent interrupted');
+            } else if (msg.type === 'ended') {
+              cleanup();
+              collapseWidget();
+            }
+            /* type 'transcript' and 'pong' are ignored */
+          };
+
+          ws.onclose = function () {
+            cleanup();
+            collapseWidget();
+          };
+
+          ws.onerror = function () {
+            cleanup();
+            collapseWidget();
+          };
+        })
+        .catch(function (err) {
+          console.error('[VoiceWidget] token fetch failed:', err);
+        });
     }
 
-    function base64ToArrayBuffer(base64) {
-      var binaryStr = atob(base64);
-      var len = binaryStr.length;
-      var bytes = new Uint8Array(len);
-      for (var i = 0; i < len; i++) {
-        bytes[i] = binaryStr.charCodeAt(i);
+    function playNextAudioChunk() {
+      console.log('[VoiceWidget] playNext called, queue:', state.audioQueue && state.audioQueue.length, 'ctx:', state.audioContext && state.audioContext.state);
+      if (!state.audioQueue || state.audioQueue.length === 0) {
+        state.isPlayingAudio = false;
+        return;
       }
-      return bytes.buffer;
-    }
-
-    function playAudioChunk(base64Data) {
-      if (!base64Data || !state.audioContext) return;
-      try {
-        var arrayBuffer = base64ToArrayBuffer(base64Data);
-        state.audioContext.decodeAudioData(
-          arrayBuffer,
-          function (audioBuffer) {
-            if (!state.audioContext) return;
-            var sourceNode = state.audioContext.createBufferSource();
-            sourceNode.buffer = audioBuffer;
-            sourceNode.connect(state.audioContext.destination);
-            sourceNode.start(0);
-          },
-          function () {
-            /* ignore decode failures */
-          }
-        );
-      } catch (e) {
-        /* ignore playback failures */
-      }
+      state.isPlayingAudio = true;
+      var buffer = state.audioQueue.shift();
+      var source = state.audioContext.createBufferSource();
+      source.buffer = buffer;
+      source.connect(state.audioContext.destination);
+      state.currentSource = source;
+      source.onended = playNextAudioChunk;
+      source.start();
     }
 
     function startAnimationLoop() {
@@ -356,12 +381,11 @@
     }
 
     function cleanup() {
-      if (state.mediaRecorder) {
-        try {
-          if (state.mediaRecorder.state !== 'inactive') {
-            state.mediaRecorder.stop();
-          }
-        } catch (e) { /* ignore */ }
+      if (state.scriptProcessor) {
+        try { state.scriptProcessor.disconnect(); } catch (e) { /* ignore */ }
+      }
+      if (state.source) {
+        try { state.source.disconnect(); } catch (e) { /* ignore */ }
       }
       if (state.mediaStream) {
         state.mediaStream.getTracks().forEach(function (track) {
@@ -377,6 +401,12 @@
       if (state.animFrame) {
         cancelAnimationFrame(state.animFrame);
       }
+      if (state.currentSource) {
+        try { state.currentSource.stop(); } catch (e) {}
+        state.currentSource = null;
+      }
+      state.audioQueue = [];
+      state.isPlayingAudio = false;
       if (state.ws) {
         try {
           if (state.ws.readyState === WebSocket.OPEN) {
@@ -385,7 +415,7 @@
         } catch (e) { /* ignore */ }
         try { state.ws.close(); } catch (e) { /* ignore */ }
       }
-      state.mediaRecorder = null;
+      state.scriptProcessor = null;
       state.mediaStream = null;
       state.audioContext = null;
       state.analyser = null;

@@ -11,6 +11,7 @@ import {
   startVoiceSession,
   updateVoiceAgent,
 } from '../services/voice-service.js'
+import { generateToken } from '../voice-relay/auth.js'
 import type { ApiResponse, VoiceAgent } from '../types/index.js'
 
 interface AuthEnv {
@@ -95,6 +96,19 @@ voiceRoutes.get('/', requireAuth, async (c) => {
   } catch (error) {
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }
+})
+
+// Public route — widget calls this from external client websites.
+// Security: HMAC token (VOICE_AUTH_SECRET), not Cognito JWT.
+voiceRoutes.get('/token', async (c) => {
+  const agentId = c.req.query('agentId')
+
+  if (!agentId) {
+    return c.json({ error: 'agentId required' }, 400)
+  }
+
+  const token = generateToken(agentId, process.env.VOICE_AUTH_SECRET ?? '')
+  return c.json({ token, expiresIn: 300 }, 200)
 })
 
 voiceRoutes.get('/public/:id', async (c) => {
