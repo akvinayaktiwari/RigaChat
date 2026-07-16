@@ -28,6 +28,12 @@
     }
     return;
   }
+  function getBottomOffset() {
+    var scriptTag = document.currentScript ||
+      document.querySelector('script[data-bot-id]');
+    return (scriptTag && scriptTag.getAttribute('data-bottom-offset')) || '20';
+  }
+  var bottomOffset = getBottomOffset();
   var state = {
     isOpen: false,
     conversationId: null,
@@ -246,6 +252,7 @@
         shadowRoot.appendChild(container.firstChild);
       }
       els.bubble = shadowRoot.getElementById('ciq-bubble');
+      els.bubble.style.bottom = bottomOffset + 'px';
       els.bubbleBadge = shadowRoot.getElementById('ciq-bubble-badge');
       els.bubbleIcon = shadowRoot.getElementById('ciq-bubble-icon');
       els.bubbleIcon.innerHTML = BUBBLE_CHAT_ICON;
