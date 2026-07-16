@@ -7,9 +7,10 @@ import tailwindcss from '@tailwindcss/vite'
 const LOCAL_WIDGET_FILES: Record<string, string> = {
   '/widget.js': 'public/widget.js',
   '/form-widget.js': 'public/form-widget.js',
+  '/voice-widget.js': 'public/voice-widget.js',
 }
 
-function serveLocalWidget(backendUrl: string): Plugin {
+function serveLocalWidget(backendUrl: string, voiceWsUrl: string): Plugin {
   return {
     name: 'serve-local-widget',
     configureServer(server) {
@@ -21,7 +22,7 @@ function serveLocalWidget(backendUrl: string): Plugin {
         }
         const raw = fs.readFileSync(path.resolve(__dirname, relativePath), 'utf-8')
         res.setHeader('Content-Type', 'application/javascript')
-        res.end(raw.replace(/__BACKEND_URL__/g, backendUrl))
+        res.end(raw.replace(/__BACKEND_URL__/g, backendUrl).replace(/__WS_URL__/g, voiceWsUrl))
       })
     },
   }
@@ -34,7 +35,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tailwindcss(),
-      serveLocalWidget(env.VITE_API_URL || ''),
+      serveLocalWidget(env.VITE_API_URL || '', env.VITE_VOICE_WS_URL || ''),
     ],
   }
 })
