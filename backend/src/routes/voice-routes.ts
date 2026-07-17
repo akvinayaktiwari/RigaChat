@@ -3,13 +3,11 @@ import { requireAuth } from '../lib/cognito.js'
 import {
   createVoiceAgent,
   deleteVoiceAgent,
-  endVoiceSession,
   getVoiceAgentById,
   getVoiceAgentContext,
   getVoiceAgentPublicConfig,
   getVoiceAgents,
   setupVoiceAgent,
-  startVoiceSession,
   updateVoiceAgent,
 } from '../services/voice-service.js'
 import { generateToken } from '../voice-relay/auth.js'
@@ -218,30 +216,3 @@ voiceRoutes.post('/:id/setup', requireAuth, async (c) => {
   }
 })
 
-voiceRoutes.post('/:id/session', async (c) => {
-  const agentId = c.req.param('id')
-
-  try {
-    const result = await startVoiceSession(agentId)
-    return c.json<ApiResponse<{ sessionId: string }>>({ success: true, data: result }, 200)
-  } catch (error) {
-    if (isNotFoundError(error)) {
-      return c.json<ApiResponse<null>>({ success: false, error: 'Voice agent not found' }, 404)
-    }
-    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
-  }
-})
-
-voiceRoutes.delete('/:id/session/:sessionId', async (c) => {
-  const sessionId = c.req.param('sessionId')
-
-  try {
-    await endVoiceSession(sessionId)
-    return c.body(null, 204)
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('not found')) {
-      return c.json<ApiResponse<null>>({ success: false, error: 'Voice session not found' }, 404)
-    }
-    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
-  }
-})

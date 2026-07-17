@@ -113,7 +113,7 @@ function applyMMR(candidates: SimilarityResult[], topN: number): SimilarityResul
 }
 
 export async function similaritySearch(
-  botId: string,
+  namespaceId: string,
   queryEmbedding: number[],
   topN: number = 5
 ): Promise<SimilarityResult[]> {
@@ -123,7 +123,7 @@ export async function similaritySearch(
     const response = await index.query({
       vector: queryEmbedding,
       topK: MMR_FETCH_COUNT,
-      filter: { botId: { $eq: botId } },
+      filter: { botId: { $eq: namespaceId } },
       includeMetadata: true,
     })
 
@@ -140,18 +140,18 @@ export async function similaritySearch(
     return applyMMR(candidates, topN)
   } catch (error) {
     throw new Error(
-      `Failed to run similarity search for bot ${botId}: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to run similarity search for bot ${namespaceId}: ${error instanceof Error ? error.message : String(error)}`
     )
   }
 }
 
-export async function deleteChunksByBotId(botId: string): Promise<void> {
+export async function deleteChunksByNamespace(namespaceId: string): Promise<void> {
   try {
     const index = getIndex()
-    await index.deleteMany({ botId: { $eq: botId } })
+    await index.deleteMany({ botId: { $eq: namespaceId } })
   } catch (error) {
     throw new Error(
-      `Failed to delete chunks for bot ${botId}: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to delete chunks for bot ${namespaceId}: ${error instanceof Error ? error.message : String(error)}`
     )
   }
 }
