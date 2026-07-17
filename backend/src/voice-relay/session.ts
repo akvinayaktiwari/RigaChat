@@ -88,8 +88,31 @@ export class VoiceSession {
     this.contextReceived = true
     this.context = context
 
-    if (this.openaiReady && !this.sessionUpdateSent) {
-      this.sendSessionUpdate(context.instructions ?? FALLBACK_INSTRUCTIONS, context.voice ?? this.fallbackVoice)
+    if (this.openaiReady && !this.sessionUpdateSent && this.openaiWs.readyState === WebSocket.OPEN) {
+      this.openaiWs.send(
+        JSON.stringify({
+          type: 'session.update',
+          session: {
+            type: 'realtime',
+            instructions: context.instructions ?? FALLBACK_INSTRUCTIONS,
+            audio: {
+              input: {
+                format: { type: 'audio/pcm', rate: 24000 },
+                turn_detection: {
+                  type: 'server_vad',
+                  threshold: 0.5,
+                  prefix_padding_ms: 300,
+                  silence_duration_ms: 500,
+                },
+              },
+              output: {
+                format: { type: 'audio/pcm', rate: 24000 },
+              },
+            },
+          },
+        })
+      )
+      this.sessionUpdateSent = true
     }
   }
 
