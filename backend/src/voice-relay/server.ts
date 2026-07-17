@@ -1,4 +1,5 @@
 import http from 'node:http'
+import { randomUUID } from 'node:crypto'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { WebSocketServer, type WebSocket } from 'ws'
@@ -104,17 +105,18 @@ wss.on('connection', async (ws: WebSocket, req) => {
     firstMessage: agent.greetingMessage,
   })
 
-  activeSessions.set(agentId, session)
+  const connectionId = randomUUID()
+  activeSessions.set(connectionId, session)
 
   ws.on('close', () => {
     session.cleanup()
-    activeSessions.delete(agentId)
+    activeSessions.delete(connectionId)
   })
 
   ws.on('error', (err) => {
     console.error(`[VoiceRelay] Browser socket error for agent ${agentId}:`, err.message)
     session.cleanup()
-    activeSessions.delete(agentId)
+    activeSessions.delete(connectionId)
   })
 })
 
