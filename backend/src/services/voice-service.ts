@@ -103,7 +103,7 @@ export async function updateVoiceAgent(
 
 export async function getVoiceAgentContext(
   agentId: string
-): Promise<Pick<VoiceAgent, 'name' | 'voice' | 'greetingMessage' | 'systemPrompt'>> {
+): Promise<Pick<VoiceAgent, 'name' | 'voice' | 'greetingMessage' | 'systemPrompt' | 'botId'>> {
   const agent = await getVoiceAgentByIdRecord(agentId)
   if (!agent) {
     throw new Error('Voice agent not found')
@@ -114,6 +114,7 @@ export async function getVoiceAgentContext(
     voice: agent.voice,
     greetingMessage: agent.greetingMessage,
     systemPrompt: agent.systemPrompt,
+    botId: agent.botId,
   }
 }
 

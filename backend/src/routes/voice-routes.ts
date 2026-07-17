@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from 'node:crypto'
 import { Hono } from 'hono'
 import { requireAuth } from '../lib/cognito.js'
 import {
@@ -10,6 +11,7 @@ import {
   setupVoiceAgent,
   updateVoiceAgent,
 } from '../services/voice-service.js'
+import { retrieveContext } from '../services/rag-service.js'
 import { generateToken } from '../voice-relay/auth.js'
 import type { ApiResponse, VoiceAgent } from '../types/index.js'
 
@@ -47,6 +49,51 @@ function isNotFoundError(error: unknown): boolean {
     error instanceof Error &&
     (error.message === 'Voice agent not found' || error.message === 'Voice agent is not enabled')
   )
+}
+
+const VOICE_TOKEN_MAX_AGE_MS = 5 * 60 * 1000
+
+// Lambda-side mirror of voice-relay/auth.ts's validateToken — duplicated
+// rather than imported since voice-relay/ is a separate EC2-only bundle
+// not built into this Lambda.
+function validateVoiceToken(token: string, secret: string): { valid: boolean; agentId?: string } {
+  let decoded: string
+  try {
+    decoded = Buffer.from(token, 'base64url').toString('utf8')
+  } catch {
+    return { valid: false }
+  }
+
+  const separatorIndex = decoded.lastIndexOf('.')
+  if (separatorIndex === -1) {
+    return { valid: false }
+  }
+
+  const payload = decoded.slice(0, separatorIndex)
+  const signature = decoded.slice(separatorIndex + 1)
+
+  const expectedSignature = createHmac('sha256', secret).update(payload).digest('hex')
+
+  const signatureBuffer = Buffer.from(signature, 'hex')
+  const expectedBuffer = Buffer.from(expectedSignature, 'hex')
+
+  if (signatureBuffer.length !== expectedBuffer.length || !timingSafeEqual(signatureBuffer, expectedBuffer)) {
+    return { valid: false }
+  }
+
+  const timestampIndex = payload.lastIndexOf(':')
+  if (timestampIndex === -1) {
+    return { valid: false }
+  }
+
+  const agentId = payload.slice(0, timestampIndex)
+  const timestamp = Number(payload.slice(timestampIndex + 1))
+
+  if (!Number.isFinite(timestamp) || Date.now() - timestamp > VOICE_TOKEN_MAX_AGE_MS) {
+    return { valid: false }
+  }
+
+  return { valid: true, agentId }
 }
 
 voiceRoutes.post('/', requireAuth, async (c) => {
@@ -154,6 +201,39 @@ voiceRoutes.get('/context/:agentId', async (c) => {
     if (isNotFoundError(error)) {
       return c.json({ error: 'Agent not found' }, 404)
     }
+    return c.json({ error: errorMessage(error) }, 500)
+  }
+})
+
+// Called by the EC2 voice relay during tool-calling. Searches this
+// agent's own Pinecone namespace, plus the linked bot's namespace
+// if botId is set, merges results.
+voiceRoutes.post('/rag', async (c) => {
+  const body = await c.req.json<{ agentId: string; query: string; token: string }>()
+
+  if (!body.agentId || !body.query) {
+    return c.json({ error: 'agentId and query required' }, 400)
+  }
+
+  const { valid, agentId: tokenAgentId } = validateVoiceToken(body.token ?? '', process.env.VOICE_AUTH_SECRET ?? '')
+  if (!valid || tokenAgentId !== body.agentId) {
+    return c.json({ error: 'Invalid or missing token' }, 401)
+  }
+
+  try {
+    const agent = await getVoiceAgentContext(body.agentId)
+
+    const agentChunks = await retrieveContext(body.agentId, body.query)
+
+    let botChunks: string[] = []
+    if (agent.botId) {
+      botChunks = await retrieveContext(agent.botId, body.query)
+    }
+
+    const merged = [...agentChunks, ...botChunks].slice(0, 5)
+
+    return c.json({ chunks: merged }, 200)
+  } catch (error) {
     return c.json({ error: errorMessage(error) }, 500)
   }
 })
