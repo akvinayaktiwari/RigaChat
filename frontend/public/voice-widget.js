@@ -272,6 +272,13 @@
       fetch(BACKEND_URL + '/api/voice-agents/token?agentId=' + encodeURIComponent(agentId))
         .then(function (r) { return r.json(); })
         .then(function (data) {
+          var contextPromise = fetch(BACKEND_URL + '/api/voice-agents/context/' + agentId)
+            .then(function (r) { return r.json(); })
+            .catch(function (err) {
+              console.error('[VoiceWidget] context fetch failed:', err);
+              return null;
+            });
+
           var wsUrl = __VOICE_RELAY_URL__ + '?agentId=' + encodeURIComponent(agentId) + '&token=' + data.token;
           var ws = new WebSocket(wsUrl);
           state.ws = ws;
@@ -283,6 +290,18 @@
                 state.ws.send(JSON.stringify({ type: 'ping' }));
               }
             }, PING_INTERVAL_MS);
+
+            contextPromise.then(function (ctx) {
+              if (ctx && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                  type: 'context',
+                  instructions: ctx.instructions,
+                  voice: ctx.voice,
+                  botName: ctx.botName
+                }));
+                console.log('[VoiceWidget] context sent to relay');
+              }
+            });
           };
 
           ws.onmessage = function (event) {
@@ -294,8 +313,6 @@
             }
             if (!msg || !msg.type) return;
             if (msg.type === 'audio') {
-              console.log('[VoiceWidget] audio frame received, base64 length:', msg.data && msg.data.length);
-
               // Decode base64 PCM16 → Float32 → play via AudioContext
               var raw = atob(msg.data);
               var pcm16 = new Int16Array(raw.length / 2);
@@ -344,7 +361,6 @@
     }
 
     function playNextAudioChunk() {
-      console.log('[VoiceWidget] playNext called, queue:', state.audioQueue && state.audioQueue.length, 'ctx:', state.audioContext && state.audioContext.state);
       if (!state.audioQueue || state.audioQueue.length === 0) {
         state.isPlayingAudio = false;
         return;

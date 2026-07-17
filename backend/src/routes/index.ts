@@ -80,6 +80,7 @@ app.use('/api/forms/*', (c, next) => {
 app.use('/api/voice-agents/*', (c, next) => {
   const isPublicRoute =
     c.req.path.startsWith('/api/voice-agents/public/') ||
+    c.req.path.startsWith('/api/voice-agents/context/') ||
     /^\/api\/voice-agents\/[^/]+\/session(\/[^/]+)?$/.test(c.req.path) ||
     c.req.path === '/api/voice-agents/token'
   const corsMiddleware = isPublicRoute ? widgetCors : dashboardCors

@@ -5,6 +5,7 @@ import {
   deleteVoiceAgent,
   endVoiceSession,
   getVoiceAgentById,
+  getVoiceAgentContext,
   getVoiceAgentPublicConfig,
   getVoiceAgents,
   setupVoiceAgent,
@@ -33,7 +34,10 @@ interface CreateVoiceAgentBody {
 }
 
 type UpdateVoiceAgentBody = Partial<
-  Pick<VoiceAgent, 'name' | 'voice' | 'greetingMessage' | 'brandColor' | 'widgetPosition' | 'maxSessionDuration' | 'isEnabled'>
+  Pick<
+    VoiceAgent,
+    'name' | 'voice' | 'greetingMessage' | 'systemPrompt' | 'brandColor' | 'widgetPosition' | 'maxSessionDuration' | 'isEnabled'
+  >
 >
 
 function errorMessage(error: unknown): string {
@@ -125,6 +129,30 @@ voiceRoutes.get('/public/:id', async (c) => {
   }
 })
 
+// Public route — called by voice widget from external client websites.
+// Returns assembled OpenAI session instructions for this agent.
+voiceRoutes.get('/context/:agentId', async (c) => {
+  const agentId = c.req.param('agentId')
+
+  try {
+    const agent = await getVoiceAgentContext(agentId)
+
+    const base =
+      agent.systemPrompt && agent.systemPrompt.length > 0
+        ? agent.systemPrompt
+        : `You are ${agent.name}, a helpful voice assistant. Start the call by greeting the caller with: "${agent.greetingMessage}"`
+
+    const instructions = `${base}\nKeep responses concise — this is a voice conversation, 2-3 sentences max.`
+
+    return c.json({ instructions, voice: agent.voice, botName: agent.name }, 200)
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      return c.json({ error: 'Agent not found' }, 404)
+    }
+    return c.json({ error: errorMessage(error) }, 500)
+  }
+})
+
 voiceRoutes.get('/:id', requireAuth, async (c) => {
   const clientId = c.get('user').sub
   const agentId = c.req.param('id')
@@ -144,6 +172,10 @@ voiceRoutes.patch('/:id', requireAuth, async (c) => {
   const clientId = c.get('user').sub
   const agentId = c.req.param('id')
   const updates = await c.req.json<UpdateVoiceAgentBody>()
+
+  if (typeof updates.systemPrompt === 'string' && updates.systemPrompt.length > 500) {
+    return c.json({ error: 'systemPrompt must be 500 characters or fewer' }, 400)
+  }
 
   try {
     const agent = await updateVoiceAgent(agentId, clientId, updates)
