@@ -62,11 +62,19 @@ interface FormData {
   isEnabled: boolean
 }
 
+function buildDefaultSystemPrompt(agent: VoiceAgent): string {
+  return `You are ${agent.name}, a helpful voice assistant for ${agent.websiteUrl}.
+Greet callers with: "${agent.greetingMessage}"
+Only answer questions about this business.
+Keep responses concise — 2-3 sentences max.`
+}
+
 function toFormData(agent: VoiceAgent): FormData {
   return {
     name: agent.name,
     greetingMessage: agent.greetingMessage,
-    systemPrompt: agent.systemPrompt ?? '',
+    systemPrompt:
+      agent.systemPrompt && agent.systemPrompt.length > 0 ? agent.systemPrompt : buildDefaultSystemPrompt(agent),
     voice: agent.voice,
     brandColor: agent.brandColor,
     widgetPosition: agent.widgetPosition,
