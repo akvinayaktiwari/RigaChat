@@ -225,7 +225,7 @@ export interface CreateFormLeadInput {
   sourceUrl: string
 }
 
-export type VoiceAgentVoice = 'alloy' | 'echo' | 'shimmer' | 'nova' | 'onyx' | 'fable'
+export type VoiceAgentVoice = 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse' | 'marin' | 'cedar'
 
 export interface VoiceAgent {
   agentId: string
