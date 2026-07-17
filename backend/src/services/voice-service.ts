@@ -69,11 +69,30 @@ export async function updateVoiceAgent(
   agentId: string,
   clientId: string,
   updates: Partial<
-    Pick<VoiceAgent, 'name' | 'voice' | 'greetingMessage' | 'brandColor' | 'widgetPosition' | 'maxSessionDuration' | 'isEnabled'>
+    Pick<
+      VoiceAgent,
+      'name' | 'voice' | 'greetingMessage' | 'systemPrompt' | 'brandColor' | 'widgetPosition' | 'maxSessionDuration' | 'isEnabled'
+    >
   >
 ): Promise<VoiceAgent> {
   await getOwnedVoiceAgent(agentId, clientId)
   return await updateVoiceAgentRecord(agentId, clientId, updates)
+}
+
+export async function getVoiceAgentContext(
+  agentId: string
+): Promise<Pick<VoiceAgent, 'name' | 'voice' | 'greetingMessage' | 'systemPrompt'>> {
+  const agent = await getVoiceAgentByIdRecord(agentId)
+  if (!agent) {
+    throw new Error('Voice agent not found')
+  }
+
+  return {
+    name: agent.name,
+    voice: agent.voice,
+    greetingMessage: agent.greetingMessage,
+    systemPrompt: agent.systemPrompt,
+  }
 }
 
 export async function deleteVoiceAgent(agentId: string, clientId: string): Promise<void> {

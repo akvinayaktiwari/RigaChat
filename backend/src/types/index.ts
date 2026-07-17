@@ -233,6 +233,7 @@ export interface VoiceAgent {
   name: string
   voice: VoiceAgentVoice
   greetingMessage: string
+  systemPrompt?: string
   websiteUrl: string
   brandColor: string
   widgetPosition: 'bottom-left' | 'bottom-right' | 'bottom-center'
