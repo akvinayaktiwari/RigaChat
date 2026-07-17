@@ -40,6 +40,9 @@ function formatCreatedDate(createdAt: string): string {
 const inputClasses =
   'w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 bg-white outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors'
 const labelClasses = 'block text-sm font-medium text-gray-700 mb-1.5'
+const hintClasses = 'text-xs text-gray-400 mt-1'
+
+const SYSTEM_PROMPT_MAX_LENGTH = 500
 
 const primaryButtonClasses =
   'bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold rounded-xl shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed'
@@ -51,6 +54,7 @@ const dangerButtonClasses =
 interface FormData {
   name: string
   greetingMessage: string
+  systemPrompt: string
   voice: VoiceAgentVoice
   brandColor: string
   widgetPosition: VoiceAgent['widgetPosition']
@@ -62,6 +66,7 @@ function toFormData(agent: VoiceAgent): FormData {
   return {
     name: agent.name,
     greetingMessage: agent.greetingMessage,
+    systemPrompt: agent.systemPrompt ?? '',
     voice: agent.voice,
     brandColor: agent.brandColor,
     widgetPosition: agent.widgetPosition,
@@ -265,6 +270,27 @@ export default function VoiceAgentDetailPage() {
               </div>
 
               <div>
+                <label className={labelClasses}>System Prompt (optional)</label>
+                <textarea
+                  rows={5}
+                  value={formData.systemPrompt}
+                  onChange={(e) => update('systemPrompt', e.target.value)}
+                  className={inputClasses}
+                />
+                <p className={hintClasses}>
+                  Customize how the AI voice agent behaves. Leave empty for default behavior. Max{' '}
+                  {SYSTEM_PROMPT_MAX_LENGTH} characters.
+                </p>
+                <p
+                  className={`text-xs mt-1 text-right ${
+                    formData.systemPrompt.length >= SYSTEM_PROMPT_MAX_LENGTH ? 'text-red-500' : 'text-gray-400'
+                  }`}
+                >
+                  {formData.systemPrompt.length}/{SYSTEM_PROMPT_MAX_LENGTH}
+                </p>
+              </div>
+
+              <div>
                 <label className={labelClasses}>Voice</label>
                 <select
                   value={formData.voice}
@@ -359,7 +385,7 @@ export default function VoiceAgentDetailPage() {
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || formData.systemPrompt.length > SYSTEM_PROMPT_MAX_LENGTH}
               className={`w-full mt-6 py-3 flex items-center justify-center gap-2 ${primaryButtonClasses}`}
             >
               {saving && <Loader2 size={16} className="animate-spin" />}

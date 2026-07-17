@@ -240,6 +240,7 @@ export interface VoiceAgent {
   name: string
   voice: VoiceAgentVoice
   greetingMessage: string
+  systemPrompt?: string
   websiteUrl: string
   brandColor: string
   widgetPosition: 'bottom-left' | 'bottom-right' | 'bottom-center'
@@ -264,6 +265,7 @@ export interface UpdateVoiceAgentInput {
   name?: string
   voice?: VoiceAgentVoice
   greetingMessage?: string
+  systemPrompt?: string
   brandColor?: string
   widgetPosition?: 'bottom-left' | 'bottom-right' | 'bottom-center'
   maxSessionDuration?: 5 | 10 | 15
