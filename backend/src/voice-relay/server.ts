@@ -98,6 +98,7 @@ wss.on('connection', async (ws: WebSocket, req) => {
   }
 
   const session = new VoiceSession(ws, {
+    agentId,
     voice: agent.voice,
     instructions: `You are ${agent.name}, a helpful voice assistant. Start the call by greeting the caller with: "${agent.greetingMessage}"`,
     firstMessage: agent.greetingMessage,

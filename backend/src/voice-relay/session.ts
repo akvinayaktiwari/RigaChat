@@ -1,12 +1,38 @@
 import { randomUUID } from 'node:crypto'
 import WebSocket from 'ws'
 import type { VoiceAgentVoice } from '../types/index.js'
+import { generateToken } from './auth.js'
 
 const REALTIME_MODEL = 'gpt-realtime'
 const REALTIME_URL = `wss://api.openai.com/v1/realtime?model=${REALTIME_MODEL}`
 const CONTEXT_TIMEOUT_MS = 5000
+const RAG_FETCH_TIMEOUT_MS = 5000
+// TODO: add BACKEND_URL to the EC2 .env — it is not set there today. This is
+// the current Lambda function URL (from scripts/deploy.sh) used as a fallback
+// until the env var exists.
+const FALLBACK_BACKEND_URL = 'https://hxtvyv6kgsasppyrvyljaezeii0zxzco.lambda-url.ap-south-1.on.aws'
 const FALLBACK_INSTRUCTIONS =
   'You are a helpful voice assistant. Keep responses concise — this is a voice conversation, 2-3 sentences max.'
+
+const KNOWLEDGE_BASE_TOOL = {
+  type: 'function',
+  name: 'search_knowledge_base',
+  description:
+    'Search the knowledge base for specific information like pricing, amenities, availability, or business policies when you do not already know the answer.',
+  parameters: {
+    type: 'object',
+    properties: {
+      query: {
+        type: 'string',
+        description: 'The specific question or topic to search for',
+      },
+    },
+    required: ['query'],
+  },
+}
+
+// Shared by both session.update send sites so they can never drift out of sync.
+const REALTIME_TOOLS = [KNOWLEDGE_BASE_TOOL]
 
 const apiKey = process.env.OPENAI_API_KEY
 
@@ -17,6 +43,7 @@ if (!apiKey) {
 }
 
 export interface VoiceAgentConfig {
+  agentId: string
   voice: VoiceAgentVoice
   instructions: string
   firstMessage: string
@@ -27,6 +54,9 @@ interface OpenAIRealtimeEvent {
   response?: { id?: string }
   delta?: { audio?: string; transcript?: string }
   error?: { message?: string }
+  name?: string
+  arguments?: string
+  call_id?: string
 }
 
 interface VoiceContext {
@@ -38,6 +68,7 @@ interface VoiceContext {
 export class VoiceSession {
   private browserWs: WebSocket
   private openaiWs: WebSocket
+  private agentId: string
   private isAgentSpeaking = false
   private currentResponseId: string | null = null
   private openaiReady = false
@@ -49,6 +80,7 @@ export class VoiceSession {
 
   constructor(browserWs: WebSocket, agentConfig: VoiceAgentConfig) {
     this.browserWs = browserWs
+    this.agentId = agentConfig.agentId
     this.fallbackVoice = agentConfig.voice
 
     this.openaiWs = new WebSocket(REALTIME_URL, {
@@ -95,6 +127,7 @@ export class VoiceSession {
           session: {
             type: 'realtime',
             instructions: context.instructions ?? FALLBACK_INSTRUCTIONS,
+            tools: REALTIME_TOOLS,
             audio: {
               input: {
                 format: { type: 'audio/pcm', rate: 24000 },
@@ -127,6 +160,7 @@ export class VoiceSession {
         session: {
           type: 'realtime',
           instructions,
+          tools: REALTIME_TOOLS,
           audio: {
             input: {
               format: { type: 'audio/pcm', rate: 24000 },
@@ -236,6 +270,12 @@ export class VoiceSession {
       return
     }
 
+    if (event.type === 'response.function_call_arguments.done' && event.name === 'search_knowledge_base') {
+      console.log('[VoiceRelay] OpenAI requested tool call')
+      this.handleToolCall(event)
+      return
+    }
+
     if (event.type === 'error') {
       console.error('[VoiceRelay] OpenAI error event:', event.error?.message)
       this.sendToBrowser({ type: 'error', message: event.error?.message ?? 'Unknown error' })
@@ -250,6 +290,60 @@ export class VoiceSession {
     this.isAgentSpeaking = false
     this.currentResponseId = null
     this.sendToBrowser({ type: 'barge-in' })
+  }
+
+  private async handleToolCall(event: OpenAIRealtimeEvent): Promise<void> {
+    console.log('[VoiceRelay] Tool call triggered:', event.name, event.arguments)
+    let chunks: string[] = []
+    try {
+      const { query } = JSON.parse(event.arguments ?? '{}') as { query: string }
+      console.log('[VoiceRelay] Fetching RAG chunks for query:', query)
+      chunks = await this.fetchRagChunks(query)
+      console.log('[VoiceRelay] RAG chunks received:', chunks.length, 'chunks')
+    } catch (error) {
+      console.log('[VoiceRelay] Tool call failed:', error)
+      console.error('[VoiceRelay] Tool call failed:', error instanceof Error ? error.message : error)
+    }
+
+    if (this.openaiWs.readyState === WebSocket.OPEN) {
+      this.openaiWs.send(
+        JSON.stringify({
+          type: 'conversation.item.create',
+          item: {
+            type: 'function_call_output',
+            call_id: event.call_id,
+            output: chunks.join('\n\n') || 'No specific information found.',
+          },
+        })
+      )
+      this.openaiWs.send(JSON.stringify({ type: 'response.create' }))
+    }
+  }
+
+  private async fetchRagChunks(query: string): Promise<string[]> {
+    const token = generateToken(this.agentId, process.env.VOICE_AUTH_SECRET ?? '')
+    const backendUrl = process.env.BACKEND_URL ?? FALLBACK_BACKEND_URL
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), RAG_FETCH_TIMEOUT_MS)
+
+    try {
+      const response = await fetch(`${backendUrl}/api/voice-agents/rag`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId: this.agentId, query, token }),
+        signal: controller.signal,
+      })
+
+      if (!response.ok) {
+        return []
+      }
+
+      const data = (await response.json()) as { chunks?: string[] }
+      return data.chunks ?? []
+    } finally {
+      clearTimeout(timeout)
+    }
   }
 
   private sendToBrowser(payload: unknown): void {
