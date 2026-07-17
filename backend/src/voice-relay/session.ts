@@ -4,6 +4,9 @@ import type { VoiceAgentVoice } from '../types/index.js'
 
 const REALTIME_MODEL = 'gpt-realtime'
 const REALTIME_URL = `wss://api.openai.com/v1/realtime?model=${REALTIME_MODEL}`
+const CONTEXT_TIMEOUT_MS = 5000
+const FALLBACK_INSTRUCTIONS =
+  'You are a helpful voice assistant. Keep responses concise — this is a voice conversation, 2-3 sentences max.'
 
 const apiKey = process.env.OPENAI_API_KEY
 
@@ -26,14 +29,27 @@ interface OpenAIRealtimeEvent {
   error?: { message?: string }
 }
 
+interface VoiceContext {
+  instructions?: string
+  voice?: VoiceAgentVoice
+  botName?: string
+}
+
 export class VoiceSession {
   private browserWs: WebSocket
   private openaiWs: WebSocket
   private isAgentSpeaking = false
   private currentResponseId: string | null = null
+  private openaiReady = false
+  private contextReceived = false
+  private sessionUpdateSent = false
+  private contextTimeout: NodeJS.Timeout | null = null
+  private fallbackVoice: VoiceAgentVoice
+  private context: VoiceContext = {}
 
   constructor(browserWs: WebSocket, agentConfig: VoiceAgentConfig) {
     this.browserWs = browserWs
+    this.fallbackVoice = agentConfig.voice
 
     this.openaiWs = new WebSocket(REALTIME_URL, {
       headers: {
@@ -42,29 +58,17 @@ export class VoiceSession {
     })
 
     this.openaiWs.on('open', () => {
-      this.openaiWs.send(
-        JSON.stringify({
-          type: 'session.update',
-          session: {
-            type: 'realtime',
-            instructions: agentConfig.instructions || 'You are a helpful voice assistant.',
-            audio: {
-              input: {
-                format: { type: 'audio/pcm', rate: 24000 },
-                turn_detection: {
-                  type: 'server_vad',
-                  threshold: 0.5,
-                  prefix_padding_ms: 300,
-                  silence_duration_ms: 500,
-                },
-              },
-              output: {
-                format: { type: 'audio/pcm', rate: 24000 },
-              },
-            },
-          },
-        })
-      )
+      this.openaiReady = true
+
+      if (this.contextReceived) {
+        this.sendSessionUpdate(this.context.instructions ?? FALLBACK_INSTRUCTIONS, this.context.voice ?? this.fallbackVoice)
+      }
+
+      this.contextTimeout = setTimeout(() => {
+        if (!this.sessionUpdateSent) {
+          this.sendSessionUpdate(FALLBACK_INSTRUCTIONS, this.fallbackVoice)
+        }
+      }, CONTEXT_TIMEOUT_MS)
     })
 
     this.openaiWs.on('message', (data: WebSocket.RawData) => {
@@ -80,7 +84,52 @@ export class VoiceSession {
     })
   }
 
+  private applyContext(context: VoiceContext): void {
+    this.contextReceived = true
+    this.context = context
+
+    if (this.openaiReady && !this.sessionUpdateSent) {
+      this.sendSessionUpdate(context.instructions ?? FALLBACK_INSTRUCTIONS, context.voice ?? this.fallbackVoice)
+    }
+  }
+
+  private sendSessionUpdate(instructions: string, voice: VoiceAgentVoice): void {
+    if (this.openaiWs.readyState !== WebSocket.OPEN) {
+      return
+    }
+
+    this.openaiWs.send(
+      JSON.stringify({
+        type: 'session.update',
+        session: {
+          type: 'realtime',
+          instructions,
+          audio: {
+            input: {
+              format: { type: 'audio/pcm', rate: 24000 },
+              turn_detection: {
+                type: 'server_vad',
+                threshold: 0.5,
+                prefix_padding_ms: 300,
+                silence_duration_ms: 500,
+              },
+            },
+            output: {
+              format: { type: 'audio/pcm', rate: 24000 },
+              voice,
+            },
+          },
+        },
+      })
+    )
+    this.sessionUpdateSent = true
+  }
+
   cleanup(): void {
+    if (this.contextTimeout) {
+      clearTimeout(this.contextTimeout)
+      this.contextTimeout = null
+    }
     if (this.openaiWs.readyState === WebSocket.OPEN || this.openaiWs.readyState === WebSocket.CONNECTING) {
       this.openaiWs.close()
     }
@@ -90,10 +139,15 @@ export class VoiceSession {
   }
 
   private handleBrowserMessage(data: WebSocket.RawData): void {
-    let message: { type: string; data?: string }
+    let message: { type: string; data?: string; instructions?: string; voice?: VoiceAgentVoice; botName?: string }
     try {
       message = JSON.parse(data.toString())
     } catch {
+      return
+    }
+
+    if (message.type === 'context') {
+      this.applyContext(message)
       return
     }
 
