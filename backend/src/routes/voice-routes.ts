@@ -83,6 +83,13 @@ voiceRoutes.post('/', requireAuth, async (c) => {
       widgetPosition: body.widgetPosition,
       maxSessionDuration: body.maxSessionDuration,
     })
+
+    try {
+      await setupVoiceAgent(agent.agentId, clientId)
+    } catch (setupError) {
+      console.error(`Failed to auto-trigger indexing for voice agent ${agent.agentId}:`, setupError)
+    }
+
     return c.json<ApiResponse<VoiceAgent>>({ success: true, data: agent }, 201)
   } catch (error) {
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)

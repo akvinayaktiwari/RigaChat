@@ -1,11 +1,14 @@
+import { v4 as uuidv4 } from 'uuid'
 import {
   createVoiceAgent as createVoiceAgentRecord,
   deleteVoiceAgent as deleteVoiceAgentRecord,
   getVoiceAgentById as getVoiceAgentByIdRecord,
   getVoiceAgentsByClient,
   updateVoiceAgent as updateVoiceAgentRecord,
+  updateVoiceIndexingJob,
 } from '../repositories/voice-repository.js'
-import { indexWebsite } from './rag-service.js'
+import { scanWebsite } from './crawler-service.js'
+import { enqueueCrawlerJob } from '../lib/sqs.js'
 import type { CreateVoiceAgentInput, VoiceAgent } from '../types/index.js'
 
 async function getOwnedVoiceAgent(agentId: string, clientId: string): Promise<VoiceAgent> {
@@ -22,8 +25,32 @@ export async function createVoiceAgent(input: CreateVoiceAgentInput): Promise<Vo
 
 export async function setupVoiceAgent(agentId: string, clientId: string): Promise<VoiceAgent> {
   const agent = await getOwnedVoiceAgent(agentId, clientId)
-  await indexWebsite(agentId, agent.websiteUrl)
-  return await updateVoiceAgentRecord(agentId, clientId, { isIndexed: true })
+
+  const scan = await scanWebsite(agent.websiteUrl)
+  const jobId = uuidv4()
+
+  await updateVoiceIndexingJob(agentId, clientId, {
+    jobId,
+    status: 'queued',
+    websiteUrl: agent.websiteUrl,
+    totalPages: scan.totalPages,
+    selectedPages: scan.selectedPages.length,
+    crawledPages: 0,
+    totalChunks: 0,
+    queuedAt: new Date().toISOString(),
+  })
+
+  await enqueueCrawlerJob({
+    jobId,
+    botId: agentId,
+    clientId,
+    urls: scan.selectedPages,
+    useAICleaning: true,
+    botName: agent.name,
+    type: 'voice_agent',
+  })
+
+  return agent
 }
 
 export async function getVoiceAgents(clientId: string): Promise<VoiceAgent[]> {

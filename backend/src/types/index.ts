@@ -246,6 +246,7 @@ export interface VoiceAgent {
   // True once this agent's own websiteUrl has been crawled, chunked,
   // and embedded into its Pinecone namespace (see feat/voice-agent-rag).
   isIndexed: boolean
+  indexingJob?: IndexingJob
   createdAt: string
   updatedAt: string
 }

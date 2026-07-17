@@ -10,6 +10,10 @@ export interface CrawlerJobMessage {
   urls: string[]
   useAICleaning: boolean
   botName: string
+  // Discriminates which table the consumer should track progress on and
+  // update on completion. Absent/omitted means 'bot' — existing bot
+  // enqueue call sites are unchanged and don't need to set this.
+  type?: 'bot' | 'voice_agent'
 }
 
 export async function enqueueCrawlerJob(job: CrawlerJobMessage): Promise<void> {
