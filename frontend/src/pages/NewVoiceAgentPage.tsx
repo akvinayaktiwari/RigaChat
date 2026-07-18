@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Check, Loader2, Volume2 } from 'lucide-react'
-import { createVoiceAgent, setupVoiceAgent } from '../services/api'
+import { createVoiceAgent } from '../services/api'
 import type { VoiceAgentVoice } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -152,12 +152,6 @@ export default function NewVoiceAgentPage() {
         setError(res.error ?? 'Failed to create voice agent')
         setLoading(false)
         return
-      }
-
-      try {
-        await setupVoiceAgent(res.data.agentId)
-      } catch (err) {
-        console.error('Voice agent setup failed, indexing can be retried from settings later:', err)
       }
 
       navigate('/dashboard/voice-agents')

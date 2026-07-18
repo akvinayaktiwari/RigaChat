@@ -47,6 +47,13 @@ export async function apiClient<T>(
     body: body ? JSON.stringify(body) : undefined,
   })
 
+  // 204 No Content has no body to parse — response.json() throws on an
+  // empty body, which would otherwise surface as a false-negative error
+  // even though the request succeeded.
+  if (response.status === 204) {
+    return { success: true } as ApiResponse<T>
+  }
+
   const parsed = (await response.json()) as ApiResponse<T>
 
   if (!response.ok && !parsed.error) {

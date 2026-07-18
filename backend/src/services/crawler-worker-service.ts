@@ -11,6 +11,7 @@ import {
 } from '../repositories/bot-repository.js'
 import {
   claimVoiceCrawlerJob,
+  getVoiceAgentById,
   updateVoiceAgent,
   updateVoiceIndexingJob,
 } from '../repositories/voice-repository.js'
@@ -195,6 +196,22 @@ export async function processCrawlerJob(job: CrawlerJobMessage): Promise<void> {
     : await claimCrawlerJob(job.botId, job.clientId, job.jobId)
   if (!claimed) {
     console.log(`Job ${job.jobId} already claimed by another invocation — skipping duplicate`)
+
+    if (isVoiceAgent) {
+      // A genuine concurrent duplicate (the case this claim guards against) means
+      // some other invocation is processing this exact jobId and will complete it
+      // normally — safe to stay quiet. But if the stored jobId no longer matches
+      // this job at all, this job was superseded and dropped with no guarantee a
+      // successor is in flight — that's a silent permanent loss, so it's worth
+      // surfacing at a level monitoring is more likely to catch.
+      const current = await getVoiceAgentById(job.botId)
+      if (current?.indexingJob?.jobId !== job.jobId) {
+        console.warn(
+          `Voice agent ${job.botId}'s job ${job.jobId} was superseded by a different job (current: ${current?.indexingJob?.jobId ?? 'none'}) before it could run — this job is permanently dropped.`
+        )
+      }
+    }
+
     return // SQS will not retry since no error thrown
   }
 
