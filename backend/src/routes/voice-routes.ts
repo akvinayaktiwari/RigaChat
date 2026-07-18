@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import { Hono } from 'hono'
 import { requireAuth } from '../lib/cognito.js'
 import {
+  addVoiceKBEntry,
   createVoiceAgent,
   deleteVoiceAgent,
   getVoiceAgentById,
@@ -9,12 +10,15 @@ import {
   getVoiceAgentPublicConfig,
   getVoiceAgents,
   getVoiceAgentUsage,
+  getVoiceKBEntries,
+  removeVoiceKBEntry,
   setupVoiceAgent,
   updateVoiceAgent,
+  updateVoiceKBEntry,
 } from '../services/voice-service.js'
 import { retrieveContext } from '../services/rag-service.js'
 import { generateToken } from '../voice-relay/auth.js'
-import type { ApiResponse, VoiceAgent, VoiceUsageSummary } from '../types/index.js'
+import type { ApiResponse, VoiceAgent, VoiceKnowledgeBaseEntry, VoiceUsageSummary } from '../types/index.js'
 
 interface AuthEnv {
   Variables: {
@@ -41,6 +45,16 @@ type UpdateVoiceAgentBody = Partial<
   >
 >
 
+interface AddVoiceKBEntryBody {
+  title?: string
+  content?: string
+}
+
+interface UpdateVoiceKBEntryBody {
+  title?: string
+  content?: string
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
@@ -48,7 +62,9 @@ function errorMessage(error: unknown): string {
 function isNotFoundError(error: unknown): boolean {
   return (
     error instanceof Error &&
-    (error.message === 'Voice agent not found' || error.message === 'Voice agent is not enabled')
+    (error.message === 'Voice agent not found' ||
+      error.message === 'Voice agent is not enabled' ||
+      error.message === 'Knowledge base entry not found')
   )
 }
 
@@ -313,6 +329,81 @@ voiceRoutes.get('/:id/usage', requireAuth, async (c) => {
   } catch (error) {
     if (isNotFoundError(error)) {
       return c.json<ApiResponse<null>>({ success: false, error: 'Voice agent not found' }, 404)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+voiceRoutes.post('/:id/kb', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const agentId = c.req.param('id')
+  const body = await c.req.json<AddVoiceKBEntryBody>()
+
+  if (!body.title || !body.content) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'title and content are required' }, 400)
+  }
+
+  try {
+    const entry = await addVoiceKBEntry(agentId, clientId, body.title, body.content)
+    return c.json<ApiResponse<VoiceKnowledgeBaseEntry>>({ success: true, data: entry }, 201)
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      return c.json<ApiResponse<null>>({ success: false, error: 'Voice agent not found' }, 404)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+voiceRoutes.get('/:id/kb', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const agentId = c.req.param('id')
+
+  try {
+    const entries = await getVoiceKBEntries(agentId, clientId)
+    return c.json<ApiResponse<VoiceKnowledgeBaseEntry[]>>({ success: true, data: entries }, 200)
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      return c.json<ApiResponse<null>>({ success: false, error: 'Voice agent not found' }, 404)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+voiceRoutes.patch('/:id/kb/:entryId', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const agentId = c.req.param('id')
+  const entryId = c.req.param('entryId')
+  const body = await c.req.json<UpdateVoiceKBEntryBody>()
+
+  if (!body.title || !body.content) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'title and content are required' }, 400)
+  }
+
+  try {
+    const entry = await updateVoiceKBEntry(agentId, clientId, entryId, {
+      title: body.title,
+      content: body.content,
+    })
+    return c.json<ApiResponse<VoiceKnowledgeBaseEntry>>({ success: true, data: entry }, 200)
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      return c.json<ApiResponse<null>>({ success: false, error: 'Voice agent not found' }, 404)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+voiceRoutes.delete('/:id/kb/:entryId', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const agentId = c.req.param('id')
+  const entryId = c.req.param('entryId')
+
+  try {
+    await removeVoiceKBEntry(agentId, clientId, entryId)
+    return c.json<ApiResponse<null>>({ success: true }, 200)
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 404)
     }
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }
