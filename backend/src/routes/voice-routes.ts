@@ -104,7 +104,6 @@ voiceRoutes.post('/', requireAuth, async (c) => {
     !body.name ||
     !body.voice ||
     !body.greetingMessage ||
-    !body.websiteUrl ||
     !body.brandColor ||
     !body.widgetPosition ||
     !body.maxSessionDuration
@@ -112,7 +111,7 @@ voiceRoutes.post('/', requireAuth, async (c) => {
     return c.json<ApiResponse<null>>(
       {
         success: false,
-        error: 'name, voice, greetingMessage, websiteUrl, brandColor, widgetPosition, and maxSessionDuration are required',
+        error: 'name, voice, greetingMessage, brandColor, widgetPosition, and maxSessionDuration are required',
       },
       400
     )

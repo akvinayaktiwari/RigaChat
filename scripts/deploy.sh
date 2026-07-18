@@ -6,6 +6,7 @@ set -e
 AWS_REGION="${AWS_REGION:-ap-south-1}"
 LAMBDA_FUNCTION_NAME="${LAMBDA_FUNCTION_NAME:-rigachat-api}"
 LAMBDA_STREAMING_FUNCTION_NAME="${LAMBDA_STREAMING_FUNCTION_NAME:-rigachat-api-streaming}"
+LAMBDA_CRAWLER_FUNCTION_NAME="${LAMBDA_CRAWLER_FUNCTION_NAME:-rigachat-crawler}"
 S3_BUCKET_FRONTEND="${S3_BUCKET_FRONTEND:-rigachat-dashboard}"
 S3_BUCKET_WIDGET="${S3_BUCKET_WIDGET:-rigachat-widget}"
 CLOUDFRONT_DISTRIBUTION_ID="${CLOUDFRONT_DISTRIBUTION_ID:-E24Z9D4G4FY8PH}"
@@ -76,6 +77,17 @@ aws lambda update-function-code \
 echo "Waiting for $LAMBDA_STREAMING_FUNCTION_NAME update..."
 aws lambda wait function-updated \
   --function-name "$LAMBDA_STREAMING_FUNCTION_NAME" \
+  --region "$AWS_REGION"
+
+echo "Deploying to $LAMBDA_CRAWLER_FUNCTION_NAME..."
+aws lambda update-function-code \
+  --function-name "$LAMBDA_CRAWLER_FUNCTION_NAME" \
+  --zip-file fileb://backend/function.zip \
+  --region "$AWS_REGION"
+
+echo "Waiting for $LAMBDA_CRAWLER_FUNCTION_NAME update..."
+aws lambda wait function-updated \
+  --function-name "$LAMBDA_CRAWLER_FUNCTION_NAME" \
   --region "$AWS_REGION"
 
 echo "==> Step 5: Building frontend..."
