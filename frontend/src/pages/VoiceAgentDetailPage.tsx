@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Check, ChevronLeft, Code, Copy, Loader2, RefreshCw, Trash2 } from 'lucide-react'
+import { BookOpen, Check, ChevronLeft, Code, Copy, Loader2, RefreshCw, Trash2 } from 'lucide-react'
 import {
   deleteVoiceAgent,
   getMyBots,
@@ -541,6 +541,15 @@ export default function VoiceAgentDetailPage() {
                 : isIndexingInProgress
                   ? 'Indexing in progress...'
                   : 'Resync Knowledge Base'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate(`/dashboard/voice-agents/${agentId}/kb`)}
+              className={`w-full mt-3 py-2.5 flex items-center justify-center gap-2 text-sm ${secondaryButtonClasses}`}
+            >
+              <BookOpen size={14} />
+              Manage Knowledge Base
             </button>
           </div>
 
