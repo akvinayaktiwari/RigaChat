@@ -156,6 +156,20 @@ export async function deleteChunksByNamespace(namespaceId: string): Promise<void
   }
 }
 
+export async function deleteChunksByEntryId(namespaceId: string, entryId: string): Promise<void> {
+  try {
+    const index = getIndex()
+    await index.deleteMany({
+      botId: { $eq: namespaceId },
+      sourceUrl: { $eq: `knowledge_base:${entryId}` },
+    })
+  } catch (error) {
+    throw new Error(
+      `Failed to delete chunks for entry ${entryId} in namespace ${namespaceId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
 export async function getRepresentativeChunks(botId: string, topK: number = 40): Promise<string[]> {
   try {
     const index = getIndex()

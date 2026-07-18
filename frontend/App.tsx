@@ -15,6 +15,7 @@ import BotDetailPage from './src/pages/BotDetailPage'
 import LeadsPage from './src/pages/LeadsPage'
 import LeadDetailPage from './src/pages/LeadDetailPage'
 import KnowledgeBasePage from './src/pages/KnowledgeBasePage'
+import VoiceKnowledgeBasePage from './src/pages/VoiceKnowledgeBasePage'
 import Settings from './src/pages/Settings'
 import WhatsApp from './src/pages/WhatsApp'
 import FormsPage from './src/pages/FormsPage'
@@ -82,6 +83,7 @@ function App() {
           <Route path="voice-agents" element={<VoiceAgentsPage />} />
           <Route path="voice-agents/new" element={<NewVoiceAgentPage />} />
           <Route path="voice-agents/:agentId" element={<VoiceAgentDetailPage />} />
+          <Route path="voice-agents/:agentId/kb" element={<VoiceKnowledgeBasePage />} />
           <Route path="forms" element={<FormsPage />} />
           <Route path="forms/new" element={<NewFormPage />} />
           <Route path="forms/:formId" element={<FormDetailPage />} />

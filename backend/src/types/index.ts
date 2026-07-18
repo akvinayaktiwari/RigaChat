@@ -98,6 +98,16 @@ export interface KnowledgeBaseEntry {
   updatedAt: string
 }
 
+export interface VoiceKnowledgeBaseEntry {
+  entryId: string
+  agentId: string
+  clientId: string
+  title: string
+  content: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface Chunk {
   chunkId: string
   botId: string

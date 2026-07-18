@@ -19,6 +19,7 @@ import type {
   UpdateKBInput,
   UpdateVoiceAgentInput,
   VoiceAgent,
+  VoiceKnowledgeBaseEntry,
   VoiceUsageSummary,
   WhatsAppConnection,
 } from '../types/index'
@@ -268,4 +269,32 @@ export function setupVoiceAgent(agentId: string): Promise<ApiResponse<VoiceAgent
 
 export function getVoiceAgentUsage(agentId: string): Promise<ApiResponse<VoiceUsageSummary>> {
   return apiClient<VoiceUsageSummary>(`/api/voice-agents/${agentId}/usage`)
+}
+
+export function addVoiceKBEntry(
+  agentId: string,
+  title: string,
+  content: string
+): Promise<ApiResponse<VoiceKnowledgeBaseEntry>> {
+  return apiClient<VoiceKnowledgeBaseEntry>(`/api/voice-agents/${agentId}/kb`, 'POST', { title, content })
+}
+
+export function getVoiceKBEntries(agentId: string): Promise<ApiResponse<VoiceKnowledgeBaseEntry[]>> {
+  return apiClient<VoiceKnowledgeBaseEntry[]>(`/api/voice-agents/${agentId}/kb`)
+}
+
+export function updateVoiceKBEntry(
+  agentId: string,
+  entryId: string,
+  title: string,
+  content: string
+): Promise<ApiResponse<VoiceKnowledgeBaseEntry>> {
+  return apiClient<VoiceKnowledgeBaseEntry>(`/api/voice-agents/${agentId}/kb/${entryId}`, 'PATCH', {
+    title,
+    content,
+  })
+}
+
+export function removeVoiceKBEntry(agentId: string, entryId: string): Promise<ApiResponse<null>> {
+  return apiClient<null>(`/api/voice-agents/${agentId}/kb/${entryId}`, 'DELETE')
 }
