@@ -21,11 +21,16 @@ async function getOwnedVoiceAgent(agentId: string, clientId: string): Promise<Vo
 }
 
 export async function createVoiceAgent(input: CreateVoiceAgentInput): Promise<VoiceAgent> {
-  return await createVoiceAgentRecord(input)
+  const hasWebsite = !!input.websiteUrl
+  return await createVoiceAgentRecord({ ...input, status: hasWebsite ? 'processing' : 'kb_only' })
 }
 
 export async function setupVoiceAgent(agentId: string, clientId: string): Promise<VoiceAgent> {
   const agent = await getOwnedVoiceAgent(agentId, clientId)
+
+  if (!agent.websiteUrl) {
+    return await updateVoiceAgentRecord(agentId, clientId, { isIndexed: true })
+  }
 
   const scan = await scanWebsite(agent.websiteUrl)
   const jobId = uuidv4()

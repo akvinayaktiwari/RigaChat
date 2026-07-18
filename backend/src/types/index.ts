@@ -227,6 +227,8 @@ export interface CreateFormLeadInput {
 
 export type VoiceAgentVoice = 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse' | 'marin' | 'cedar'
 
+export type VoiceAgentStatus = 'processing' | 'kb_only'
+
 export interface VoiceAgent {
   agentId: string
   clientId: string
@@ -238,15 +240,17 @@ export interface VoiceAgent {
   // also queries that bot's Pinecone namespace in addition to this
   // agent's own namespace.
   botId?: string
-  websiteUrl: string
+  websiteUrl?: string
   brandColor: string
   widgetPosition: 'bottom-left' | 'bottom-right' | 'bottom-center'
   maxSessionDuration: 5 | 10 | 15
   isEnabled: boolean
-  // True once this agent's own websiteUrl has been crawled, chunked,
-  // and embedded into its Pinecone namespace (see feat/voice-agent-rag).
+  // True once this agent's own websiteUrl has been crawled, chunked, and
+  // embedded into its Pinecone namespace (see feat/voice-agent-rag) — or
+  // immediately for a kb_only agent, which has no crawl to wait on.
   isIndexed: boolean
   indexingJob?: IndexingJob
+  status?: VoiceAgentStatus
   createdAt: string
   updatedAt: string
 }
@@ -296,8 +300,9 @@ export interface CreateVoiceAgentInput {
   name: string
   voice: VoiceAgentVoice
   greetingMessage: string
-  websiteUrl: string
+  websiteUrl?: string
   brandColor: string
   widgetPosition: 'bottom-left' | 'bottom-right' | 'bottom-center'
   maxSessionDuration: 5 | 10 | 15
+  status?: VoiceAgentStatus
 }
