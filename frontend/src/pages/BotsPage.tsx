@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   BookOpen,
@@ -15,8 +15,9 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import { confirmBotIndexing, deleteBot, getMyBots, startBotIndexing } from '../services/api'
-import { IndexingProgress } from '../components/IndexingProgress'
+import { confirmBotIndexing, deleteBot, getBotIndexingStatus, getMyBots, startBotIndexing } from '../services/api'
+import IndexingProgressCard from '../components/IndexingProgressCard'
+import { useIndexingStatus } from '../hooks/useIndexingStatus'
 import type { BotConfig, BotStatus } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -84,6 +85,24 @@ export default function BotsPage() {
     })
   }, [])
 
+  const activeIndexingFetchFn = useCallback(async () => {
+    if (!indexingBotId) return undefined
+    const res = await getBotIndexingStatus(indexingBotId)
+    return res.success && res.data && 'jobId' in res.data ? res.data : undefined
+  }, [indexingBotId])
+
+  const { job: activeIndexingJob, refresh: refreshIndexingJob } = useIndexingStatus(
+    indexingBotId ?? '',
+    activeIndexingFetchFn,
+    !!indexingBotId
+  )
+
+  useEffect(() => {
+    if (activeIndexingJob?.status === 'complete') {
+      handleResyncComplete()
+    }
+  }, [activeIndexingJob?.status])
+
   async function handleConfirmDelete() {
     if (!botToDelete) return
     setDeleting(true)
@@ -129,6 +148,15 @@ export default function BotsPage() {
   function handleResyncError(botId: string, error: string) {
     console.error(`Resync failed for bot ${botId}:`, error)
   }
+
+  const handleResyncRetry = useCallback(
+    async (bot: BotConfig) => {
+      await handleResync(bot)
+      refreshIndexingJob()
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [refreshIndexingJob]
+  )
 
   async function handleCopyEmbed() {
     if (!selectedBotForEmbed) return
@@ -213,10 +241,10 @@ export default function BotsPage() {
 
                 {indexingBotId === bot.botId && (
                   <div className="mb-4">
-                    <IndexingProgress
-                      botId={bot.botId}
-                      onComplete={handleResyncComplete}
-                      onError={(err) => handleResyncError(bot.botId, err)}
+                    <IndexingProgressCard
+                      job={activeIndexingJob}
+                      surface="bot"
+                      onRetry={() => handleResyncRetry(bot)}
                     />
                   </div>
                 )}
