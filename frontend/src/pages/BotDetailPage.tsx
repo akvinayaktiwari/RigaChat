@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AlertTriangle, BookOpen, Check, ChevronLeft, Code, Copy, Loader2, RefreshCw, Trash2 } from 'lucide-react'
 import { confirmBotIndexing, deleteBot, getBotById, getBotIndexingStatus, startBotIndexing, updateBot } from '../services/api'
+import IndexingProgressCard from '../components/IndexingProgressCard'
 import type { BotConfig, BotStatus, IndexingJob } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -556,32 +557,7 @@ export default function BotDetailPage() {
               </button>
 
               {indexingStatus !== 'idle' && indexingStatus !== 'confirmation_required' && (
-                <div className="bg-white rounded-xl p-4 mt-4 border border-red-100">
-                  <p className="font-bold text-gray-900 text-sm">Building Knowledge Base...</p>
-                  <div className="bg-gray-100 rounded-full h-2 w-full mt-3">
-                    <div
-                      className="bg-violet-600 rounded-full h-2 transition-all"
-                      style={{
-                        width: `${
-                          indexingJob && indexingJob.selectedPages > 0
-                            ? Math.min(100, (indexingJob.crawledPages / indexingJob.selectedPages) * 100)
-                            : 0
-                        }%`,
-                      }}
-                    />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    {(indexingStatus === 'scanning' || indexingStatus === 'queued') && 'Scanning pages...'}
-                    {indexingStatus === 'processing' &&
-                      indexingJob &&
-                      `${indexingJob.crawledPages} of ${indexingJob.selectedPages} pages processed`}
-                    {indexingStatus === 'complete' &&
-                      indexingJob &&
-                      `✓ Complete — ${indexingJob.totalChunks} knowledge chunks indexed`}
-                    {indexingStatus === 'failed' &&
-                      `✗ Failed: ${indexingJob?.error ?? 'Unknown error'}`}
-                  </p>
-                </div>
+                <IndexingProgressCard job={indexingJob ?? undefined} surface="bot" onRetry={handleStartIndexing} />
               )}
             </div>
 
