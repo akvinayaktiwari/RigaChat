@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import WebSocket from 'ws'
-import type { VoiceAgentVoice } from '../types/index.js'
+import type { VoiceAgentVoice, VoiceCallLog } from '../types/index.js'
 import { generateToken } from './auth.js'
+import { writeVoiceCallLog } from '../repositories/voice-repository.js'
 
 const REALTIME_MODEL = 'gpt-realtime'
 const REALTIME_URL = `wss://api.openai.com/v1/realtime?model=${REALTIME_MODEL}`
@@ -44,14 +45,23 @@ if (!apiKey) {
 
 export interface VoiceAgentConfig {
   agentId: string
+  clientId: string
   voice: VoiceAgentVoice
   instructions: string
   firstMessage: string
 }
 
+interface OpenAIResponseUsage {
+  total_tokens?: number
+  input_tokens?: number
+  output_tokens?: number
+  input_token_details?: { audio_tokens?: number }
+  output_token_details?: { audio_tokens?: number }
+}
+
 interface OpenAIRealtimeEvent {
   type: string
-  response?: { id?: string }
+  response?: { id?: string; usage?: OpenAIResponseUsage }
   delta?: { audio?: string; transcript?: string }
   error?: { message?: string }
   name?: string
@@ -69,6 +79,12 @@ export class VoiceSession {
   private browserWs: WebSocket
   private openaiWs: WebSocket
   private agentId: string
+  private clientId: string
+  private callId = randomUUID()
+  private startedAt = new Date().toISOString()
+  private totalInputTokens = 0
+  private totalOutputTokens = 0
+  private totalAudioTokens = 0
   private isAgentSpeaking = false
   private currentResponseId: string | null = null
   private openaiReady = false
@@ -81,6 +97,7 @@ export class VoiceSession {
   constructor(browserWs: WebSocket, agentConfig: VoiceAgentConfig) {
     this.browserWs = browserWs
     this.agentId = agentConfig.agentId
+    this.clientId = agentConfig.clientId
     this.fallbackVoice = agentConfig.voice
 
     this.openaiWs = new WebSocket(REALTIME_URL, {
@@ -187,12 +204,42 @@ export class VoiceSession {
       clearTimeout(this.contextTimeout)
       this.contextTimeout = null
     }
+
+    // Fire-and-forget: cleanup() is synchronous and must always close the
+    // sockets below regardless of whether the log write succeeds. A sync
+    // try/catch here wouldn't catch a rejection from this non-awaited async
+    // call, so failures are handled via .catch() instead.
+    this.writeCallLog('completed').catch((error) => {
+      console.error('[VoiceRelay] Failed to write call log:', error instanceof Error ? error.message : error)
+    })
+
     if (this.openaiWs.readyState === WebSocket.OPEN || this.openaiWs.readyState === WebSocket.CONNECTING) {
       this.openaiWs.close()
     }
     if (this.browserWs.readyState === WebSocket.OPEN || this.browserWs.readyState === WebSocket.CONNECTING) {
       this.browserWs.close()
     }
+  }
+
+  private async writeCallLog(status: 'completed' | 'dropped' | 'error'): Promise<void> {
+    const endedAt = new Date().toISOString()
+    const durationSeconds = Math.round((new Date(endedAt).getTime() - new Date(this.startedAt).getTime()) / 1000)
+
+    const log: VoiceCallLog = {
+      agentId: this.agentId,
+      callId: this.callId,
+      clientId: this.clientId,
+      startedAt: this.startedAt,
+      endedAt,
+      durationSeconds,
+      inputTokens: this.totalInputTokens,
+      outputTokens: this.totalOutputTokens,
+      audioTokens: this.totalAudioTokens,
+      totalTokens: this.totalInputTokens + this.totalOutputTokens,
+      status,
+    }
+
+    await writeVoiceCallLog(log)
   }
 
   private handleBrowserMessage(data: WebSocket.RawData): void {
@@ -248,6 +295,13 @@ export class VoiceSession {
     }
 
     if (event.type === 'response.done') {
+      if (event.response?.usage) {
+        this.totalInputTokens += event.response.usage.input_tokens ?? 0
+        this.totalOutputTokens += event.response.usage.output_tokens ?? 0
+        this.totalAudioTokens +=
+          (event.response.usage.input_token_details?.audio_tokens ?? 0) +
+          (event.response.usage.output_token_details?.audio_tokens ?? 0)
+      }
       this.isAgentSpeaking = false
       this.currentResponseId = null
       return

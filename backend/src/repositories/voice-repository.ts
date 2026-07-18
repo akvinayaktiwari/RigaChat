@@ -1,9 +1,10 @@
 import { v4 as uuidv4 } from 'uuid'
 import { DeleteCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient } from './dynamo-client.js'
-import type { CreateVoiceAgentInput, IndexingJob, VoiceAgent } from '../types/index.js'
+import type { CreateVoiceAgentInput, IndexingJob, VoiceAgent, VoiceCallLog } from '../types/index.js'
 
 const TABLE_NAME_ENV_VAR = 'DYNAMODB_TABLE_VOICE_AGENTS'
+const CALL_LOGS_TABLE_NAME_ENV_VAR = 'DYNAMODB_TABLE_VOICE_CALL_LOGS'
 
 function getVoiceAgentsTableName(): string {
   const tableName = process.env[TABLE_NAME_ENV_VAR]
@@ -11,6 +12,18 @@ function getVoiceAgentsTableName(): string {
   if (!tableName) {
     throw new Error(
       `Missing required environment variable ${TABLE_NAME_ENV_VAR}. Set it in your .env file before starting the server.`
+    )
+  }
+
+  return tableName
+}
+
+function getVoiceCallLogsTableName(): string {
+  const tableName = process.env[CALL_LOGS_TABLE_NAME_ENV_VAR]
+
+  if (!tableName) {
+    throw new Error(
+      `Missing required environment variable ${CALL_LOGS_TABLE_NAME_ENV_VAR}. Set it in your .env file before starting the server.`
     )
   }
 
@@ -162,6 +175,21 @@ export async function updateVoiceIndexingJob(
   } catch (error) {
     throw new Error(
       `Failed to update indexing job for voice agent ${agentId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
+export async function writeVoiceCallLog(log: VoiceCallLog): Promise<void> {
+  try {
+    await dynamoClient.send(
+      new PutCommand({
+        TableName: getVoiceCallLogsTableName(),
+        Item: log,
+      })
+    )
+  } catch (error) {
+    throw new Error(
+      `Failed to write voice call log ${log.callId} for agent ${log.agentId}: ${error instanceof Error ? error.message : String(error)}`
     )
   }
 }

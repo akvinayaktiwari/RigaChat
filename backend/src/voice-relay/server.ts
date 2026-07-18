@@ -35,6 +35,7 @@ const dynamoClient = DynamoDBDocumentClient.from(new DynamoDBClient({ region }))
 
 interface VoiceAgentRecord {
   agentId: string
+  clientId: string
   name: string
   voice: VoiceAgentVoice
   greetingMessage: string
@@ -100,6 +101,7 @@ wss.on('connection', async (ws: WebSocket, req) => {
 
   const session = new VoiceSession(ws, {
     agentId,
+    clientId: agent.clientId,
     voice: agent.voice,
     instructions: `You are ${agent.name}, a helpful voice assistant. Start the call by greeting the caller with: "${agent.greetingMessage}"`,
     firstMessage: agent.greetingMessage,
