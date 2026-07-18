@@ -185,7 +185,9 @@ export default function VoiceAgentsPage() {
 
               <div className="flex items-center gap-2 mb-3">
                 <Globe size={14} className="text-gray-400 shrink-0" />
-                <span className="text-sm text-gray-500 truncate">{truncateUrl(agent.websiteUrl)}</span>
+                <span className="text-sm text-gray-500 truncate">
+                  {agent.websiteUrl ? truncateUrl(agent.websiteUrl) : 'Knowledge Base only'}
+                </span>
               </div>
 
               <div className="flex items-center gap-2 mb-3">

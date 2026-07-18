@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, Loader2, Volume2 } from 'lucide-react'
+import { ArrowLeft, BookOpen, Check, Globe, Info, Loader2, Volume2 } from 'lucide-react'
 import { createVoiceAgent } from '../services/api'
 import type { VoiceAgentVoice } from '../types/index'
 
@@ -28,6 +28,36 @@ const SESSION_DURATION_OPTIONS: { value: FormData['maxSessionDuration']; label: 
   { value: 5, label: '5 minutes' },
   { value: 10, label: '10 minutes' },
   { value: 15, label: '15 minutes' },
+]
+
+type FlowType = 'website' | 'kb_only'
+
+const FLOW_OPTIONS: {
+  value: FlowType
+  icon: typeof Globe
+  title: string
+  description: string
+  badge: string
+  badgeClasses: string
+}[] = [
+  {
+    value: 'website',
+    icon: Globe,
+    title: 'Train from website',
+    description:
+      'Enter your website URL. Our crawler automatically reads your pages and trains your voice agent on your content.',
+    badge: 'Recommended',
+    badgeClasses: 'bg-violet-100 text-violet-700',
+  },
+  {
+    value: 'kb_only',
+    icon: BookOpen,
+    title: 'Add manually',
+    description:
+      'Skip the crawler. Add FAQs, product details, and policies directly as knowledge base entries.',
+    badge: 'Great for SPAs',
+    badgeClasses: 'bg-gray-100 text-gray-600',
+  },
 ]
 
 interface FormData {
@@ -101,6 +131,7 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
 export default function NewVoiceAgentPage() {
   const navigate = useNavigate()
   const [currentStep, setCurrentStep] = useState(1)
+  const [flowType, setFlowType] = useState<FlowType>('website')
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM_DATA)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -112,7 +143,7 @@ export default function NewVoiceAgentPage() {
   }
 
   function handleNext() {
-    if (currentStep === 1) {
+    if (currentStep === 1 && flowType === 'website') {
       if (!/^https?:\/\//.test(formData.websiteUrl)) {
         setWebsiteUrlError('Website URL must start with http:// or https://')
         return
@@ -142,7 +173,7 @@ export default function NewVoiceAgentPage() {
         name: formData.name,
         voice: formData.voice,
         greetingMessage: formData.greetingMessage,
-        websiteUrl: formData.websiteUrl,
+        ...(flowType === 'website' ? { websiteUrl: formData.websiteUrl } : {}),
         brandColor: formData.brandColor,
         widgetPosition: formData.widgetPosition,
         maxSessionDuration: formData.maxSessionDuration,
@@ -151,6 +182,11 @@ export default function NewVoiceAgentPage() {
       if (!res.success || !res.data) {
         setError(res.error ?? 'Failed to create voice agent')
         setLoading(false)
+        return
+      }
+
+      if (flowType === 'kb_only') {
+        navigate(`/dashboard/voice-agents/${res.data.agentId}`)
         return
       }
 
@@ -163,7 +199,10 @@ export default function NewVoiceAgentPage() {
   }
 
   const isNextDisabled =
-    currentStep === 1 && (!formData.name.trim() || !formData.websiteUrl.trim() || !formData.greetingMessage.trim())
+    currentStep === 1 &&
+    (!formData.name.trim() ||
+      (flowType === 'website' && !formData.websiteUrl.trim()) ||
+      !formData.greetingMessage.trim())
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -202,19 +241,67 @@ export default function NewVoiceAgentPage() {
             </div>
 
             <div>
-              <label className={labelClasses}>Website URL</label>
-              <input
-                type="url"
-                value={formData.websiteUrl}
-                onChange={(e) => {
-                  update('websiteUrl', e.target.value)
-                  setWebsiteUrlError(null)
-                }}
-                placeholder="https://yourwebsite.com"
-                className={inputClasses}
-              />
-              {websiteUrlError && <p className="text-xs text-red-500 mt-1">{websiteUrlError}</p>}
-              <p className={hintClasses}>We&apos;ll crawl your site to train the agent</p>
+              <h2 className="font-bold text-xl text-gray-900 mb-2" style={JAKARTA_FONT}>
+                How do you want to train your voice agent?
+              </h2>
+              <p className="text-sm text-gray-500 mt-1 mb-4">You can always add more content later.</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {FLOW_OPTIONS.map((option) => {
+                  const Icon = option.icon
+                  const isSelected = flowType === option.value
+
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setFlowType(option.value)}
+                      className={`relative text-left rounded-2xl p-6 transition-all ${
+                        isSelected
+                          ? 'border-2 border-violet-600 bg-violet-50 shadow-md'
+                          : 'border border-gray-200 cursor-pointer hover:border-violet-300 hover:shadow-md'
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-4 right-4 text-xs font-semibold px-2 py-1 rounded-full ${option.badgeClasses}`}
+                      >
+                        {option.badge}
+                      </span>
+                      <Icon className="text-violet-600 mb-3" size={28} />
+                      <p className="font-semibold text-gray-900" style={JAKARTA_FONT}>
+                        {option.title}
+                      </p>
+                      <p className="text-sm text-gray-500 mt-1">{option.description}</p>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {flowType === 'website' ? (
+                <div className="mt-4">
+                  <label className={labelClasses}>Website URL</label>
+                  <input
+                    type="url"
+                    value={formData.websiteUrl}
+                    onChange={(e) => {
+                      update('websiteUrl', e.target.value)
+                      setWebsiteUrlError(null)
+                    }}
+                    placeholder="https://yourwebsite.com"
+                    className={inputClasses}
+                  />
+                  {websiteUrlError && <p className="text-xs text-red-500 mt-1">{websiteUrlError}</p>}
+                  <p className={hintClasses}>We&apos;ll crawl your site to train the agent</p>
+                </div>
+              ) : (
+                <div className="mt-4 bg-violet-50 border border-violet-100 rounded-xl p-4 text-sm text-violet-700 flex gap-3">
+                  <Info size={18} className="shrink-0 mt-0.5" />
+                  <p>
+                    Your voice agent will be ready immediately. After setup, you&apos;ll be guided to add your
+                    first knowledge base entry.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div>
@@ -341,8 +428,12 @@ export default function NewVoiceAgentPage() {
               </div>
               <div className="h-px bg-gray-100" />
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500">Website URL</span>
-                <span className="text-sm text-gray-700">{formData.websiteUrl}</span>
+                <span className="text-sm text-gray-500">Training source</span>
+                {flowType === 'kb_only' ? (
+                  <span className="text-violet-600 font-medium text-sm">Knowledge Base only</span>
+                ) : (
+                  <span className="text-sm text-gray-700">{formData.websiteUrl}</span>
+                )}
               </div>
               <div className="h-px bg-gray-100" />
               <div className="flex items-center justify-between">
@@ -374,9 +465,11 @@ export default function NewVoiceAgentPage() {
               </div>
             </div>
 
-            <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700">
-              After launching, your agent will crawl your website and index it. This takes 30–60 seconds.
-            </div>
+            {flowType === 'website' && (
+              <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700">
+                After launching, your agent will crawl your website and index it. This takes 30–60 seconds.
+              </div>
+            )}
 
             <button
               type="button"
