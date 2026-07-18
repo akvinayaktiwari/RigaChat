@@ -19,6 +19,7 @@ import type {
   UpdateKBInput,
   UpdateVoiceAgentInput,
   VoiceAgent,
+  VoiceUsageSummary,
   WhatsAppConnection,
 } from '../types/index'
 
@@ -256,4 +257,8 @@ export function deleteVoiceAgent(agentId: string): Promise<ApiResponse<null>> {
 
 export function setupVoiceAgent(agentId: string): Promise<ApiResponse<VoiceAgent>> {
   return apiClient<VoiceAgent>(`/api/voice-agents/${agentId}/setup`, 'POST')
+}
+
+export function getVoiceAgentUsage(agentId: string): Promise<ApiResponse<VoiceUsageSummary>> {
+  return apiClient<VoiceUsageSummary>(`/api/voice-agents/${agentId}/usage`)
 }

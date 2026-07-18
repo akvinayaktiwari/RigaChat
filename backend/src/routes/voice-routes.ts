@@ -8,12 +8,13 @@ import {
   getVoiceAgentContext,
   getVoiceAgentPublicConfig,
   getVoiceAgents,
+  getVoiceAgentUsage,
   setupVoiceAgent,
   updateVoiceAgent,
 } from '../services/voice-service.js'
 import { retrieveContext } from '../services/rag-service.js'
 import { generateToken } from '../voice-relay/auth.js'
-import type { ApiResponse, VoiceAgent } from '../types/index.js'
+import type { ApiResponse, VoiceAgent, VoiceUsageSummary } from '../types/index.js'
 
 interface AuthEnv {
   Variables: {
@@ -295,6 +296,21 @@ voiceRoutes.post('/:id/setup', requireAuth, async (c) => {
   try {
     const agent = await setupVoiceAgent(agentId, clientId)
     return c.json<ApiResponse<VoiceAgent>>({ success: true, data: agent }, 200)
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      return c.json<ApiResponse<null>>({ success: false, error: 'Voice agent not found' }, 404)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+voiceRoutes.get('/:id/usage', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const agentId = c.req.param('id')
+
+  try {
+    const usage = await getVoiceAgentUsage(agentId, clientId)
+    return c.json<ApiResponse<VoiceUsageSummary>>({ success: true, data: usage }, 200)
   } catch (error) {
     if (isNotFoundError(error)) {
       return c.json<ApiResponse<null>>({ success: false, error: 'Voice agent not found' }, 404)

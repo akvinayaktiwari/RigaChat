@@ -265,6 +265,13 @@ export interface VoiceCallLog {
   status: 'completed' | 'dropped' | 'error'
 }
 
+export interface VoiceUsageSummary {
+  totalCalls: number
+  totalMinutes: number
+  totalTokens: number
+  recentCalls: VoiceCallLog[]
+}
+
 export interface VoiceSession {
   sessionId: string
   agentId: string

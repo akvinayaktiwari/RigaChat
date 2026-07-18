@@ -1,8 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Check, ChevronLeft, Code, Copy, Loader2, RefreshCw, Trash2 } from 'lucide-react'
-import { deleteVoiceAgent, getMyBots, getVoiceAgent, setupVoiceAgent, updateVoiceAgent } from '../services/api'
-import type { BotConfig, VoiceAgent, VoiceAgentVoice } from '../types/index'
+import {
+  deleteVoiceAgent,
+  getMyBots,
+  getVoiceAgent,
+  getVoiceAgentUsage,
+  setupVoiceAgent,
+  updateVoiceAgent,
+} from '../services/api'
+import type { BotConfig, VoiceAgent, VoiceAgentVoice, VoiceUsageSummary } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -114,6 +121,7 @@ export default function VoiceAgentDetailPage() {
   const [fetchError, setFetchError] = useState<string | null>(null)
 
   const [bots, setBots] = useState<BotConfig[]>([])
+  const [usage, setUsage] = useState<VoiceUsageSummary | null>(null)
 
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
@@ -152,6 +160,15 @@ export default function VoiceAgentDetailPage() {
       }
     })
   }, [])
+
+  useEffect(() => {
+    if (!agentId) return
+    getVoiceAgentUsage(agentId).then((res) => {
+      if (res.success && res.data) {
+        setUsage(res.data)
+      }
+    })
+  }, [agentId])
 
   function update<K extends keyof FormData>(key: K, value: FormData[K]) {
     setFormData((prev) => (prev ? { ...prev, [key]: value } : prev))
@@ -525,6 +542,44 @@ export default function VoiceAgentDetailPage() {
                   ? 'Indexing in progress...'
                   : 'Resync Knowledge Base'}
             </button>
+          </div>
+
+          <div className="bg-white rounded-2xl p-6 border border-black/5 shadow-sm">
+            <h2 className="font-bold text-lg text-gray-900 mb-4" style={JAKARTA_FONT}>
+              Usage
+            </h2>
+
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div>
+                <p className="text-xs text-gray-500">Total Calls</p>
+                <p className="text-lg font-bold text-gray-900">{usage?.totalCalls ?? 0}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Total Minutes</p>
+                <p className="text-lg font-bold text-gray-900">{usage?.totalMinutes ?? 0}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Total Tokens</p>
+                <p className="text-lg font-bold text-gray-900">{usage?.totalTokens ?? 0}</p>
+              </div>
+            </div>
+
+            {usage && usage.recentCalls.length > 0 ? (
+              <div className="space-y-2">
+                {usage.recentCalls.map((call) => (
+                  <div
+                    key={call.callId}
+                    className="flex items-center justify-between text-sm border-t border-gray-100 pt-2"
+                  >
+                    <span className="text-gray-700">{formatCreatedDate(call.startedAt)}</span>
+                    <span className="text-gray-500">{call.durationSeconds}s</span>
+                    <span className="text-gray-500">{call.totalTokens} tokens</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">No calls yet</p>
+            )}
           </div>
 
           <div className="bg-white rounded-2xl p-6 border border-black/5 shadow-sm">

@@ -275,6 +275,27 @@ export interface UpdateVoiceAgentInput {
   isEnabled?: boolean
 }
 
+export interface VoiceCallLog {
+  agentId: string
+  callId: string
+  clientId: string
+  startedAt: string
+  endedAt: string
+  durationSeconds: number
+  inputTokens: number
+  outputTokens: number
+  audioTokens: number
+  totalTokens: number
+  status: 'completed' | 'dropped' | 'error'
+}
+
+export interface VoiceUsageSummary {
+  totalCalls: number
+  totalMinutes: number
+  totalTokens: number
+  recentCalls: VoiceCallLog[]
+}
+
 export interface VoiceAgentPublicConfig {
   agentId: string
   name: string

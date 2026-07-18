@@ -4,12 +4,13 @@ import {
   deleteVoiceAgent as deleteVoiceAgentRecord,
   getVoiceAgentById as getVoiceAgentByIdRecord,
   getVoiceAgentsByClient,
+  getVoiceCallLogsForAgent,
   updateVoiceAgent as updateVoiceAgentRecord,
   updateVoiceIndexingJob,
 } from '../repositories/voice-repository.js'
 import { scanWebsite } from './crawler-service.js'
 import { enqueueCrawlerJob } from '../lib/sqs.js'
-import type { CreateVoiceAgentInput, VoiceAgent } from '../types/index.js'
+import type { CreateVoiceAgentInput, VoiceAgent, VoiceUsageSummary } from '../types/index.js'
 
 async function getOwnedVoiceAgent(agentId: string, clientId: string): Promise<VoiceAgent> {
   const agent = await getVoiceAgentByIdRecord(agentId)
@@ -121,4 +122,18 @@ export async function getVoiceAgentContext(
 export async function deleteVoiceAgent(agentId: string, clientId: string): Promise<void> {
   await getOwnedVoiceAgent(agentId, clientId)
   await deleteVoiceAgentRecord(agentId, clientId)
+}
+
+export async function getVoiceAgentUsage(agentId: string, clientId: string): Promise<VoiceUsageSummary> {
+  await getOwnedVoiceAgent(agentId, clientId)
+  const logs = await getVoiceCallLogsForAgent(agentId)
+
+  const sortedByRecent = [...logs].sort((a, b) => b.startedAt.localeCompare(a.startedAt))
+
+  return {
+    totalCalls: sortedByRecent.length,
+    totalMinutes: Math.round(sortedByRecent.reduce((sum, log) => sum + log.durationSeconds, 0) / 60),
+    totalTokens: sortedByRecent.reduce((sum, log) => sum + log.totalTokens, 0),
+    recentCalls: sortedByRecent.slice(0, 10),
+  }
 }

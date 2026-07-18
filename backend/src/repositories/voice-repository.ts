@@ -194,6 +194,23 @@ export async function writeVoiceCallLog(log: VoiceCallLog): Promise<void> {
   }
 }
 
+export async function getVoiceCallLogsForAgent(agentId: string): Promise<VoiceCallLog[]> {
+  try {
+    const result = await dynamoClient.send(
+      new QueryCommand({
+        TableName: getVoiceCallLogsTableName(),
+        KeyConditionExpression: 'agentId = :agentId',
+        ExpressionAttributeValues: { ':agentId': agentId },
+      })
+    )
+    return (result.Items as VoiceCallLog[] | undefined) ?? []
+  } catch (error) {
+    throw new Error(
+      `Failed to get voice call logs for agent ${agentId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
 export async function deleteVoiceAgent(agentId: string, clientId: string): Promise<void> {
   try {
     await dynamoClient.send(
