@@ -491,11 +491,7 @@ export default function VoiceAgentDetailPage() {
                     <Check size={12} />
                     Knowledge base indexed
                   </span>
-                ) : isIndexingFailed ? (
-                  <span className="border text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-700 border-red-200">
-                    Indexing failed
-                  </span>
-                ) : (
+                ) : isIndexingInProgress ? null : isIndexingFailed ? null : (
                   <span className="border text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border-amber-200">
                     Not indexed
                   </span>
