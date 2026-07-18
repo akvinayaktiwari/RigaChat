@@ -70,6 +70,8 @@ clientRoutes.patch('/me', requireAuth, async (c) => {
   }
 })
 
+// Legacy field, not read by entitlement-service.ts — no real access impact
+// today. Do not wire to subscription.plan without payment verification.
 clientRoutes.patch('/me/plan', requireAuth, async (c) => {
   const clientId = c.get('user').sub
   const body = await c.req.json<UpgradePlanBody>()

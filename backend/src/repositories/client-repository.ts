@@ -131,6 +131,30 @@ export async function removeClientWhatsAppConnection(clientId: string): Promise<
   }
 }
 
+export async function getAllClients(): Promise<ClientRecord[]> {
+  try {
+    const clients: ClientRecord[] = []
+    let exclusiveStartKey: Record<string, unknown> | undefined
+
+    do {
+      const result = await dynamoClient.send(
+        new ScanCommand({
+          TableName: TABLE_NAME,
+          ExclusiveStartKey: exclusiveStartKey,
+        })
+      )
+      clients.push(...((result.Items as ClientRecord[] | undefined) ?? []))
+      exclusiveStartKey = result.LastEvaluatedKey
+    } while (exclusiveStartKey)
+
+    return clients
+  } catch (error) {
+    throw new Error(
+      `Failed to scan clients: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
 export async function getConnectedWhatsAppClients(): Promise<ClientRecord[]> {
   try {
     const clients: ClientRecord[] = []

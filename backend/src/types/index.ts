@@ -369,7 +369,7 @@ export interface Subscription {
   trialStartedAt: string | null
   trialEndsAt: string | null
   currentPeriodStart: string
-  currentPeriodEnd: string
+  currentPeriodEnd: string | null
   paymentProvider: 'razorpay' | null
   providerSubscriptionId: string | null
   providerCustomerId: string | null
