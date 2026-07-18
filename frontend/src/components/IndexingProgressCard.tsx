@@ -218,15 +218,13 @@ export default function IndexingProgressCard({ job, surface, onRetry }: Indexing
               </p>
             </div>
           </div>
-          {job.errorDetail?.retryable !== false && (
-            <button
-              type="button"
-              onClick={onRetry}
-              className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary-hover"
-            >
-              <RefreshCw size={14} /> Retry
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={onRetry}
+            className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary-hover"
+          >
+            <RefreshCw size={14} /> {job.errorDetail?.retryable === false ? 'Contact support' : 'Try again'}
+          </button>
         </div>
       )}
     </div>
