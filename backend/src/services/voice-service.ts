@@ -1,16 +1,23 @@
 import { v4 as uuidv4 } from 'uuid'
 import {
   createVoiceAgent as createVoiceAgentRecord,
+  createVoiceKBEntry,
   deleteVoiceAgent as deleteVoiceAgentRecord,
+  deleteVoiceKBEntry,
   getVoiceAgentById as getVoiceAgentByIdRecord,
   getVoiceAgentsByClient,
   getVoiceCallLogsForAgent,
+  getVoiceKBEntriesByAgent,
+  getVoiceKBEntry,
   updateVoiceAgent as updateVoiceAgentRecord,
   updateVoiceIndexingJob,
+  updateVoiceKBEntry as updateVoiceKBEntryRecord,
 } from '../repositories/voice-repository.js'
 import { scanWebsite } from './crawler-service.js'
 import { enqueueCrawlerJob } from '../lib/sqs.js'
-import type { CreateVoiceAgentInput, VoiceAgent, VoiceUsageSummary } from '../types/index.js'
+import { indexKnowledgeBaseEntry } from './rag-service.js'
+import { deleteChunksByEntryId } from '../repositories/vector-repository.js'
+import type { CreateVoiceAgentInput, VoiceAgent, VoiceKnowledgeBaseEntry, VoiceUsageSummary } from '../types/index.js'
 
 async function getOwnedVoiceAgent(agentId: string, clientId: string): Promise<VoiceAgent> {
   const agent = await getVoiceAgentByIdRecord(agentId)
@@ -141,4 +148,58 @@ export async function getVoiceAgentUsage(agentId: string, clientId: string): Pro
     totalTokens: sortedByRecent.reduce((sum, log) => sum + log.totalTokens, 0),
     recentCalls: sortedByRecent.slice(0, 10),
   }
+}
+
+export async function addVoiceKBEntry(
+  agentId: string,
+  clientId: string,
+  title: string,
+  content: string
+): Promise<VoiceKnowledgeBaseEntry> {
+  await getOwnedVoiceAgent(agentId, clientId)
+
+  const now = new Date().toISOString()
+  const entry: VoiceKnowledgeBaseEntry = {
+    entryId: uuidv4(),
+    agentId,
+    clientId,
+    title,
+    content,
+    createdAt: now,
+    updatedAt: now,
+  }
+
+  await createVoiceKBEntry(entry)
+  await indexKnowledgeBaseEntry(agentId, entry.entryId, title, content)
+
+  return entry
+}
+
+export async function getVoiceKBEntries(agentId: string, clientId: string): Promise<VoiceKnowledgeBaseEntry[]> {
+  await getOwnedVoiceAgent(agentId, clientId)
+  return await getVoiceKBEntriesByAgent(agentId)
+}
+
+export async function updateVoiceKBEntry(
+  agentId: string,
+  clientId: string,
+  entryId: string,
+  updates: Pick<VoiceKnowledgeBaseEntry, 'title' | 'content'>
+): Promise<VoiceKnowledgeBaseEntry> {
+  await getOwnedVoiceAgent(agentId, clientId)
+  const updated = await updateVoiceKBEntryRecord(agentId, entryId, updates)
+  await indexKnowledgeBaseEntry(agentId, entryId, updates.title, updates.content)
+  return updated
+}
+
+export async function removeVoiceKBEntry(agentId: string, clientId: string, entryId: string): Promise<void> {
+  await getOwnedVoiceAgent(agentId, clientId)
+
+  const entry = await getVoiceKBEntry(agentId, entryId)
+  if (!entry) {
+    throw new Error('Knowledge base entry not found')
+  }
+
+  await deleteChunksByEntryId(agentId, entryId)
+  await deleteVoiceKBEntry(agentId, entryId)
 }

@@ -1,10 +1,17 @@
 import { v4 as uuidv4 } from 'uuid'
-import { DeleteCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { DeleteCommand, GetCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient } from './dynamo-client.js'
-import type { CreateVoiceAgentInput, IndexingJob, VoiceAgent, VoiceCallLog } from '../types/index.js'
+import type {
+  CreateVoiceAgentInput,
+  IndexingJob,
+  VoiceAgent,
+  VoiceCallLog,
+  VoiceKnowledgeBaseEntry,
+} from '../types/index.js'
 
 const TABLE_NAME_ENV_VAR = 'DYNAMODB_TABLE_VOICE_AGENTS'
 const CALL_LOGS_TABLE_NAME_ENV_VAR = 'DYNAMODB_TABLE_VOICE_CALL_LOGS'
+const VOICE_KB_TABLE_NAME_ENV_VAR = 'DYNAMODB_TABLE_VOICE_KB'
 
 function getVoiceAgentsTableName(): string {
   const tableName = process.env[TABLE_NAME_ENV_VAR]
@@ -24,6 +31,18 @@ function getVoiceCallLogsTableName(): string {
   if (!tableName) {
     throw new Error(
       `Missing required environment variable ${CALL_LOGS_TABLE_NAME_ENV_VAR}. Set it in your .env file before starting the server.`
+    )
+  }
+
+  return tableName
+}
+
+function getVoiceKBTableName(): string {
+  const tableName = process.env[VOICE_KB_TABLE_NAME_ENV_VAR]
+
+  if (!tableName) {
+    throw new Error(
+      `Missing required environment variable ${VOICE_KB_TABLE_NAME_ENV_VAR}. Set it in your .env file before starting the server.`
     )
   }
 
@@ -222,6 +241,107 @@ export async function deleteVoiceAgent(agentId: string, clientId: string): Promi
   } catch (error) {
     throw new Error(
       `Failed to delete voice agent ${agentId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
+export async function createVoiceKBEntry(entry: VoiceKnowledgeBaseEntry): Promise<VoiceKnowledgeBaseEntry> {
+  try {
+    await dynamoClient.send(
+      new PutCommand({
+        TableName: getVoiceKBTableName(),
+        Item: entry,
+      })
+    )
+    return entry
+  } catch (error) {
+    throw new Error(
+      `Failed to create knowledge base entry for voice agent ${entry.agentId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
+export async function getVoiceKBEntriesByAgent(agentId: string): Promise<VoiceKnowledgeBaseEntry[]> {
+  try {
+    const result = await dynamoClient.send(
+      new QueryCommand({
+        TableName: getVoiceKBTableName(),
+        KeyConditionExpression: 'agentId = :agentId',
+        ExpressionAttributeValues: { ':agentId': agentId },
+      })
+    )
+    return (result.Items as VoiceKnowledgeBaseEntry[] | undefined) ?? []
+  } catch (error) {
+    throw new Error(
+      `Failed to get knowledge base entries for voice agent ${agentId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
+export async function getVoiceKBEntry(agentId: string, entryId: string): Promise<VoiceKnowledgeBaseEntry | null> {
+  try {
+    const result = await dynamoClient.send(
+      new GetCommand({
+        TableName: getVoiceKBTableName(),
+        Key: { agentId, entryId },
+      })
+    )
+    return (result.Item as VoiceKnowledgeBaseEntry | undefined) ?? null
+  } catch (error) {
+    throw new Error(
+      `Failed to get knowledge base entry ${entryId} for voice agent ${agentId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
+export async function updateVoiceKBEntry(
+  agentId: string,
+  entryId: string,
+  updates: Pick<VoiceKnowledgeBaseEntry, 'title' | 'content'>
+): Promise<VoiceKnowledgeBaseEntry> {
+  const now = new Date().toISOString()
+  const fields: Record<string, unknown> = { ...updates, updatedAt: now }
+
+  const updateExpressionParts: string[] = []
+  const expressionAttributeNames: Record<string, string> = {}
+  const expressionAttributeValues: Record<string, unknown> = {}
+
+  for (const [key, value] of Object.entries(fields)) {
+    updateExpressionParts.push(`#${key} = :${key}`)
+    expressionAttributeNames[`#${key}`] = key
+    expressionAttributeValues[`:${key}`] = value
+  }
+
+  try {
+    const result = await dynamoClient.send(
+      new UpdateCommand({
+        TableName: getVoiceKBTableName(),
+        Key: { agentId, entryId },
+        UpdateExpression: `SET ${updateExpressionParts.join(', ')}`,
+        ExpressionAttributeNames: expressionAttributeNames,
+        ExpressionAttributeValues: expressionAttributeValues,
+        ReturnValues: 'ALL_NEW',
+      })
+    )
+    return result.Attributes as VoiceKnowledgeBaseEntry
+  } catch (error) {
+    throw new Error(
+      `Failed to update knowledge base entry ${entryId} for voice agent ${agentId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
+export async function deleteVoiceKBEntry(agentId: string, entryId: string): Promise<void> {
+  try {
+    await dynamoClient.send(
+      new DeleteCommand({
+        TableName: getVoiceKBTableName(),
+        Key: { agentId, entryId },
+      })
+    )
+  } catch (error) {
+    throw new Error(
+      `Failed to delete knowledge base entry ${entryId} for voice agent ${agentId}: ${error instanceof Error ? error.message : String(error)}`
     )
   }
 }
