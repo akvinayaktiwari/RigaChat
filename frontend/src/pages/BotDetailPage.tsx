@@ -114,7 +114,10 @@ export default function BotDetailPage() {
       return
     }
     getBotById(botId).then((res) => {
-      if (res.success && res.data) setBot(res.data)
+      if (res.success && res.data) {
+        setBot(res.data)
+        if (res.data.websiteUrl) setResyncUrl(res.data.websiteUrl)
+      }
       setLoading(false)
     })
   }, [botId])
