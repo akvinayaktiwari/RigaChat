@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Check, ChevronLeft, Code, Copy, Loader2, RefreshCw, Trash2 } from 'lucide-react'
-import { deleteVoiceAgent, getVoiceAgent, setupVoiceAgent, updateVoiceAgent } from '../services/api'
-import type { VoiceAgent, VoiceAgentVoice } from '../types/index'
+import { deleteVoiceAgent, getMyBots, getVoiceAgent, setupVoiceAgent, updateVoiceAgent } from '../services/api'
+import type { BotConfig, VoiceAgent, VoiceAgentVoice } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -55,6 +55,7 @@ interface FormData {
   name: string
   greetingMessage: string
   systemPrompt: string
+  botId: string
   voice: VoiceAgentVoice
   brandColor: string
   widgetPosition: VoiceAgent['widgetPosition']
@@ -75,6 +76,7 @@ function toFormData(agent: VoiceAgent): FormData {
     greetingMessage: agent.greetingMessage,
     systemPrompt:
       agent.systemPrompt && agent.systemPrompt.length > 0 ? agent.systemPrompt : buildDefaultSystemPrompt(agent),
+    botId: agent.botId ?? '',
     voice: agent.voice,
     brandColor: agent.brandColor,
     widgetPosition: agent.widgetPosition,
@@ -111,6 +113,8 @@ export default function VoiceAgentDetailPage() {
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
 
+  const [bots, setBots] = useState<BotConfig[]>([])
+
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -140,6 +144,14 @@ export default function VoiceAgentDetailPage() {
       setLoading(false)
     })
   }, [agentId])
+
+  useEffect(() => {
+    getMyBots().then((res) => {
+      if (res.success && res.data) {
+        setBots(res.data)
+      }
+    })
+  }, [])
 
   function update<K extends keyof FormData>(key: K, value: FormData[K]) {
     setFormData((prev) => (prev ? { ...prev, [key]: value } : prev))
@@ -304,6 +316,26 @@ export default function VoiceAgentDetailPage() {
                   }`}
                 >
                   {formData.systemPrompt.length}/{SYSTEM_PROMPT_MAX_LENGTH}
+                </p>
+              </div>
+
+              <div>
+                <label className={labelClasses}>Link to existing chatbot (optional)</label>
+                <select
+                  value={formData.botId}
+                  onChange={(e) => update('botId', e.target.value)}
+                  className={`${inputClasses} cursor-pointer`}
+                >
+                  <option value="">None — use only this agent's own knowledge base</option>
+                  {bots.map((bot) => (
+                    <option key={bot.botId} value={bot.botId}>
+                      {bot.name}
+                    </option>
+                  ))}
+                </select>
+                <p className={hintClasses}>
+                  Also search this chatbot's knowledge base when answering voice calls, in addition to this agent's
+                  own indexed content.
                 </p>
               </div>
 
