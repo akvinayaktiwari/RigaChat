@@ -1,9 +1,10 @@
 import { v4 as uuidv4 } from 'uuid'
 import { DeleteCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient } from './dynamo-client.js'
-import type { CreateVoiceAgentInput, VoiceAgent } from '../types/index.js'
+import type { CreateVoiceAgentInput, IndexingJob, VoiceAgent, VoiceCallLog } from '../types/index.js'
 
 const TABLE_NAME_ENV_VAR = 'DYNAMODB_TABLE_VOICE_AGENTS'
+const CALL_LOGS_TABLE_NAME_ENV_VAR = 'DYNAMODB_TABLE_VOICE_CALL_LOGS'
 
 function getVoiceAgentsTableName(): string {
   const tableName = process.env[TABLE_NAME_ENV_VAR]
@@ -11,6 +12,18 @@ function getVoiceAgentsTableName(): string {
   if (!tableName) {
     throw new Error(
       `Missing required environment variable ${TABLE_NAME_ENV_VAR}. Set it in your .env file before starting the server.`
+    )
+  }
+
+  return tableName
+}
+
+function getVoiceCallLogsTableName(): string {
+  const tableName = process.env[CALL_LOGS_TABLE_NAME_ENV_VAR]
+
+  if (!tableName) {
+    throw new Error(
+      `Missing required environment variable ${CALL_LOGS_TABLE_NAME_ENV_VAR}. Set it in your .env file before starting the server.`
     )
   }
 
@@ -113,6 +126,87 @@ export async function updateVoiceAgent(
   } catch (error) {
     throw new Error(
       `Failed to update voice agent ${agentId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
+// Atomic claim to guard against SQS at-least-once delivery causing two
+// concurrent Lambda invocations to both crawl and upsert the same job.
+// Mirrors bot-repository.ts's claimCrawlerJob, against the voice_agents table.
+export async function claimVoiceCrawlerJob(agentId: string, clientId: string, jobId: string): Promise<boolean> {
+  try {
+    await dynamoClient.send(
+      new UpdateCommand({
+        TableName: getVoiceAgentsTableName(),
+        Key: { clientId, agentId },
+        UpdateExpression: 'SET indexingJob.#status = :processing, indexingJob.startedAt = :now',
+        ConditionExpression: 'indexingJob.jobId = :jobId AND indexingJob.#status = :queued',
+        ExpressionAttributeNames: { '#status': 'status' },
+        ExpressionAttributeValues: {
+          ':processing': 'processing',
+          ':queued': 'queued',
+          ':jobId': jobId,
+          ':now': new Date().toISOString(),
+        },
+      })
+    )
+    return true
+  } catch (error) {
+    if (error instanceof Error && error.name === 'ConditionalCheckFailedException') {
+      return false
+    }
+    console.error(`Failed to claim crawler job ${jobId} for voice agent ${agentId}:`, error)
+    return false
+  }
+}
+
+export async function updateVoiceIndexingJob(
+  agentId: string,
+  clientId: string,
+  updates: Partial<IndexingJob>
+): Promise<void> {
+  try {
+    const agent = await getVoiceAgentById(agentId)
+    const merged: IndexingJob = {
+      ...(agent?.indexingJob as IndexingJob | undefined),
+      ...updates,
+    } as IndexingJob
+    await updateVoiceAgent(agentId, clientId, { indexingJob: merged })
+  } catch (error) {
+    throw new Error(
+      `Failed to update indexing job for voice agent ${agentId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
+export async function writeVoiceCallLog(log: VoiceCallLog): Promise<void> {
+  try {
+    await dynamoClient.send(
+      new PutCommand({
+        TableName: getVoiceCallLogsTableName(),
+        Item: log,
+      })
+    )
+  } catch (error) {
+    throw new Error(
+      `Failed to write voice call log ${log.callId} for agent ${log.agentId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
+export async function getVoiceCallLogsForAgent(agentId: string): Promise<VoiceCallLog[]> {
+  try {
+    const result = await dynamoClient.send(
+      new QueryCommand({
+        TableName: getVoiceCallLogsTableName(),
+        KeyConditionExpression: 'agentId = :agentId',
+        ExpressionAttributeValues: { ':agentId': agentId },
+      })
+    )
+    return (result.Items as VoiceCallLog[] | undefined) ?? []
+  } catch (error) {
+    throw new Error(
+      `Failed to get voice call logs for agent ${agentId}: ${error instanceof Error ? error.message : String(error)}`
     )
   }
 }

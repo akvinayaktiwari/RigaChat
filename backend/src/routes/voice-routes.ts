@@ -1,19 +1,20 @@
+import { createHmac, timingSafeEqual } from 'node:crypto'
 import { Hono } from 'hono'
 import { requireAuth } from '../lib/cognito.js'
 import {
   createVoiceAgent,
   deleteVoiceAgent,
-  endVoiceSession,
   getVoiceAgentById,
   getVoiceAgentContext,
   getVoiceAgentPublicConfig,
   getVoiceAgents,
+  getVoiceAgentUsage,
   setupVoiceAgent,
-  startVoiceSession,
   updateVoiceAgent,
 } from '../services/voice-service.js'
+import { retrieveContext } from '../services/rag-service.js'
 import { generateToken } from '../voice-relay/auth.js'
-import type { ApiResponse, VoiceAgent } from '../types/index.js'
+import type { ApiResponse, VoiceAgent, VoiceUsageSummary } from '../types/index.js'
 
 interface AuthEnv {
   Variables: {
@@ -51,6 +52,51 @@ function isNotFoundError(error: unknown): boolean {
   )
 }
 
+const VOICE_TOKEN_MAX_AGE_MS = 5 * 60 * 1000
+
+// Lambda-side mirror of voice-relay/auth.ts's validateToken — duplicated
+// rather than imported since voice-relay/ is a separate EC2-only bundle
+// not built into this Lambda.
+function validateVoiceToken(token: string, secret: string): { valid: boolean; agentId?: string } {
+  let decoded: string
+  try {
+    decoded = Buffer.from(token, 'base64url').toString('utf8')
+  } catch {
+    return { valid: false }
+  }
+
+  const separatorIndex = decoded.lastIndexOf('.')
+  if (separatorIndex === -1) {
+    return { valid: false }
+  }
+
+  const payload = decoded.slice(0, separatorIndex)
+  const signature = decoded.slice(separatorIndex + 1)
+
+  const expectedSignature = createHmac('sha256', secret).update(payload).digest('hex')
+
+  const signatureBuffer = Buffer.from(signature, 'hex')
+  const expectedBuffer = Buffer.from(expectedSignature, 'hex')
+
+  if (signatureBuffer.length !== expectedBuffer.length || !timingSafeEqual(signatureBuffer, expectedBuffer)) {
+    return { valid: false }
+  }
+
+  const timestampIndex = payload.lastIndexOf(':')
+  if (timestampIndex === -1) {
+    return { valid: false }
+  }
+
+  const agentId = payload.slice(0, timestampIndex)
+  const timestamp = Number(payload.slice(timestampIndex + 1))
+
+  if (!Number.isFinite(timestamp) || Date.now() - timestamp > VOICE_TOKEN_MAX_AGE_MS) {
+    return { valid: false }
+  }
+
+  return { valid: true, agentId }
+}
+
 voiceRoutes.post('/', requireAuth, async (c) => {
   const body = await c.req.json<CreateVoiceAgentBody>()
 
@@ -85,6 +131,13 @@ voiceRoutes.post('/', requireAuth, async (c) => {
       widgetPosition: body.widgetPosition,
       maxSessionDuration: body.maxSessionDuration,
     })
+
+    try {
+      await setupVoiceAgent(agent.agentId, clientId)
+    } catch (setupError) {
+      console.error(`Failed to auto-trigger indexing for voice agent ${agent.agentId}:`, setupError)
+    }
+
     return c.json<ApiResponse<VoiceAgent>>({ success: true, data: agent }, 201)
   } catch (error) {
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
@@ -149,6 +202,39 @@ voiceRoutes.get('/context/:agentId', async (c) => {
     if (isNotFoundError(error)) {
       return c.json({ error: 'Agent not found' }, 404)
     }
+    return c.json({ error: errorMessage(error) }, 500)
+  }
+})
+
+// Called by the EC2 voice relay during tool-calling. Searches this
+// agent's own Pinecone namespace, plus the linked bot's namespace
+// if botId is set, merges results.
+voiceRoutes.post('/rag', async (c) => {
+  const body = await c.req.json<{ agentId: string; query: string; token: string }>()
+
+  if (!body.agentId || !body.query) {
+    return c.json({ error: 'agentId and query required' }, 400)
+  }
+
+  const { valid, agentId: tokenAgentId } = validateVoiceToken(body.token ?? '', process.env.VOICE_AUTH_SECRET ?? '')
+  if (!valid || tokenAgentId !== body.agentId) {
+    return c.json({ error: 'Invalid or missing token' }, 401)
+  }
+
+  try {
+    const agent = await getVoiceAgentContext(body.agentId)
+
+    const agentChunks = await retrieveContext(body.agentId, body.query)
+
+    let botChunks: string[] = []
+    if (agent.botId) {
+      botChunks = await retrieveContext(agent.botId, body.query)
+    }
+
+    const merged = [...agentChunks, ...botChunks].slice(0, 5)
+
+    return c.json({ chunks: merged }, 200)
+  } catch (error) {
     return c.json({ error: errorMessage(error) }, 500)
   }
 })
@@ -218,12 +304,13 @@ voiceRoutes.post('/:id/setup', requireAuth, async (c) => {
   }
 })
 
-voiceRoutes.post('/:id/session', async (c) => {
+voiceRoutes.get('/:id/usage', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
   const agentId = c.req.param('id')
 
   try {
-    const result = await startVoiceSession(agentId)
-    return c.json<ApiResponse<{ sessionId: string }>>({ success: true, data: result }, 200)
+    const usage = await getVoiceAgentUsage(agentId, clientId)
+    return c.json<ApiResponse<VoiceUsageSummary>>({ success: true, data: usage }, 200)
   } catch (error) {
     if (isNotFoundError(error)) {
       return c.json<ApiResponse<null>>({ success: false, error: 'Voice agent not found' }, 404)
@@ -232,16 +319,3 @@ voiceRoutes.post('/:id/session', async (c) => {
   }
 })
 
-voiceRoutes.delete('/:id/session/:sessionId', async (c) => {
-  const sessionId = c.req.param('sessionId')
-
-  try {
-    await endVoiceSession(sessionId)
-    return c.body(null, 204)
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('not found')) {
-      return c.json<ApiResponse<null>>({ success: false, error: 'Voice session not found' }, 404)
-    }
-    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
-  }
-})

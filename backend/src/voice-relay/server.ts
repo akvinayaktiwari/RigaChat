@@ -1,4 +1,5 @@
 import http from 'node:http'
+import { randomUUID } from 'node:crypto'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { WebSocketServer, type WebSocket } from 'ws'
@@ -34,6 +35,7 @@ const dynamoClient = DynamoDBDocumentClient.from(new DynamoDBClient({ region }))
 
 interface VoiceAgentRecord {
   agentId: string
+  clientId: string
   name: string
   voice: VoiceAgentVoice
   greetingMessage: string
@@ -98,22 +100,25 @@ wss.on('connection', async (ws: WebSocket, req) => {
   }
 
   const session = new VoiceSession(ws, {
+    agentId,
+    clientId: agent.clientId,
     voice: agent.voice,
     instructions: `You are ${agent.name}, a helpful voice assistant. Start the call by greeting the caller with: "${agent.greetingMessage}"`,
     firstMessage: agent.greetingMessage,
   })
 
-  activeSessions.set(agentId, session)
+  const connectionId = randomUUID()
+  activeSessions.set(connectionId, session)
 
   ws.on('close', () => {
     session.cleanup()
-    activeSessions.delete(agentId)
+    activeSessions.delete(connectionId)
   })
 
   ws.on('error', (err) => {
     console.error(`[VoiceRelay] Browser socket error for agent ${agentId}:`, err.message)
     session.cleanup()
-    activeSessions.delete(agentId)
+    activeSessions.delete(connectionId)
   })
 })
 

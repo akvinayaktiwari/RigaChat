@@ -241,12 +241,14 @@ export interface VoiceAgent {
   voice: VoiceAgentVoice
   greetingMessage: string
   systemPrompt?: string
+  botId?: string
   websiteUrl: string
   brandColor: string
   widgetPosition: 'bottom-left' | 'bottom-right' | 'bottom-center'
   maxSessionDuration: 5 | 10 | 15
   isEnabled: boolean
   isIndexed: boolean
+  indexingJob?: IndexingJob
   createdAt: string
   updatedAt: string
 }
@@ -266,10 +268,32 @@ export interface UpdateVoiceAgentInput {
   voice?: VoiceAgentVoice
   greetingMessage?: string
   systemPrompt?: string
+  botId?: string
   brandColor?: string
   widgetPosition?: 'bottom-left' | 'bottom-right' | 'bottom-center'
   maxSessionDuration?: 5 | 10 | 15
   isEnabled?: boolean
+}
+
+export interface VoiceCallLog {
+  agentId: string
+  callId: string
+  clientId: string
+  startedAt: string
+  endedAt: string
+  durationSeconds: number
+  inputTokens: number
+  outputTokens: number
+  audioTokens: number
+  totalTokens: number
+  status: 'completed' | 'dropped' | 'error'
+}
+
+export interface VoiceUsageSummary {
+  totalCalls: number
+  totalMinutes: number
+  totalTokens: number
+  recentCalls: VoiceCallLog[]
 }
 
 export interface VoiceAgentPublicConfig {

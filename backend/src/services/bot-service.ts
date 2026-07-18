@@ -8,8 +8,8 @@ import {
   updateBot,
   updateIndexingJob,
 } from '../repositories/bot-repository.js'
-import { deleteChunksByBotId } from '../repositories/vector-repository.js'
-import { reindexBot } from './rag-service.js'
+import { deleteChunksByNamespace } from '../repositories/vector-repository.js'
+import { reindexNamespace } from './rag-service.js'
 import { scanWebsite } from './crawler-service.js'
 import { enqueueCrawlerJob } from '../lib/sqs.js'
 import type { BotConfig, IndexingJob } from '../types/index.js'
@@ -206,7 +206,7 @@ export async function resyncBot(
 ): Promise<{ pagesIndexed: number; chunksIndexed: number }> {
   const bot = await getBotById(botId, clientId)
   if (!bot) throw new Error('Bot not found')
-  const result = await reindexBot(botId, websiteUrl)
+  const result = await reindexNamespace(botId, websiteUrl)
   if (result.supportEmail) {
     await updateBot(botId, clientId, { supportEmail: result.supportEmail })
   }
@@ -332,7 +332,7 @@ export async function removeBot(botId: string, clientId: string): Promise<void> 
 
   try {
     await deleteBot(botId, clientId)
-    await deleteChunksByBotId(botId)
+    await deleteChunksByNamespace(botId)
   } catch (error) {
     throw new Error(
       `Failed to remove bot ${botId}: ${error instanceof Error ? error.message : String(error)}`

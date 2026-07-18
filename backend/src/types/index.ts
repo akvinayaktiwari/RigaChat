@@ -234,14 +234,42 @@ export interface VoiceAgent {
   voice: VoiceAgentVoice
   greetingMessage: string
   systemPrompt?: string
+  // Optional link to an existing chatbot — when set, voice RAG search
+  // also queries that bot's Pinecone namespace in addition to this
+  // agent's own namespace.
+  botId?: string
   websiteUrl: string
   brandColor: string
   widgetPosition: 'bottom-left' | 'bottom-right' | 'bottom-center'
   maxSessionDuration: 5 | 10 | 15
   isEnabled: boolean
+  // True once this agent's own websiteUrl has been crawled, chunked,
+  // and embedded into its Pinecone namespace (see feat/voice-agent-rag).
   isIndexed: boolean
+  indexingJob?: IndexingJob
   createdAt: string
   updatedAt: string
+}
+
+export interface VoiceCallLog {
+  agentId: string
+  callId: string
+  clientId: string
+  startedAt: string
+  endedAt: string
+  durationSeconds: number
+  inputTokens: number
+  outputTokens: number
+  audioTokens: number
+  totalTokens: number
+  status: 'completed' | 'dropped' | 'error'
+}
+
+export interface VoiceUsageSummary {
+  totalCalls: number
+  totalMinutes: number
+  totalTokens: number
+  recentCalls: VoiceCallLog[]
 }
 
 export interface VoiceSession {

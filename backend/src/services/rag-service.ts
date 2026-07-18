@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid'
 import { extractPageFacts, generateEmbedding, generateEmbeddingsBatch } from './openai-service.js'
 import { chunkFacts, chunkWithContext, crawlPagesParallel, extractSupportEmail, scanWebsite } from './crawler-service.js'
-import { upsertChunks, similaritySearch, deleteChunksByBotId } from '../repositories/vector-repository.js'
+import { upsertChunks, similaritySearch, deleteChunksByNamespace } from '../repositories/vector-repository.js'
 import { getPublicBotConfig } from '../repositories/bot-repository.js'
 import { generateAndPrewarmSuggestions } from './suggestion-service.js'
 import type { Chunk } from '../types/index.js'
@@ -23,7 +23,7 @@ async function runSuggestionPrewarm(botId: string, kbContent: string): Promise<v
 }
 
 export async function indexWebsite(
-  botId: string,
+  namespaceId: string,
   websiteUrl: string
 ): Promise<{ pagesIndexed: number; chunksIndexed: number; supportEmail: string | null }> {
   try {
@@ -37,8 +37,8 @@ export async function indexWebsite(
 
     const supportEmail = extractSupportEmail(pages.map((page) => page.fullPageText))
 
-    const botConfig = await getPublicBotConfig(botId)
-    const botName = botConfig?.name ?? botId
+    const botConfig = await getPublicBotConfig(namespaceId)
+    const botName = botConfig?.name ?? namespaceId
 
     const chunks: Chunk[] = []
     for (const page of pages) {
@@ -49,7 +49,7 @@ export async function indexWebsite(
 
       const createdAt = new Date().toISOString()
       for (const text of [...paragraphChunks, ...factChunks]) {
-        chunks.push({ chunkId: uuidv4(), botId, text, sourceUrl: page.url, createdAt })
+        chunks.push({ chunkId: uuidv4(), botId: namespaceId, text, sourceUrl: page.url, createdAt })
       }
     }
 
@@ -57,30 +57,30 @@ export async function indexWebsite(
 
     await upsertChunks(chunks, embeddings)
 
-    await runSuggestionPrewarm(botId, chunks.map((chunk) => chunk.text).join('\n\n'))
+    await runSuggestionPrewarm(namespaceId, chunks.map((chunk) => chunk.text).join('\n\n'))
 
     return { pagesIndexed: pages.length, chunksIndexed: chunks.length, supportEmail }
   } catch (error) {
     throw new Error(
-      `Failed to index website ${websiteUrl} for bot ${botId}: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to index website ${websiteUrl} for bot ${namespaceId}: ${error instanceof Error ? error.message : String(error)}`
     )
   }
 }
 
 export async function indexKnowledgeBaseEntry(
-  botId: string,
+  namespaceId: string,
   entryId: string,
   title: string,
   content: string
 ): Promise<void> {
   try {
     const combinedText = `${title}\n\n${content}`
-    const botConfig = await getPublicBotConfig(botId)
-    const botName = botConfig?.name ?? botId
+    const botConfig = await getPublicBotConfig(namespaceId)
+    const botName = botConfig?.name ?? namespaceId
 
     const chunks: Chunk[] = chunkWithContext(combinedText, botName, 'Knowledge Base').map((chunkString) => ({
       chunkId: uuidv4(),
-      botId,
+      botId: namespaceId,
       text: chunkString,
       sourceUrl: `knowledge_base:${entryId}`,
       createdAt: new Date().toISOString(),
@@ -90,40 +90,40 @@ export async function indexKnowledgeBaseEntry(
 
     await upsertChunks(chunks, embeddings)
 
-    await runSuggestionPrewarm(botId, combinedText)
+    await runSuggestionPrewarm(namespaceId, combinedText)
   } catch (error) {
     throw new Error(
-      `Failed to index knowledge base entry ${entryId} for bot ${botId}: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to index knowledge base entry ${entryId} for bot ${namespaceId}: ${error instanceof Error ? error.message : String(error)}`
     )
   }
 }
 
 export async function retrieveContext(
-  botId: string,
+  namespaceId: string,
   query: string,
   existingEmbedding?: number[]
 ): Promise<string[]> {
   try {
     const queryEmbedding = existingEmbedding ?? (await generateEmbedding(query))
-    const results = await similaritySearch(botId, queryEmbedding, 5)
+    const results = await similaritySearch(namespaceId, queryEmbedding, 5)
     return results.map((result) => result.text)
   } catch (error) {
     throw new Error(
-      `Failed to retrieve context for bot ${botId}: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to retrieve context for bot ${namespaceId}: ${error instanceof Error ? error.message : String(error)}`
     )
   }
 }
 
-export async function reindexBot(
-  botId: string,
+export async function reindexNamespace(
+  namespaceId: string,
   websiteUrl: string
 ): Promise<{ pagesIndexed: number; chunksIndexed: number; supportEmail: string | null }> {
   try {
-    await deleteChunksByBotId(botId)
-    return await indexWebsite(botId, websiteUrl)
+    await deleteChunksByNamespace(namespaceId)
+    return await indexWebsite(namespaceId, websiteUrl)
   } catch (error) {
     throw new Error(
-      `Failed to reindex bot ${botId}: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to reindex bot ${namespaceId}: ${error instanceof Error ? error.message : String(error)}`
     )
   }
 }

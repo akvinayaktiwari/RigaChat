@@ -81,8 +81,8 @@ app.use('/api/voice-agents/*', (c, next) => {
   const isPublicRoute =
     c.req.path.startsWith('/api/voice-agents/public/') ||
     c.req.path.startsWith('/api/voice-agents/context/') ||
-    /^\/api\/voice-agents\/[^/]+\/session(\/[^/]+)?$/.test(c.req.path) ||
-    c.req.path === '/api/voice-agents/token'
+    c.req.path === '/api/voice-agents/token' ||
+    c.req.path === '/api/voice-agents/rag'
   const corsMiddleware = isPublicRoute ? widgetCors : dashboardCors
   return corsMiddleware(c, next)
 })

@@ -9,9 +9,14 @@ import {
   updateBotCrawlStatus,
   updateIndexingJob,
 } from '../repositories/bot-repository.js'
+import {
+  claimVoiceCrawlerJob,
+  updateVoiceAgent,
+  updateVoiceIndexingJob,
+} from '../repositories/voice-repository.js'
 import { generateAndPrewarmSuggestions } from './suggestion-service.js'
 import type { CrawlerJobMessage } from '../lib/sqs.js'
-import type { Chunk } from '../types/index.js'
+import type { Chunk, IndexingJob } from '../types/index.js'
 
 interface CrawlAndChunkResult {
   chunks: Chunk[]
@@ -30,6 +35,22 @@ type PageFactsResult = Awaited<ReturnType<typeof extractPageFacts>>
 
 const FACT_EXTRACTION_BATCH_SIZE = 5
 
+// Dispatches indexing-job progress writes to whichever table the job
+// actually belongs to — bots and voice agents each track indexingJob
+// progress on their own table, with no shared repository for it.
+async function updateJobProgress(
+  botId: string,
+  clientId: string,
+  jobType: CrawlerJobMessage['type'],
+  updates: Partial<IndexingJob>
+): Promise<void> {
+  if (jobType === 'voice_agent') {
+    await updateVoiceIndexingJob(botId, clientId, updates)
+  } else {
+    await updateIndexingJob(botId, clientId, updates)
+  }
+}
+
 // gpt-4o-mini's rate limit is 500 RPM. 5 concurrent calls per batch leaves
 // safe headroom for multiple bots indexing at once — 10 was considered but
 // risks 429s under concurrent load.
@@ -44,7 +65,8 @@ async function extractFactsBatch(
   pages: CrawledPage[],
   botName: string,
   botId: string,
-  clientId: string
+  clientId: string,
+  jobType: CrawlerJobMessage['type']
 ): Promise<PageFactsResult[]> {
   const results: PageFactsResult[] = []
 
@@ -61,7 +83,7 @@ async function extractFactsBatch(
         results.push({ facts: '', paragraphs: '' })
       }
     }
-    await updateIndexingJob(botId, clientId, { crawledPages: pages.length + results.length })
+    await updateJobProgress(botId, clientId, jobType, { crawledPages: pages.length + results.length })
   }
 
   return results
@@ -74,10 +96,11 @@ async function buildEnrichedChunks(
   pages: CrawledPage[],
   botId: string,
   clientId: string,
-  botName: string
+  botName: string,
+  jobType: CrawlerJobMessage['type']
 ): Promise<EnrichedChunkResult> {
   const t0 = Date.now()
-  const allFacts = await extractFactsBatch(pages, botName, botId, clientId)
+  const allFacts = await extractFactsBatch(pages, botName, botId, clientId, jobType)
   console.log(
     `Fact extraction complete: ${pages.length} pages in ${Date.now() - t0}ms (batch size: ${FACT_EXTRACTION_BATCH_SIZE})`
   )
@@ -110,7 +133,7 @@ async function crawlAndChunk(job: CrawlerJobMessage): Promise<CrawlAndChunkResul
   // and returns clean paragraphs, so running cleanContentWithAI() first would
   // just be a second, redundant GPT-4o-mini call per page.
   const pages = await crawlPagesParallel(job.urls, false, async (crawled, total) => {
-    await updateIndexingJob(job.botId, job.clientId, { crawledPages: crawled })
+    await updateJobProgress(job.botId, job.clientId, job.type, { crawledPages: crawled })
     console.log(`Progress: ${crawled}/${total}`)
   })
 
@@ -121,13 +144,14 @@ async function crawlAndChunk(job: CrawlerJobMessage): Promise<CrawlAndChunkResul
   // Double the denominator so the progress bar has room to keep climbing
   // through fact extraction instead of freezing (or rewinding) at the crawl
   // phase's ceiling. Restored to the true page count once the job completes.
-  await updateIndexingJob(job.botId, job.clientId, { selectedPages: pages.length * 2 })
+  await updateJobProgress(job.botId, job.clientId, job.type, { selectedPages: pages.length * 2 })
 
   const { chunks, factsExtracted, factsSkipped } = await buildEnrichedChunks(
     pages,
     job.botId,
     job.clientId,
-    job.botName
+    job.botName,
+    job.type
   )
   console.log(
     `Chunks built: ${chunks.length} total (${factsExtracted} pages with facts extracted, ${factsSkipped} pages without facts)`
@@ -161,17 +185,21 @@ async function prewarmSuggestionsForJob(botId: string, chunks: Chunk[]): Promise
 }
 
 export async function processCrawlerJob(job: CrawlerJobMessage): Promise<void> {
+  const isVoiceAgent = job.type === 'voice_agent'
+
   // Idempotency check — only one Lambda processes this job. SQS's at-least-once
   // delivery can invoke this twice for the same message; this atomic conditional
   // write ensures only the first invocation transitions 'queued' -> 'processing'.
-  const claimed = await claimCrawlerJob(job.botId, job.clientId, job.jobId)
+  const claimed = isVoiceAgent
+    ? await claimVoiceCrawlerJob(job.botId, job.clientId, job.jobId)
+    : await claimCrawlerJob(job.botId, job.clientId, job.jobId)
   if (!claimed) {
     console.log(`Job ${job.jobId} already claimed by another invocation — skipping duplicate`)
     return // SQS will not retry since no error thrown
   }
 
   try {
-    console.log(`Starting crawl for bot ${job.botId}: ${job.urls.length} pages`)
+    console.log(`Starting crawl for ${isVoiceAgent ? 'voice agent' : 'bot'} ${job.botId}: ${job.urls.length} pages`)
 
     const { chunks, pageCount, supportEmail } = await crawlAndChunk(job)
 
@@ -179,7 +207,7 @@ export async function processCrawlerJob(job: CrawlerJobMessage): Promise<void> {
     const embeddings = await generateEmbeddingsBatch(chunks.map((c) => c.text))
     await upsertChunks(chunks, embeddings)
 
-    await updateIndexingJob(job.botId, job.clientId, {
+    await updateJobProgress(job.botId, job.clientId, job.type, {
       status: 'complete',
       crawledPages: pageCount,
       selectedPages: pageCount,
@@ -187,18 +215,24 @@ export async function processCrawlerJob(job: CrawlerJobMessage): Promise<void> {
       completedAt: new Date().toISOString(),
     })
 
-    if (supportEmail) {
+    if (isVoiceAgent) {
+      await updateVoiceAgent(job.botId, job.clientId, { isIndexed: true })
+    } else if (supportEmail) {
       await updateBot(job.botId, job.clientId, { supportEmail })
     }
 
     console.log(`Indexing complete: ${chunks.length} chunks`)
 
-    await prewarmSuggestionsForJob(job.botId, chunks)
+    if (!isVoiceAgent) {
+      await prewarmSuggestionsForJob(job.botId, chunks)
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    await updateIndexingJob(job.botId, job.clientId, { status: 'failed', error: message })
-    await updateBotCrawlStatus(job.botId, job.clientId, 'crawl_failed', mapCrawlErrorMessage(message))
-    console.error(`Crawl job failed for bot ${job.botId}:`, error)
+    await updateJobProgress(job.botId, job.clientId, job.type, { status: 'failed', error: message })
+    if (!isVoiceAgent) {
+      await updateBotCrawlStatus(job.botId, job.clientId, 'crawl_failed', mapCrawlErrorMessage(message))
+    }
+    console.error(`Crawl job failed for ${isVoiceAgent ? 'voice agent' : 'bot'} ${job.botId}:`, error)
     // Do not rethrow — SQS retries won't fix a SPA/rendering failure, so the
     // job must complete cleanly instead of looping forever.
   }

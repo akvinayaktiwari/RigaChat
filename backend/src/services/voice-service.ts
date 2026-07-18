@@ -1,17 +1,16 @@
+import { v4 as uuidv4 } from 'uuid'
 import {
   createVoiceAgent as createVoiceAgentRecord,
   deleteVoiceAgent as deleteVoiceAgentRecord,
   getVoiceAgentById as getVoiceAgentByIdRecord,
   getVoiceAgentsByClient,
+  getVoiceCallLogsForAgent,
   updateVoiceAgent as updateVoiceAgentRecord,
+  updateVoiceIndexingJob,
 } from '../repositories/voice-repository.js'
-import { OpenAIRealtimeProvider } from '../providers/openai-realtime-provider.js'
-import { indexWebsite, retrieveContext } from './rag-service.js'
-import type { CreateVoiceAgentInput, VoiceAgent, VoiceConfig } from '../types/index.js'
-
-const SEED_QUERY = 'Tell me about this business'
-
-export const voiceProvider = new OpenAIRealtimeProvider()
+import { scanWebsite } from './crawler-service.js'
+import { enqueueCrawlerJob } from '../lib/sqs.js'
+import type { CreateVoiceAgentInput, VoiceAgent, VoiceUsageSummary } from '../types/index.js'
 
 async function getOwnedVoiceAgent(agentId: string, clientId: string): Promise<VoiceAgent> {
   const agent = await getVoiceAgentByIdRecord(agentId)
@@ -27,8 +26,32 @@ export async function createVoiceAgent(input: CreateVoiceAgentInput): Promise<Vo
 
 export async function setupVoiceAgent(agentId: string, clientId: string): Promise<VoiceAgent> {
   const agent = await getOwnedVoiceAgent(agentId, clientId)
-  await indexWebsite(agentId, agent.websiteUrl)
-  return await updateVoiceAgentRecord(agentId, clientId, { isIndexed: true })
+
+  const scan = await scanWebsite(agent.websiteUrl)
+  const jobId = uuidv4()
+
+  await updateVoiceIndexingJob(agentId, clientId, {
+    jobId,
+    status: 'queued',
+    websiteUrl: agent.websiteUrl,
+    totalPages: scan.totalPages,
+    selectedPages: scan.selectedPages.length,
+    crawledPages: 0,
+    totalChunks: 0,
+    queuedAt: new Date().toISOString(),
+  })
+
+  await enqueueCrawlerJob({
+    jobId,
+    botId: agentId,
+    clientId,
+    urls: scan.selectedPages,
+    useAICleaning: true,
+    botName: agent.name,
+    type: 'voice_agent',
+  })
+
+  return agent
 }
 
 export async function getVoiceAgents(clientId: string): Promise<VoiceAgent[]> {
@@ -81,7 +104,7 @@ export async function updateVoiceAgent(
 
 export async function getVoiceAgentContext(
   agentId: string
-): Promise<Pick<VoiceAgent, 'name' | 'voice' | 'greetingMessage' | 'systemPrompt'>> {
+): Promise<Pick<VoiceAgent, 'name' | 'voice' | 'greetingMessage' | 'systemPrompt' | 'botId'>> {
   const agent = await getVoiceAgentByIdRecord(agentId)
   if (!agent) {
     throw new Error('Voice agent not found')
@@ -92,6 +115,7 @@ export async function getVoiceAgentContext(
     voice: agent.voice,
     greetingMessage: agent.greetingMessage,
     systemPrompt: agent.systemPrompt,
+    botId: agent.botId,
   }
 }
 
@@ -100,28 +124,16 @@ export async function deleteVoiceAgent(agentId: string, clientId: string): Promi
   await deleteVoiceAgentRecord(agentId, clientId)
 }
 
-export async function startVoiceSession(agentId: string): Promise<{ sessionId: string }> {
-  const publicConfig = await getVoiceAgentPublicConfig(agentId)
-  const agent = await getVoiceAgentByIdRecord(agentId)
-  if (!agent) {
-    throw new Error('Voice agent not found')
+export async function getVoiceAgentUsage(agentId: string, clientId: string): Promise<VoiceUsageSummary> {
+  await getOwnedVoiceAgent(agentId, clientId)
+  const logs = await getVoiceCallLogsForAgent(agentId)
+
+  const sortedByRecent = [...logs].sort((a, b) => b.startedAt.localeCompare(a.startedAt))
+
+  return {
+    totalCalls: sortedByRecent.length,
+    totalMinutes: Math.round(sortedByRecent.reduce((sum, log) => sum + log.durationSeconds, 0) / 60),
+    totalTokens: sortedByRecent.reduce((sum, log) => sum + log.totalTokens, 0),
+    recentCalls: sortedByRecent.slice(0, 10),
   }
-
-  const contextChunks = await retrieveContext(agentId, SEED_QUERY)
-
-  const config: VoiceConfig = {
-    agentId,
-    clientId: agent.clientId,
-    voice: publicConfig.voice,
-    greetingMessage: publicConfig.greetingMessage,
-    maxSessionDuration: agent.maxSessionDuration,
-    ragContext: contextChunks.join('\n\n'),
-  }
-
-  const session = await voiceProvider.connect(config)
-  return { sessionId: session.sessionId }
-}
-
-export async function endVoiceSession(sessionId: string): Promise<void> {
-  await voiceProvider.disconnect(sessionId)
 }

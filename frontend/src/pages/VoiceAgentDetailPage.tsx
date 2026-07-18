@@ -1,8 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Check, ChevronLeft, Code, Copy, Loader2, RefreshCw, Trash2 } from 'lucide-react'
-import { deleteVoiceAgent, getVoiceAgent, setupVoiceAgent, updateVoiceAgent } from '../services/api'
-import type { VoiceAgent, VoiceAgentVoice } from '../types/index'
+import {
+  deleteVoiceAgent,
+  getMyBots,
+  getVoiceAgent,
+  getVoiceAgentUsage,
+  setupVoiceAgent,
+  updateVoiceAgent,
+} from '../services/api'
+import type { BotConfig, VoiceAgent, VoiceAgentVoice, VoiceUsageSummary } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -55,6 +62,7 @@ interface FormData {
   name: string
   greetingMessage: string
   systemPrompt: string
+  botId: string
   voice: VoiceAgentVoice
   brandColor: string
   widgetPosition: VoiceAgent['widgetPosition']
@@ -75,6 +83,7 @@ function toFormData(agent: VoiceAgent): FormData {
     greetingMessage: agent.greetingMessage,
     systemPrompt:
       agent.systemPrompt && agent.systemPrompt.length > 0 ? agent.systemPrompt : buildDefaultSystemPrompt(agent),
+    botId: agent.botId ?? '',
     voice: agent.voice,
     brandColor: agent.brandColor,
     widgetPosition: agent.widgetPosition,
@@ -111,12 +120,17 @@ export default function VoiceAgentDetailPage() {
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
 
+  const [bots, setBots] = useState<BotConfig[]>([])
+  const [usage, setUsage] = useState<VoiceUsageSummary | null>(null)
+
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
   const [reindexing, setReindexing] = useState(false)
   const [reindexError, setReindexError] = useState<string | null>(null)
+  const [justQueued, setJustQueued] = useState(false)
+  const [resyncSuccess, setResyncSuccess] = useState(false)
 
   const [copySuccess, setCopySuccess] = useState(false)
 
@@ -136,6 +150,23 @@ export default function VoiceAgentDetailPage() {
         setFetchError(res.error ?? 'Voice agent not found')
       }
       setLoading(false)
+    })
+  }, [agentId])
+
+  useEffect(() => {
+    getMyBots().then((res) => {
+      if (res.success && res.data) {
+        setBots(res.data)
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!agentId) return
+    getVoiceAgentUsage(agentId).then((res) => {
+      if (res.success && res.data) {
+        setUsage(res.data)
+      }
     })
   }, [agentId])
 
@@ -170,14 +201,17 @@ export default function VoiceAgentDetailPage() {
     if (!agentId) return
     setReindexing(true)
     setReindexError(null)
+    setResyncSuccess(false)
     try {
       const res = await setupVoiceAgent(agentId)
       if (res.success) {
-        const refreshed = await getVoiceAgent(agentId)
-        if (refreshed.success && refreshed.data) {
-          setAgent(refreshed.data)
-          setFormData(toFormData(refreshed.data))
-        }
+        // The setup response reflects the agent as it was before the new
+        // indexingJob was written, so we can't read the queued status back
+        // from it. The actual isIndexed flip happens async via SQS — reflect
+        // that a job was queued optimistically instead of waiting for it.
+        setJustQueued(true)
+        setResyncSuccess(true)
+        setTimeout(() => setResyncSuccess(false), 3000)
       } else {
         setReindexError(res.error ?? 'Failed to re-index website')
       }
@@ -234,6 +268,10 @@ export default function VoiceAgentDetailPage() {
       </div>
     )
   }
+
+  const jobStatus = agent.indexingJob?.status
+  const isIndexingInProgress = justQueued || jobStatus === 'queued' || jobStatus === 'processing'
+  const isIndexingFailed = !justQueued && jobStatus === 'failed'
 
   return (
     <div>
@@ -295,6 +333,26 @@ export default function VoiceAgentDetailPage() {
                   }`}
                 >
                   {formData.systemPrompt.length}/{SYSTEM_PROMPT_MAX_LENGTH}
+                </p>
+              </div>
+
+              <div>
+                <label className={labelClasses}>Link to existing chatbot (optional)</label>
+                <select
+                  value={formData.botId}
+                  onChange={(e) => update('botId', e.target.value)}
+                  className={`${inputClasses} cursor-pointer`}
+                >
+                  <option value="">None — use only this agent's own knowledge base</option>
+                  {bots.map((bot) => (
+                    <option key={bot.botId} value={bot.botId}>
+                      {bot.name}
+                    </option>
+                  ))}
+                </select>
+                <p className={hintClasses}>
+                  Also search this chatbot's knowledge base when answering voice calls, in addition to this agent's
+                  own indexed content.
                 </p>
               </div>
 
@@ -411,15 +469,25 @@ export default function VoiceAgentDetailPage() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-500">Indexing</span>
-                <span
-                  className={`border text-xs font-semibold px-2.5 py-1 rounded-full ${
-                    agent.isIndexed
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : 'bg-amber-50 text-amber-700 border-amber-200'
-                  }`}
-                >
-                  {agent.isIndexed ? 'Ready' : 'Not indexed'}
-                </span>
+                {agent.isIndexed ? (
+                  <span className="inline-flex items-center gap-1 border text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border-emerald-200">
+                    <Check size={12} />
+                    Knowledge base indexed
+                  </span>
+                ) : isIndexingInProgress ? (
+                  <span className="inline-flex items-center gap-1 border text-xs font-semibold px-2.5 py-1 rounded-full bg-violet-50 text-violet-700 border-violet-200">
+                    <Loader2 size={12} className="animate-spin" />
+                    Indexing in progress...
+                  </span>
+                ) : isIndexingFailed ? (
+                  <span className="border text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-700 border-red-200">
+                    Indexing failed
+                  </span>
+                ) : (
+                  <span className="border text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border-amber-200">
+                    Not indexed
+                  </span>
+                )}
               </div>
 
               <div className="flex items-center justify-between">
@@ -441,21 +509,77 @@ export default function VoiceAgentDetailPage() {
               </div>
             </div>
 
+            {isIndexingFailed && agent.indexingJob?.error && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 mt-4">
+                <p className="text-sm text-red-700">{agent.indexingJob.error}</p>
+              </div>
+            )}
+
             {reindexError && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-3 mt-4">
                 <p className="text-sm text-red-700">{reindexError}</p>
               </div>
             )}
 
+            {resyncSuccess && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 mt-4">
+                <p className="text-sm text-emerald-700">Resync started — this may take a few minutes.</p>
+              </div>
+            )}
+
             <button
               type="button"
               onClick={handleReindex}
-              disabled={reindexing}
-              className={`w-full mt-4 py-2.5 flex items-center justify-center gap-2 text-sm ${secondaryButtonClasses}`}
+              disabled={reindexing || isIndexingInProgress}
+              className={`w-full mt-4 py-2.5 flex items-center justify-center gap-2 text-sm ${
+                isIndexingFailed ? primaryButtonClasses : secondaryButtonClasses
+              }`}
             >
               <RefreshCw size={14} className={reindexing ? 'animate-spin' : ''} />
-              {reindexing ? 'Indexing...' : 'Re-index website'}
+              {reindexing
+                ? 'Resyncing...'
+                : isIndexingInProgress
+                  ? 'Indexing in progress...'
+                  : 'Resync Knowledge Base'}
             </button>
+          </div>
+
+          <div className="bg-white rounded-2xl p-6 border border-black/5 shadow-sm">
+            <h2 className="font-bold text-lg text-gray-900 mb-4" style={JAKARTA_FONT}>
+              Usage
+            </h2>
+
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div>
+                <p className="text-xs text-gray-500">Total Calls</p>
+                <p className="text-lg font-bold text-gray-900">{usage?.totalCalls ?? 0}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Total Minutes</p>
+                <p className="text-lg font-bold text-gray-900">{usage?.totalMinutes ?? 0}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Total Tokens</p>
+                <p className="text-lg font-bold text-gray-900">{usage?.totalTokens ?? 0}</p>
+              </div>
+            </div>
+
+            {usage && usage.recentCalls.length > 0 ? (
+              <div className="space-y-2">
+                {usage.recentCalls.map((call) => (
+                  <div
+                    key={call.callId}
+                    className="flex items-center justify-between text-sm border-t border-gray-100 pt-2"
+                  >
+                    <span className="text-gray-700">{formatCreatedDate(call.startedAt)}</span>
+                    <span className="text-gray-500">{call.durationSeconds}s</span>
+                    <span className="text-gray-500">{call.totalTokens} tokens</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">No calls yet</p>
+            )}
           </div>
 
           <div className="bg-white rounded-2xl p-6 border border-black/5 shadow-sm">

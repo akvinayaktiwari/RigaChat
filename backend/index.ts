@@ -4,7 +4,6 @@ import type { LambdaEvent } from 'hono/aws-lambda'
 import { app } from './src/routes/index.js'
 import { sendWeeklyReportsForAllClients } from './src/services/whatsapp-service.js'
 import { processCrawlerJob } from './src/services/crawler-worker-service.js'
-import { handler as voiceWsHandler } from './src/handlers/voice-ws-handler.js'
 import type { CrawlerJobMessage } from './src/lib/sqs.js'
 
 // Lambda Function URL only supports one invocation mode (BUFFERED or RESPONSE_STREAM)
@@ -69,8 +68,6 @@ const hasStreamingRuntime =
   typeof (globalThis as LambdaStreamingGlobal).awslambda?.streamifyResponse === 'function'
 
 export const streamingHandler = hasStreamingRuntime ? streamHandle(app) : undefined
-
-export { voiceWsHandler }
 
 if (process.env.NODE_ENV !== 'production') {
   const port = Number(process.env.PORT) || 3000
