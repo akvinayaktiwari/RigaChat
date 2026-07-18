@@ -15,7 +15,6 @@ import {
 } from 'lucide-react'
 import { confirmBotIndexing, setupBot, startBotIndexing } from '../services/api'
 import { Toggle } from '../components/Toggle'
-import { IndexingProgress } from '../components/IndexingProgress'
 import type { BotConfig, LeadFormField } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -115,7 +114,7 @@ const INITIAL_FORM_DATA: FormData = {
   budgetRangeEnabled: true,
 }
 
-type LaunchStep = 'form' | 'creating' | 'confirmation_required' | 'indexing'
+type LaunchStep = 'form' | 'creating' | 'confirmation_required'
 
 interface StepErrors {
   name?: string
@@ -282,7 +281,7 @@ export default function NewBotPage() {
         setSelectedPages(indexRes.data.selectedPages ?? 50)
         setLaunchStep('confirmation_required')
       } else {
-        setLaunchStep('indexing')
+        navigate(`/dashboard/bots/${newBotId}`)
       }
     } catch {
       setLaunchError('Something went wrong. Please try again.')
@@ -294,7 +293,7 @@ export default function NewBotPage() {
     if (!botId || !jobId) return
     try {
       await confirmBotIndexing(botId, jobId)
-      setLaunchStep('indexing')
+      navigate(`/dashboard/bots/${botId}`)
     } catch {
       setLaunchError('Something went wrong. Please try again.')
     }
@@ -334,25 +333,7 @@ export default function NewBotPage() {
       {launchStep === 'form' && <StepIndicator currentStep={currentStep} />}
 
       <div className="bg-white rounded-2xl p-8 shadow-sm border border-black/5 mt-6">
-        {launchStep === 'indexing' && botId ? (
-          <div className="py-6">
-            <div className="flex flex-col items-center text-center mb-6">
-              <div className="w-16 h-16 rounded-full bg-violet-50 flex items-center justify-center mb-4">
-                <Loader2 className="text-violet-600 animate-spin" size={32} />
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900" style={JAKARTA_FONT}>
-                Building Your Chatbot
-              </h2>
-              <p className="text-gray-500 mt-2">We&apos;re crawling your site and indexing content</p>
-            </div>
-            <IndexingProgress
-              botId={botId}
-              onComplete={() => navigate(`/dashboard/bots/${botId}`)}
-              onError={(err) => setLaunchError(err)}
-            />
-            {launchError && <p className="text-sm text-red-500 mt-3 text-center">{launchError}</p>}
-          </div>
-        ) : launchStep === 'creating' || launchStep === 'confirmation_required' ? (
+        {launchStep === 'creating' || launchStep === 'confirmation_required' ? (
           <div className="flex flex-col items-center text-center py-12">
             <Loader2 className="animate-spin text-violet-600" size={48} />
             <p className="text-gray-500 text-sm mt-2">Creating your bot...</p>
