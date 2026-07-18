@@ -71,10 +71,7 @@ interface FormData {
 }
 
 function buildDefaultSystemPrompt(agent: VoiceAgent): string {
-  return `You are ${agent.name}, a helpful voice assistant for ${agent.websiteUrl}.
-Greet callers with: "${agent.greetingMessage}"
-Only answer questions about this business.
-Keep responses concise — 2-3 sentences max.`
+  return `You are ${agent.name}, a voice assistant for this business. Always use the search_knowledge_base tool when asked about pricing, features, or details. Answer directly using only what the tool returns — don't ask broadening questions like "which product" unless the knowledge base itself lists multiple distinct options. If nothing relevant is found, say so honestly. Greet callers with: "${agent.greetingMessage}" Keep responses to 2-3 sentences.`
 }
 
 function toFormData(agent: VoiceAgent): FormData {
