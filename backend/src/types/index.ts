@@ -337,3 +337,51 @@ export interface CreateVoiceAgentInput {
   maxSessionDuration: 5 | 10 | 15
   status?: VoiceAgentStatus
 }
+
+export type SubscriptionStatus =
+  | 'trialing'
+  | 'active'
+  | 'past_due'
+  | 'suspended'
+  | 'trial_expired'
+  | 'cancelled'
+
+export type PlanTier = 'free' | 'starter' | 'growth' | 'agency'
+
+export interface SubscriptionAddons {
+  voice?: { subscribed: boolean; subscribedAt: string }
+}
+
+export interface SubscriptionOverrides {
+  chat?: { conversations?: number | null }
+  leads?: { max?: number | null }
+  agents?: { max?: number | null }
+  voice?: { minutes?: number | null }
+}
+
+export interface Subscription {
+  accountId: string
+  status: SubscriptionStatus
+  plan: PlanTier
+  addons: SubscriptionAddons
+  overrides: SubscriptionOverrides
+  isInternal: boolean
+  trialStartedAt: string | null
+  trialEndsAt: string | null
+  currentPeriodStart: string
+  currentPeriodEnd: string
+  razorpaySubscriptionId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Entitlements {
+  accountId: string
+  status: SubscriptionStatus
+  features: {
+    chat: { enabled: boolean; mode: 'full' | 'degraded' | null; limits: { conversations: number | null } }
+    crm: { enabled: boolean; limits: { leads: number | null } }
+    agents: { enabled: boolean; limits: { max: number | null } }
+    voice: { enabled: boolean; limits: { minutes: number | null } }
+  }
+}

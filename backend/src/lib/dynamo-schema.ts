@@ -112,6 +112,13 @@ export const tableDefinitions: Record<string, TableDefinition> = {
     ],
     BillingMode: 'PAY_PER_REQUEST',
   },
+
+  subscriptions: {
+    TableName: 'DYNAMODB_TABLE_SUBSCRIPTIONS', // reads from process.env.DYNAMODB_TABLE_SUBSCRIPTIONS
+    KeySchema: [{ AttributeName: 'accountId', KeyType: 'HASH' }],
+    AttributeDefinitions: [{ AttributeName: 'accountId', AttributeType: 'S' }],
+    BillingMode: 'PAY_PER_REQUEST',
+  },
 }
 
 export function printTableDefinitions(): void {

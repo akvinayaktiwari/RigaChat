@@ -1,5 +1,6 @@
 import { createHash } from 'crypto'
 import { getRedisProvider } from '../providers/redis/redis-provider.factory.js'
+import type { Entitlements } from '../types/index.js'
 
 const EMBEDDING_TTL = 24 * 60 * 60        // 24 hours
 const ANSWER_TTL = 7 * 24 * 60 * 60       // 7 days
@@ -74,5 +75,41 @@ export async function deleteCachedAnswer(
     await redis.delete(key)
   } catch (err) {
     console.error('Failed to delete cached answer:', err)
+  }
+}
+
+export async function getCachedEntitlements(accountId: string): Promise<Entitlements | null> {
+  try {
+    const redis = getRedisProvider()
+    const key = `entitlements:${accountId}`
+    const value = await redis.get(key)
+    if (!value) return null
+    return JSON.parse(value) as Entitlements
+  } catch {
+    return null
+  }
+}
+
+export async function setCachedEntitlements(
+  accountId: string,
+  entitlements: Entitlements,
+  ttlSeconds: number
+): Promise<void> {
+  try {
+    const redis = getRedisProvider()
+    const key = `entitlements:${accountId}`
+    await redis.set(key, JSON.stringify(entitlements), ttlSeconds)
+  } catch (err) {
+    console.error('Failed to cache entitlements:', err)
+  }
+}
+
+export async function deleteCachedEntitlements(accountId: string): Promise<void> {
+  try {
+    const redis = getRedisProvider()
+    const key = `entitlements:${accountId}`
+    await redis.delete(key)
+  } catch (err) {
+    console.error('Failed to delete cached entitlements:', err)
   }
 }
