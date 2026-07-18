@@ -247,6 +247,7 @@ export interface VoiceAgent {
   maxSessionDuration: 5 | 10 | 15
   isEnabled: boolean
   isIndexed: boolean
+  indexingJob?: IndexingJob
   createdAt: string
   updatedAt: string
 }

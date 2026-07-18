@@ -117,6 +117,8 @@ export default function VoiceAgentDetailPage() {
 
   const [reindexing, setReindexing] = useState(false)
   const [reindexError, setReindexError] = useState<string | null>(null)
+  const [justQueued, setJustQueued] = useState(false)
+  const [resyncSuccess, setResyncSuccess] = useState(false)
 
   const [copySuccess, setCopySuccess] = useState(false)
 
@@ -170,14 +172,17 @@ export default function VoiceAgentDetailPage() {
     if (!agentId) return
     setReindexing(true)
     setReindexError(null)
+    setResyncSuccess(false)
     try {
       const res = await setupVoiceAgent(agentId)
       if (res.success) {
-        const refreshed = await getVoiceAgent(agentId)
-        if (refreshed.success && refreshed.data) {
-          setAgent(refreshed.data)
-          setFormData(toFormData(refreshed.data))
-        }
+        // The setup response reflects the agent as it was before the new
+        // indexingJob was written, so we can't read the queued status back
+        // from it. The actual isIndexed flip happens async via SQS — reflect
+        // that a job was queued optimistically instead of waiting for it.
+        setJustQueued(true)
+        setResyncSuccess(true)
+        setTimeout(() => setResyncSuccess(false), 3000)
       } else {
         setReindexError(res.error ?? 'Failed to re-index website')
       }
@@ -234,6 +239,10 @@ export default function VoiceAgentDetailPage() {
       </div>
     )
   }
+
+  const jobStatus = agent.indexingJob?.status
+  const isIndexingInProgress = justQueued || jobStatus === 'queued' || jobStatus === 'processing'
+  const isIndexingFailed = !justQueued && jobStatus === 'failed'
 
   return (
     <div>
@@ -411,15 +420,25 @@ export default function VoiceAgentDetailPage() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-500">Indexing</span>
-                <span
-                  className={`border text-xs font-semibold px-2.5 py-1 rounded-full ${
-                    agent.isIndexed
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : 'bg-amber-50 text-amber-700 border-amber-200'
-                  }`}
-                >
-                  {agent.isIndexed ? 'Ready' : 'Not indexed'}
-                </span>
+                {agent.isIndexed ? (
+                  <span className="inline-flex items-center gap-1 border text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border-emerald-200">
+                    <Check size={12} />
+                    Knowledge base indexed
+                  </span>
+                ) : isIndexingInProgress ? (
+                  <span className="inline-flex items-center gap-1 border text-xs font-semibold px-2.5 py-1 rounded-full bg-violet-50 text-violet-700 border-violet-200">
+                    <Loader2 size={12} className="animate-spin" />
+                    Indexing in progress...
+                  </span>
+                ) : isIndexingFailed ? (
+                  <span className="border text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-700 border-red-200">
+                    Indexing failed
+                  </span>
+                ) : (
+                  <span className="border text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border-amber-200">
+                    Not indexed
+                  </span>
+                )}
               </div>
 
               <div className="flex items-center justify-between">
@@ -441,20 +460,38 @@ export default function VoiceAgentDetailPage() {
               </div>
             </div>
 
+            {isIndexingFailed && agent.indexingJob?.error && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 mt-4">
+                <p className="text-sm text-red-700">{agent.indexingJob.error}</p>
+              </div>
+            )}
+
             {reindexError && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-3 mt-4">
                 <p className="text-sm text-red-700">{reindexError}</p>
               </div>
             )}
 
+            {resyncSuccess && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 mt-4">
+                <p className="text-sm text-emerald-700">Resync started — this may take a few minutes.</p>
+              </div>
+            )}
+
             <button
               type="button"
               onClick={handleReindex}
-              disabled={reindexing}
-              className={`w-full mt-4 py-2.5 flex items-center justify-center gap-2 text-sm ${secondaryButtonClasses}`}
+              disabled={reindexing || isIndexingInProgress}
+              className={`w-full mt-4 py-2.5 flex items-center justify-center gap-2 text-sm ${
+                isIndexingFailed ? primaryButtonClasses : secondaryButtonClasses
+              }`}
             >
               <RefreshCw size={14} className={reindexing ? 'animate-spin' : ''} />
-              {reindexing ? 'Indexing...' : 'Re-index website'}
+              {reindexing
+                ? 'Resyncing...'
+                : isIndexingInProgress
+                  ? 'Indexing in progress...'
+                  : 'Resync Knowledge Base'}
             </button>
           </div>
 
