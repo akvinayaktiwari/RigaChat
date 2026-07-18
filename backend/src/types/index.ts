@@ -49,6 +49,27 @@ export interface IndexingJob {
   startedAt?: string
   completedAt?: string
   error?: string
+
+  // Finer-grained phase while status === 'processing'. status stays source of truth
+  // for queued/complete/failed/pending/confirmation_required.
+  // Mapping: queued→status 'queued', ready→'complete', failed→'failed';
+  // crawling & indexing both live under status 'processing'.
+  phase?: 'queued' | 'crawling' | 'indexing' | 'ready' | 'failed'
+
+  // Incremental embedding-phase counter (denominator is existing totalChunks).
+  // Distinct from totalChunks, which is written once at completion.
+  chunksDone?: number
+
+  // Last progress write; powers stall detection. Distinct from the outer
+  // BotConfig/VoiceAgent record's own updatedAt.
+  updatedAt?: string
+
+  // Structured error for the new progress component. Leave existing `error?: string`
+  // EXACTLY as-is (two live UI read sites depend on it); the worker writes both.
+  errorDetail?: { message: string; retryable: boolean }
+
+  // Populated on completion.
+  summary?: { pages: number; passages: number }
 }
 
 export interface SuggestedQuestion {
