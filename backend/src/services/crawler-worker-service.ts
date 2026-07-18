@@ -84,7 +84,10 @@ async function extractFactsBatch(
         results.push({ facts: '', paragraphs: '' })
       }
     }
-    await updateJobProgress(botId, clientId, jobType, { crawledPages: pages.length + results.length })
+    await updateJobProgress(botId, clientId, jobType, {
+      crawledPages: pages.length + results.length,
+      updatedAt: new Date().toISOString(),
+    })
   }
 
   return results
@@ -134,7 +137,10 @@ async function crawlAndChunk(job: CrawlerJobMessage): Promise<CrawlAndChunkResul
   // and returns clean paragraphs, so running cleanContentWithAI() first would
   // just be a second, redundant GPT-4o-mini call per page.
   const pages = await crawlPagesParallel(job.urls, false, async (crawled, total) => {
-    await updateJobProgress(job.botId, job.clientId, job.type, { crawledPages: crawled })
+    await updateJobProgress(job.botId, job.clientId, job.type, {
+      crawledPages: crawled,
+      updatedAt: new Date().toISOString(),
+    })
     console.log(`Progress: ${crawled}/${total}`)
   })
 
@@ -145,7 +151,10 @@ async function crawlAndChunk(job: CrawlerJobMessage): Promise<CrawlAndChunkResul
   // Double the denominator so the progress bar has room to keep climbing
   // through fact extraction instead of freezing (or rewinding) at the crawl
   // phase's ceiling. Restored to the true page count once the job completes.
-  await updateJobProgress(job.botId, job.clientId, job.type, { selectedPages: pages.length * 2 })
+  await updateJobProgress(job.botId, job.clientId, job.type, {
+    selectedPages: pages.length * 2,
+    updatedAt: new Date().toISOString(),
+  })
 
   const { chunks, factsExtracted, factsSkipped } = await buildEnrichedChunks(
     pages,
@@ -218,9 +227,22 @@ export async function processCrawlerJob(job: CrawlerJobMessage): Promise<void> {
   try {
     console.log(`Starting crawl for ${isVoiceAgent ? 'voice agent' : 'bot'} ${job.botId}: ${job.urls.length} pages`)
 
+    await updateJobProgress(job.botId, job.clientId, job.type, {
+      phase: 'crawling',
+      updatedAt: new Date().toISOString(),
+    })
+
     const { chunks, pageCount, supportEmail } = await crawlAndChunk(job)
 
     console.log(`Embedding ${chunks.length} chunks in batch`)
+    // Embedding is a single bulk call (generateEmbeddingsBatch + upsertChunks below),
+    // not a per-chunk loop — there's no iteration boundary to report incremental
+    // chunksDone against, so phase 'indexing' is written once here with chunksDone
+    // left absent (renders as an indeterminate bar) until the completion write below.
+    await updateJobProgress(job.botId, job.clientId, job.type, {
+      phase: 'indexing',
+      updatedAt: new Date().toISOString(),
+    })
     const embeddings = await generateEmbeddingsBatch(chunks.map((c) => c.text))
     await upsertChunks(chunks, embeddings)
 
@@ -230,6 +252,10 @@ export async function processCrawlerJob(job: CrawlerJobMessage): Promise<void> {
       selectedPages: pageCount,
       totalChunks: chunks.length,
       completedAt: new Date().toISOString(),
+      phase: 'ready',
+      chunksDone: chunks.length,
+      updatedAt: new Date().toISOString(),
+      summary: { pages: pageCount, passages: chunks.length },
     })
 
     if (isVoiceAgent) {
@@ -245,7 +271,13 @@ export async function processCrawlerJob(job: CrawlerJobMessage): Promise<void> {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    await updateJobProgress(job.botId, job.clientId, job.type, { status: 'failed', error: message })
+    await updateJobProgress(job.botId, job.clientId, job.type, {
+      status: 'failed',
+      error: message,
+      errorDetail: { message, retryable: true },
+      phase: 'failed',
+      updatedAt: new Date().toISOString(),
+    })
     if (!isVoiceAgent) {
       await updateBotCrawlStatus(job.botId, job.clientId, 'crawl_failed', mapCrawlErrorMessage(message))
     }
