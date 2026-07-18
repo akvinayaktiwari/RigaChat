@@ -113,10 +113,24 @@ export default function BotDetailPage() {
       setLoading(false)
       return
     }
-    getBotById(botId).then((res) => {
+    getBotById(botId).then(async (res) => {
       if (res.success && res.data) {
         setBot(res.data)
         if (res.data.websiteUrl) setResyncUrl(res.data.websiteUrl)
+
+        const statusRes = await getBotIndexingStatus(botId)
+        if (
+          statusRes.success &&
+          statusRes.data &&
+          'jobId' in statusRes.data &&
+          (statusRes.data.status === 'pending' ||
+            statusRes.data.status === 'queued' ||
+            statusRes.data.status === 'processing')
+        ) {
+          setIndexingJob(statusRes.data)
+          setIndexingStatus('processing')
+          startPolling()
+        }
       }
       setLoading(false)
     })
