@@ -260,8 +260,11 @@ export async function processCrawlerJob(job: CrawlerJobMessage): Promise<void> {
 
     if (isVoiceAgent) {
       await updateVoiceAgent(job.botId, job.clientId, { isIndexed: true })
-    } else if (supportEmail) {
-      await updateBot(job.botId, job.clientId, { supportEmail })
+    } else {
+      await updateBot(job.botId, job.clientId, {
+        status: 'active',
+        ...(supportEmail ? { supportEmail } : {}),
+      })
     }
 
     console.log(`Indexing complete: ${chunks.length} chunks`)
