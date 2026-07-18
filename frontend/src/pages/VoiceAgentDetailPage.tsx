@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { BookOpen, Check, ChevronLeft, Code, Copy, Loader2, RefreshCw, Trash2 } from 'lucide-react'
 import {
@@ -9,6 +9,8 @@ import {
   setupVoiceAgent,
   updateVoiceAgent,
 } from '../services/api'
+import IndexingProgressCard from '../components/IndexingProgressCard'
+import { useIndexingStatus } from '../hooks/useIndexingStatus'
 import type { BotConfig, VoiceAgent, VoiceAgentVoice, VoiceUsageSummary } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -167,6 +169,18 @@ export default function VoiceAgentDetailPage() {
     })
   }, [agentId])
 
+  const fetchIndexingStatus = useCallback(async () => {
+    if (!agentId) return undefined
+    const res = await getVoiceAgent(agentId)
+    return res.success ? res.data?.indexingJob : undefined
+  }, [agentId])
+
+  const { job: indexingJobStatus, refresh: refreshIndexingStatus } = useIndexingStatus(
+    agentId ?? '',
+    fetchIndexingStatus,
+    true
+  )
+
   function update<K extends keyof FormData>(key: K, value: FormData[K]) {
     setFormData((prev) => (prev ? { ...prev, [key]: value } : prev))
   }
@@ -219,6 +233,12 @@ export default function VoiceAgentDetailPage() {
       setReindexing(false)
     }
   }
+
+  const handleRetry = useCallback(async () => {
+    await handleReindex()
+    refreshIndexingStatus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshIndexingStatus])
 
   async function handleCopyEmbed() {
     if (!agentId) return
@@ -471,11 +491,6 @@ export default function VoiceAgentDetailPage() {
                     <Check size={12} />
                     Knowledge base indexed
                   </span>
-                ) : isIndexingInProgress ? (
-                  <span className="inline-flex items-center gap-1 border text-xs font-semibold px-2.5 py-1 rounded-full bg-violet-50 text-violet-700 border-violet-200">
-                    <Loader2 size={12} className="animate-spin" />
-                    Indexing in progress...
-                  </span>
                 ) : isIndexingFailed ? (
                   <span className="border text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-700 border-red-200">
                     Indexing failed
@@ -506,11 +521,9 @@ export default function VoiceAgentDetailPage() {
               </div>
             </div>
 
-            {isIndexingFailed && agent.indexingJob?.error && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3 mt-4">
-                <p className="text-sm text-red-700">{agent.indexingJob.error}</p>
-              </div>
-            )}
+            <div className="mt-4">
+              <IndexingProgressCard job={indexingJobStatus} surface="voice" onRetry={handleRetry} />
+            </div>
 
             {reindexError && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-3 mt-4">
