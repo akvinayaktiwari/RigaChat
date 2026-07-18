@@ -4,10 +4,33 @@ import {
   getCachedEntitlements,
   setCachedEntitlements,
 } from '../repositories/redis-repository.js'
+import { incrementIfUnderLimit, incrementUsage } from '../repositories/usage-repository.js'
+import { countBotsForClient } from '../repositories/bot-repository.js'
+import { getPeriodKey } from '../lib/usage-period.js'
 import { FEATURES, PLANS, TRIAL } from '../config/entitlements-config.js'
 import type { Entitlements, Subscription } from '../types/index.js'
 
 const ENTITLEMENTS_CACHE_TTL_SECONDS = 60
+
+export class EntitlementError extends Error {
+  code: 'FEATURE_DISABLED' | 'LIMIT_EXCEEDED'
+  feature: string
+  limit?: number
+  current?: number
+
+  constructor(
+    code: 'FEATURE_DISABLED' | 'LIMIT_EXCEEDED',
+    feature: string,
+    details?: { limit?: number; current?: number }
+  ) {
+    super(`Entitlement denied: ${code} for ${feature}`)
+    this.name = 'EntitlementError'
+    this.code = code
+    this.feature = feature
+    this.limit = details?.limit
+    this.current = details?.current
+  }
+}
 
 // Explicit `null` in an override means "unlimited" and must win over the plan
 // default; `undefined` (key absent) means "no override" and falls through.
@@ -149,4 +172,59 @@ export async function resolveEntitlements(accountId: string): Promise<Entitlemen
 
 export async function invalidateEntitlementsCache(accountId: string): Promise<void> {
   await deleteCachedEntitlements(accountId)
+}
+
+// resolveEntitlements() fetches the Subscription internally but only returns
+// the computed Entitlements shape — the raw subscription isn't exposed, so
+// this is a second getByAccountId() fetch per checkEntitlement('chat') call.
+// A null subscription mirrors computeEntitlements()'s own "no row → fresh
+// trial" handling: treated as the 'trial' bucket directly.
+async function resolveChatPeriodKey(accountId: string): Promise<string> {
+  const subscription = await getByAccountId(accountId)
+  return subscription ? getPeriodKey(subscription) : 'trial'
+}
+
+export async function checkEntitlement(
+  accountId: string,
+  featureKey: 'chat' | 'agents',
+  quantity = 1
+): Promise<void> {
+  const entitlements = await resolveEntitlements(accountId)
+  const feature = entitlements.features[featureKey]
+
+  if (!feature.enabled) {
+    throw new EntitlementError('FEATURE_DISABLED', featureKey)
+  }
+
+  if (featureKey === 'chat') {
+    const limit = entitlements.features.chat.limits.conversations
+    const periodKey = await resolveChatPeriodKey(accountId)
+
+    if (limit === null) {
+      // Unlimited — still record usage for visibility, never blocks.
+      await incrementUsage(accountId, periodKey, 'chatConversations', quantity)
+      return
+    }
+
+    const result = await incrementIfUnderLimit(accountId, periodKey, 'chatConversations', limit, quantity)
+    if (!result.allowed) {
+      // `current: limit` is an approximation, not the real pre-increment
+      // value — incrementIfUnderLimit()'s ConditionalCheckFailedException
+      // path doesn't return the item's current attributes. DynamoDB
+      // supports ReturnValuesOnConditionCheckFailure: 'ALL_OLD' to fix this
+      // precisely, but that would widen incrementIfUnderLimit()'s return
+      // contract beyond what was specified here — flagged, not applied.
+      throw new EntitlementError('LIMIT_EXCEEDED', 'chat', { limit, current: limit })
+    }
+    return
+  }
+
+  // featureKey === 'agents'
+  const limit = entitlements.features.agents.limits.max
+  if (limit === null) return
+
+  const count = await countBotsForClient(accountId)
+  if (count + quantity > limit) {
+    throw new EntitlementError('LIMIT_EXCEEDED', 'agents', { limit, current: count })
+  }
 }

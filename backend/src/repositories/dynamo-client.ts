@@ -7,7 +7,16 @@ const baseClient = new DynamoDBClient({ region })
 
 export const dynamoClient = DynamoDBDocumentClient.from(baseClient)
 
-type TableKey = 'clients' | 'bots' | 'leads' | 'conversations' | 'kb' | 'forms' | 'form_leads' | 'subscriptions'
+type TableKey =
+  | 'clients'
+  | 'bots'
+  | 'leads'
+  | 'conversations'
+  | 'kb'
+  | 'forms'
+  | 'form_leads'
+  | 'subscriptions'
+  | 'usage'
 
 const tableEnvVarNames: Record<TableKey, string> = {
   clients: 'DYNAMODB_TABLE_CLIENTS',
@@ -18,6 +27,7 @@ const tableEnvVarNames: Record<TableKey, string> = {
   forms: 'DYNAMODB_TABLE_FORMS',
   form_leads: 'DYNAMODB_TABLE_FORM_LEADS',
   subscriptions: 'DYNAMODB_TABLE_SUBSCRIPTIONS',
+  usage: 'DYNAMODB_TABLE_USAGE',
 }
 
 export function getTableName(key: TableKey): string {

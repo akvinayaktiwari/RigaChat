@@ -56,6 +56,24 @@ export async function getBotsByClientId(clientId: string): Promise<BotConfig[]> 
   }
 }
 
+export async function countBotsForClient(clientId: string): Promise<number> {
+  try {
+    const result = await dynamoClient.send(
+      new QueryCommand({
+        TableName: TABLE_NAME,
+        KeyConditionExpression: 'clientId = :clientId',
+        ExpressionAttributeValues: { ':clientId': clientId },
+        Select: 'COUNT',
+      })
+    )
+    return result.Count ?? 0
+  } catch (error) {
+    throw new Error(
+      `Failed to count bots for client ${clientId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
 export async function updateBot(
   botId: string,
   clientId: string,
