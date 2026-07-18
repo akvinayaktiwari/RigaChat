@@ -274,8 +274,8 @@ voiceRoutes.patch('/:id', requireAuth, async (c) => {
   const agentId = c.req.param('id')
   const updates = await c.req.json<UpdateVoiceAgentBody>()
 
-  if (typeof updates.systemPrompt === 'string' && updates.systemPrompt.length > 500) {
-    return c.json({ error: 'systemPrompt must be 500 characters or fewer' }, 400)
+  if (typeof updates.systemPrompt === 'string' && updates.systemPrompt.length > 1000) {
+    return c.json({ error: 'systemPrompt must be 1000 characters or fewer' }, 400)
   }
 
   try {

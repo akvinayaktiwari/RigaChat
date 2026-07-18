@@ -49,7 +49,7 @@ const inputClasses =
 const labelClasses = 'block text-sm font-medium text-gray-700 mb-1.5'
 const hintClasses = 'text-xs text-gray-400 mt-1'
 
-const SYSTEM_PROMPT_MAX_LENGTH = 500
+const SYSTEM_PROMPT_MAX_LENGTH = 1000
 
 const primaryButtonClasses =
   'bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold rounded-xl shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed'
@@ -71,7 +71,7 @@ interface FormData {
 }
 
 function buildDefaultSystemPrompt(agent: VoiceAgent): string {
-  return `You are ${agent.name}, a voice assistant for this business. Always use the search_knowledge_base tool when asked about pricing, features, or details. Answer directly using only what the tool returns — don't ask broadening questions like "which product" unless the knowledge base itself lists multiple distinct options. If nothing relevant is found, say so honestly. Greet callers with: "${agent.greetingMessage}" Keep responses to 2-3 sentences.`
+  return `You are ${agent.name}, a voice assistant for ${agent.websiteUrl}. Always use the search_knowledge_base tool when asked about pricing, features, or details. Answer directly using only what the tool returns — don't ask broadening questions like "which product" unless the knowledge base itself lists multiple distinct options. If nothing relevant is found, say so honestly. Greet callers with: "${agent.greetingMessage}" Keep responses to 2-3 sentences.`
 }
 
 function toFormData(agent: VoiceAgent): FormData {
