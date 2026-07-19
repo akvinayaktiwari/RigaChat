@@ -1,8 +1,32 @@
-import { GetCommand, PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand, PutCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import type { Subscription } from '../types/index.js'
 
 const TABLE_NAME = getTableName('subscriptions')
+
+export async function getAllSubscriptions(): Promise<Subscription[]> {
+  try {
+    const subscriptions: Subscription[] = []
+    let exclusiveStartKey: Record<string, unknown> | undefined
+
+    do {
+      const result = await dynamoClient.send(
+        new ScanCommand({
+          TableName: TABLE_NAME,
+          ExclusiveStartKey: exclusiveStartKey,
+        })
+      )
+      subscriptions.push(...((result.Items as Subscription[] | undefined) ?? []))
+      exclusiveStartKey = result.LastEvaluatedKey
+    } while (exclusiveStartKey)
+
+    return subscriptions
+  } catch (error) {
+    throw new Error(
+      `Failed to scan subscriptions: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
 
 export async function getByAccountId(accountId: string): Promise<Subscription | null> {
   try {

@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { adminRoutes } from './admin-routes.js'
 import { authRoutes } from './auth-routes.js'
 import { botRoutes } from './bot-routes.js'
 import { chatRoutes } from './chat-routes.js'
@@ -32,6 +33,20 @@ const widgetCors = cors({
   credentials: false,
   maxAge: 86400,
 })
+
+// Config 3: internal ops console routes — its own explicit allowlist, kept
+// separate from dashboardCors even though the shape is identical, since this
+// is the most sensitive route surface in the app and must never silently
+// inherit a future change made to the customer dashboard's CORS config.
+const adminCors = cors({
+  origin: process.env.ADMIN_CONSOLE_ORIGIN || 'http://localhost:5173',
+  allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  maxAge: 86400,
+})
+
+app.use('/api/admin/*', adminCors)
 
 app.use('/api/clients/*', dashboardCors)
 app.use('/api/kb/*', dashboardCors)
@@ -98,6 +113,7 @@ app.get('/health', (c) => {
   })
 })
 
+app.route('/api/admin', adminRoutes)
 app.route('/api/auth', authRoutes)
 app.route('/api/bots', botRoutes)
 app.route('/api/chat', chatRoutes)

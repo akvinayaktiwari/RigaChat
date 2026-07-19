@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { ProtectedRoute } from './src/components/ProtectedRoute/ProtectedRoute'
+import { AdminProtectedRoute } from './src/components/AdminProtectedRoute/AdminProtectedRoute'
 import { DashboardLayout } from './src/components/DashboardLayout/DashboardLayout'
 import { ToastContainer } from './src/components/Toast/Toast'
 import LandingPage from './src/pages/LandingPage'
@@ -41,12 +42,23 @@ import WhatsAppFeature from './src/pages/features/WhatsApp'
 import Crm from './src/pages/features/Crm'
 import Forms from './src/pages/features/Forms'
 import Careers from './src/pages/Careers'
+import AdminLoginPage from './src/pages/admin/AdminLoginPage'
+import AdminAccountsPage from './src/pages/admin/AdminAccountsPage'
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/admin/login" element={<AdminLoginPage />} />
+        <Route
+          path="/admin/accounts"
+          element={
+            <AdminProtectedRoute>
+              <AdminAccountsPage />
+            </AdminProtectedRoute>
+          }
+        />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route path="/widget-test" element={<WidgetTestPage />} />
