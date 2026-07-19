@@ -1,111 +1,123 @@
-import { CheckCircle, Flame } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock, Mail, XCircle } from 'lucide-react'
+import type { EntitlementFeatures, SubscriptionStatus, SubscriptionSummary } from '../../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
-type PlanId = 'starter' | 'growth' | 'agency'
-
-interface Plan {
-  id: PlanId
-  name: string
-  price: string
-  period: string
-  popular?: boolean
-  features: string[]
+const PLAN_LABELS: Record<SubscriptionSummary['plan'], string> = {
+  free: 'Free',
+  starter: 'Starter',
+  growth: 'Growth',
+  agency: 'Agency',
 }
 
-const PLANS: Plan[] = [
-  {
-    id: 'starter',
-    name: 'Starter',
-    price: '₹1,999',
-    period: '/mo',
-    features: ['5 Active Bots', '1,000 Monthly Leads', 'Standard Analytics'],
-  },
-  {
-    id: 'growth',
-    name: 'Growth',
-    price: '₹5,499',
-    period: '/mo',
-    popular: true,
-    features: ['25 Active Bots', '10,000 Monthly Leads', 'Advanced ROI Insights', 'Multi-user Collaboration'],
-  },
-  {
-    id: 'agency',
-    name: 'Agency',
-    price: '₹14,999',
-    period: '/mo',
-    features: ['Unlimited Bots', 'Unlimited Leads', 'Custom API Endpoints', 'White-label Reports'],
-  },
-]
+const STATUS_BADGES: Record<SubscriptionStatus, { label: string; icon: typeof CheckCircle2; classes: string }> = {
+  trialing: { label: 'Trialing', icon: Clock, classes: 'bg-violet-50 text-violet-700 border-violet-200' },
+  active: { label: 'Active', icon: CheckCircle2, classes: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  trial_expired: { label: 'Trial Expired', icon: AlertTriangle, classes: 'bg-amber-50 text-amber-700 border-amber-200' },
+  past_due: { label: 'Past Due', icon: AlertTriangle, classes: 'bg-amber-50 text-amber-700 border-amber-200' },
+  suspended: { label: 'Suspended', icon: XCircle, classes: 'bg-red-50 text-red-700 border-red-200' },
+  cancelled: { label: 'Cancelled', icon: XCircle, classes: 'bg-gray-100 text-gray-600 border-gray-200' },
+}
+
+function daysRemaining(trialEndsAt: string): number {
+  const ms = new Date(trialEndsAt).getTime() - Date.now()
+  return Math.max(0, Math.ceil(ms / (24 * 60 * 60 * 1000)))
+}
+
+function formatLimit(limit: number | null, unit: string): string {
+  return limit === null ? `Unlimited ${unit}` : `${limit} ${unit}`
+}
+
+function LimitRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+      <span className="text-sm text-gray-500">{label}</span>
+      <span className="text-sm font-semibold text-gray-900">{value}</span>
+    </div>
+  )
+}
+
+function describeFeatures(features: EntitlementFeatures): { chat: string; crm: string; chatbots: string; voice: string } {
+  return {
+    chat: features.chat.enabled
+      ? `${formatLimit(features.chat.limits.conversations, 'conversations/month')}${features.chat.mode === 'degraded' ? ' (degraded)' : ''}`
+      : 'Not included',
+    crm: features.crm.enabled ? formatLimit(features.crm.limits.leads, 'leads') : 'Not included',
+    chatbots: features.agents.enabled ? formatLimit(features.agents.limits.max, 'chatbots') : 'Not included',
+    voice: features.voice.enabled ? formatLimit(features.voice.limits.minutes, 'minutes/month') : 'Voice: not included',
+  }
+}
 
 interface SubscriptionSectionProps {
-  currentPlan: PlanId
-  onSelectPlan: (planId: string) => void
+  subscription: SubscriptionSummary
 }
 
-export default function SubscriptionSection({ currentPlan, onSelectPlan }: SubscriptionSectionProps) {
+export default function SubscriptionSection({ subscription }: SubscriptionSectionProps) {
+  const { plan, status, trialEndsAt, features, usage } = subscription
+  const badge = STATUS_BADGES[status]
+  const BadgeIcon = badge.icon
+  const limits = describeFeatures(features)
+  const chatLimit = features.chat.limits.conversations
+
   return (
     <div className="bg-white rounded-2xl border border-black/5 p-6 shadow-sm">
-      <h3 className="font-bold text-lg text-gray-900 pb-4 border-b border-gray-50 mb-6" style={JAKARTA_FONT}>
-        Subscription
-      </h3>
+      <div className="flex items-center justify-between pb-4 border-b border-gray-50 mb-6">
+        <h3 className="font-bold text-lg text-gray-900" style={JAKARTA_FONT}>
+          Subscription
+        </h3>
+        <a
+          href="mailto:admin@drsyeta.in?subject=Upgrade my BeepBoop plan"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-violet-600 hover:text-violet-700 transition-colors"
+        >
+          <Mail size={14} />
+          Contact us to upgrade
+        </a>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {PLANS.map((plan) => {
-          const isCurrent = plan.id === currentPlan
-          return (
-            <div
-              key={plan.id}
-              className={`relative rounded-2xl p-5 flex flex-col transition-all duration-200 border ${
-                isCurrent ? 'border-2 border-violet-600 bg-violet-50' : 'border-gray-200 bg-white hover:border-violet-300'
-              }`}
-            >
-              {plan.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-linear-to-r from-violet-600 to-purple-500 text-white text-[10px] font-bold uppercase tracking-wider rounded-full shadow-md flex items-center gap-1">
-                  <Flame className="w-3 h-3 fill-amber-300 text-amber-300" />
-                  Most Popular
-                </div>
-              )}
+      <div className="flex items-center gap-3 mb-6">
+        <span className="text-2xl font-extrabold text-gray-900" style={JAKARTA_FONT}>
+          {PLAN_LABELS[plan]}
+        </span>
+        <span
+          className={`inline-flex items-center gap-1.5 border text-xs font-semibold px-2.5 py-1 rounded-full ${badge.classes}`}
+        >
+          <BadgeIcon size={12} />
+          {badge.label}
+        </span>
+      </div>
 
-              <h4 className="font-bold text-lg text-gray-900 mb-1" style={JAKARTA_FONT}>
-                {plan.name}
-              </h4>
-              <div className="flex items-baseline gap-1">
-                <span className="text-3xl font-extrabold text-gray-900" style={JAKARTA_FONT}>
-                  {plan.price}
-                </span>
-                <span className="text-sm text-gray-500 font-normal">{plan.period}</span>
-              </div>
+      {status === 'trialing' && trialEndsAt && (
+        <div className="mb-6 bg-violet-50 border border-violet-100 rounded-xl p-4 text-sm text-violet-700 flex items-center gap-2">
+          <Clock size={16} className="shrink-0" />
+          {daysRemaining(trialEndsAt)} day{daysRemaining(trialEndsAt) === 1 ? '' : 's'} left in your trial
+        </div>
+      )}
 
-              <div className="mt-4 flex flex-col gap-2 flex-1">
-                {plan.features.map((feature) => (
-                  <div key={feature} className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span className="text-sm text-gray-600">{feature}</span>
-                  </div>
-                ))}
-              </div>
+      {(status === 'trial_expired' || status === 'suspended' || status === 'past_due') && (
+        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700 flex items-center gap-2">
+          <AlertTriangle size={16} className="shrink-0" />
+          Your account is in a limited state. Contact us to restore full access.
+        </div>
+      )}
 
-              {isCurrent ? (
-                <button
-                  type="button"
-                  disabled
-                  className="w-full mt-4 py-2.5 bg-violet-100 text-violet-600 font-semibold rounded-xl cursor-default text-sm"
-                >
-                  Current Plan
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => onSelectPlan(plan.id)}
-                  className="w-full mt-4 py-2.5 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold rounded-xl shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity text-sm"
-                >
-                  {plan.id === 'agency' ? 'Contact Sales' : 'Upgrade'}
-                </button>
-              )}
-            </div>
-          )
-        })}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Limits</p>
+          <LimitRow label="Chat" value={limits.chat} />
+          <LimitRow label="CRM" value={limits.crm} />
+          <LimitRow label="Chatbots" value={limits.chatbots} />
+          <LimitRow label="Voice" value={limits.voice} />
+        </div>
+
+        {features.chat.enabled && (
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Usage this period</p>
+            <LimitRow
+              label="Conversations"
+              value={chatLimit === null ? `${usage.chatConversations} used` : `${usage.chatConversations} of ${chatLimit} used`}
+            />
+          </div>
+        )}
       </div>
     </div>
   )

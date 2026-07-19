@@ -4,11 +4,11 @@ import {
   getCachedEntitlements,
   setCachedEntitlements,
 } from '../repositories/redis-repository.js'
-import { incrementIfUnderLimit, incrementUsage } from '../repositories/usage-repository.js'
+import { getUsage, incrementIfUnderLimit, incrementUsage } from '../repositories/usage-repository.js'
 import { countBotsForClient } from '../repositories/bot-repository.js'
 import { getPeriodKey } from '../lib/usage-period.js'
 import { FEATURES, PLANS, TRIAL } from '../config/entitlements-config.js'
-import type { Entitlements, Subscription } from '../types/index.js'
+import type { Entitlements, PlanTier, Subscription } from '../types/index.js'
 
 const ENTITLEMENTS_CACHE_TTL_SECONDS = 60
 
@@ -185,6 +185,34 @@ export async function resolveEntitlements(accountId: string): Promise<Entitlemen
 
 export async function invalidateEntitlementsCache(accountId: string): Promise<void> {
   await deleteCachedEntitlements(accountId)
+}
+
+export interface SubscriptionSummary {
+  plan: PlanTier
+  status: Entitlements['status']
+  trialEndsAt: string | null
+  features: Entitlements['features']
+  usage: { chatConversations: number }
+}
+
+// Client-facing view of a caller's own subscription — composes
+// resolveEntitlements() (status/features, unchanged) with fields
+// resolveEntitlements() doesn't expose (plan, trialEndsAt) and current-period
+// usage. A null subscription mirrors computeEntitlements()'s own "no row"
+// handling: treated as a fresh trial with no plan/trial-end set yet.
+export async function getSubscriptionSummary(accountId: string): Promise<SubscriptionSummary> {
+  const [subscription, entitlements] = await Promise.all([getByAccountId(accountId), resolveEntitlements(accountId)])
+
+  const periodKey = subscription ? getPeriodKey(subscription) : 'trial'
+  const chatConversations = await getUsage(accountId, periodKey, 'chatConversations')
+
+  return {
+    plan: subscription?.plan ?? 'free',
+    status: entitlements.status,
+    trialEndsAt: subscription?.trialEndsAt ?? null,
+    features: entitlements.features,
+    usage: { chatConversations },
+  }
 }
 
 // resolveEntitlements() fetches the Subscription internally but only returns

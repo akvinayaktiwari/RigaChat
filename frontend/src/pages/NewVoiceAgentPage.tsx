@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, BookOpen, Check, Globe, Info, Loader2, Volume2 } from 'lucide-react'
-import { createVoiceAgent } from '../services/api'
+import { ArrowLeft, BookOpen, Check, Globe, Info, Loader2, Lock, Mail, Volume2 } from 'lucide-react'
+import { createVoiceAgent, getMySubscription } from '../services/api'
 import type { VoiceAgentVoice } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -137,6 +137,26 @@ export default function NewVoiceAgentPage() {
   const [error, setError] = useState<string | null>(null)
   const [websiteUrlError, setWebsiteUrlError] = useState<string | null>(null)
   const [brandColorError, setBrandColorError] = useState<string | null>(null)
+  const [checkingAccess, setCheckingAccess] = useState(true)
+  const [voiceEnabled, setVoiceEnabled] = useState(false)
+
+  // Route-level gate, independent of VoiceAgentsPage's button visibility —
+  // this component re-checks on every mount, so direct navigation to
+  // /dashboard/voice-agents/new can't bypass the entitlement.
+  useEffect(() => {
+    async function checkAccess() {
+      try {
+        const res = await getMySubscription()
+        setVoiceEnabled(res.success && res.data ? res.data.features.voice.enabled : false)
+      } catch (err) {
+        console.error('Failed to check voice entitlement:', err)
+        setVoiceEnabled(false)
+      } finally {
+        setCheckingAccess(false)
+      }
+    }
+    checkAccess()
+  }, [])
 
   function update<K extends keyof FormData>(key: K, value: FormData[K]) {
     setFormData((prev) => ({ ...prev, [key]: value }))
@@ -203,6 +223,55 @@ export default function NewVoiceAgentPage() {
     (!formData.name.trim() ||
       (flowType === 'website' && !formData.websiteUrl.trim()) ||
       !formData.greetingMessage.trim())
+
+  if (checkingAccess) {
+    return (
+      <div className="max-w-2xl mx-auto flex items-center justify-center py-24">
+        <Loader2 className="animate-spin text-violet-400" size={28} />
+      </div>
+    )
+  }
+
+  if (!voiceEnabled) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="flex items-center gap-3 mb-6">
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard/voice-agents')}
+            title="Back to Voice Agents"
+            className="text-gray-500 hover:text-gray-800 transition-colors"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <h1 className="font-extrabold text-2xl text-gray-900" style={JAKARTA_FONT}>
+              Create New Voice Agent
+            </h1>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl p-10 shadow-sm border border-black/5 flex flex-col items-center text-center">
+          <div className="w-14 h-14 rounded-2xl bg-violet-50 flex items-center justify-center mb-4">
+            <Lock className="w-7 h-7 text-violet-400" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2" style={JAKARTA_FONT}>
+            Voice Agents are an add-on
+          </h2>
+          <p className="text-sm text-gray-500 max-w-sm mb-6">
+            Voice Agents aren&apos;t included in your current plan. Contact us to enable this for your account.
+          </p>
+          <a
+            href="mailto:admin@drsyeta.in?subject=Enable Voice Agents for my account"
+            className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity"
+          >
+            <Mail size={16} />
+            Contact us
+          </a>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-2xl mx-auto">

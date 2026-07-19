@@ -1,6 +1,8 @@
 import { Hono } from 'hono'
 import { requireAuth } from '../lib/cognito.js'
 import { getClient, updateClientProfile, upgradeClientPlan, upsertClient } from '../services/client-service.js'
+import { getSubscriptionSummary } from '../services/entitlement-service.js'
+import type { SubscriptionSummary } from '../services/entitlement-service.js'
 import type { ApiResponse, ClientRecord } from '../types/index.js'
 
 interface AuthEnv {
@@ -50,6 +52,19 @@ clientRoutes.get('/me', requireAuth, async (c) => {
     if (error instanceof Error && error.message === 'Client not found') {
       return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
     }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+// clientId derives strictly from the JWT (c.get('user').sub), never a
+// param/query/body — this must only ever return the caller's own data.
+clientRoutes.get('/me/subscription', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+
+  try {
+    const summary = await getSubscriptionSummary(clientId)
+    return c.json<ApiResponse<SubscriptionSummary>>({ success: true, data: summary }, 200)
+  } catch (error) {
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }
 })

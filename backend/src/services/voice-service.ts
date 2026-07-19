@@ -17,6 +17,7 @@ import { scanWebsite } from './crawler-service.js'
 import { enqueueCrawlerJob } from '../lib/sqs.js'
 import { indexKnowledgeBaseEntry } from './rag-service.js'
 import { deleteChunksByEntryId } from '../repositories/vector-repository.js'
+import { checkEntitlement } from './entitlement-service.js'
 import type { CreateVoiceAgentInput, VoiceAgent, VoiceKnowledgeBaseEntry, VoiceUsageSummary } from '../types/index.js'
 
 async function getOwnedVoiceAgent(agentId: string, clientId: string): Promise<VoiceAgent> {
@@ -35,6 +36,10 @@ export async function getVoiceAgentRecord(agentId: string): Promise<VoiceAgent |
 }
 
 export async function createVoiceAgent(input: CreateVoiceAgentInput): Promise<VoiceAgent> {
+  // Checked before any DB write — same placement as setupBot()'s
+  // checkEntitlement('agents') call in bot-service.ts.
+  await checkEntitlement(input.clientId, 'voice')
+
   const hasWebsite = !!input.websiteUrl
   return await createVoiceAgentRecord({ ...input, status: hasWebsite ? 'processing' : 'kb_only' })
 }

@@ -336,3 +336,22 @@ export interface VoiceAgentPublicConfig {
   widgetPosition: 'bottom-left' | 'bottom-right' | 'bottom-center'
   isEnabled: boolean
 }
+
+export type PlanTier = 'free' | 'starter' | 'growth' | 'agency'
+
+export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'suspended' | 'trial_expired' | 'cancelled'
+
+export interface EntitlementFeatures {
+  chat: { enabled: boolean; mode: 'full' | 'degraded' | null; limits: { conversations: number | null } }
+  crm: { enabled: boolean; limits: { leads: number | null } }
+  agents: { enabled: boolean; limits: { max: number | null } }
+  voice: { enabled: boolean; limits: { minutes: number | null } }
+}
+
+export interface SubscriptionSummary {
+  plan: PlanTier
+  status: SubscriptionStatus
+  trialEndsAt: string | null
+  features: EntitlementFeatures
+  usage: { chatConversations: number }
+}

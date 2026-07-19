@@ -7,6 +7,8 @@ import {
   Code,
   Copy,
   Globe,
+  Lock,
+  Mail,
   MoreVertical,
   Plus,
   RefreshCw,
@@ -15,7 +17,14 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import { confirmBotIndexing, deleteBot, getBotIndexingStatus, getMyBots, startBotIndexing } from '../services/api'
+import {
+  confirmBotIndexing,
+  deleteBot,
+  getBotIndexingStatus,
+  getMyBots,
+  getMySubscription,
+  startBotIndexing,
+} from '../services/api'
 import IndexingProgressCard from '../components/IndexingProgressCard'
 import { useIndexingStatus } from '../hooks/useIndexingStatus'
 import type { BotConfig, BotStatus } from '../types/index'
@@ -77,13 +86,21 @@ export default function BotsPage() {
   const [indexingBotId, setIndexingBotId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [openMenuBotId, setOpenMenuBotId] = useState<string | null>(null)
+  const [agentsLimit, setAgentsLimit] = useState<number | null>(null)
 
   useEffect(() => {
     getMyBots().then((res) => {
       setBots(res.data ?? [])
       setLoading(false)
     })
+    getMySubscription().then((res) => {
+      if (res.success && res.data) {
+        setAgentsLimit(res.data.features.agents.limits.max)
+      }
+    })
   }, [])
+
+  const atCap = agentsLimit !== null && bots.length >= agentsLimit
 
   const activeIndexingFetchFn = useCallback(async () => {
     if (!indexingBotId) return undefined
@@ -171,38 +188,70 @@ export default function BotsPage() {
         <h1 className="font-extrabold text-2xl text-gray-900" style={JAKARTA_FONT}>
           Chatbots
         </h1>
-        <button
-          type="button"
-          onClick={() => navigate('/dashboard/bots/new')}
-          className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity"
-        >
-          <Plus size={16} />
-          Create New Bot
-        </button>
-      </div>
-
-      {loading ? (
-        <CardsSkeleton />
-      ) : bots.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 px-4">
-          <div className="w-14 h-14 rounded-2xl bg-violet-50 flex items-center justify-center mb-4">
-            <BotIcon className="w-7 h-7 text-violet-400" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2" style={JAKARTA_FONT}>
-            No Chatbots Yet
-          </h2>
-          <p className="text-sm text-gray-500 text-center max-w-xs mb-6">
-            Create your first AI chatbot and start capturing leads from your website
-          </p>
+        {atCap ? (
+          <a
+            href="mailto:admin@drsyeta.in?subject=Upgrade my BeepBoop plan"
+            className="inline-flex items-center gap-2 bg-amber-50 text-amber-700 border border-amber-200 font-medium px-4 py-2.5 rounded-xl text-sm hover:bg-amber-100 transition-colors"
+          >
+            <Lock size={14} />
+            Plan limit reached — Contact us to upgrade
+          </a>
+        ) : (
           <button
             type="button"
             onClick={() => navigate('/dashboard/bots/new')}
             className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity"
           >
             <Plus size={16} />
-            Create your first bot
+            Create New Bot
           </button>
-        </div>
+        )}
+      </div>
+
+      {loading ? (
+        <CardsSkeleton />
+      ) : bots.length === 0 ? (
+        atCap ? (
+          <div className="flex flex-col items-center justify-center py-16 px-4">
+            <div className="w-14 h-14 rounded-2xl bg-amber-50 flex items-center justify-center mb-4">
+              <Lock className="w-7 h-7 text-amber-500" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2" style={JAKARTA_FONT}>
+              Chatbot limit reached
+            </h2>
+            <p className="text-sm text-gray-500 text-center max-w-xs mb-6">
+              You&apos;ve reached your plan&apos;s limit of {agentsLimit} chatbot{agentsLimit === 1 ? '' : 's'}.
+              Upgrade to add more.
+            </p>
+            <a
+              href="mailto:admin@drsyeta.in?subject=Upgrade my BeepBoop plan"
+              className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity"
+            >
+              <Mail size={16} />
+              Contact us to upgrade
+            </a>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-16 px-4">
+            <div className="w-14 h-14 rounded-2xl bg-violet-50 flex items-center justify-center mb-4">
+              <BotIcon className="w-7 h-7 text-violet-400" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2" style={JAKARTA_FONT}>
+              No Chatbots Yet
+            </h2>
+            <p className="text-sm text-gray-500 text-center max-w-xs mb-6">
+              Create your first AI chatbot and start capturing leads from your website
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard/bots/new')}
+              className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity"
+            >
+              <Plus size={16} />
+              Create your first bot
+            </button>
+          </div>
+        )
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {bots.map((bot) => {

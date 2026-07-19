@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertCircle, Globe, Mic, Plus, Trash2, Volume2 } from 'lucide-react'
-import { deleteVoiceAgent, getVoiceAgents, updateVoiceAgent } from '../services/api'
+import { AlertCircle, Globe, Lock, Mail, Mic, Plus, Trash2, Volume2 } from 'lucide-react'
+import { deleteVoiceAgent, getMySubscription, getVoiceAgents, updateVoiceAgent } from '../services/api'
 import type { VoiceAgent } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -42,6 +42,29 @@ function StatusBadge({ isEnabled }: { isEnabled: boolean }) {
   )
 }
 
+function VoiceUpsellCard() {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 px-4">
+      <div className="w-14 h-14 rounded-2xl bg-violet-50 flex items-center justify-center mb-4">
+        <Lock className="w-7 h-7 text-violet-400" />
+      </div>
+      <h2 className="text-xl font-bold text-gray-900 mb-2" style={JAKARTA_FONT}>
+        Voice Agents are an add-on
+      </h2>
+      <p className="text-sm text-gray-500 text-center max-w-sm mb-6">
+        Voice Agents aren&apos;t included in your current plan. Contact us to enable this for your account.
+      </p>
+      <a
+        href="mailto:admin@drsyeta.in?subject=Enable Voice Agents for my account"
+        className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity"
+      >
+        <Mail size={16} />
+        Contact us
+      </a>
+    </div>
+  )
+}
+
 function IndexedBadge({ isIndexed }: { isIndexed: boolean }) {
   return isIndexed ? (
     <span className="border text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border-emerald-200">
@@ -61,6 +84,18 @@ export default function VoiceAgentsPage() {
   const [error, setError] = useState<string | null>(null)
   const [togglingAgentId, setTogglingAgentId] = useState<string | null>(null)
   const [deletingAgentId, setDeletingAgentId] = useState<string | null>(null)
+  const [voiceEnabled, setVoiceEnabled] = useState<boolean | null>(null)
+
+  async function fetchSubscription() {
+    try {
+      const res = await getMySubscription()
+      if (res.success && res.data) {
+        setVoiceEnabled(res.data.features.voice.enabled)
+      }
+    } catch (err) {
+      console.error('Failed to fetch subscription:', err)
+    }
+  }
 
   async function fetchAgents() {
     setLoading(true)
@@ -82,6 +117,7 @@ export default function VoiceAgentsPage() {
 
   useEffect(() => {
     fetchAgents()
+    fetchSubscription()
   }, [])
 
   async function handleToggleEnabled(agent: VoiceAgent) {
@@ -119,14 +155,16 @@ export default function VoiceAgentsPage() {
         <h1 className="font-extrabold text-2xl text-gray-900" style={JAKARTA_FONT}>
           Voice Agents
         </h1>
-        <button
-          type="button"
-          onClick={() => navigate('/dashboard/voice-agents/new')}
-          className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity"
-        >
-          <Plus size={16} />
-          New Voice Agent
-        </button>
+        {voiceEnabled !== false && (
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard/voice-agents/new')}
+            className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity"
+          >
+            <Plus size={16} />
+            New Voice Agent
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -137,28 +175,42 @@ export default function VoiceAgentsPage() {
           <p className="text-sm text-red-700">{error}</p>
         </div>
       ) : agents.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 px-4">
-          <div className="w-14 h-14 rounded-2xl bg-violet-50 flex items-center justify-center mb-4">
-            <Mic className="w-7 h-7 text-violet-400" />
+        voiceEnabled === false ? (
+          <VoiceUpsellCard />
+        ) : (
+          <div className="flex flex-col items-center justify-center py-16 px-4">
+            <div className="w-14 h-14 rounded-2xl bg-violet-50 flex items-center justify-center mb-4">
+              <Mic className="w-7 h-7 text-violet-400" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2" style={JAKARTA_FONT}>
+              No voice agents yet
+            </h2>
+            <p className="text-sm text-gray-500 text-center max-w-xs mb-6">
+              Create your first voice agent to get started
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard/voice-agents/new')}
+              className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity"
+            >
+              <Plus size={16} />
+              Create Voice Agent
+            </button>
           </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2" style={JAKARTA_FONT}>
-            No voice agents yet
-          </h2>
-          <p className="text-sm text-gray-500 text-center max-w-xs mb-6">
-            Create your first voice agent to get started
-          </p>
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard/voice-agents/new')}
-            className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity"
-          >
-            <Plus size={16} />
-            Create Voice Agent
-          </button>
-        </div>
+        )
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {agents.map((agent) => (
+        <>
+          {voiceEnabled === false && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3 mb-5">
+              <Lock className="w-5 h-5 text-amber-500 shrink-0" />
+              <p className="text-sm text-amber-700">
+                Voice Agents are no longer included in your plan. Existing agents are shown below; contact us to
+                re-enable creating new ones.
+              </p>
+            </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {agents.map((agent) => (
             <div
               key={agent.agentId}
               className="bg-white rounded-2xl border border-black/5 p-5 hover:shadow-md transition-all duration-200"
@@ -223,8 +275,9 @@ export default function VoiceAgentsPage() {
                 </button>
               </div>
             </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   )

@@ -16,6 +16,7 @@ import type {
   ResyncResult,
   SetupBotResult,
   StartIndexingResult,
+  SubscriptionSummary,
   UpdateKBInput,
   UpdateVoiceAgentInput,
   VoiceAgent,
@@ -161,8 +162,8 @@ export function updateProfile(name: string): Promise<ApiResponse<ClientRecord>> 
   return apiClient<ClientRecord>('/api/clients/me', 'PATCH', { name })
 }
 
-export function updateClientPlan(plan: ClientRecord['plan']): Promise<ApiResponse<ClientRecord>> {
-  return apiClient<ClientRecord>('/api/clients/me/plan', 'PATCH', { plan })
+export function getMySubscription(): Promise<ApiResponse<SubscriptionSummary>> {
+  return apiClient<SubscriptionSummary>('/api/clients/me/subscription')
 }
 
 // Auth API

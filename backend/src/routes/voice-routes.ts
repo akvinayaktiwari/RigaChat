@@ -157,6 +157,10 @@ voiceRoutes.post('/', requireAuth, async (c) => {
 
     return c.json<ApiResponse<VoiceAgent>>({ success: true, data: agent }, 201)
   } catch (error) {
+    if (error instanceof EntitlementError) {
+      const { status, body } = toEntitlementErrorResponse(error)
+      return c.json(body, status)
+    }
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }
 })

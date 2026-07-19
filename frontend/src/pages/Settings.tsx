@@ -13,10 +13,10 @@ import {
   disconnectCRM,
   getIntegrationStatus,
   getMe,
-  updateClientPlan,
+  getMySubscription,
   updateProfile,
 } from '../services/api'
-import type { ClientRecord, Preferences } from '../types/index'
+import type { ClientRecord, Preferences, SubscriptionSummary } from '../types/index'
 
 const PREFS_STORAGE_KEY = 'beepboop_prefs'
 
@@ -41,6 +41,7 @@ export default function Settings() {
   const toast = useToast()
 
   const [profile, setProfile] = useState<ClientRecord | null>(null)
+  const [subscription, setSubscription] = useState<SubscriptionSummary | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [zohoStatus, setZohoStatus] = useState<'connected' | 'disconnected' | 'loading'>('loading')
   const [preferences, setPreferences] = useState<Preferences>(loadPreferences)
@@ -56,6 +57,14 @@ export default function Settings() {
         else toast.show(res.error ?? 'Failed to load profile', 'error')
       } catch {
         toast.show('Failed to load profile', 'error')
+      }
+
+      try {
+        const subRes = await getMySubscription()
+        if (subRes.success && subRes.data) setSubscription(subRes.data)
+        else toast.show(subRes.error ?? 'Failed to load subscription', 'error')
+      } catch {
+        toast.show('Failed to load subscription', 'error')
       }
 
       try {
@@ -99,20 +108,6 @@ export default function Settings() {
     }
   }
 
-  async function handleSelectPlan(planId: string) {
-    try {
-      const res = await updateClientPlan(planId as ClientRecord['plan'])
-      if (res.success && res.data) {
-        setProfile(res.data)
-        toast.show(`Upgraded to the ${res.data.plan} plan`, 'success')
-      } else {
-        toast.show(res.error ?? 'Failed to update plan', 'error')
-      }
-    } catch {
-      toast.show('Failed to update plan', 'error')
-    }
-  }
-
   function handleConnectZoho() {
     connectZoho()
   }
@@ -143,7 +138,7 @@ export default function Settings() {
     logout()
   }
 
-  if (isLoading || !profile) {
+  if (isLoading || !profile || !subscription) {
     return (
       <div className="space-y-4 animate-pulse">
         <div className="h-40 bg-gray-100 rounded-2xl" />
@@ -164,7 +159,7 @@ export default function Settings() {
           onEditProfile={() => setShowEditProfile(true)}
         />
 
-        <SubscriptionSection currentPlan={profile.plan} onSelectPlan={handleSelectPlan} />
+        <SubscriptionSection subscription={subscription} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <PreferencesSection preferences={preferences} onToggle={handleTogglePreference} />

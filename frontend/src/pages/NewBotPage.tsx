@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  AlertTriangle,
   ArrowLeft,
   BookOpen,
   Check,
@@ -9,12 +10,14 @@ import {
   Home,
   Info,
   Loader2,
+  Lock,
   Mail,
   Phone,
   User,
 } from 'lucide-react'
-import { confirmBotIndexing, setupBot, startBotIndexing } from '../services/api'
+import { confirmBotIndexing, getMyBots, getMySubscription, setupBot, startBotIndexing } from '../services/api'
 import { Toggle } from '../components/Toggle'
+import { translateEntitlementError } from '../lib/entitlementErrors'
 import type { BotConfig, LeadFormField } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -189,6 +192,29 @@ export default function NewBotPage() {
   const [totalPages, setTotalPages] = useState(0)
   const [selectedPages, setSelectedPages] = useState(0)
   const [launchError, setLaunchError] = useState<string | null>(null)
+  const [checkingAccess, setCheckingAccess] = useState(true)
+  const [atCap, setAtCap] = useState(false)
+  const [agentsLimit, setAgentsLimit] = useState<number | null>(null)
+
+  // Route-level gate, independent of BotsPage's button visibility — this
+  // re-checks on every mount, so direct navigation to /dashboard/bots/new
+  // can't bypass the cap. Mirrors NewVoiceAgentPage's checkAccess effect.
+  useEffect(() => {
+    async function checkAccess() {
+      try {
+        const [subRes, botsRes] = await Promise.all([getMySubscription(), getMyBots()])
+        const limit = subRes.success && subRes.data ? subRes.data.features.agents.limits.max : null
+        const count = botsRes.success && botsRes.data ? botsRes.data.length : 0
+        setAgentsLimit(limit)
+        setAtCap(limit !== null && count >= limit)
+      } catch (err) {
+        console.error('Failed to check chatbot entitlement:', err)
+      } finally {
+        setCheckingAccess(false)
+      }
+    }
+    checkAccess()
+  }, [])
 
   function update<K extends keyof FormData>(key: K, value: FormData[K]) {
     setFormData((prev) => ({ ...prev, [key]: value }))
@@ -254,7 +280,7 @@ export default function NewBotPage() {
       })
 
       if (!res.success || !res.data) {
-        setLaunchError(res.error ?? 'Failed to create chatbot')
+        setLaunchError(translateEntitlementError(res) ?? res.error ?? 'Failed to create chatbot')
         setLaunchStep('form')
         return
       }
@@ -310,6 +336,56 @@ export default function NewBotPage() {
     })
     .map((field) => field.label)
     .join(', ')
+
+  if (checkingAccess) {
+    return (
+      <div className="max-w-2xl mx-auto flex items-center justify-center py-24">
+        <Loader2 className="animate-spin text-violet-400" size={28} />
+      </div>
+    )
+  }
+
+  if (atCap) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="flex items-center gap-3 mb-6">
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard/bots')}
+            title="Back to Chatbots"
+            className="text-gray-500 hover:text-gray-800 transition-colors"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <h1 className="font-extrabold text-2xl text-gray-900" style={JAKARTA_FONT}>
+              Create New Chatbot
+            </h1>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl p-10 shadow-sm border border-black/5 flex flex-col items-center text-center">
+          <div className="w-14 h-14 rounded-2xl bg-amber-50 flex items-center justify-center mb-4">
+            <Lock className="w-7 h-7 text-amber-500" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2" style={JAKARTA_FONT}>
+            Chatbot limit reached
+          </h2>
+          <p className="text-sm text-gray-500 max-w-sm mb-6">
+            You&apos;ve reached your plan&apos;s limit of {agentsLimit} chatbot{agentsLimit === 1 ? '' : 's'}.
+            Upgrade to add more.
+          </p>
+          <a
+            href="mailto:admin@drsyeta.in?subject=Upgrade my BeepBoop plan"
+            className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity"
+          >
+            <Mail size={16} />
+            Contact us to upgrade
+          </a>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -640,7 +716,12 @@ export default function NewBotPage() {
                   Launch Chatbot 🚀
                 </button>
 
-                {launchError && <p className="text-sm text-red-500 mt-3 text-center">{launchError}</p>}
+                {launchError && (
+                  <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700 flex items-center gap-2">
+                    <AlertTriangle size={16} className="shrink-0" />
+                    {launchError}
+                  </div>
+                )}
               </div>
             )}
           </>
