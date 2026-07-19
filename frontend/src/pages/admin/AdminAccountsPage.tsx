@@ -4,6 +4,7 @@ import { useStaffAuth } from '../../hooks/useStaffAuth'
 import { getAdminAccounts } from '../../services/adminApi'
 import type { AdminAccountSummary, AdminFeatureState } from '../../services/adminApi'
 import { Spinner } from '../../components/Spinner/Spinner'
+import { AccountDetailPanel } from '../../components/AccountDetailPanel/AccountDetailPanel'
 
 function formatFeature(key: string, feature: AdminFeatureState): string {
   if (!feature.enabled) return `${key}: off`
@@ -42,6 +43,21 @@ export default function AdminAccountsPage() {
   const [accounts, setAccounts] = useState<AdminAccountSummary[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
+
+  async function reloadAccounts() {
+    if (!token) return
+    try {
+      const res = await getAdminAccounts(token)
+      if (!res.success || !res.data) {
+        setError(res.error ?? 'Failed to load accounts')
+        return
+      }
+      setAccounts(res.data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load accounts')
+    }
+  }
 
   useEffect(() => {
     if (!token) return
@@ -72,6 +88,8 @@ export default function AdminAccountsPage() {
       cancelled = true
     }
   }, [token])
+
+  const selectedAccount = accounts?.find((a) => a.accountId === selectedAccountId) ?? null
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -129,7 +147,11 @@ export default function AdminAccountsPage() {
               </thead>
               <tbody>
                 {accounts.map((account) => (
-                  <tr key={account.accountId} className="border-b border-gray-50 last:border-0">
+                  <tr
+                    key={account.accountId}
+                    onClick={() => setSelectedAccountId(account.accountId)}
+                    className="border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50 transition-colors"
+                  >
                     <td className="px-4 py-3 text-gray-900">{account.email ?? <span className="text-gray-400">—</span>}</td>
                     <td className="px-4 py-3 text-gray-700">{account.name ?? <span className="text-gray-400">—</span>}</td>
                     <td className="px-4 py-3 text-gray-700 capitalize">{account.plan}</td>
@@ -150,6 +172,15 @@ export default function AdminAccountsPage() {
           </div>
         )}
       </main>
+
+      {selectedAccount && token && (
+        <AccountDetailPanel
+          account={selectedAccount}
+          token={token}
+          onClose={() => setSelectedAccountId(null)}
+          onRefresh={reloadAccounts}
+        />
+      )}
     </div>
   )
 }

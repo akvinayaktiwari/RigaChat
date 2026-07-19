@@ -1,10 +1,10 @@
 import { v4 as uuidv4 } from 'uuid'
 import { getAllSubscriptions, getByAccountId, updatePartial } from '../repositories/subscription-repository.js'
 import { getClientById } from '../repositories/client-repository.js'
-import { writeAuditEntry } from '../repositories/audit-log-repository.js'
+import { getAuditHistory, writeAuditEntry } from '../repositories/audit-log-repository.js'
 import { resolveEntitlements, invalidateEntitlementsCache } from './entitlement-service.js'
 import { PLANS } from '../config/entitlements-config.js'
-import type { AuditAction, Entitlements, PlanTier, Subscription, SubscriptionOverrides } from '../types/index.js'
+import type { AuditAction, AuditEntry, Entitlements, PlanTier, Subscription, SubscriptionOverrides } from '../types/index.js'
 
 export class AdminValidationError extends Error {}
 
@@ -148,4 +148,10 @@ export async function setOverrides(
   actorEmail: string
 ): Promise<Subscription> {
   return applyMutationWithAudit(accountId, 'set_overrides', reason, actorEmail, () => ({ overrides }))
+}
+
+// Thin passthrough — routes call services only, never repositories, so this
+// exists purely to satisfy that layering rule for an otherwise trivial read.
+export async function getAccountAuditHistory(accountId: string): Promise<AuditEntry[]> {
+  return getAuditHistory(accountId)
 }

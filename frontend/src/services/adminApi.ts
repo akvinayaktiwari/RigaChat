@@ -46,3 +46,128 @@ export async function getAdminAccounts(staffToken: string): Promise<ApiResponse<
 
   return parsed
 }
+
+export type PlanTier = 'free' | 'starter' | 'growth' | 'agency'
+
+export interface SubscriptionOverrides {
+  chat?: { conversations?: number | null }
+  leads?: { max?: number | null }
+  agents?: { max?: number | null }
+  voice?: { minutes?: number | null }
+}
+
+export interface AdminSubscription {
+  accountId: string
+  status: string
+  plan: PlanTier
+  addons: { voice?: { subscribed: boolean; subscribedAt: string } }
+  overrides: SubscriptionOverrides
+  isInternal: boolean
+  trialStartedAt: string | null
+  trialEndsAt: string | null
+  currentPeriodStart: string
+  currentPeriodEnd: string | null
+  paymentProvider: 'razorpay' | null
+  providerSubscriptionId: string | null
+  providerCustomerId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type AuditAction = 'toggle_internal' | 'extend_trial' | 'change_plan' | 'set_overrides'
+
+export interface AuditEntry {
+  accountId: string
+  timestamp: string
+  auditId: string
+  actorEmail: string
+  action: AuditAction
+  reason: string
+  before: Record<string, unknown>
+  after: Record<string, unknown>
+}
+
+async function postAdminAction<T>(staffToken: string, path: string, body: unknown): Promise<ApiResponse<T>> {
+  const response = await fetch(`${BASE_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${staffToken}`,
+    },
+    body: JSON.stringify(body),
+  })
+
+  const parsed = (await response.json()) as ApiResponse<T>
+
+  if (!response.ok && !parsed.error) {
+    throw new Error(`Admin action request failed with status ${response.status}`)
+  }
+
+  return parsed
+}
+
+export async function toggleInternal(
+  staffToken: string,
+  accountId: string,
+  isInternal: boolean,
+  reason: string
+): Promise<ApiResponse<AdminSubscription>> {
+  return postAdminAction<AdminSubscription>(staffToken, `/api/admin/accounts/${accountId}/toggle-internal`, {
+    isInternal,
+    reason,
+  })
+}
+
+export async function extendTrial(
+  staffToken: string,
+  accountId: string,
+  newTrialEndsAt: string,
+  reason: string
+): Promise<ApiResponse<AdminSubscription>> {
+  return postAdminAction<AdminSubscription>(staffToken, `/api/admin/accounts/${accountId}/extend-trial`, {
+    newTrialEndsAt,
+    reason,
+  })
+}
+
+export async function changePlan(
+  staffToken: string,
+  accountId: string,
+  plan: PlanTier,
+  reason: string
+): Promise<ApiResponse<AdminSubscription>> {
+  return postAdminAction<AdminSubscription>(staffToken, `/api/admin/accounts/${accountId}/change-plan`, {
+    plan,
+    reason,
+  })
+}
+
+export async function setOverrides(
+  staffToken: string,
+  accountId: string,
+  overrides: SubscriptionOverrides,
+  reason: string
+): Promise<ApiResponse<AdminSubscription>> {
+  return postAdminAction<AdminSubscription>(staffToken, `/api/admin/accounts/${accountId}/set-overrides`, {
+    overrides,
+    reason,
+  })
+}
+
+export async function getAuditHistory(staffToken: string, accountId: string): Promise<ApiResponse<AuditEntry[]>> {
+  const response = await fetch(`${BASE_URL}/api/admin/accounts/${accountId}/audit-log`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${staffToken}`,
+    },
+  })
+
+  const parsed = (await response.json()) as ApiResponse<AuditEntry[]>
+
+  if (!response.ok && !parsed.error) {
+    throw new Error(`Admin audit history request failed with status ${response.status}`)
+  }
+
+  return parsed
+}

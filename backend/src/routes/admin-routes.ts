@@ -4,11 +4,12 @@ import {
   AdminValidationError,
   changePlan,
   extendTrial,
+  getAccountAuditHistory,
   listAccountsWithEntitlements,
   setOverrides,
   toggleInternal,
 } from '../services/admin-service.js'
-import type { ApiResponse, PlanTier, Subscription, SubscriptionOverrides } from '../types/index.js'
+import type { ApiResponse, AuditEntry, PlanTier, Subscription, SubscriptionOverrides } from '../types/index.js'
 
 export const adminRoutes = new Hono()
 
@@ -28,6 +29,17 @@ adminRoutes.get('/accounts', async (c) => {
   } catch (error) {
     console.error('Admin accounts list error:', error)
     return c.json<ApiResponse<null>>({ success: false, error: 'Failed to load accounts' }, 500)
+  }
+})
+
+adminRoutes.get('/accounts/:accountId/audit-log', async (c) => {
+  const accountId = c.req.param('accountId')
+  try {
+    const history = await getAccountAuditHistory(accountId)
+    return c.json<ApiResponse<AuditEntry[]>>({ success: true, data: history }, 200)
+  } catch (error) {
+    console.error('Admin audit history error:', error)
+    return c.json<ApiResponse<null>>({ success: false, error: 'Failed to load audit history' }, 500)
   }
 })
 
