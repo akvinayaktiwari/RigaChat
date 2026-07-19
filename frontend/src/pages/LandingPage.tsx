@@ -4,6 +4,7 @@ import HeroSection from '../components/landing/HeroSection'
 import StatsBar from '../components/landing/StatsBar'
 import FeaturesSection from '../components/landing/FeaturesSection'
 import IntegrationsSection from '../components/landing/IntegrationsSection'
+import RoadmapSection from '../components/landing/RoadmapSection'
 import HowItWorksSection from '../components/landing/HowItWorksSection'
 import TestimonialsSection from '../components/landing/TestimonialsSection'
 import CTASection from '../components/landing/CTASection'
@@ -45,6 +46,7 @@ export default function LandingPage() {
       <StatsBar />
       <FeaturesSection />
       <IntegrationsSection />
+      <RoadmapSection />
       <HowItWorksSection />
       <TestimonialsSection />
       <CTASection />

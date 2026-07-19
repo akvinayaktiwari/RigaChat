@@ -213,6 +213,58 @@ body {
   animation: vyostraGlowBreathe 2.5s ease-in-out infinite;
 }
 
+/* RoadmapSection (landing page, dark "futuristic plan" surface) — dot-grid
+   overlay + two motion effects. Kept separate from vyostraGlowBreathe above
+   since that one drives a drop-shadow on the logo, not an opacity pulse on a
+   card glow. */
+.roadmap-dot-grid {
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+  mask-image: linear-gradient(to bottom, black, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, black, transparent);
+}
+
+@keyframes roadmapJourneysGlow {
+  0%, 100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.roadmap-journeys-glow {
+  animation: roadmapJourneysGlow 4s ease-in-out infinite;
+}
+
+@keyframes roadmapSparkTravel {
+  0% {
+    left: 0%;
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 1;
+  }
+  100% {
+    left: 100%;
+    opacity: 0;
+  }
+}
+
+.roadmap-spark {
+  animation: roadmapSparkTravel 5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .roadmap-journeys-glow,
+  .roadmap-spark {
+    animation: none;
+  }
+}
+
 /* Legal page PDF export: hide site chrome, print only the document body */
 @media print {
   .landing-page nav,
