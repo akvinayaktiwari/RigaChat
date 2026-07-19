@@ -8,6 +8,7 @@ import {
   getVoiceAgentById,
   getVoiceAgentContext,
   getVoiceAgentPublicConfig,
+  getVoiceAgentRecord,
   getVoiceAgents,
   getVoiceAgentUsage,
   getVoiceKBEntries,
@@ -18,6 +19,7 @@ import {
 } from '../services/voice-service.js'
 import { retrieveContext } from '../services/rag-service.js'
 import { generateToken } from '../voice-relay/auth.js'
+import { checkEntitlement, EntitlementError, toEntitlementErrorResponse } from '../services/entitlement-service.js'
 import type { ApiResponse, VoiceAgent, VoiceKnowledgeBaseEntry, VoiceUsageSummary } from '../types/index.js'
 
 interface AuthEnv {
@@ -177,6 +179,21 @@ voiceRoutes.get('/token', async (c) => {
 
   if (!agentId) {
     return c.json({ error: 'agentId required' }, 400)
+  }
+
+  const agent = await getVoiceAgentRecord(agentId)
+  if (!agent) {
+    return c.json({ error: 'Agent not found' }, 404)
+  }
+
+  try {
+    await checkEntitlement(agent.clientId, 'voice')
+  } catch (error) {
+    if (error instanceof EntitlementError) {
+      const { status, body } = toEntitlementErrorResponse(error)
+      return c.json(body, status)
+    }
+    throw error
   }
 
   const token = generateToken(agentId, process.env.VOICE_AUTH_SECRET ?? '')

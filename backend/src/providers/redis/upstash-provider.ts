@@ -45,6 +45,16 @@ export class UpstashRedisProvider implements RedisProvider {
     }
   }
 
+  async setNX(key: string, value: string, ttlSeconds: number): Promise<boolean> {
+    try {
+      const result = await this.client.set(key, value, { ex: ttlSeconds, nx: true })
+      return result === 'OK'
+    } catch (err) {
+      console.error('Redis SET NX error:', err)
+      return false
+    }
+  }
+
   getProviderName(): RedisProviderName {
     return 'upstash'
   }

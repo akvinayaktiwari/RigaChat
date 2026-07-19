@@ -6,6 +6,7 @@ import {
   updateKBEntry as updateKBEntryRepo,
 } from '../repositories/kb-repository.js'
 import { indexKnowledgeBaseEntry } from './rag-service.js'
+import { checkEntitlement } from './entitlement-service.js'
 import type { KnowledgeBaseEntry } from '../types/index.js'
 
 interface CreateKBEntryInput {
@@ -16,6 +17,11 @@ interface CreateKBEntryInput {
 }
 
 export async function addKBEntry(input: CreateKBEntryInput): Promise<KnowledgeBaseEntry> {
+  // Called before the try block below on purpose — that block rewraps every
+  // error into a generic Error, which would strip EntitlementError's type
+  // and prevent the route from producing the correct 402/403 response.
+  await checkEntitlement(input.clientId, 'chat')
+
   try {
     const entry = await createKBEntry({
       botId: input.botId,

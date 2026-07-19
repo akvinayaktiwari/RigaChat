@@ -10,6 +10,7 @@ import { kbRoutes } from './kb-routes.js'
 import { leadRoutes } from './lead-routes.js'
 import { voiceRoutes } from './voice-routes.js'
 import { webhookRoutes } from './webhooks.js'
+import { EntitlementError, toEntitlementErrorResponse } from '../services/entitlement-service.js'
 import type { ApiResponse } from '../types/index.js'
 
 export const app = new Hono()
@@ -116,6 +117,11 @@ app.notFound((c) => {
 })
 
 app.onError((err, c) => {
+  if (err instanceof EntitlementError) {
+    const { status, body } = toEntitlementErrorResponse(err)
+    return c.json(body, status)
+  }
+
   console.error('Unhandled error:', err)
   return c.json<ApiResponse<null>>({
     success: false,

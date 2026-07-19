@@ -12,9 +12,17 @@ import { deleteChunksByNamespace } from '../repositories/vector-repository.js'
 import { reindexNamespace } from './rag-service.js'
 import { scanWebsite } from './crawler-service.js'
 import { enqueueCrawlerJob } from '../lib/sqs.js'
+import { checkEntitlement } from './entitlement-service.js'
+import { getByAccountId } from '../repositories/subscription-repository.js'
+import { tryAcquireResyncLock } from '../repositories/redis-repository.js'
+import { RESYNC_COOLDOWN_SECONDS } from '../config/entitlements-config.js'
 import type { BotConfig, IndexingJob } from '../types/index.js'
 
 const MAX_AUTO_QUEUE_PAGES = 50
+
+// Cost-abuse guard on resyncBot(), not a billing/entitlement concept —
+// mirrors MessageCeilingError's placement in chat-service.ts.
+export class ResyncCooldownError extends Error {}
 
 function isValidUrl(url: string): boolean {
   try {
@@ -101,6 +109,13 @@ async function crawlAndEnqueueOnSetup(
 }
 
 export async function setupBot(input: CreateBotInput): Promise<SetupBotResult> {
+  // Checked before createBot() runs, not merely before the crawl/embed
+  // pipeline — countBotsForClient() reads current state, so checking after
+  // the new bot row already exists would double-count it (once via the
+  // row itself, once via quantity=1) and block one bot earlier than the
+  // real limit.
+  await checkEntitlement(input.clientId, 'agents')
+
   const botId = uuidv4()
   const hasWebsite = !!input.websiteUrl
 
@@ -206,6 +221,22 @@ export async function resyncBot(
 ): Promise<{ pagesIndexed: number; chunksIndexed: number }> {
   const bot = await getBotById(botId, clientId)
   if (!bot) throw new Error('Bot not found')
+
+  // Lightweight status check, same reasoning as streamMessage()'s ceiling
+  // check — resolveEntitlements() only returns the computed shape, not
+  // isInternal, and a full resolve isn't needed for this one flag.
+  const subscription = await getByAccountId(bot.clientId)
+  const isInternal = subscription?.isInternal === true
+
+  if (!isInternal) {
+    const acquired = await tryAcquireResyncLock(botId)
+    if (!acquired) {
+      throw new ResyncCooldownError(
+        `This bot was resynced recently. Please wait ${RESYNC_COOLDOWN_SECONDS / 60} minutes before resyncing again.`
+      )
+    }
+  }
+
   const result = await reindexNamespace(botId, websiteUrl)
   if (result.supportEmail) {
     await updateBot(botId, clientId, { supportEmail: result.supportEmail })

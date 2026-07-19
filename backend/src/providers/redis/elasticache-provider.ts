@@ -20,6 +20,10 @@ export class ElastiCacheRedisProvider implements RedisProvider {
     throw new Error('ElastiCache provider not yet implemented')
   }
 
+  async setNX(_key: string, _value: string, _ttlSeconds: number): Promise<boolean> {
+    throw new Error('ElastiCache provider not yet implemented')
+  }
+
   getProviderName(): RedisProviderName {
     return 'elasticache'
   }

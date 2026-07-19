@@ -1,11 +1,13 @@
 import { Hono } from 'hono'
 import { stream } from 'hono/streaming'
 import {
+  MessageCeilingError,
   checkLeadTrigger,
   saveAssistantMessage,
   startConversation,
   streamMessage,
 } from '../services/chat-service.js'
+import { EntitlementError, toEntitlementErrorResponse } from '../services/entitlement-service.js'
 import type { ApiResponse } from '../types/index.js'
 
 export const chatRoutes = new Hono()
@@ -39,6 +41,10 @@ chatRoutes.post('/start', async (c) => {
     const result = await startConversation({ botId: body.botId, sourceUrl: body.sourceUrl })
     return c.json<ApiResponse<typeof result>>({ success: true, data: result }, 201)
   } catch (error) {
+    if (error instanceof EntitlementError) {
+      const { status, body: responseBody } = toEntitlementErrorResponse(error)
+      return c.json(responseBody, status)
+    }
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }
 })
@@ -59,6 +65,9 @@ chatRoutes.post('/message', async (c) => {
   try {
     generator = await streamMessage({ botId, conversationId, message })
   } catch (error) {
+    if (error instanceof MessageCeilingError) {
+      return c.json<ApiResponse<null>>({ success: false, error: 'Too many requests' }, 429)
+    }
     const msg = errorMessage(error)
     if (msg === 'Conversation not found' || msg === 'Bot not found') {
       return c.json<ApiResponse<null>>({ success: false, error: msg }, 404)

@@ -6,7 +6,15 @@ import { getPublicConfig } from './bot-service.js'
 import { queryCacheNamespace } from '../repositories/vector-repository.js'
 import { getCachedAnswer, setCachedAnswer } from '../repositories/redis-repository.js'
 import { saveToCache } from './cache-service.js'
+import { checkEntitlement } from './entitlement-service.js'
+import { getByAccountId } from '../repositories/subscription-repository.js'
+import { CEILING_CHECK_THRESHOLD, MESSAGE_CEILING_PER_CONVERSATION } from '../config/entitlements-config.js'
 import type { ConversationMessage } from '../types/index.js'
+
+// Deliberately distinct from EntitlementError — this is a flat per-conversation
+// abuse guard, not a plan/billing concept, so it's kept out of the
+// LIMIT_EXCEEDED/402 shape entirely.
+export class MessageCeilingError extends Error {}
 
 interface StartConversationInput {
   botId: string
@@ -27,8 +35,15 @@ interface SendMessageInput {
 export async function startConversation(
   input: StartConversationInput
 ): Promise<StartConversationResult> {
+  // getPublicConfig() and checkEntitlement() are called before the try block
+  // below on purpose — that block rewraps every error into a generic Error,
+  // which would strip EntitlementError's type and prevent the route from
+  // producing the correct 402/403 response (same fix as addKBEntry() in the
+  // prior module).
+  const botConfig = await getPublicConfig(input.botId)
+  await checkEntitlement(botConfig.clientId, 'chat')
+
   try {
-    const botConfig = await getPublicConfig(input.botId)
     const conversationId = uuidv4()
 
     await createConversation({
@@ -78,6 +93,29 @@ export async function streamMessage(input: SendMessageInput): Promise<AsyncGener
   const conversation = await getConversation(input.botId, input.conversationId)
   if (!conversation) {
     throw new Error('Conversation not found')
+  }
+
+  // Cheap pre-filter: below CEILING_CHECK_THRESHOLD, skip the
+  // getPublicConfig()/getByAccountId() lookups entirely — zero new DB
+  // reads for the overwhelming majority of ordinary conversations, which
+  // never come anywhere near MESSAGE_CEILING_PER_CONVERSATION.
+  if (conversation.messages.length >= CEILING_CHECK_THRESHOLD) {
+    // A direct subscription-repository lookup instead of a full
+    // resolveEntitlements() call — this only needs the raw isInternal flag,
+    // not the computed Entitlements shape (which doesn't expose isInternal
+    // separately anyway), so it skips the PLANS lookup and the entitlements
+    // cache write that resolveEntitlements() would otherwise do on every
+    // single message. Duplicates the getPublicConfig() call made later in
+    // this function (inside the Promise.all below) — that one only runs on
+    // a cache miss, so hoisting it here would add a bot-record fetch to the
+    // Redis-cache-hit fast path this function is otherwise optimized for.
+    const botConfigForCeilingCheck = await getPublicConfig(input.botId)
+    const subscription = await getByAccountId(botConfigForCeilingCheck.clientId)
+    const isInternal = subscription?.isInternal === true
+
+    if (!isInternal && conversation.messages.length >= MESSAGE_CEILING_PER_CONVERSATION) {
+      throw new MessageCeilingError('This conversation has reached its message limit.')
+    }
   }
 
   const userMessage: ConversationMessage = {

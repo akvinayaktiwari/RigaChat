@@ -27,6 +27,13 @@ async function getOwnedVoiceAgent(agentId: string, clientId: string): Promise<Vo
   return agent
 }
 
+// Ownership-check-free passthrough for the public token-issuance route,
+// which has no authenticated clientId yet to check ownership against —
+// discovering the owning clientId is the whole point of this call.
+export async function getVoiceAgentRecord(agentId: string): Promise<VoiceAgent | null> {
+  return await getVoiceAgentByIdRecord(agentId)
+}
+
 export async function createVoiceAgent(input: CreateVoiceAgentInput): Promise<VoiceAgent> {
   const hasWebsite = !!input.websiteUrl
   return await createVoiceAgentRecord({ ...input, status: hasWebsite ? 'processing' : 'kb_only' })

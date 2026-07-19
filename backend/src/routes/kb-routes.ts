@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { requireAuth } from '../lib/cognito.js'
 import { addKBEntry, getKBEntries, removeKBEntry, updateKBEntry } from '../services/kb-service.js'
+import { EntitlementError, toEntitlementErrorResponse } from '../services/entitlement-service.js'
 import type { ApiResponse, KnowledgeBaseEntry } from '../types/index.js'
 
 interface AuthEnv {
@@ -46,6 +47,10 @@ kbRoutes.post('/', requireAuth, async (c) => {
     })
     return c.json<ApiResponse<KnowledgeBaseEntry>>({ success: true, data: entry }, 201)
   } catch (error) {
+    if (error instanceof EntitlementError) {
+      const { status, body } = toEntitlementErrorResponse(error)
+      return c.json(body, status)
+    }
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }
 })

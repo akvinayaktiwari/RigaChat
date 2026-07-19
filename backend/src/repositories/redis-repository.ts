@@ -1,5 +1,6 @@
 import { createHash } from 'crypto'
 import { getRedisProvider } from '../providers/redis/redis-provider.factory.js'
+import { RESYNC_COOLDOWN_SECONDS } from '../config/entitlements-config.js'
 import type { Entitlements } from '../types/index.js'
 
 const EMBEDDING_TTL = 24 * 60 * 60        // 24 hours
@@ -112,4 +113,10 @@ export async function deleteCachedEntitlements(accountId: string): Promise<void>
   } catch (err) {
     console.error('Failed to delete cached entitlements:', err)
   }
+}
+
+export async function tryAcquireResyncLock(botId: string): Promise<boolean> {
+  const redis = getRedisProvider()
+  const key = `resync-lock:${botId}`
+  return await redis.setNX(key, '1', RESYNC_COOLDOWN_SECONDS)
 }

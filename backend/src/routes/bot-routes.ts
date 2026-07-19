@@ -7,12 +7,14 @@ import {
   getIndexingStatus,
   getPublicConfig,
   removeBot,
+  ResyncCooldownError,
   resyncBot,
   setupBot,
   startIndexingJob,
   updateBotConfig,
 } from '../services/bot-service.js'
 import { generateAndPrewarmSuggestions, getKbContentForBot } from '../services/suggestion-service.js'
+import { EntitlementError, toEntitlementErrorResponse } from '../services/entitlement-service.js'
 import type { ApiResponse, BotConfig, PrewarmResult } from '../types/index.js'
 
 interface AuthEnv {
@@ -84,6 +86,10 @@ botRoutes.post('/setup', requireAuth, async (c) => {
     })
     return c.json<ApiResponse<typeof result>>({ success: true, data: result }, 201)
   } catch (error) {
+    if (error instanceof EntitlementError) {
+      const { status, body } = toEntitlementErrorResponse(error)
+      return c.json(body, status)
+    }
     console.error('Bot setup error:', error)
     if (error instanceof Error && error.message === 'SCAN_FAILED') {
       return c.json<ApiResponse<null>>(
@@ -284,6 +290,9 @@ botRoutes.post('/:botId/resync', requireAuth, async (c) => {
     const result = await resyncBot(botId, clientId, body.websiteUrl)
     return c.json<ApiResponse<typeof result>>({ success: true, data: result }, 200)
   } catch (error) {
+    if (error instanceof ResyncCooldownError) {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 429)
+    }
     if (error instanceof Error && error.message === 'Bot not found') {
       return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
     }

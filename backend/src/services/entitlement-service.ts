@@ -32,6 +32,19 @@ export class EntitlementError extends Error {
   }
 }
 
+// Shared by app.onError() and any route catch block that needs to turn an
+// EntitlementError into the same 402/403 shape, so the status/body mapping
+// lives in exactly one place.
+export function toEntitlementErrorResponse(error: EntitlementError): {
+  status: 402 | 403
+  body: { error: string; feature: string; limit?: number; current?: number }
+} {
+  return {
+    status: error.code === 'FEATURE_DISABLED' ? 403 : 402,
+    body: { error: error.code, feature: error.feature, limit: error.limit, current: error.current },
+  }
+}
+
 // Explicit `null` in an override means "unlimited" and must win over the plan
 // default; `undefined` (key absent) means "no override" and falls through.
 // A plain `??` would treat both the same way and silently drop explicit nulls.
@@ -186,7 +199,7 @@ async function resolveChatPeriodKey(accountId: string): Promise<string> {
 
 export async function checkEntitlement(
   accountId: string,
-  featureKey: 'chat' | 'agents',
+  featureKey: 'chat' | 'agents' | 'voice',
   quantity = 1
 ): Promise<void> {
   const entitlements = await resolveEntitlements(accountId)
@@ -219,12 +232,19 @@ export async function checkEntitlement(
     return
   }
 
-  // featureKey === 'agents'
-  const limit = entitlements.features.agents.limits.max
-  if (limit === null) return
+  if (featureKey === 'agents') {
+    const limit = entitlements.features.agents.limits.max
+    if (limit === null) return
 
-  const count = await countBotsForClient(accountId)
-  if (count + quantity > limit) {
-    throw new EntitlementError('LIMIT_EXCEEDED', 'agents', { limit, current: count })
+    const count = await countBotsForClient(accountId)
+    if (count + quantity > limit) {
+      throw new EntitlementError('LIMIT_EXCEEDED', 'agents', { limit, current: count })
+    }
+    return
   }
+
+  // featureKey === 'voice' — the enabled check above is the whole gate at
+  // token issuance. Minute-level usage is metered via VoiceCallLog after a
+  // call completes, not the flow-based usage-repository pattern chat uses;
+  // enforcing a minutes cap is out of scope for this module.
 }
