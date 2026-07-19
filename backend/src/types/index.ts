@@ -387,3 +387,16 @@ export interface Entitlements {
     voice: { enabled: boolean; limits: { minutes: number | null } }
   }
 }
+
+export type AuditAction = 'toggle_internal' | 'extend_trial' | 'change_plan' | 'set_overrides'
+
+export interface AuditEntry {
+  accountId: string
+  timestamp: string
+  auditId: string
+  actorEmail: string
+  action: AuditAction
+  reason: string
+  before: Record<string, unknown>
+  after: Record<string, unknown>
+}

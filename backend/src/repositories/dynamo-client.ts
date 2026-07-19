@@ -17,6 +17,7 @@ type TableKey =
   | 'form_leads'
   | 'subscriptions'
   | 'usage'
+  | 'audit_log'
 
 const tableEnvVarNames: Record<TableKey, string> = {
   clients: 'DYNAMODB_TABLE_CLIENTS',
@@ -28,6 +29,7 @@ const tableEnvVarNames: Record<TableKey, string> = {
   form_leads: 'DYNAMODB_TABLE_FORM_LEADS',
   subscriptions: 'DYNAMODB_TABLE_SUBSCRIPTIONS',
   usage: 'DYNAMODB_TABLE_USAGE',
+  audit_log: 'DYNAMODB_TABLE_AUDIT_LOG',
 }
 
 export function getTableName(key: TableKey): string {
