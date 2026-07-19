@@ -7,6 +7,7 @@ import {
   Code,
   Copy,
   Globe,
+  Loader2,
   Lock,
   Mail,
   MoreVertical,
@@ -87,6 +88,7 @@ export default function BotsPage() {
   const [deleting, setDeleting] = useState(false)
   const [openMenuBotId, setOpenMenuBotId] = useState<string | null>(null)
   const [agentsLimit, setAgentsLimit] = useState<number | null>(null)
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true)
 
   useEffect(() => {
     getMyBots().then((res) => {
@@ -97,9 +99,15 @@ export default function BotsPage() {
       if (res.success && res.data) {
         setAgentsLimit(res.data.features.agents.limits.max)
       }
+      setSubscriptionLoading(false)
     })
   }, [])
 
+  // atCap reads bots.length and agentsLimit, both of which start out at
+  // their "not capped" defaults (0 bots, null limit) before either fetch
+  // resolves — capReady gates every atCap-dependent render so the button
+  // never flashes before flipping to the upsell state.
+  const capReady = !loading && !subscriptionLoading
   const atCap = agentsLimit !== null && bots.length >= agentsLimit
 
   const activeIndexingFetchFn = useCallback(async () => {
@@ -188,7 +196,11 @@ export default function BotsPage() {
         <h1 className="font-extrabold text-2xl text-gray-900" style={JAKARTA_FONT}>
           Chatbots
         </h1>
-        {atCap ? (
+        {!capReady ? (
+          <div className="w-10 h-10 flex items-center justify-center">
+            <Loader2 className="animate-spin text-violet-400" size={20} />
+          </div>
+        ) : atCap ? (
           <a
             href="mailto:admin@drsyeta.in?subject=Upgrade my BeepBoop plan"
             className="inline-flex items-center gap-2 bg-amber-50 text-amber-700 border border-amber-200 font-medium px-4 py-2.5 rounded-xl text-sm hover:bg-amber-100 transition-colors"
@@ -208,7 +220,7 @@ export default function BotsPage() {
         )}
       </div>
 
-      {loading ? (
+      {loading || (bots.length === 0 && subscriptionLoading) ? (
         <CardsSkeleton />
       ) : bots.length === 0 ? (
         atCap ? (

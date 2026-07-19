@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertCircle, Globe, Lock, Mail, Mic, Plus, Trash2, Volume2 } from 'lucide-react'
+import { AlertCircle, Globe, Loader2, Lock, Mail, Mic, Plus, Trash2, Volume2 } from 'lucide-react'
 import { deleteVoiceAgent, getMySubscription, getVoiceAgents, updateVoiceAgent } from '../services/api'
 import type { VoiceAgent } from '../types/index'
 
@@ -85,6 +85,7 @@ export default function VoiceAgentsPage() {
   const [togglingAgentId, setTogglingAgentId] = useState<string | null>(null)
   const [deletingAgentId, setDeletingAgentId] = useState<string | null>(null)
   const [voiceEnabled, setVoiceEnabled] = useState<boolean | null>(null)
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true)
 
   async function fetchSubscription() {
     try {
@@ -94,6 +95,8 @@ export default function VoiceAgentsPage() {
       }
     } catch (err) {
       console.error('Failed to fetch subscription:', err)
+    } finally {
+      setSubscriptionLoading(false)
     }
   }
 
@@ -155,19 +158,25 @@ export default function VoiceAgentsPage() {
         <h1 className="font-extrabold text-2xl text-gray-900" style={JAKARTA_FONT}>
           Voice Agents
         </h1>
-        {voiceEnabled !== false && (
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard/voice-agents/new')}
-            className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity"
-          >
-            <Plus size={16} />
-            New Voice Agent
-          </button>
+        {subscriptionLoading ? (
+          <div className="w-10 h-10 flex items-center justify-center">
+            <Loader2 className="animate-spin text-violet-400" size={20} />
+          </div>
+        ) : (
+          voiceEnabled !== false && (
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard/voice-agents/new')}
+              className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity"
+            >
+              <Plus size={16} />
+              New Voice Agent
+            </button>
+          )
         )}
       </div>
 
-      {loading ? (
+      {loading || (agents.length === 0 && subscriptionLoading) ? (
         <CardsSkeleton />
       ) : error ? (
         <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center gap-3">
@@ -200,7 +209,7 @@ export default function VoiceAgentsPage() {
         )
       ) : (
         <>
-          {voiceEnabled === false && (
+          {!subscriptionLoading && voiceEnabled === false && (
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3 mb-5">
               <Lock className="w-5 h-5 text-amber-500 shrink-0" />
               <p className="text-sm text-amber-700">
