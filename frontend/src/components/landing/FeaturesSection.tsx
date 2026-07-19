@@ -1,4 +1,4 @@
-import { Database, Zap, BarChart3, MessageSquare, Globe, Shield, type LucideIcon } from 'lucide-react'
+import { Database, Zap, BarChart3, MessageSquare, Globe, Shield, Mic, type LucideIcon } from 'lucide-react'
 
 interface BentoFeature {
   icon: LucideIcon
@@ -36,6 +36,16 @@ const BENTO_FEATURES: BentoFeature[] = [
     gradient: 'from-sky-50 to-blue-50',
     accentColor: 'text-sky-600',
     iconBg: 'bg-sky-100',
+    large: false,
+  },
+  {
+    icon: Mic,
+    title: 'AI Voice Agent (on page)',
+    description:
+      'Visitors can talk to your AI agent right on your website — no app, no phone call. Same knowledge base, same CRM sync, now with a voice.',
+    gradient: 'from-indigo-50 to-blue-50',
+    accentColor: 'text-indigo-600',
+    iconBg: 'bg-indigo-100',
     large: false,
   },
   {
