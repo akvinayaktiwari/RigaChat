@@ -7,6 +7,7 @@ interface UpsertClientInput {
   clientId: string
   email: string
   name: string
+  authProvider: ClientRecord['authProvider']
 }
 
 export async function upsertClient(input: UpsertClientInput): Promise<ClientRecord> {
@@ -21,7 +22,7 @@ export async function upsertClient(input: UpsertClientInput): Promise<ClientReco
       clientId: input.clientId,
       email: input.email,
       name: input.name,
-      authProvider: 'google',
+      authProvider: input.authProvider,
       plan: 'starter',
     })
 

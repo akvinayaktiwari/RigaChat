@@ -37,3 +37,9 @@ export const CEILING_CHECK_THRESHOLD = 20
 // entitlement — same cooldown for every plan, isInternal accounts bypass
 // it (checked at the call site). 10 minutes; flag if you disagree.
 export const RESYNC_COOLDOWN_SECONDS = 600
+
+// Abuse guard on POST /api/auth/quick-signup, keyed by requester IP via the
+// same setNX-lock shape as RESYNC_COOLDOWN_SECONDS above (RedisProvider has
+// no counter primitive, only setNX) — so this is "1 attempt per window," not
+// a true N-attempts/window counter. Flag if a counter is actually wanted.
+export const QUICK_SIGNUP_RATE_LIMIT_SECONDS = 60

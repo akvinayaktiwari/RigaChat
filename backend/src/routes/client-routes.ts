@@ -35,6 +35,7 @@ clientRoutes.post('/me', requireAuth, async (c) => {
       clientId: user.sub,
       email: user.email,
       name: user.name ?? user.email.split('@')[0],
+      authProvider: 'google',
     })
     return c.json<ApiResponse<ClientRecord>>({ success: true, data: client }, 200)
   } catch (error) {

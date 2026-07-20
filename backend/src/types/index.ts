@@ -172,7 +172,7 @@ export interface ClientRecord {
   clientId: string
   email: string
   name: string
-  authProvider: 'google'
+  authProvider: 'google' | 'email'
   plan: 'starter' | 'growth' | 'agency'
   crmConnection?: CRMConnection
   whatsappConnection?: WhatsAppConnection
