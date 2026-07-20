@@ -18,6 +18,12 @@ interface SubscribeBody {
   tier?: string
 }
 
+// error stays for backward-compat/human-readable logging; code is the new
+// stable field callers should switch on instead of matching message text.
+interface BillingErrorResponse extends ApiResponse<null> {
+  code: BillingError['code']
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
@@ -48,7 +54,10 @@ billingRoutes.post('/subscribe', requireAuth, async (c) => {
     return c.json<ApiResponse<SubscribeResult>>({ success: true, data: result }, 200)
   } catch (error) {
     if (error instanceof BillingError) {
-      return c.json<ApiResponse<null>>({ success: false, error: error.message }, billingErrorStatus(error.code))
+      return c.json<BillingErrorResponse>(
+        { success: false, error: error.message, code: error.code },
+        billingErrorStatus(error.code)
+      )
     }
     console.error('Billing subscribe error:', error)
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)

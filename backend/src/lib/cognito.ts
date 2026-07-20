@@ -36,7 +36,8 @@ async function authenticate(token: string | undefined): Promise<{ sub: string; e
       email: payload.email as string,
       name: (payload.name ?? payload.email) as string,
     }
-  } catch {
+  } catch (err) {
+    console.error('Cognito token verification failed:', err)
     return null
   }
 }

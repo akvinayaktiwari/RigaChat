@@ -8,6 +8,10 @@ import IntegrationsSection from '../components/settings/IntegrationsSection'
 import DangerZoneSection from '../components/settings/DangerZoneSection'
 import EditProfileModal from '../components/settings/EditProfileModal'
 import DeleteConfirmModal from '../components/settings/DeleteConfirmModal'
+// TEMPORARY (module 4 dev trigger) — UpgradeModal isn't wired to a real
+// entry point yet (that's module 5). Remove this import + the button/modal
+// below once the real Upgrade button/upsell cards call it instead.
+import UpgradeModal from '../components/billing/UpgradeModal'
 import {
   connectZoho,
   disconnectCRM,
@@ -48,6 +52,8 @@ export default function Settings() {
   const [showEditProfile, setShowEditProfile] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  // TEMPORARY (module 4 dev trigger) — see UpgradeModal import comment above.
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -161,6 +167,17 @@ export default function Settings() {
 
         <SubscriptionSection subscription={subscription} />
 
+        {/* TEMPORARY (module 4 dev trigger) — remove this button once
+            module 5 wires UpgradeModal to the real Upgrade button / upsell
+            cards on Bots/VoiceAgents pages instead. */}
+        <button
+          type="button"
+          onClick={() => setShowUpgradeModal(true)}
+          className="text-xs font-medium text-gray-400 hover:text-gray-600 underline transition-colors"
+        >
+          [DEV] Open upgrade modal
+        </button>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <PreferencesSection preferences={preferences} onToggle={handleTogglePreference} />
           <IntegrationsSection
@@ -185,6 +202,9 @@ export default function Settings() {
       {showDeleteConfirm && (
         <DeleteConfirmModal onClose={() => setShowDeleteConfirm(false)} onConfirm={handleDeleteAccount} />
       )}
+
+      {/* TEMPORARY (module 4 dev trigger) — see import comment above. */}
+      <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} suggestedTier="growth" />
     </div>
   )
 }

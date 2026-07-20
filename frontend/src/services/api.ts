@@ -166,6 +166,31 @@ export function getMySubscription(): Promise<ApiResponse<SubscriptionSummary>> {
   return apiClient<SubscriptionSummary>('/api/clients/me/subscription')
 }
 
+export interface SubscribeResult {
+  subscriptionId: string
+  razorpayKeyId: string
+}
+
+export type BillingErrorCode =
+  | 'INTERNAL_ACCOUNT_NO_BILLING'
+  | 'ALREADY_SUBSCRIBED'
+  | 'NO_SUBSCRIPTION_RECORD'
+  | 'CONFIG_ERROR'
+  | 'PROVIDER_ERROR'
+
+// billing-routes.ts (backend) sends an extra `code` field on BillingError
+// responses that apiClient<T>()'s generic ApiResponse<T> doesn't model —
+// mirrors the same pattern apiClient() itself uses internally (`as ApiResponse<T>`
+// over the parsed JSON) rather than widening the shared ApiResponse<T> type
+// for every other call site just for this one route's error shape.
+export interface SubscribeResponse extends ApiResponse<SubscribeResult> {
+  code?: BillingErrorCode
+}
+
+export function subscribeToTier(tier: 'starter' | 'growth' | 'agency'): Promise<SubscribeResponse> {
+  return apiClient<SubscribeResult>('/api/billing/subscribe', 'POST', { tier }) as Promise<SubscribeResponse>
+}
+
 // Auth API
 
 export function confirmSignup(username: string): Promise<ApiResponse<null>> {
