@@ -119,6 +119,32 @@ export const tableDefinitions: Record<string, TableDefinition> = {
     AttributeDefinitions: [{ AttributeName: 'accountId', AttributeType: 'S' }],
     BillingMode: 'PAY_PER_REQUEST',
   },
+
+  // Payment-webhook idempotency dedup. TTL attribute `expiresAt` (Unix epoch
+  // seconds, ~90 days out) must be enabled on this attribute after creation —
+  // the TableDefinition type above has no TTL field since no other table
+  // uses one yet, so it's noted here instead of modeled in the interface.
+  webhook_events: {
+    TableName: 'DYNAMODB_TABLE_WEBHOOK_EVENTS', // reads from process.env.DYNAMODB_TABLE_WEBHOOK_EVENTS
+    KeySchema: [{ AttributeName: 'eventId', KeyType: 'HASH' }],
+    AttributeDefinitions: [{ AttributeName: 'eventId', AttributeType: 'S' }],
+    BillingMode: 'PAY_PER_REQUEST',
+  },
+
+  // Durable payment ledger, separate from the subscriptions table (which only
+  // holds current state, not history). One row per subscription.charged event.
+  payment_history: {
+    TableName: 'DYNAMODB_TABLE_PAYMENT_HISTORY', // reads from process.env.DYNAMODB_TABLE_PAYMENT_HISTORY
+    KeySchema: [
+      { AttributeName: 'accountId', KeyType: 'HASH' },
+      { AttributeName: 'paidAt', KeyType: 'RANGE' },
+    ],
+    AttributeDefinitions: [
+      { AttributeName: 'accountId', AttributeType: 'S' },
+      { AttributeName: 'paidAt', AttributeType: 'S' },
+    ],
+    BillingMode: 'PAY_PER_REQUEST',
+  },
 }
 
 export function printTableDefinitions(): void {

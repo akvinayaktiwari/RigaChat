@@ -389,6 +389,25 @@ export interface Entitlements {
   }
 }
 
+export interface WebhookEvent {
+  eventId: string
+  provider: string
+  eventType: string
+  processedAt: string
+  expiresAt: number
+}
+
+export interface PaymentRecord {
+  accountId: string
+  paidAt: string
+  paymentId: string
+  subscriptionId: string
+  amount: number
+  currency: string
+  status: string
+  createdAt: string
+}
+
 export type AuditAction = 'toggle_internal' | 'extend_trial' | 'change_plan' | 'set_overrides'
 
 export interface AuditEntry {

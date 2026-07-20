@@ -18,6 +18,8 @@ type TableKey =
   | 'subscriptions'
   | 'usage'
   | 'audit_log'
+  | 'webhook_events'
+  | 'payment_history'
 
 const tableEnvVarNames: Record<TableKey, string> = {
   clients: 'DYNAMODB_TABLE_CLIENTS',
@@ -30,6 +32,8 @@ const tableEnvVarNames: Record<TableKey, string> = {
   subscriptions: 'DYNAMODB_TABLE_SUBSCRIPTIONS',
   usage: 'DYNAMODB_TABLE_USAGE',
   audit_log: 'DYNAMODB_TABLE_AUDIT_LOG',
+  webhook_events: 'DYNAMODB_TABLE_WEBHOOK_EVENTS',
+  payment_history: 'DYNAMODB_TABLE_PAYMENT_HISTORY',
 }
 
 export function getTableName(key: TableKey): string {
