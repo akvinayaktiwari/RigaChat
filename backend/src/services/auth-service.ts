@@ -97,7 +97,7 @@ async function emailExists(email: string): Promise<boolean> {
 // see redis-repository.ts) since this is an unauthenticated account-creation
 // endpoint.
 export async function quickSignup(email: string, password: string, ip: string): Promise<QuickSignupResult> {
-  const acquired = await tryAcquireQuickSignupAttempt(ip)
+  const acquired = await tryAcquireQuickSignupAttempt(ip, email)
   if (!acquired) {
     throw new QuickSignupError('RATE_LIMITED', 'Too many signup attempts. Please wait a moment and try again.')
   }

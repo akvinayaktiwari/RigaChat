@@ -121,8 +121,13 @@ export async function tryAcquireResyncLock(botId: string): Promise<boolean> {
   return await redis.setNX(key, '1', RESYNC_COOLDOWN_SECONDS)
 }
 
-export async function tryAcquireQuickSignupAttempt(ip: string): Promise<boolean> {
+// Keyed on ip+email, not ip alone — a shared/NAT'd IP (common on mobile
+// networks, office wifi) would otherwise let one visitor's attempt lock out
+// every other visitor behind the same IP, including the same person retrying
+// after a typo. This still rate-limits rapid-fire attempts against a single
+// email; it does not limit how many distinct emails one IP can attempt.
+export async function tryAcquireQuickSignupAttempt(ip: string, email: string): Promise<boolean> {
   const redis = getRedisProvider()
-  const key = `quicksignup:ratelimit:${ip}`
+  const key = `quicksignup:ratelimit:${ip}:${email}`
   return await redis.setNX(key, '1', QUICK_SIGNUP_RATE_LIMIT_SECONDS)
 }
