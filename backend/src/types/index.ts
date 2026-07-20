@@ -345,6 +345,7 @@ export type SubscriptionStatus =
   | 'suspended'
   | 'trial_expired'
   | 'cancelled'
+  | 'pending_activation'
 
 export type PlanTier = 'free' | 'starter' | 'growth' | 'agency'
 
