@@ -34,5 +34,10 @@ export function translateEntitlementError(body: EntitlementErrorBody): string | 
     return 'Voice Agents are an add-on not included in your current plan.'
   }
 
+  if (body.error === 'LIMIT_EXCEEDED' && body.feature === 'kbFileSize') {
+    const limitMB = body.limit ? Math.round(body.limit / (1024 * 1024)) : 0
+    return `This file is larger than your plan's ${limitMB}MB limit. Upgrade for a higher limit.`
+  }
+
   return "You've reached a plan limit. Contact us to upgrade."
 }

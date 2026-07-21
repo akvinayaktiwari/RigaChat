@@ -57,6 +57,11 @@ export interface Lead {
   createdAt: string
 }
 
+export type KBFileType = 'pdf' | 'docx' | 'text'
+
+// indexingStatus is undefined for text-only entries (added via the plain
+// title+content form) — only file-upload entries carry these fields, mirrors
+// backend/src/types/index.ts's KnowledgeBaseEntry exactly.
 export interface KnowledgeBaseEntry {
   entryId: string
   botId: string
@@ -65,6 +70,27 @@ export interface KnowledgeBaseEntry {
   content: string
   createdAt: string
   updatedAt: string
+  sourceFileKey?: string
+  fileType?: KBFileType
+  fileSizeBytes?: number
+  indexingStatus?: 'queued' | 'processing' | 'complete' | 'failed'
+  indexingJobId?: string
+  indexingError?: string
+}
+
+export interface KBUploadUrlResult {
+  uploadUrl: string
+  key: string
+  entryId: string
+}
+
+export interface ConfirmKBUploadInput {
+  botId: string
+  entryId: string
+  filename: string
+  fileType: KBFileType
+  fileSizeBytes: number
+  s3Key: string
 }
 
 export interface Chunk {
@@ -346,6 +372,7 @@ export interface EntitlementFeatures {
   crm: { enabled: boolean; limits: { leads: number | null } }
   agents: { enabled: boolean; limits: { max: number | null } }
   voice: { enabled: boolean; limits: { minutes: number | null } }
+  kbFileSize: { enabled: boolean; limits: { maxBytes: number | null } }
 }
 
 export interface SubscriptionSummary {
