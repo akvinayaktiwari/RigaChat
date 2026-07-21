@@ -6,6 +6,11 @@ import { useTierCheckout } from '../../hooks/useTierCheckout'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
+// Static marketing label — matches PricingSection.tsx's own MOST_POPULAR_TIER
+// constant. Independent of suggestedTier: Growth is "Most Popular" for every
+// visitor, regardless of which tier is being recommended to them.
+const MOST_POPULAR_TIER: BillableTier = 'growth'
+
 interface UpgradeModalProps {
   isOpen: boolean
   onClose: () => void
@@ -58,7 +63,15 @@ export default function UpgradeModal({ isOpen, onClose, suggestedTier }: Upgrade
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               {PRICING_TIERS.map((plan) => {
+                // Two independent concepts: isMostPopular is fixed marketing
+                // copy (always Growth), isSuggested is a per-account dynamic
+                // recommendation. Both drive the same highlight treatment
+                // (border/ring, filled button) — isHighlighted — but the
+                // badge text picks "Most Popular" first so a card never shows
+                // two overlapping pills when suggestedTier happens to be Growth.
+                const isMostPopular = plan.tier === MOST_POPULAR_TIER
                 const isSuggested = suggestedTier === plan.tier
+                const isHighlighted = isMostPopular || isSuggested
                 const isResuming = pendingCheckout?.tier === plan.tier
                 const isSubmitting = submittingTier === plan.tier
 
@@ -66,12 +79,12 @@ export default function UpgradeModal({ isOpen, onClose, suggestedTier }: Upgrade
                   <div
                     key={plan.tier}
                     className={`relative bg-white rounded-2xl border p-6 shadow-sm transition-all duration-300 ${
-                      isSuggested ? 'border-violet-400 ring-2 ring-violet-100' : 'border-black/5'
+                      isHighlighted ? 'border-violet-400 ring-2 ring-violet-100' : 'border-black/5'
                     }`}
                   >
-                    {isSuggested && (
+                    {isHighlighted && (
                       <span className="absolute -top-3 left-6 bg-linear-to-r from-violet-600 to-purple-500 text-white text-xs font-semibold px-3 py-1 rounded-full">
-                        Most Popular
+                        {isMostPopular ? 'Most Popular' : 'Recommended for you'}
                       </span>
                     )}
 
@@ -101,7 +114,7 @@ export default function UpgradeModal({ isOpen, onClose, suggestedTier }: Upgrade
                       onClick={() => selectTier(plan.tier)}
                       disabled={submittingTier !== null}
                       className={`w-full flex items-center justify-center gap-2 font-semibold px-4 py-2.5 rounded-xl text-sm transition-opacity disabled:opacity-50 ${
-                        isSuggested
+                        isHighlighted
                           ? 'bg-linear-to-r from-violet-600 to-purple-500 text-white shadow-md shadow-violet-200/50 hover:opacity-90'
                           : 'bg-gray-50 text-gray-900 border border-gray-200 hover:bg-gray-100'
                       }`}
