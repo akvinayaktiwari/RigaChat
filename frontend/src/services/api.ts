@@ -185,6 +185,11 @@ export type BillingErrorCode =
 // for every other call site just for this one route's error shape.
 export interface SubscribeResponse extends ApiResponse<SubscribeResult> {
   code?: BillingErrorCode
+  // Only populated for ALREADY_SUBSCRIBED — mirrors billing-service.ts's
+  // BillingError.details. providerSubscriptionId/razorpayKeyId are present
+  // when the existing subscription is pending_activation (resumable);
+  // absent for an active (hard-blocked, non-resumable) duplicate.
+  details?: { status?: string; providerSubscriptionId?: string | null; razorpayKeyId?: string | null }
 }
 
 export function subscribeToTier(tier: 'starter' | 'growth' | 'agency'): Promise<SubscribeResponse> {

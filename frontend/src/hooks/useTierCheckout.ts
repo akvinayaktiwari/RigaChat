@@ -11,7 +11,13 @@ const POLL_MAX_ATTEMPTS = 10
 export type TierCheckoutStage = 'idle' | 'polling' | 'success' | 'timeout'
 
 export interface PendingTierCheckout {
-  tier: BillableTier
+  // null when recovered from a fresh ALREADY_SUBSCRIBED 409 with no local
+  // record of which tier was being purchased — subscription.plan isn't
+  // updated until Razorpay activation, so the server can't tell us the
+  // pending tier either. Resuming is still safe in that case: Razorpay's
+  // checkout is keyed by subscription_id, so the amount/plan shown to the
+  // user is authoritative regardless of what we display locally.
+  tier: BillableTier | null
   subscriptionId: string
   razorpayKeyId: string
 }
@@ -29,7 +35,7 @@ function resolveBillingErrorMessage(
       return 'This is an internal account and cannot be billed.'
 
     case 'ALREADY_SUBSCRIBED': {
-      if (!pending) {
+      if (!pending || pending.tier === null) {
         return "You already have a subscription in progress. Refresh this page, or contact us if this doesn't look right."
       }
       const tierName = PRICING_TIERS.find((t) => t.tier === pending.tier)?.name ?? pending.tier
@@ -107,7 +113,7 @@ export function useTierCheckout(onConfirmed?: () => void): UseTierCheckoutResult
     poll()
   }
 
-  async function openRazorpayCheckout(tier: BillableTier, subscriptionId: string, razorpayKeyId: string) {
+  async function openRazorpayCheckout(tier: BillableTier | null, subscriptionId: string, razorpayKeyId: string) {
     try {
       await loadRazorpayScript()
     } catch {
@@ -124,7 +130,7 @@ export function useTierCheckout(onConfirmed?: () => void): UseTierCheckoutResult
       key: razorpayKeyId,
       subscription_id: subscriptionId,
       name: 'VyostraAI',
-      description: `${PRICING_TIERS.find((t) => t.tier === tier)?.name ?? tier} plan`,
+      description: tier ? `${PRICING_TIERS.find((t) => t.tier === tier)?.name ?? tier} plan` : 'your plan',
       theme: { color: '#7c3aed' },
       handler: () => {
         setPendingCheckout(null)
@@ -150,8 +156,13 @@ export function useTierCheckout(onConfirmed?: () => void): UseTierCheckoutResult
   async function selectTier(tier: BillableTier) {
     setErrorMessage(null)
 
-    if (pendingCheckout && pendingCheckout.tier === tier) {
-      await openRazorpayCheckout(tier, pendingCheckout.subscriptionId, pendingCheckout.razorpayKeyId)
+    // Resume applies both when we know this pending checkout is for the
+    // clicked tier, and when the pending tier is unknown (recovered from a
+    // fresh 409 below) — in the unknown case we can't tell whether it
+    // matches, so we don't block on a guess; we resume the real existing
+    // subscription regardless of which tier was clicked.
+    if (pendingCheckout && (pendingCheckout.tier === null || pendingCheckout.tier === tier)) {
+      await openRazorpayCheckout(pendingCheckout.tier, pendingCheckout.subscriptionId, pendingCheckout.razorpayKeyId)
       return
     }
 
@@ -159,6 +170,23 @@ export function useTierCheckout(onConfirmed?: () => void): UseTierCheckoutResult
     try {
       const res = await subscribeToTier(tier)
       if (!res.success || !res.data) {
+        // Fresh ALREADY_SUBSCRIBED with no local pendingCheckout (e.g. after
+        // a page refresh) but the server handed back enough to resume
+        // (pending_activation + a configured Razorpay key) — recover and
+        // reopen checkout instead of dead-ending. tier stays null: we don't
+        // know if the existing pending subscription matches what was just
+        // clicked (subscription.plan isn't updated until activation), so we
+        // don't claim a match — see PendingTierCheckout's tier comment.
+        if (res.code === 'ALREADY_SUBSCRIBED' && res.details?.providerSubscriptionId && res.details?.razorpayKeyId) {
+          const recovered: PendingTierCheckout = {
+            tier: null,
+            subscriptionId: res.details.providerSubscriptionId,
+            razorpayKeyId: res.details.razorpayKeyId,
+          }
+          setPendingCheckout(recovered)
+          await openRazorpayCheckout(recovered.tier, recovered.subscriptionId, recovered.razorpayKeyId)
+          return
+        }
         setErrorMessage(resolveBillingErrorMessage(res.code, res.error, pendingCheckout))
         return
       }

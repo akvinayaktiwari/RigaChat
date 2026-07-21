@@ -65,10 +65,20 @@ export async function subscribeToTier(clientId: string, tier: BillableTier): Pro
   }
 
   if (subscription.status === 'active' || subscription.status === 'pending_activation') {
+    // pending_activation is resumable — the caller can reopen Razorpay
+    // checkout against the existing providerSubscriptionId instead of
+    // dead-ending, provided a key is configured. active is a real, already-
+    // paid duplicate and stays a hard block (no razorpayKeyId included).
+    const isResumable = subscription.status === 'pending_activation' && Boolean(subscription.providerSubscriptionId)
+
     throw new BillingError(
       'ALREADY_SUBSCRIBED',
       `Account ${clientId} already has a ${subscription.status} subscription.`,
-      { status: subscription.status, providerSubscriptionId: subscription.providerSubscriptionId }
+      {
+        status: subscription.status,
+        providerSubscriptionId: subscription.providerSubscriptionId,
+        ...(isResumable ? { razorpayKeyId: process.env.RAZORPAY_KEY_ID ?? null } : {}),
+      }
     )
   }
 

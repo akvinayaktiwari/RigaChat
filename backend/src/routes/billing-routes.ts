@@ -22,6 +22,7 @@ interface SubscribeBody {
 // stable field callers should switch on instead of matching message text.
 interface BillingErrorResponse extends ApiResponse<null> {
   code: BillingError['code']
+  details?: Record<string, unknown>
 }
 
 function errorMessage(error: unknown): string {
@@ -55,7 +56,7 @@ billingRoutes.post('/subscribe', requireAuth, async (c) => {
   } catch (error) {
     if (error instanceof BillingError) {
       return c.json<BillingErrorResponse>(
-        { success: false, error: error.message, code: error.code },
+        { success: false, error: error.message, code: error.code, details: error.details },
         billingErrorStatus(error.code)
       )
     }
