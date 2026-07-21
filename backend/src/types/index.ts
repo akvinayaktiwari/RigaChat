@@ -386,6 +386,9 @@ export interface Entitlements {
     crm: { enabled: boolean; limits: { leads: number | null } }
     agents: { enabled: boolean; limits: { max: number | null } }
     voice: { enabled: boolean; limits: { minutes: number | null } }
+    // No per-account override support (unlike chat/agents/voice above) --
+    // not requested for this feature, kept out to avoid unrequested scope.
+    kbFileSize: { enabled: boolean; limits: { maxBytes: number | null } }
   }
 }
 

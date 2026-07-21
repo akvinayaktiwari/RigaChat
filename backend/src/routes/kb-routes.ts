@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { requireAuth } from '../lib/cognito.js'
-import { addKBEntry, getKBEntries, removeKBEntry, updateKBEntry } from '../services/kb-service.js'
+import { addKBEntry, getKBEntries, getKBUploadUrl, removeKBEntry, updateKBEntry } from '../services/kb-service.js'
+import type { KBFileType, KBUploadUrlResult } from '../services/kb-service.js'
 import { EntitlementError, toEntitlementErrorResponse } from '../services/entitlement-service.js'
 import type { ApiResponse, KnowledgeBaseEntry } from '../types/index.js'
 
@@ -21,6 +22,15 @@ interface AddKBEntryBody {
 interface UpdateKBEntryBody {
   title?: string
   content?: string
+}
+
+const KB_FILE_TYPES: KBFileType[] = ['pdf', 'docx', 'text']
+
+interface UploadUrlBody {
+  botId?: string
+  filename?: string
+  fileType?: string
+  fileSizeBytes?: number
 }
 
 function errorMessage(error: unknown): string {
@@ -50,6 +60,49 @@ kbRoutes.post('/', requireAuth, async (c) => {
     if (error instanceof EntitlementError) {
       const { status, body } = toEntitlementErrorResponse(error)
       return c.json(body, status)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+kbRoutes.post('/upload-url', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const body = await c.req.json<UploadUrlBody>()
+
+  if (!body.botId || !body.filename || !body.fileType || typeof body.fileSizeBytes !== 'number') {
+    return c.json<ApiResponse<null>>(
+      { success: false, error: 'botId, filename, fileType, and fileSizeBytes are required' },
+      400
+    )
+  }
+
+  if (!KB_FILE_TYPES.includes(body.fileType as KBFileType)) {
+    return c.json<ApiResponse<null>>(
+      { success: false, error: `fileType must be one of: ${KB_FILE_TYPES.join(', ')}` },
+      400
+    )
+  }
+
+  // filename becomes the last segment of the S3 key
+  // ({clientId}/{botId}/{kbEntryId}/{filename}) -- reject '/' so a crafted
+  // filename can't inject extra path segments into that structure.
+  if (body.filename.includes('/')) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'filename must not contain "/"' }, 400)
+  }
+
+  try {
+    const result = await getKBUploadUrl({
+      botId: body.botId,
+      clientId,
+      filename: body.filename,
+      fileType: body.fileType as KBFileType,
+      fileSizeBytes: body.fileSizeBytes,
+    })
+    return c.json<ApiResponse<KBUploadUrlResult>>({ success: true, data: result }, 200)
+  } catch (error) {
+    if (error instanceof EntitlementError) {
+      const { status, body: errBody } = toEntitlementErrorResponse(error)
+      return c.json(errBody, status)
     }
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }

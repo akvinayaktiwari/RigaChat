@@ -4,14 +4,21 @@ export const TRIAL = {
   agents: 1,
   leads: 25,
   chat: { conversations: 50 },
+  // Same ceiling as the Starter plan -- not specified by product for the
+  // trial/free tier, flagged rather than left unset. Also reused for the
+  // past_due/suspended/trial_expired degraded state below, matching how
+  // that state already reuses TRIAL's leads/agents caps.
+  kbFileSize: { maxMB: 5 },
 } as const
 
 // null = unlimited
 export const PLANS = {
-  free: { agents: 1, leads: 25, chat: { conversations: 50 } },
-  starter: { agents: 1, leads: 50, chat: { conversations: 500 } },
-  growth: { agents: 3, leads: null, chat: { conversations: 2000 } },
-  agency: { agents: null, leads: null, chat: { conversations: null } },
+  // maxMB not specified by product for 'free' -- mirrors TRIAL.kbFileSize
+  // above (Starter's ceiling), flagged rather than assumed silently.
+  free: { agents: 1, leads: 25, chat: { conversations: 50 }, kbFileSize: { maxMB: 5 } },
+  starter: { agents: 1, leads: 50, chat: { conversations: 500 }, kbFileSize: { maxMB: 5 } },
+  growth: { agents: 3, leads: null, chat: { conversations: 2000 }, kbFileSize: { maxMB: 15 } },
+  agency: { agents: null, leads: null, chat: { conversations: null }, kbFileSize: { maxMB: 100 } },
 } as const
 
 export const FEATURES = {

@@ -61,6 +61,7 @@ function buildInternalEntitlements(accountId: string): Entitlements {
       crm: { enabled: true, limits: { leads: null } },
       agents: { enabled: true, limits: { max: null } },
       voice: { enabled: true, limits: { minutes: null } },
+      kbFileSize: { enabled: true, limits: { maxBytes: null } },
     },
   }
 }
@@ -74,6 +75,7 @@ function buildFullTrialEntitlements(accountId: string): Entitlements {
       crm: { enabled: true, limits: { leads: TRIAL.leads } },
       agents: { enabled: true, limits: { max: TRIAL.agents } },
       voice: { enabled: false, limits: { minutes: 0 } },
+      kbFileSize: { enabled: true, limits: { maxBytes: TRIAL.kbFileSize.maxMB * 1024 * 1024 } },
     },
   }
 }
@@ -93,6 +95,9 @@ function buildDegradedEntitlements(
       crm: { enabled: true, limits: { leads: TRIAL.leads } },
       agents: { enabled: true, limits: { max: TRIAL.agents } },
       voice: { enabled: false, limits: { minutes: 0 } },
+      // Mirrors crm/agents above: reuses TRIAL's cap rather than the null
+      // (unlimited) it would get in buildActiveEntitlements.
+      kbFileSize: { enabled: true, limits: { maxBytes: TRIAL.kbFileSize.maxMB * 1024 * 1024 } },
     },
   }
 }
@@ -118,6 +123,7 @@ function buildActiveEntitlements(accountId: string, subscription: Subscription):
       crm: { enabled: true, limits: { leads: leadsMax } },
       agents: { enabled: true, limits: { max: agentsMax } },
       voice: { enabled: voiceSubscribed, limits: { minutes: voiceMinutes } },
+      kbFileSize: { enabled: true, limits: { maxBytes: planDefaults.kbFileSize.maxMB * 1024 * 1024 } },
     },
   }
 }
@@ -133,6 +139,10 @@ function buildCancelledEntitlements(accountId: string, subscription: Subscriptio
       crm: { enabled: true, limits: { leads: planDefaults.leads } },
       agents: { enabled: true, limits: { max: planDefaults.agents } },
       voice: { enabled: false, limits: { minutes: 0 } },
+      // Disabled alongside chat, not capped like crm/agents -- KB upload is
+      // a training/content feature, closer in kind to chat than to CRM
+      // record-keeping. Not specified for the cancelled state; flagged.
+      kbFileSize: { enabled: false, limits: { maxBytes: null } },
     },
   }
 }
@@ -227,7 +237,7 @@ async function resolveChatPeriodKey(accountId: string): Promise<string> {
 
 export async function checkEntitlement(
   accountId: string,
-  featureKey: 'chat' | 'agents' | 'voice',
+  featureKey: 'chat' | 'agents' | 'voice' | 'kbFileSize',
   quantity = 1
 ): Promise<void> {
   const entitlements = await resolveEntitlements(accountId)
@@ -267,6 +277,19 @@ export async function checkEntitlement(
     const count = await countBotsForClient(accountId)
     if (count + quantity > limit) {
       throw new EntitlementError('LIMIT_EXCEEDED', 'agents', { limit, current: count })
+    }
+    return
+  }
+
+  if (featureKey === 'kbFileSize') {
+    // Static per-request ceiling, not a cumulative usage counter -- quantity
+    // here is the file's size in bytes, compared directly against the
+    // plan's cap. No usage-repository write, unlike 'chat'.
+    const limit = entitlements.features.kbFileSize.limits.maxBytes
+    if (limit === null) return
+
+    if (quantity > limit) {
+      throw new EntitlementError('LIMIT_EXCEEDED', 'kbFileSize', { limit, current: quantity })
     }
     return
   }
