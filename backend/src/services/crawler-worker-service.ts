@@ -1,6 +1,4 @@
 import { v4 as uuidv4 } from 'uuid'
-import { PDFParse } from 'pdf-parse'
-import mammoth from 'mammoth'
 import { crawlPagesParallel, chunkWithContext, chunkFacts, extractSupportEmail } from './crawler-service.js'
 import { extractPageFacts, generateEmbeddingsBatch } from './openai-service.js'
 import { indexKnowledgeBaseEntry } from './rag-service.js'
@@ -208,17 +206,24 @@ const MIN_EXTRACTED_TEXT_LENGTH = 50
 // one attribute.
 const CONTENT_PREVIEW_MAX_LENGTH = 2000
 
+// pdf-parse (v2) pulls in pdfjs-dist + @napi-rs/canvas, whose module-level
+// code unconditionally references browser Canvas APIs (DOMMatrix etc.) —
+// this crashed the entire Lambda bundle at cold start in production, on
+// every route, not just KB file uploads, since it was a static top-level
+// import. unpdf ships a serverless build of PDF.js built specifically for
+// environments without a canvas/DOM (Cloudflare Workers, Lambda, etc.) with
+// zero hard dependencies. Both extraction libraries are also now imported
+// dynamically, scoped to this one function, so a future bad dependency in
+// either can only fail a KB-file job, not every route on cold start.
 async function extractText(buffer: Buffer, fileType: KBFileType): Promise<string> {
   if (fileType === 'pdf') {
-    const parser = new PDFParse({ data: buffer })
-    try {
-      const result = await parser.getText()
-      return result.text
-    } finally {
-      await parser.destroy()
-    }
+    const { extractText: extractPdfText, getDocumentProxy } = await import('unpdf')
+    const pdf = await getDocumentProxy(new Uint8Array(buffer))
+    const { text } = await extractPdfText(pdf, { mergePages: true })
+    return text
   }
   if (fileType === 'docx') {
+    const { default: mammoth } = await import('mammoth')
     const result = await mammoth.extractRawText({ buffer })
     return result.value
   }
