@@ -1,10 +1,17 @@
 import { ArrowRight } from 'lucide-react'
+import { PRICING_TIERS, formatPrice } from '../../lib/pricingTiers'
+import type { Region } from '../../lib/pricingTiers'
 
 interface CTASectionProps {
   onStartTrial: () => void
+  region: Region
 }
 
-export default function CTASection({ onStartTrial }: CTASectionProps) {
+// PRICING_TIERS is declared in ascending price order (starter, growth,
+// agency) in both regions — see pricingTiers.ts.
+const LOWEST_TIER = PRICING_TIERS[0]
+
+export default function CTASection({ onStartTrial, region }: CTASectionProps) {
   return (
     <section id="pricing" className="py-24 px-4">
       <div className="max-w-4xl mx-auto">
@@ -49,7 +56,9 @@ export default function CTASection({ onStartTrial }: CTASectionProps) {
               </a>
             </div>
 
-            <p className="mt-6 text-white/50 text-xs">Plans from ₹1,999/mo · Cancel anytime</p>
+            <p className="mt-6 text-white/50 text-xs">
+              Plans from {formatPrice(LOWEST_TIER.pricing[region], region)}/mo · Cancel anytime
+            </p>
           </div>
         </div>
       </div>

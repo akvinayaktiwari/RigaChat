@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { AlertTriangle, Check, CheckCircle2, Loader2, X } from 'lucide-react'
-import { PRICING_TIERS } from '../../lib/pricingTiers'
+import { PRICING_TIERS, formatPrice } from '../../lib/pricingTiers'
 import type { BillableTier } from '../../lib/pricingTiers'
 import { useTierCheckout } from '../../hooks/useTierCheckout'
 
@@ -19,10 +19,6 @@ interface UpgradeModalProps {
   // (Settings.tsx) still passes it and this was flagged, not silently
   // deleted, per the task that requested this change.
   suggestedTier?: BillableTier
-}
-
-function formatPrice(rupees: number): string {
-  return `₹${rupees.toLocaleString('en-IN')}`
 }
 
 export default function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
@@ -91,7 +87,7 @@ export default function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
 
                     <div className="flex items-baseline gap-1 mb-5">
                       <span className="text-3xl font-extrabold text-gray-900" style={JAKARTA_FONT}>
-                        {formatPrice(plan.priceInRupees)}
+                        {formatPrice(plan.pricing.in, 'in')}
                       </span>
                       <span className="text-sm text-gray-400">/mo</span>
                     </div>

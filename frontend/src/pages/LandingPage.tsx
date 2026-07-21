@@ -16,7 +16,8 @@ import QuickSignupModal from '../components/auth/QuickSignupModal'
 import { useAuth } from '../hooks/useAuth'
 import type { AuthUser } from '../hooks/useAuth'
 import { useTierCheckout } from '../hooks/useTierCheckout'
-import type { BillableTier } from '../lib/pricingTiers'
+import { detectRegion } from '../lib/pricingTiers'
+import type { BillableTier, Region } from '../lib/pricingTiers'
 
 const VOICE_AGENT_ID = 'b5b88f4b-3a4d-41cc-b590-9324655c341f'
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -26,6 +27,7 @@ type SignupModalRequest = { mode: 'trial' } | { mode: 'checkout'; tier: Billable
 export default function LandingPage() {
   const [isDemoOpen, setIsDemoOpen] = useState(false)
   const [signupModal, setSignupModal] = useState<SignupModalRequest | null>(null)
+  const [region, setRegion] = useState<Region>(() => detectRegion())
   const voiceWidgetInjected = useRef(false)
   const { isAuthenticated, setSession } = useAuth()
 
@@ -101,8 +103,8 @@ export default function LandingPage() {
       <RoadmapSection />
       <HowItWorksSection />
       <TestimonialsSection />
-      <PricingSection onSelectTier={handleSelectTier} />
-      <CTASection onStartTrial={handleStartTrial} />
+      <PricingSection onSelectTier={handleSelectTier} region={region} onRegionChange={setRegion} />
+      <CTASection onStartTrial={handleStartTrial} region={region} />
       <Footer />
       <DemoModal isOpen={isDemoOpen} onClose={() => setIsDemoOpen(false)} />
       <QuickSignupModal
