@@ -70,9 +70,18 @@ leadRoutes.post('/', async (c) => {
 })
 
 leadRoutes.get('/bot/:botId', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
   const botId = c.req.param('botId')
-  const leads = await getLeadsForBot(botId)
-  return c.json<ApiResponse<Lead[]>>({ success: true, data: leads }, 200)
+
+  try {
+    const leads = await getLeadsForBot(botId, clientId)
+    return c.json<ApiResponse<Lead[]>>({ success: true, data: leads }, 200)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Bot not found') {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
 })
 
 leadRoutes.get('/all', requireAuth, async (c) => {
@@ -82,11 +91,12 @@ leadRoutes.get('/all', requireAuth, async (c) => {
 })
 
 leadRoutes.get('/:botId/:leadId', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
   const botId = c.req.param('botId')
   const leadId = c.req.param('leadId')
 
   try {
-    const lead = await getLeadDetail(botId, leadId)
+    const lead = await getLeadDetail(botId, leadId, clientId)
     return c.json<ApiResponse<Lead>>({ success: true, data: lead }, 200)
   } catch (error) {
     if (error instanceof Error && error.message === 'Lead not found') {

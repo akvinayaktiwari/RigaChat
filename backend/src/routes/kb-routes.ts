@@ -109,12 +109,22 @@ kbRoutes.post('/upload-url', requireAuth, async (c) => {
 })
 
 kbRoutes.get('/:botId', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
   const botId = c.req.param('botId')
-  const entries = await getKBEntries(botId)
-  return c.json<ApiResponse<KnowledgeBaseEntry[]>>({ success: true, data: entries }, 200)
+
+  try {
+    const entries = await getKBEntries(botId, clientId)
+    return c.json<ApiResponse<KnowledgeBaseEntry[]>>({ success: true, data: entries }, 200)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Bot not found') {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
 })
 
 kbRoutes.patch('/:botId/:entryId', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
   const botId = c.req.param('botId')
   const entryId = c.req.param('entryId')
   const body = await c.req.json<UpdateKBEntryBody>()
@@ -124,7 +134,7 @@ kbRoutes.patch('/:botId/:entryId', requireAuth, async (c) => {
   }
 
   try {
-    const entry = await updateKBEntry(botId, entryId, {
+    const entry = await updateKBEntry(botId, entryId, clientId, {
       title: body.title,
       content: body.content,
     })
@@ -138,11 +148,12 @@ kbRoutes.patch('/:botId/:entryId', requireAuth, async (c) => {
 })
 
 kbRoutes.delete('/:botId/:entryId', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
   const botId = c.req.param('botId')
   const entryId = c.req.param('entryId')
 
   try {
-    await removeKBEntry(botId, entryId)
+    await removeKBEntry(botId, entryId, clientId)
     return c.json<ApiResponse<{ message: string }>>(
       { success: true, data: { message: 'Knowledge base entry deleted' } },
       200

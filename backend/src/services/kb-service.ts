@@ -8,6 +8,7 @@ import {
 } from '../repositories/kb-repository.js'
 import { indexKnowledgeBaseEntry } from './rag-service.js'
 import { checkEntitlement } from './entitlement-service.js'
+import { getBotConfig } from './bot-service.js'
 import { generatePresignedUploadUrl } from '../lib/s3.js'
 import type { KnowledgeBaseEntry } from '../types/index.js'
 
@@ -83,7 +84,13 @@ export async function addKBEntry(input: CreateKBEntryInput): Promise<KnowledgeBa
   }
 }
 
-export async function getKBEntries(botId: string): Promise<KnowledgeBaseEntry[]> {
+// getBotConfig() throws 'Bot not found' both when the bot genuinely doesn't
+// exist and when it exists but belongs to a different clientId (the bots
+// table's {clientId, botId} key means a mismatched clientId can't find the
+// row at all) -- same 404, no distinction revealed either way.
+export async function getKBEntries(botId: string, clientId: string): Promise<KnowledgeBaseEntry[]> {
+  await getBotConfig(botId, clientId)
+
   try {
     return await getKBEntriesByBotId(botId)
   } catch (error) {
@@ -96,8 +103,16 @@ export async function getKBEntries(botId: string): Promise<KnowledgeBaseEntry[]>
 export async function updateKBEntry(
   botId: string,
   entryId: string,
+  clientId: string,
   updates: Pick<KnowledgeBaseEntry, 'title' | 'content'>
 ): Promise<KnowledgeBaseEntry> {
+  // 404 either way (missing vs. owned by someone else) -- don't reveal
+  // existence to a non-owner. Mirrors voice-service.ts's getOwnedVoiceAgent().
+  const existing = await getKBEntryById(botId, entryId)
+  if (!existing || existing.clientId !== clientId) {
+    throw new Error('KB entry not found')
+  }
+
   try {
     const entry = await updateKBEntryRepo(botId, entryId, updates)
     await indexKnowledgeBaseEntry(botId, entryId, entry.title, entry.content)
@@ -109,9 +124,9 @@ export async function updateKBEntry(
   }
 }
 
-export async function removeKBEntry(botId: string, entryId: string): Promise<void> {
+export async function removeKBEntry(botId: string, entryId: string, clientId: string): Promise<void> {
   const entry = await getKBEntryById(botId, entryId)
-  if (!entry) {
+  if (!entry || entry.clientId !== clientId) {
     throw new Error('KB entry not found')
   }
 

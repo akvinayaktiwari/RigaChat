@@ -6,6 +6,7 @@ import {
 } from '../repositories/lead-repository.js'
 import { markLeadCaptured } from '../repositories/conversation-repository.js'
 import { sendLeadNotification } from './whatsapp-service.js'
+import { getBotConfig } from './bot-service.js'
 import type { BotConfig, Lead } from '../types/index.js'
 
 interface CreateLeadInput {
@@ -90,7 +91,11 @@ export async function captureLead(bot: BotConfig, input: CreateLeadInput): Promi
   }
 }
 
-export async function getLeadsForBot(botId: string, limit?: number): Promise<Lead[]> {
+// getBotConfig() throws 'Bot not found' both when the bot genuinely doesn't
+// exist and when it belongs to a different clientId -- same 404 either way.
+export async function getLeadsForBot(botId: string, clientId: string, limit?: number): Promise<Lead[]> {
+  await getBotConfig(botId, clientId)
+
   try {
     return await getLeadsByBotId(botId, limit)
   } catch (error) {
@@ -110,9 +115,11 @@ export async function getLeadsForClient(clientId: string): Promise<Lead[]> {
   }
 }
 
-export async function getLeadDetail(botId: string, leadId: string): Promise<Lead> {
+// 404 either way (missing vs. owned by someone else) -- don't reveal
+// existence to a non-owner. Mirrors voice-service.ts's getOwnedVoiceAgent().
+export async function getLeadDetail(botId: string, leadId: string, clientId: string): Promise<Lead> {
   const lead = await getLeadById(botId, leadId)
-  if (!lead) {
+  if (!lead || lead.clientId !== clientId) {
     throw new Error('Lead not found')
   }
   return lead
