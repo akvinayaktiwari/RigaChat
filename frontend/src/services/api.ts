@@ -2,6 +2,7 @@ import type {
   ApiResponse,
   BotConfig,
   ClientRecord,
+  ConfirmKBUploadInput,
   ConnectWhatsAppInput,
   CRMConnection,
   CreateBotInput,
@@ -11,6 +12,8 @@ import type {
   FormConfig,
   FormLead,
   IndexingJob,
+  KBFileType,
+  KBUploadUrlResult,
   KnowledgeBaseEntry,
   Lead,
   ResyncResult,
@@ -146,6 +149,21 @@ export function deleteKBEntry(
   entryId: string
 ): Promise<ApiResponse<{ message: string }>> {
   return apiClient<{ message: string }>(`/api/kb/${botId}/${entryId}`, 'DELETE')
+}
+
+export interface GetKBUploadUrlInput {
+  botId: string
+  filename: string
+  fileType: KBFileType
+  fileSizeBytes: number
+}
+
+export function getKBUploadUrl(data: GetKBUploadUrlInput): Promise<ApiResponse<KBUploadUrlResult>> {
+  return apiClient<KBUploadUrlResult>('/api/kb/upload-url', 'POST', data)
+}
+
+export function confirmKBUpload(data: ConfirmKBUploadInput): Promise<ApiResponse<KnowledgeBaseEntry>> {
+  return apiClient<KnowledgeBaseEntry>('/api/kb/confirm-upload', 'POST', data)
 }
 
 // Client API
