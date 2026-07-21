@@ -21,7 +21,12 @@ interface AuthContextValue extends AuthState {
   logout: () => void
   handleCallback: (code: string) => Promise<boolean>
   signUp: (name: string, email: string, password: string) => Promise<void>
-  signIn: (email: string, password: string) => Promise<void>
+  signIn: (email: string, password: string) => Promise<{ token: string; user: AuthUser }>
+  // For flows that obtain a token+user outside the Cognito calls this hook
+  // otherwise owns (e.g. the backend-orchestrated quick-signup endpoint,
+  // which already returns a ready-to-use {token, user} pair) — sets the same
+  // session state signIn()/handleCallback() do, without re-hitting Cognito.
+  setSession: (token: string, user: AuthUser) => void
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -204,7 +209,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = `https://${COGNITO_DOMAIN}/logout?${params.toString()}`
   }
 
-  async function signIn(email: string, password: string): Promise<void> {
+  function setSession(token: string, user: AuthUser): void {
+    setAuthToken(token)
+    setState({ isAuthenticated: true, isLoading: false, user, token })
+    saveSession(token, user)
+  }
+
+  async function signIn(email: string, password: string): Promise<{ token: string; user: AuthUser }> {
     const response = await fetch(COGNITO_API_URL, {
       method: 'POST',
       headers: {
@@ -259,6 +270,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token: idToken,
     })
     saveSession(idToken, user)
+
+    return { token: idToken, user }
   }
 
   async function signUp(name: string, email: string, password: string): Promise<void> {
@@ -309,7 +322,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return createElement(
     AuthContext.Provider,
-    { value: { ...state, login, logout, handleCallback, signUp, signIn } },
+    { value: { ...state, login, logout, handleCallback, signUp, signIn, setSession } },
     children
   )
 }

@@ -1,15 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect } from 'react'
 import { AlertTriangle, Check, CheckCircle2, Loader2, X } from 'lucide-react'
-import { subscribeToTier, getMySubscription } from '../../services/api'
-import type { BillingErrorCode } from '../../services/api'
-import { loadRazorpayScript } from '../../lib/razorpay-checkout'
 import { PRICING_TIERS } from '../../lib/pricingTiers'
 import type { BillableTier } from '../../lib/pricingTiers'
+import { useTierCheckout } from '../../hooks/useTierCheckout'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
-
-const POLL_INTERVAL_MS = 3000
-const POLL_MAX_ATTEMPTS = 10
 
 interface UpgradeModalProps {
   isOpen: boolean
@@ -17,164 +12,21 @@ interface UpgradeModalProps {
   suggestedTier?: BillableTier
 }
 
-type Stage = 'tiers' | 'polling' | 'success' | 'timeout'
-
-interface PendingCheckout {
-  tier: BillableTier
-  subscriptionId: string
-  razorpayKeyId: string
-}
-
 function formatPrice(rupees: number): string {
   return `₹${rupees.toLocaleString('en-IN')}`
 }
 
-// Switches on billing-routes.ts's stable `code` field rather than matching
-// substrings of `error` (the human-readable message) — message text can
-// change without warning; `code` is the contract.
-function resolveBillingErrorMessage(
-  code: BillingErrorCode | undefined,
-  message: string | undefined,
-  pending: PendingCheckout | null
-): string {
-  switch (code) {
-    case 'INTERNAL_ACCOUNT_NO_BILLING':
-      return 'This is an internal account and cannot be billed.'
-
-    case 'ALREADY_SUBSCRIBED': {
-      if (!pending) {
-        return "You already have a subscription in progress. Refresh this page, or contact us if this doesn't look right."
-      }
-      const tierName = PRICING_TIERS.find((t) => t.tier === pending.tier)?.name ?? pending.tier
-      return `You have a pending payment for the ${tierName} plan — finish that checkout below, or wait for it to expire before choosing a different plan.`
-    }
-
-    case 'NO_SUBSCRIPTION_RECORD':
-    case 'CONFIG_ERROR':
-    case 'PROVIDER_ERROR':
-      // These carry internal detail (env var names, provider error text) not
-      // meant for end users — a safe generic message instead of `message`.
-      return 'Something went wrong on our end. Please try again shortly, or contact us if it persists.'
-
-    default:
-      // No BillingError code — e.g. the 400 bad-tier validation error, which
-      // is already a safe, human-readable message worth showing as-is.
-      return message ?? 'Something went wrong. Please try again.'
-  }
-}
-
 export default function UpgradeModal({ isOpen, onClose, suggestedTier }: UpgradeModalProps) {
-  const [stage, setStage] = useState<Stage>('tiers')
-  const [submittingTier, setSubmittingTier] = useState<BillableTier | null>(null)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [pendingCheckout, setPendingCheckout] = useState<PendingCheckout | null>(null)
-  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { stage, submittingTier, errorMessage, pendingCheckout, selectTier, reset } = useTierCheckout(() => {
+    setTimeout(() => onClose(), 1500)
+  })
 
   useEffect(() => {
-    if (!isOpen) {
-      setStage('tiers')
-      setSubmittingTier(null)
-      setErrorMessage(null)
-      setPendingCheckout(null)
-      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current)
-    }
+    if (!isOpen) reset()
+    // reset() is stable across renders (defined fresh each render but only
+    // its behavior matters here); isOpen is the only real dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
-
-  useEffect(() => {
-    return () => {
-      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current)
-    }
-  }, [])
-
-  function startPolling() {
-    let attempts = 0
-
-    const poll = async () => {
-      attempts += 1
-      try {
-        const res = await getMySubscription()
-        if (res.success && res.data?.status === 'active') {
-          setStage('success')
-          setTimeout(() => onClose(), 1500)
-          return
-        }
-      } catch {
-        // Transient network blip — keep polling rather than aborting confirmation.
-      }
-
-      if (attempts >= POLL_MAX_ATTEMPTS) {
-        setStage('timeout')
-        return
-      }
-
-      pollTimeoutRef.current = setTimeout(poll, POLL_INTERVAL_MS)
-    }
-
-    poll()
-  }
-
-  async function openRazorpayCheckout(tier: BillableTier, subscriptionId: string, razorpayKeyId: string) {
-    try {
-      await loadRazorpayScript()
-    } catch {
-      setErrorMessage('Could not load the checkout script. Check your connection and try again.')
-      return
-    }
-
-    if (!window.Razorpay) {
-      setErrorMessage('Checkout is unavailable right now. Try again in a moment.')
-      return
-    }
-
-    const checkout = new window.Razorpay({
-      key: razorpayKeyId,
-      subscription_id: subscriptionId,
-      name: 'VyostraAI',
-      description: `${PRICING_TIERS.find((t) => t.tier === tier)?.name ?? tier} plan`,
-      theme: { color: '#7c3aed' },
-      handler: () => {
-        setPendingCheckout(null)
-        setErrorMessage(null)
-        setStage('polling')
-        startPolling()
-      },
-      modal: {
-        // User closed Razorpay's popup without paying. subscribeToTier()
-        // 409s (ALREADY_SUBSCRIBED) on any second call while the local row
-        // is still pending_activation, so calling /subscribe again here
-        // would just fail — the only way forward is to resume this exact
-        // Razorpay subscription, not create a new one.
-        ondismiss: () => {
-          setPendingCheckout({ tier, subscriptionId, razorpayKeyId })
-          setStage('tiers')
-        },
-      },
-    })
-    checkout.open()
-  }
-
-  async function handleSelectTier(tier: BillableTier) {
-    setErrorMessage(null)
-
-    if (pendingCheckout && pendingCheckout.tier === tier) {
-      await openRazorpayCheckout(tier, pendingCheckout.subscriptionId, pendingCheckout.razorpayKeyId)
-      return
-    }
-
-    setSubmittingTier(tier)
-    try {
-      const res = await subscribeToTier(tier)
-      if (!res.success || !res.data) {
-        setErrorMessage(resolveBillingErrorMessage(res.code, res.error, pendingCheckout))
-        return
-      }
-      await openRazorpayCheckout(tier, res.data.subscriptionId, res.data.razorpayKeyId)
-    } catch {
-      setErrorMessage('Something went wrong starting checkout. Please try again.')
-    } finally {
-      setSubmittingTier(null)
-    }
-  }
 
   if (!isOpen) return null
 
@@ -190,7 +42,7 @@ export default function UpgradeModal({ isOpen, onClose, suggestedTier }: Upgrade
           <X size={20} />
         </button>
 
-        {stage === 'tiers' && (
+        {stage === 'idle' && (
           <>
             <h2 className="font-bold text-2xl text-gray-900 mb-1" style={JAKARTA_FONT}>
               Choose your plan
@@ -219,7 +71,7 @@ export default function UpgradeModal({ isOpen, onClose, suggestedTier }: Upgrade
                   >
                     {isSuggested && (
                       <span className="absolute -top-3 left-6 bg-linear-to-r from-violet-600 to-purple-500 text-white text-xs font-semibold px-3 py-1 rounded-full">
-                        Recommended
+                        Most Popular
                       </span>
                     )}
 
@@ -246,7 +98,7 @@ export default function UpgradeModal({ isOpen, onClose, suggestedTier }: Upgrade
 
                     <button
                       type="button"
-                      onClick={() => handleSelectTier(plan.tier)}
+                      onClick={() => selectTier(plan.tier)}
                       disabled={submittingTier !== null}
                       className={`w-full flex items-center justify-center gap-2 font-semibold px-4 py-2.5 rounded-xl text-sm transition-opacity disabled:opacity-50 ${
                         isSuggested

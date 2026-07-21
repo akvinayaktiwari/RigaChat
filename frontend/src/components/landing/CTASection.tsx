@@ -1,6 +1,10 @@
 import { ArrowRight } from 'lucide-react'
 
-export default function CTASection() {
+interface CTASectionProps {
+  onStartTrial: () => void
+}
+
+export default function CTASection({ onStartTrial }: CTASectionProps) {
   return (
     <section id="pricing" className="py-24 px-4">
       <div className="max-w-4xl mx-auto">
@@ -29,13 +33,14 @@ export default function CTASection() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <a
-                href="/login"
+              <button
+                type="button"
+                onClick={onStartTrial}
                 className="inline-flex items-center justify-center gap-2 bg-white text-violet-700 font-bold px-7 py-4 rounded-xl hover:bg-gray-50 transition-colors shadow-lg text-sm"
               >
                 Start free trial
                 <ArrowRight className="w-4 h-4" />
-              </a>
+              </button>
               <a
                 href="mailto:admin@drsyeta.in"
                 className="inline-flex items-center justify-center gap-2 bg-white/10 border border-white/20 text-white font-semibold px-7 py-4 rounded-xl hover:bg-white/20 transition-colors text-sm"

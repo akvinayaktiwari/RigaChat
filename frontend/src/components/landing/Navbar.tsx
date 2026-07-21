@@ -10,7 +10,7 @@ const NAV_LINKS = [
   { label: 'Features', href: '/#features' },
   { label: 'Integrations', href: '/#integrations' },
   { label: 'How it works', href: '/#how-it-works' },
-  { label: 'Pricing', href: '/#pricing' },
+  { label: 'Pricing', href: '/#plans' },
 ]
 
 export default function Navbar({ onOpenDemo }: NavbarProps) {

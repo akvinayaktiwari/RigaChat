@@ -197,6 +197,23 @@ export function confirmSignup(username: string): Promise<ApiResponse<null>> {
   return apiClient<null>('/api/auth/confirm', 'POST', { username })
 }
 
+export interface QuickSignupResult {
+  token: string
+  user: { clientId: string; email: string; name: string; plan: string }
+}
+
+export type QuickSignupErrorCode = 'EMAIL_EXISTS' | 'RATE_LIMITED' | 'INVALID_PASSWORD' | 'PROVIDER_ERROR'
+
+// Mirrors SubscribeResponse's pattern above — auth-routes.ts sends the same
+// extra `code` field on QuickSignupError responses.
+export interface QuickSignupResponse extends ApiResponse<QuickSignupResult> {
+  code?: QuickSignupErrorCode
+}
+
+export function quickSignup(email: string, password: string): Promise<QuickSignupResponse> {
+  return apiClient<QuickSignupResult>('/api/auth/quick-signup', 'POST', { email, password }) as Promise<QuickSignupResponse>
+}
+
 // Form API
 
 export function createForm(data: CreateFormInput): Promise<ApiResponse<FormConfig>> {
