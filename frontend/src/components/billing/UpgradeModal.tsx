@@ -7,13 +7,17 @@ import { useTierCheckout } from '../../hooks/useTierCheckout'
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
 // Static marketing label — matches PricingSection.tsx's own MOST_POPULAR_TIER
-// constant. Independent of suggestedTier: Growth is "Most Popular" for every
-// visitor, regardless of which tier is being recommended to them.
+// constant. Growth is "Most Popular" for every visitor; no per-account
+// highlighting.
 const MOST_POPULAR_TIER: BillableTier = 'growth'
 
 interface UpgradeModalProps {
   isOpen: boolean
   onClose: () => void
+  // Unused inside this component as of the "Most Popular only" simplification
+  // — kept on the prop type rather than removed because the one call site
+  // (Settings.tsx) still passes it and this was flagged, not silently
+  // deleted, per the task that requested this change.
   suggestedTier?: BillableTier
 }
 
@@ -21,7 +25,7 @@ function formatPrice(rupees: number): string {
   return `₹${rupees.toLocaleString('en-IN')}`
 }
 
-export default function UpgradeModal({ isOpen, onClose, suggestedTier }: UpgradeModalProps) {
+export default function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
   const { stage, submittingTier, errorMessage, pendingCheckout, selectTier, reset } = useTierCheckout(() => {
     setTimeout(() => onClose(), 1500)
   })
@@ -63,15 +67,7 @@ export default function UpgradeModal({ isOpen, onClose, suggestedTier }: Upgrade
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               {PRICING_TIERS.map((plan) => {
-                // Two independent concepts: isMostPopular is fixed marketing
-                // copy (always Growth), isSuggested is a per-account dynamic
-                // recommendation. Both drive the same highlight treatment
-                // (border/ring, filled button) — isHighlighted — but the
-                // badge text picks "Most Popular" first so a card never shows
-                // two overlapping pills when suggestedTier happens to be Growth.
                 const isMostPopular = plan.tier === MOST_POPULAR_TIER
-                const isSuggested = suggestedTier === plan.tier
-                const isHighlighted = isMostPopular || isSuggested
                 const isResuming = pendingCheckout?.tier === plan.tier
                 const isSubmitting = submittingTier === plan.tier
 
@@ -79,12 +75,12 @@ export default function UpgradeModal({ isOpen, onClose, suggestedTier }: Upgrade
                   <div
                     key={plan.tier}
                     className={`relative bg-white rounded-2xl border p-6 shadow-sm transition-all duration-300 ${
-                      isHighlighted ? 'border-violet-400 ring-2 ring-violet-100' : 'border-black/5'
+                      isMostPopular ? 'border-violet-400 ring-2 ring-violet-100' : 'border-black/5'
                     }`}
                   >
-                    {isHighlighted && (
+                    {isMostPopular && (
                       <span className="absolute -top-3 left-6 bg-linear-to-r from-violet-600 to-purple-500 text-white text-xs font-semibold px-3 py-1 rounded-full">
-                        {isMostPopular ? 'Most Popular' : 'Recommended for you'}
+                        Most Popular
                       </span>
                     )}
 
@@ -114,7 +110,7 @@ export default function UpgradeModal({ isOpen, onClose, suggestedTier }: Upgrade
                       onClick={() => selectTier(plan.tier)}
                       disabled={submittingTier !== null}
                       className={`w-full flex items-center justify-center gap-2 font-semibold px-4 py-2.5 rounded-xl text-sm transition-opacity disabled:opacity-50 ${
-                        isHighlighted
+                        isMostPopular
                           ? 'bg-linear-to-r from-violet-600 to-purple-500 text-white shadow-md shadow-violet-200/50 hover:opacity-90'
                           : 'bg-gray-50 text-gray-900 border border-gray-200 hover:bg-gray-100'
                       }`}
