@@ -1,6 +1,9 @@
 import { v4 as uuidv4 } from 'uuid'
+import { PDFParse } from 'pdf-parse'
+import mammoth from 'mammoth'
 import { crawlPagesParallel, chunkWithContext, chunkFacts, extractSupportEmail } from './crawler-service.js'
 import { extractPageFacts, generateEmbeddingsBatch } from './openai-service.js'
+import { indexKnowledgeBaseEntry } from './rag-service.js'
 import { upsertChunks } from '../repositories/vector-repository.js'
 import {
   claimCrawlerJob,
@@ -15,9 +18,11 @@ import {
   updateVoiceAgent,
   updateVoiceIndexingJob,
 } from '../repositories/voice-repository.js'
-import { claimKBFileIndexingJob, updateKBIndexingStatus } from '../repositories/kb-repository.js'
+import { claimKBFileIndexingJob, getKBEntryById, updateKBIndexingStatus } from '../repositories/kb-repository.js'
+import { getObjectAsBuffer } from '../lib/s3.js'
 import { generateAndPrewarmSuggestions } from './suggestion-service.js'
 import type { CrawlerJobMessage, KBFileCrawlerJobMessage, WebsiteCrawlerJobMessage } from '../lib/sqs.js'
+import type { KBFileType } from './kb-service.js'
 import type { Chunk, IndexingJob } from '../types/index.js'
 
 interface CrawlAndChunkResult {
@@ -195,11 +200,34 @@ async function prewarmSuggestionsForJob(botId: string, chunks: Chunk[]): Promise
   }
 }
 
-// Stub only -- proves the route -> DynamoDB -> SQS -> worker -> status
-// plumbing end-to-end without pretending extraction exists yet. A future
-// module replaces the 'failed' write below with real pdf-parse/mammoth
-// extraction, chunking, and embedding (mirroring crawlAndChunk() above for
-// website jobs).
+const MIN_EXTRACTED_TEXT_LENGTH = 50
+// DynamoDB items cap at 400KB total; Agency-tier source files can be up to
+// 100MB, so full extracted text can't safely live in this field. Only a
+// preview is stored here -- the full text is chunked and embedded into
+// Pinecone via indexKnowledgeBaseEntry() below and never reconstituted as
+// one attribute.
+const CONTENT_PREVIEW_MAX_LENGTH = 2000
+
+async function extractText(buffer: Buffer, fileType: KBFileType): Promise<string> {
+  if (fileType === 'pdf') {
+    const parser = new PDFParse({ data: buffer })
+    try {
+      const result = await parser.getText()
+      return result.text
+    } finally {
+      await parser.destroy()
+    }
+  }
+  if (fileType === 'docx') {
+    const result = await mammoth.extractRawText({ buffer })
+    return result.value
+  }
+  return buffer.toString('utf-8')
+}
+
+// Replaces the earlier 'failed' stub that only proved the route -> DynamoDB
+// -> SQS -> worker -> status plumbing. This is the real extraction ->
+// chunk -> embed -> upsert pipeline.
 async function processKBFileJob(job: KBFileCrawlerJobMessage): Promise<void> {
   // The claim's own conditional UpdateCommand already performs the
   // 'queued' -> 'processing' transition atomically -- mirrors
@@ -215,10 +243,61 @@ async function processKBFileJob(job: KBFileCrawlerJobMessage): Promise<void> {
     `Received KB file job for entry ${job.entryId} (bot ${job.botId}): fileType=${job.fileType}, key=${job.s3Key} — status now 'processing'`
   )
 
-  await updateKBIndexingStatus(job.botId, job.entryId, {
-    indexingStatus: 'failed',
-    indexingError: 'File extraction not yet implemented — this module only proves the upload/queue/worker plumbing.',
-  })
+  try {
+    const entry = await getKBEntryById(job.botId, job.entryId)
+    if (!entry) {
+      throw new Error(`KB entry ${job.entryId} no longer exists`)
+    }
+
+    let buffer: Buffer
+    try {
+      buffer = await getObjectAsBuffer(job.s3Key)
+    } catch (error) {
+      throw new Error(`fetch stage failed: ${error instanceof Error ? error.message : String(error)}`)
+    }
+
+    let extractedText: string
+    try {
+      extractedText = await extractText(buffer, job.fileType)
+    } catch (error) {
+      throw new Error(`extract stage failed: ${error instanceof Error ? error.message : String(error)}`)
+    }
+
+    const trimmed = extractedText.trim()
+    if (trimmed.length < MIN_EXTRACTED_TEXT_LENGTH) {
+      // Graceful failure path for scanned/image-only PDFs -- deliberately
+      // not OCR'd in this version. Not an exception (nothing actually
+      // failed), so this returns directly rather than falling into the
+      // catch block below.
+      await updateKBIndexingStatus(job.botId, job.entryId, {
+        indexingStatus: 'failed',
+        indexingError: 'No readable text found in file — scanned/image-only PDFs are not supported in this version.',
+      })
+      return
+    }
+
+    try {
+      // Reuses the exact same chunk (chunkWithContext) -> embed
+      // (generateEmbeddingsBatch) -> upsert (upsertChunks) sequence text KB
+      // entries already use -- including the 'knowledge_base:{entryId}'
+      // sourceUrl convention deleteChunksByEntryId() already depends on.
+      await indexKnowledgeBaseEntry(job.botId, job.entryId, entry.title, trimmed)
+    } catch (error) {
+      throw new Error(`embed/upsert stage failed: ${error instanceof Error ? error.message : String(error)}`)
+    }
+
+    await updateKBIndexingStatus(job.botId, job.entryId, {
+      indexingStatus: 'complete',
+      content: trimmed.slice(0, CONTENT_PREVIEW_MAX_LENGTH),
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error(`KB file extraction failed for entry ${job.entryId} (bot ${job.botId}):`, error)
+    await updateKBIndexingStatus(job.botId, job.entryId, {
+      indexingStatus: 'failed',
+      indexingError: message,
+    })
+  }
 }
 
 export async function processCrawlerJob(job: CrawlerJobMessage): Promise<void> {

@@ -171,7 +171,7 @@ export async function claimKBFileIndexingJob(botId: string, entryId: string, job
 export async function updateKBIndexingStatus(
   botId: string,
   entryId: string,
-  updates: Partial<Pick<KnowledgeBaseEntry, 'indexingStatus' | 'indexingError'>>
+  updates: Partial<Pick<KnowledgeBaseEntry, 'indexingStatus' | 'indexingError' | 'content'>>
 ): Promise<void> {
   const updateExpressionParts: string[] = []
   const expressionAttributeNames: Record<string, string> = {}
