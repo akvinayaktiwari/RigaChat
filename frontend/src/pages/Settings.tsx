@@ -8,9 +8,6 @@ import IntegrationsSection from '../components/settings/IntegrationsSection'
 import DangerZoneSection from '../components/settings/DangerZoneSection'
 import EditProfileModal from '../components/settings/EditProfileModal'
 import DeleteConfirmModal from '../components/settings/DeleteConfirmModal'
-// TEMPORARY (module 4 dev trigger) — UpgradeModal isn't wired to a real
-// entry point yet (that's module 5). Remove this import + the button/modal
-// below once the real Upgrade button/upsell cards call it instead.
 import UpgradeModal from '../components/billing/UpgradeModal'
 import {
   connectZoho,
@@ -21,6 +18,16 @@ import {
   updateProfile,
 } from '../services/api'
 import type { ClientRecord, Preferences, SubscriptionSummary } from '../types/index'
+import type { BillableTier } from '../lib/pricingTiers'
+
+// Suggests the next tier up from the account's current plan; agency has no
+// tier above it, so there's nothing sensible to suggest.
+const NEXT_TIER_UP: Record<SubscriptionSummary['plan'], BillableTier | undefined> = {
+  free: 'starter',
+  starter: 'growth',
+  growth: 'agency',
+  agency: undefined,
+}
 
 const PREFS_STORAGE_KEY = 'beepboop_prefs'
 
@@ -52,7 +59,6 @@ export default function Settings() {
   const [showEditProfile, setShowEditProfile] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  // TEMPORARY (module 4 dev trigger) — see UpgradeModal import comment above.
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   useEffect(() => {
@@ -165,18 +171,7 @@ export default function Settings() {
           onEditProfile={() => setShowEditProfile(true)}
         />
 
-        <SubscriptionSection subscription={subscription} />
-
-        {/* TEMPORARY (module 4 dev trigger) — remove this button once
-            module 5 wires UpgradeModal to the real Upgrade button / upsell
-            cards on Bots/VoiceAgents pages instead. */}
-        <button
-          type="button"
-          onClick={() => setShowUpgradeModal(true)}
-          className="text-xs font-medium text-gray-400 hover:text-gray-600 underline transition-colors"
-        >
-          [DEV] Open upgrade modal
-        </button>
+        <SubscriptionSection subscription={subscription} onUpgradeClick={() => setShowUpgradeModal(true)} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <PreferencesSection preferences={preferences} onToggle={handleTogglePreference} />
@@ -203,8 +198,11 @@ export default function Settings() {
         <DeleteConfirmModal onClose={() => setShowDeleteConfirm(false)} onConfirm={handleDeleteAccount} />
       )}
 
-      {/* TEMPORARY (module 4 dev trigger) — see import comment above. */}
-      <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} suggestedTier="growth" />
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        suggestedTier={NEXT_TIER_UP[subscription.plan]}
+      />
     </div>
   )
 }

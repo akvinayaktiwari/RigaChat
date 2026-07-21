@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Clock, Mail, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock, Sparkles, XCircle } from 'lucide-react'
 import type { EntitlementFeatures, SubscriptionStatus, SubscriptionSummary } from '../../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -50,9 +50,10 @@ function describeFeatures(features: EntitlementFeatures): { chat: string; crm: s
 
 interface SubscriptionSectionProps {
   subscription: SubscriptionSummary
+  onUpgradeClick: () => void
 }
 
-export default function SubscriptionSection({ subscription }: SubscriptionSectionProps) {
+export default function SubscriptionSection({ subscription, onUpgradeClick }: SubscriptionSectionProps) {
   const { plan, status, trialEndsAt, features, usage } = subscription
   const badge = STATUS_BADGES[status]
   const BadgeIcon = badge.icon
@@ -65,13 +66,14 @@ export default function SubscriptionSection({ subscription }: SubscriptionSectio
         <h3 className="font-bold text-lg text-gray-900" style={JAKARTA_FONT}>
           Subscription
         </h3>
-        <a
-          href="mailto:admin@drsyeta.in?subject=Upgrade my BeepBoop plan"
+        <button
+          type="button"
+          onClick={onUpgradeClick}
           className="inline-flex items-center gap-1.5 text-sm font-medium text-violet-600 hover:text-violet-700 transition-colors"
         >
-          <Mail size={14} />
-          Contact us to upgrade
-        </a>
+          <Sparkles size={14} />
+          Upgrade plan
+        </button>
       </div>
 
       <div className="flex items-center gap-3 mb-6">
