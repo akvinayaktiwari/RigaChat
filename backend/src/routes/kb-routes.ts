@@ -1,6 +1,13 @@
 import { Hono } from 'hono'
 import { requireAuth } from '../lib/cognito.js'
-import { addKBEntry, getKBEntries, getKBUploadUrl, removeKBEntry, updateKBEntry } from '../services/kb-service.js'
+import {
+  addKBEntry,
+  confirmKBUpload,
+  getKBEntries,
+  getKBUploadUrl,
+  removeKBEntry,
+  updateKBEntry,
+} from '../services/kb-service.js'
 import type { KBFileType, KBUploadUrlResult } from '../services/kb-service.js'
 import { EntitlementError, toEntitlementErrorResponse } from '../services/entitlement-service.js'
 import type { ApiResponse, KnowledgeBaseEntry } from '../types/index.js'
@@ -31,6 +38,15 @@ interface UploadUrlBody {
   filename?: string
   fileType?: string
   fileSizeBytes?: number
+}
+
+interface ConfirmUploadBody {
+  botId?: string
+  entryId?: string
+  filename?: string
+  fileType?: string
+  fileSizeBytes?: number
+  s3Key?: string
 }
 
 function errorMessage(error: unknown): string {
@@ -100,6 +116,54 @@ kbRoutes.post('/upload-url', requireAuth, async (c) => {
     })
     return c.json<ApiResponse<KBUploadUrlResult>>({ success: true, data: result }, 200)
   } catch (error) {
+    if (error instanceof EntitlementError) {
+      const { status, body: errBody } = toEntitlementErrorResponse(error)
+      return c.json(errBody, status)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+kbRoutes.post('/confirm-upload', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const body = await c.req.json<ConfirmUploadBody>()
+
+  if (
+    !body.botId ||
+    !body.entryId ||
+    !body.filename ||
+    !body.fileType ||
+    typeof body.fileSizeBytes !== 'number' ||
+    !body.s3Key
+  ) {
+    return c.json<ApiResponse<null>>(
+      { success: false, error: 'botId, entryId, filename, fileType, fileSizeBytes, and s3Key are required' },
+      400
+    )
+  }
+
+  if (!KB_FILE_TYPES.includes(body.fileType as KBFileType)) {
+    return c.json<ApiResponse<null>>(
+      { success: false, error: `fileType must be one of: ${KB_FILE_TYPES.join(', ')}` },
+      400
+    )
+  }
+
+  try {
+    const entry = await confirmKBUpload({
+      botId: body.botId,
+      clientId,
+      entryId: body.entryId,
+      filename: body.filename,
+      fileType: body.fileType as KBFileType,
+      fileSizeBytes: body.fileSizeBytes,
+      s3Key: body.s3Key,
+    })
+    return c.json<ApiResponse<KnowledgeBaseEntry>>({ success: true, data: entry }, 201)
+  } catch (error) {
+    if (error instanceof Error && error.message === 's3Key does not match expected upload location') {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 400)
+    }
     if (error instanceof EntitlementError) {
       const { status, body: errBody } = toEntitlementErrorResponse(error)
       return c.json(errBody, status)

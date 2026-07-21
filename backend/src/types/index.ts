@@ -114,9 +114,25 @@ export interface KnowledgeBaseEntry {
   botId: string
   clientId: string
   title: string
+  // Required even for file-upload rows, which write '' here until a future
+  // module extracts real text -- see indexingStatus below for the source of
+  // truth on whether content is actually populated yet.
   content: string
   createdAt: string
   updatedAt: string
+
+  // File-upload path only (see kb-service.ts's confirmKBUpload()) -- absent
+  // on rows created via the text-entry addKBEntry() path.
+  sourceFileKey?: string
+  fileType?: 'pdf' | 'docx' | 'text'
+  fileSizeBytes?: number
+  // Flat fields rather than a nested object (unlike bots/voice agents'
+  // indexingJob) -- indexingJobId exists alongside indexingStatus so the
+  // same atomic-claim-guard pattern (match on jobId AND status) still works
+  // without introducing a nested shape here.
+  indexingStatus?: 'queued' | 'processing' | 'complete' | 'failed'
+  indexingJobId?: string
+  indexingError?: string
 }
 
 export interface VoiceKnowledgeBaseEntry {

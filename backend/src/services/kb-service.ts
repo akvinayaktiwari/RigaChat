@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid'
 import {
   createKBEntry,
+  createKBFileEntry,
   deleteKBEntry,
   getKBEntriesByBotId,
   getKBEntryById,
@@ -9,6 +10,7 @@ import {
 import { indexKnowledgeBaseEntry } from './rag-service.js'
 import { checkEntitlement } from './entitlement-service.js'
 import { generatePresignedUploadUrl } from '../lib/s3.js'
+import { enqueueCrawlerJob } from '../lib/sqs.js'
 import type { KnowledgeBaseEntry } from '../types/index.js'
 
 interface CreateKBEntryInput {
@@ -37,6 +39,10 @@ interface GetKBUploadUrlInput {
 export interface KBUploadUrlResult {
   uploadUrl: string
   key: string
+  // Exposed explicitly so callers (confirm-upload) don't have to parse it
+  // back out of `key` -- same value, already minted below, just returned
+  // directly instead of only being embedded in the key string.
+  entryId: string
 }
 
 // Only generates a presigned PUT URL -- no DynamoDB write happens here.
@@ -56,7 +62,67 @@ export async function getKBUploadUrl(input: GetKBUploadUrlInput): Promise<KBUplo
 
   const uploadUrl = await generatePresignedUploadUrl(key, KB_FILE_CONTENT_TYPES[input.fileType])
 
-  return { uploadUrl, key }
+  return { uploadUrl, key, entryId: kbEntryId }
+}
+
+interface ConfirmKBUploadInput {
+  botId: string
+  clientId: string
+  entryId: string
+  filename: string
+  fileType: KBFileType
+  fileSizeBytes: number
+  s3Key: string
+}
+
+// "nicer derivation" was offered as optional in the spec, not required --
+// going with the simplest, most predictable rule (strip the extension) since
+// anything fancier (hyphen/underscore-to-space, title-casing) risks mangling
+// filenames it can't safely guess the intent of.
+function deriveTitleFromFilename(filename: string): string {
+  const lastDot = filename.lastIndexOf('.')
+  return lastDot > 0 ? filename.slice(0, lastDot) : filename
+}
+
+// Only creates the DynamoDB row and enqueues the indexing job -- no
+// extraction happens here. See crawler-worker-service.ts's processKBFileJob()
+// for the (stubbed) consumer side.
+export async function confirmKBUpload(input: ConfirmKBUploadInput): Promise<KnowledgeBaseEntry> {
+  const expectedKey = `${input.clientId}/${input.botId}/${input.entryId}/${input.filename}`
+  if (input.s3Key !== expectedKey) {
+    throw new Error('s3Key does not match expected upload location')
+  }
+
+  const jobId = uuidv4()
+
+  const entry = await createKBFileEntry({
+    entryId: input.entryId,
+    botId: input.botId,
+    clientId: input.clientId,
+    title: deriveTitleFromFilename(input.filename),
+    content: '',
+    sourceFileKey: input.s3Key,
+    fileType: input.fileType,
+    fileSizeBytes: input.fileSizeBytes,
+    indexingStatus: 'queued',
+    indexingJobId: jobId,
+  })
+
+  // If this throws, the entry is left stuck at 'queued' -- the same
+  // pre-existing gap already documented for the bot/voice-agent pipeline (no
+  // reaper exists for a DB row written just before its SQS enqueue fails).
+  // Not new here, not fixed here.
+  await enqueueCrawlerJob({
+    jobId,
+    botId: input.botId,
+    clientId: input.clientId,
+    type: 'kb_file',
+    entryId: input.entryId,
+    s3Key: input.s3Key,
+    fileType: input.fileType,
+  })
+
+  return entry
 }
 
 export async function addKBEntry(input: CreateKBEntryInput): Promise<KnowledgeBaseEntry> {

@@ -15,8 +15,9 @@ import {
   updateVoiceAgent,
   updateVoiceIndexingJob,
 } from '../repositories/voice-repository.js'
+import { claimKBFileIndexingJob, updateKBIndexingStatus } from '../repositories/kb-repository.js'
 import { generateAndPrewarmSuggestions } from './suggestion-service.js'
-import type { CrawlerJobMessage } from '../lib/sqs.js'
+import type { CrawlerJobMessage, KBFileCrawlerJobMessage, WebsiteCrawlerJobMessage } from '../lib/sqs.js'
 import type { Chunk, IndexingJob } from '../types/index.js'
 
 interface CrawlAndChunkResult {
@@ -132,7 +133,7 @@ async function buildEnrichedChunks(
   return { chunks, factsExtracted, factsSkipped }
 }
 
-async function crawlAndChunk(job: CrawlerJobMessage): Promise<CrawlAndChunkResult> {
+async function crawlAndChunk(job: WebsiteCrawlerJobMessage): Promise<CrawlAndChunkResult> {
   // useAICleaning disabled — extractPageFacts() already removes boilerplate
   // and returns clean paragraphs, so running cleanContentWithAI() first would
   // just be a second, redundant GPT-4o-mini call per page.
@@ -194,7 +195,38 @@ async function prewarmSuggestionsForJob(botId: string, chunks: Chunk[]): Promise
   }
 }
 
+// Stub only -- proves the route -> DynamoDB -> SQS -> worker -> status
+// plumbing end-to-end without pretending extraction exists yet. A future
+// module replaces the 'failed' write below with real pdf-parse/mammoth
+// extraction, chunking, and embedding (mirroring crawlAndChunk() above for
+// website jobs).
+async function processKBFileJob(job: KBFileCrawlerJobMessage): Promise<void> {
+  // The claim's own conditional UpdateCommand already performs the
+  // 'queued' -> 'processing' transition atomically -- mirrors
+  // claimCrawlerJob/claimVoiceCrawlerJob's precedent, which never re-writes
+  // status again right after a successful claim either.
+  const claimed = await claimKBFileIndexingJob(job.botId, job.entryId, job.jobId)
+  if (!claimed) {
+    console.log(`KB file job ${job.jobId} already claimed by another invocation — skipping duplicate`)
+    return
+  }
+
+  console.log(
+    `Received KB file job for entry ${job.entryId} (bot ${job.botId}): fileType=${job.fileType}, key=${job.s3Key} — status now 'processing'`
+  )
+
+  await updateKBIndexingStatus(job.botId, job.entryId, {
+    indexingStatus: 'failed',
+    indexingError: 'File extraction not yet implemented — this module only proves the upload/queue/worker plumbing.',
+  })
+}
+
 export async function processCrawlerJob(job: CrawlerJobMessage): Promise<void> {
+  if (job.type === 'kb_file') {
+    await processKBFileJob(job)
+    return
+  }
+
   const isVoiceAgent = job.type === 'voice_agent'
 
   // Idempotency check — only one Lambda processes this job. SQS's at-least-once
