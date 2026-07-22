@@ -8,12 +8,14 @@ export interface VyostraLogoProps {
   size?: number;
   animate?: boolean;
   className?: string;
+  variant?: "gradient" | "white";
 }
 
 export function VyostraLogo({
   size = 36,
   animate = true,
   className,
+  variant = "gradient",
 }: VyostraLogoProps): JSX.Element {
   const lineRefs = useRef<(SVGLineElement | null)[]>([null, null, null, null, null]);
 
@@ -75,10 +77,13 @@ export function VyostraLogo({
       height={size}
       role="img"
       aria-label="Vyostra AI"
+      data-variant={variant}
       className={className}
       style={
         animate
-          ? { animation: "vyostra-logo-glow 3.2s ease-in-out infinite" }
+          ? {
+              animation: `${variant === "white" ? "vyostra-logo-glow-white" : "vyostra-logo-glow"} 3.2s ease-in-out infinite`,
+            }
           : undefined
       }
     >
@@ -96,7 +101,7 @@ export function VyostraLogo({
           x2={x}
           y1={VY1[i]}
           y2={VY2[i]}
-          stroke="url(#vyostraLogoGrad)"
+          stroke={variant === "white" ? "#ffffff" : "url(#vyostraLogoGrad)"}
           strokeWidth={7}
           strokeLinecap="round"
         />
@@ -106,10 +111,18 @@ export function VyostraLogo({
           0%, 100% { filter: drop-shadow(0 0 5px rgba(124,58,237,.28)); }
           50%      { filter: drop-shadow(0 0 18px rgba(168,85,247,.55)); }
         }
+        @keyframes vyostra-logo-glow-white {
+          0%, 100% { filter: drop-shadow(0 0 5px rgba(255,255,255,.22)); }
+          50%      { filter: drop-shadow(0 0 15px rgba(255,255,255,.5)); }
+        }
         @media (prefers-reduced-motion: reduce) {
-          svg[aria-label="Vyostra AI"] {
+          svg[aria-label="Vyostra AI"][data-variant="gradient"] {
             animation: none !important;
             filter: drop-shadow(0 0 8px rgba(124,58,237,.35));
+          }
+          svg[aria-label="Vyostra AI"][data-variant="white"] {
+            animation: none !important;
+            filter: drop-shadow(0 0 8px rgba(255,255,255,.35));
           }
         }
       `}</style>
