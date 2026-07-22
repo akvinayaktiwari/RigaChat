@@ -1,8 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { Spinner } from '../components/Spinner/Spinner'
-import styles from './AuthCallbackPage.module.css'
+import { LoadingScreen } from '../components/LoadingScreen'
 
 export default function AuthCallbackPage() {
   const { handleCallback } = useAuth()
@@ -32,10 +31,5 @@ export default function AuthCallbackPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return (
-    <div className={styles.page}>
-      <Spinner size="lg" />
-      <p>Signing you in...</p>
-    </div>
-  )
+  return <LoadingScreen status="Signing you in…" />
 }
