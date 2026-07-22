@@ -14,6 +14,7 @@ import {
   claimVoiceCrawlerJob,
   claimVoiceKBFileIndexingJob,
   getVoiceAgentById,
+  getVoiceKBEntry,
   updateVoiceAgent,
   updateVoiceIndexingJob,
   updateVoiceKBIndexingStatus,
@@ -312,10 +313,10 @@ async function processKBFileJob(job: KBFileCrawlerJobMessage): Promise<void> {
   }
 }
 
-// Stub only -- proves the route -> DynamoDB -> SQS -> worker -> status
-// plumbing, same as processKBFileJob()'s original pre-unpdf stub. Real
-// extraction (fetch -> extractText -> chunk/embed/upsert) is the next
-// module, once this shape is confirmed working end to end.
+// Replaces the earlier 'failed' stub that only proved the route -> DynamoDB
+// -> SQS -> worker -> status plumbing. Mirrors processKBFileJob() exactly
+// (same extractText(), same MIN_EXTRACTED_TEXT_LENGTH/CONTENT_PREVIEW_MAX_LENGTH,
+// same stage-prefixed error convention), against the voice_kb table instead.
 async function processVoiceKBFileJob(job: VoiceKBFileCrawlerJobMessage): Promise<void> {
   const claimed = await claimVoiceKBFileIndexingJob(job.agentId, job.entryId, job.jobId)
   if (!claimed) {
@@ -327,10 +328,60 @@ async function processVoiceKBFileJob(job: VoiceKBFileCrawlerJobMessage): Promise
     `Received voice KB file job for entry ${job.entryId} (agent ${job.agentId}): fileType=${job.fileType}, key=${job.s3Key} — status now 'processing'`
   )
 
-  await updateVoiceKBIndexingStatus(job.agentId, job.entryId, {
-    indexingStatus: 'failed',
-    indexingError: 'extraction not yet implemented',
-  })
+  try {
+    const entry = await getVoiceKBEntry(job.agentId, job.entryId)
+    if (!entry) {
+      throw new Error(`Voice KB entry ${job.entryId} no longer exists`)
+    }
+
+    let buffer: Buffer
+    try {
+      buffer = await getObjectAsBuffer(job.s3Key)
+    } catch (error) {
+      throw new Error(`fetch stage failed: ${error instanceof Error ? error.message : String(error)}`)
+    }
+
+    let extractedText: string
+    try {
+      extractedText = await extractText(buffer, job.fileType)
+    } catch (error) {
+      throw new Error(`extract stage failed: ${error instanceof Error ? error.message : String(error)}`)
+    }
+
+    const trimmed = extractedText.trim()
+    if (trimmed.length < MIN_EXTRACTED_TEXT_LENGTH) {
+      // Graceful failure path for scanned/image-only PDFs -- deliberately
+      // not OCR'd in this version. Not an exception (nothing actually
+      // failed), so this returns directly rather than falling into the
+      // catch block below.
+      await updateVoiceKBIndexingStatus(job.agentId, job.entryId, {
+        indexingStatus: 'failed',
+        indexingError: 'No readable text found in file — scanned/image-only PDFs are not supported in this version.',
+      })
+      return
+    }
+
+    try {
+      // Reuses the exact same chunk (chunkWithContext) -> embed
+      // (generateEmbeddingsBatch) -> upsert (upsertChunks) sequence the bot
+      // KB file pipeline and voice text-KB entries already use.
+      await indexKnowledgeBaseEntry(job.agentId, job.entryId, entry.title, trimmed)
+    } catch (error) {
+      throw new Error(`embed/upsert stage failed: ${error instanceof Error ? error.message : String(error)}`)
+    }
+
+    await updateVoiceKBIndexingStatus(job.agentId, job.entryId, {
+      indexingStatus: 'complete',
+      content: trimmed.slice(0, CONTENT_PREVIEW_MAX_LENGTH),
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error(`Voice KB file extraction failed for entry ${job.entryId} (agent ${job.agentId}):`, error)
+    await updateVoiceKBIndexingStatus(job.agentId, job.entryId, {
+      indexingStatus: 'failed',
+      indexingError: message,
+    })
+  }
 }
 
 export async function processCrawlerJob(job: CrawlerJobMessage): Promise<void> {
