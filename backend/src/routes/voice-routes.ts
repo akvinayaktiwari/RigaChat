@@ -12,11 +12,13 @@ import {
   getVoiceAgents,
   getVoiceAgentUsage,
   getVoiceKBEntries,
+  getVoiceKBUploadUrl,
   removeVoiceKBEntry,
   setupVoiceAgent,
   updateVoiceAgent,
   updateVoiceKBEntry,
 } from '../services/voice-service.js'
+import type { KBFileType, KBUploadUrlResult } from '../services/kb-service.js'
 import { retrieveContext } from '../services/rag-service.js'
 import { generateToken } from '../voice-relay/auth.js'
 import { checkEntitlement, EntitlementError, toEntitlementErrorResponse } from '../services/entitlement-service.js'
@@ -55,6 +57,14 @@ interface AddVoiceKBEntryBody {
 interface UpdateVoiceKBEntryBody {
   title?: string
   content?: string
+}
+
+const VOICE_KB_FILE_TYPES: KBFileType[] = ['pdf', 'docx', 'text']
+
+interface VoiceKBUploadUrlBody {
+  filename?: string
+  fileType?: string
+  fileSizeBytes?: number
 }
 
 function errorMessage(error: unknown): string {
@@ -385,6 +395,53 @@ voiceRoutes.get('/:id/kb', requireAuth, async (c) => {
   } catch (error) {
     if (isNotFoundError(error)) {
       return c.json<ApiResponse<null>>({ success: false, error: 'Voice agent not found' }, 404)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+voiceRoutes.post('/:id/kb/upload-url', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const agentId = c.req.param('id')
+  const body = await c.req.json<VoiceKBUploadUrlBody>()
+
+  if (!body.filename || !body.fileType || typeof body.fileSizeBytes !== 'number') {
+    return c.json<ApiResponse<null>>(
+      { success: false, error: 'filename, fileType, and fileSizeBytes are required' },
+      400
+    )
+  }
+
+  if (!VOICE_KB_FILE_TYPES.includes(body.fileType as KBFileType)) {
+    return c.json<ApiResponse<null>>(
+      { success: false, error: `fileType must be one of: ${VOICE_KB_FILE_TYPES.join(', ')}` },
+      400
+    )
+  }
+
+  // filename becomes the last segment of the S3 key
+  // ({clientId}/voice-agents/{agentId}/{entryId}/{filename}) -- reject '/'
+  // so a crafted filename can't inject extra path segments.
+  if (body.filename.includes('/')) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'filename must not contain "/"' }, 400)
+  }
+
+  try {
+    const result = await getVoiceKBUploadUrl({
+      agentId,
+      clientId,
+      filename: body.filename,
+      fileType: body.fileType as KBFileType,
+      fileSizeBytes: body.fileSizeBytes,
+    })
+    return c.json<ApiResponse<KBUploadUrlResult>>({ success: true, data: result }, 200)
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      return c.json<ApiResponse<null>>({ success: false, error: 'Voice agent not found' }, 404)
+    }
+    if (error instanceof EntitlementError) {
+      const { status, body: errBody } = toEntitlementErrorResponse(error)
+      return c.json(errBody, status)
     }
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }

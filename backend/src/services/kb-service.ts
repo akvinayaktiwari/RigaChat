@@ -23,7 +23,7 @@ interface CreateKBEntryInput {
 
 export type KBFileType = 'pdf' | 'docx' | 'text'
 
-const KB_FILE_CONTENT_TYPES: Record<KBFileType, string> = {
+export const KB_FILE_CONTENT_TYPES: Record<KBFileType, string> = {
   pdf: 'application/pdf',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   text: 'text/plain',

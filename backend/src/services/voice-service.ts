@@ -18,6 +18,9 @@ import { enqueueCrawlerJob } from '../lib/sqs.js'
 import { indexKnowledgeBaseEntry } from './rag-service.js'
 import { deleteChunksByEntryId } from '../repositories/vector-repository.js'
 import { checkEntitlement } from './entitlement-service.js'
+import { generatePresignedUploadUrl } from '../lib/s3.js'
+import { KB_FILE_CONTENT_TYPES } from './kb-service.js'
+import type { KBFileType, KBUploadUrlResult } from './kb-service.js'
 import type { CreateVoiceAgentInput, VoiceAgent, VoiceKnowledgeBaseEntry, VoiceUsageSummary } from '../types/index.js'
 
 async function getOwnedVoiceAgent(agentId: string, clientId: string): Promise<VoiceAgent> {
@@ -160,6 +163,33 @@ export async function getVoiceAgentUsage(agentId: string, clientId: string): Pro
     totalTokens: sortedByRecent.reduce((sum, log) => sum + log.totalTokens, 0),
     recentCalls: sortedByRecent.slice(0, 10),
   }
+}
+
+interface GetVoiceKBUploadUrlInput {
+  agentId: string
+  clientId: string
+  filename: string
+  fileType: KBFileType
+  fileSizeBytes: number
+}
+
+// Presigned PUT URL only -- no DynamoDB write happens here, mirrors
+// kb-service.ts's getKBUploadUrl(). Confirm-upload (the DB row + indexing
+// enqueue, against voice_kb) is a separate module, once the file actually
+// lands in S3.
+export async function getVoiceKBUploadUrl(input: GetVoiceKBUploadUrlInput): Promise<KBUploadUrlResult> {
+  await getOwnedVoiceAgent(input.agentId, input.clientId)
+  await checkEntitlement(input.clientId, 'kbFileSize', input.fileSizeBytes)
+
+  // Key prefix carries an explicit 'voice-agents' segment so it can't be
+  // mistaken for a bot KB file key ({clientId}/{botId}/{entryId}/{filename})
+  // even though both live in the same S3_BUCKET_KB_FILES bucket.
+  const entryId = uuidv4()
+  const key = `${input.clientId}/voice-agents/${input.agentId}/${entryId}/${input.filename}`
+
+  const uploadUrl = await generatePresignedUploadUrl(key, KB_FILE_CONTENT_TYPES[input.fileType])
+
+  return { uploadUrl, key, entryId }
 }
 
 export async function addVoiceKBEntry(
