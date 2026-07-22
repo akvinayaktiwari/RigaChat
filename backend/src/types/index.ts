@@ -197,6 +197,20 @@ export interface WhatsAppConnection {
   connectedAt: string
 }
 
+export interface ForgotPasswordInput {
+  email: string
+}
+
+export interface ForgotPasswordResponse {
+  message: string
+}
+
+export interface ConfirmForgotPasswordInput {
+  email: string
+  code: string
+  newPassword: string
+}
+
 export interface ClientRecord {
   clientId: string
   email: string

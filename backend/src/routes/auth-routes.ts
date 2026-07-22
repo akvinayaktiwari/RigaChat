@@ -2,9 +2,17 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { getConnInfo as getLambdaConnInfo } from 'hono/aws-lambda'
 import { getConnInfo as getNodeConnInfo } from '@hono/node-server/conninfo'
-import { confirmSignup, quickSignup, QuickSignupError } from '../services/auth-service.js'
-import type { QuickSignupErrorCode, QuickSignupResult } from '../services/auth-service.js'
-import type { ApiResponse } from '../types/index.js'
+import {
+  confirmForgotPassword,
+  ConfirmForgotPasswordError,
+  confirmSignup,
+  forgotPassword,
+  ForgotPasswordError,
+  quickSignup,
+  QuickSignupError,
+} from '../services/auth-service.js'
+import type { ConfirmForgotPasswordErrorCode, QuickSignupErrorCode, QuickSignupResult } from '../services/auth-service.js'
+import type { ApiResponse, ConfirmForgotPasswordInput, ForgotPasswordInput, ForgotPasswordResponse } from '../types/index.js'
 
 export const authRoutes = new Hono()
 
@@ -19,6 +27,10 @@ interface QuickSignupBody {
 
 interface QuickSignupErrorResponse extends ApiResponse<null> {
   code: QuickSignupErrorCode
+}
+
+interface ConfirmForgotPasswordErrorResponse extends ApiResponse<null> {
+  code: ConfirmForgotPasswordErrorCode
 }
 
 function errorMessage(error: unknown): string {
@@ -45,6 +57,17 @@ function quickSignupErrorStatus(code: QuickSignupErrorCode): 400 | 409 | 429 | 5
       return 409
     case 'RATE_LIMITED':
       return 429
+    case 'INVALID_PASSWORD':
+      return 400
+    case 'PROVIDER_ERROR':
+      return 500
+  }
+}
+
+function confirmForgotPasswordErrorStatus(code: ConfirmForgotPasswordErrorCode): 400 | 500 {
+  switch (code) {
+    case 'INVALID_CODE':
+    case 'CODE_EXPIRED':
     case 'INVALID_PASSWORD':
       return 400
     case 'PROVIDER_ERROR':
@@ -84,6 +107,46 @@ authRoutes.post('/quick-signup', async (c) => {
       return c.json<QuickSignupErrorResponse>(
         { success: false, error: error.message, code: error.code },
         quickSignupErrorStatus(error.code)
+      )
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+authRoutes.post('/forgot-password', async (c) => {
+  const body = await c.req.json<ForgotPasswordInput>()
+
+  if (!body.email) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'email is required' }, 400)
+  }
+
+  try {
+    await forgotPassword(body.email)
+  } catch (error) {
+    if (error instanceof ForgotPasswordError) {
+      return c.json<ForgotPasswordResponse>({ message: error.message }, 429)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+
+  return c.json<ForgotPasswordResponse>({ message: 'If that email is registered, a code has been sent.' }, 200)
+})
+
+authRoutes.post('/confirm-forgot-password', async (c) => {
+  const body = await c.req.json<ConfirmForgotPasswordInput>()
+
+  if (!body.email || !body.code || !body.newPassword) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'email, code, and newPassword are required' }, 400)
+  }
+
+  try {
+    await confirmForgotPassword(body.email, body.code, body.newPassword)
+    return c.json<ApiResponse<null>>({ success: true }, 200)
+  } catch (error) {
+    if (error instanceof ConfirmForgotPasswordError) {
+      return c.json<ConfirmForgotPasswordErrorResponse>(
+        { success: false, error: error.message, code: error.code },
+        confirmForgotPasswordErrorStatus(error.code)
       )
     }
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
