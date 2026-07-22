@@ -211,6 +211,19 @@ export interface ConfirmForgotPasswordInput {
   newPassword: string
 }
 
+export interface ConfirmSignupInput {
+  email: string
+  code: string
+}
+
+export interface ResendConfirmationCodeInput {
+  email: string
+}
+
+export interface ResendConfirmationCodeResponse {
+  message: string
+}
+
 export interface ClientRecord {
   clientId: string
   email: string

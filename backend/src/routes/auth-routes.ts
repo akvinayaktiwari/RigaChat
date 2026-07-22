@@ -5,20 +5,32 @@ import { getConnInfo as getNodeConnInfo } from '@hono/node-server/conninfo'
 import {
   confirmForgotPassword,
   ConfirmForgotPasswordError,
-  confirmSignup,
+  confirmSignupWithCode,
+  ConfirmSignupError,
   forgotPassword,
   ForgotPasswordError,
   quickSignup,
   QuickSignupError,
+  resendConfirmationCode,
+  ResendConfirmationCodeError,
 } from '../services/auth-service.js'
-import type { ConfirmForgotPasswordErrorCode, QuickSignupErrorCode, QuickSignupResult } from '../services/auth-service.js'
-import type { ApiResponse, ConfirmForgotPasswordInput, ForgotPasswordInput, ForgotPasswordResponse } from '../types/index.js'
+import type {
+  ConfirmForgotPasswordErrorCode,
+  ConfirmSignupErrorCode,
+  QuickSignupErrorCode,
+  QuickSignupResult,
+} from '../services/auth-service.js'
+import type {
+  ApiResponse,
+  ConfirmForgotPasswordInput,
+  ConfirmSignupInput,
+  ForgotPasswordInput,
+  ForgotPasswordResponse,
+  ResendConfirmationCodeInput,
+  ResendConfirmationCodeResponse,
+} from '../types/index.js'
 
 export const authRoutes = new Hono()
-
-interface ConfirmSignupBody {
-  username?: string
-}
 
 interface QuickSignupBody {
   email?: string
@@ -31,6 +43,10 @@ interface QuickSignupErrorResponse extends ApiResponse<null> {
 
 interface ConfirmForgotPasswordErrorResponse extends ApiResponse<null> {
   code: ConfirmForgotPasswordErrorCode
+}
+
+interface ConfirmSignupErrorResponse extends ApiResponse<null> {
+  code: ConfirmSignupErrorCode
 }
 
 function errorMessage(error: unknown): string {
@@ -75,19 +91,58 @@ function confirmForgotPasswordErrorStatus(code: ConfirmForgotPasswordErrorCode):
   }
 }
 
-authRoutes.post('/confirm', async (c) => {
-  const body = await c.req.json<ConfirmSignupBody>()
+function confirmSignupErrorStatus(code: ConfirmSignupErrorCode): 400 | 500 {
+  switch (code) {
+    case 'INVALID_CODE':
+    case 'CODE_EXPIRED':
+    case 'ALREADY_CONFIRMED':
+      return 400
+    case 'PROVIDER_ERROR':
+      return 500
+  }
+}
 
-  if (!body.username) {
-    return c.json<ApiResponse<null>>({ success: false, error: 'Username required' }, 400)
+authRoutes.post('/confirm-signup', async (c) => {
+  const body = await c.req.json<ConfirmSignupInput>()
+
+  if (!body.email || !body.code) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'email and code are required' }, 400)
   }
 
   try {
-    await confirmSignup(body.username)
+    await confirmSignupWithCode(body.email, body.code)
     return c.json<ApiResponse<null>>({ success: true }, 200)
   } catch (error) {
+    if (error instanceof ConfirmSignupError) {
+      return c.json<ConfirmSignupErrorResponse>(
+        { success: false, error: error.message, code: error.code },
+        confirmSignupErrorStatus(error.code)
+      )
+    }
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }
+})
+
+authRoutes.post('/resend-confirmation-code', async (c) => {
+  const body = await c.req.json<ResendConfirmationCodeInput>()
+
+  if (!body.email) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'email is required' }, 400)
+  }
+
+  try {
+    await resendConfirmationCode(body.email)
+  } catch (error) {
+    if (error instanceof ResendConfirmationCodeError) {
+      return c.json<ResendConfirmationCodeResponse>({ message: error.message }, 429)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+
+  return c.json<ResendConfirmationCodeResponse>(
+    { message: 'If that email is registered and unverified, a new code has been sent.' },
+    200
+  )
 })
 
 authRoutes.post('/quick-signup', async (c) => {

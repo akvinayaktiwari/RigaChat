@@ -2,8 +2,10 @@ import {
   AdminConfirmSignUpCommand,
   AdminGetUserCommand,
   ConfirmForgotPasswordCommand,
+  ConfirmSignUpCommand,
   ForgotPasswordCommand,
   InitiateAuthCommand,
+  ResendConfirmationCodeCommand,
   SignUpCommand,
 } from '@aws-sdk/client-cognito-identity-provider'
 import { cognitoAdminClient } from '../lib/cognito-admin.js'
@@ -42,12 +44,16 @@ export class QuickSignupError extends Error {
   }
 }
 
-// Cognito auto-confirmation for the "skip email verification" signup flow.
+// Cognito auto-confirmation used only by quickSignup()'s backend-orchestrated
+// checkout flow below, which bypasses real email verification by design (it
+// needs to hand back a ready-to-use session in one call). The regular signup
+// flow now goes through confirmSignupWithCode()/ConfirmSignUpCommand instead
+// -- see the "signup email verification (OTP)" module.
 // NotAuthorizedException covers "already confirmed" (harmless — the user can
 // already sign in) and InvalidParameterException covers "no such user" (the
 // signup itself failed upstream, nothing to confirm). Both are treated as a
-// no-op success so the frontend's post-signup signIn() call isn't blocked by
-// a confirmation error that doesn't actually indicate a problem.
+// no-op success so quickSignup()'s immediate sign-in isn't blocked by a
+// confirmation error that doesn't actually indicate a problem.
 export async function confirmSignup(username: string): Promise<void> {
   try {
     await cognitoAdminClient.send(
@@ -245,5 +251,78 @@ export async function confirmForgotPassword(email: string, code: string, newPass
     )
   } catch (err) {
     throw mapConfirmForgotPasswordError(err)
+  }
+}
+
+export type ConfirmSignupErrorCode = 'INVALID_CODE' | 'CODE_EXPIRED' | 'ALREADY_CONFIRMED' | 'PROVIDER_ERROR'
+
+export class ConfirmSignupError extends Error {
+  code: ConfirmSignupErrorCode
+
+  constructor(code: ConfirmSignupErrorCode, message: string) {
+    super(message)
+    this.name = 'ConfirmSignupError'
+    this.code = code
+  }
+}
+
+function mapConfirmSignupError(err: unknown): ConfirmSignupError {
+  const error = err as CognitoServiceError
+  switch (error.name) {
+    case 'CodeMismatchException':
+      return new ConfirmSignupError('INVALID_CODE', 'Invalid code')
+    case 'ExpiredCodeException':
+      return new ConfirmSignupError('CODE_EXPIRED', 'Code expired, request a new one')
+    case 'NotAuthorizedException':
+      return new ConfirmSignupError('ALREADY_CONFIRMED', 'This account is already verified. Please sign in.')
+    default:
+      return new ConfirmSignupError('PROVIDER_ERROR', `Failed to confirm signup: ${error.message ?? String(err)}`)
+  }
+}
+
+// Real, code-checked confirmation (ConfirmSignUpCommand) for the regular
+// signup flow -- unlike confirmSignup() above, this actually validates the
+// code Cognito emailed the user rather than force-confirming as an admin.
+export async function confirmSignupWithCode(email: string, code: string): Promise<void> {
+  try {
+    await cognitoAdminClient.send(
+      new ConfirmSignUpCommand({
+        ClientId: clientId,
+        Username: email,
+        ConfirmationCode: code,
+      })
+    )
+  } catch (err) {
+    throw mapConfirmSignupError(err)
+  }
+}
+
+export class ResendConfirmationCodeError extends Error {
+  code: 'RATE_LIMITED'
+
+  constructor(message: string) {
+    super(message)
+    this.name = 'ResendConfirmationCodeError'
+    this.code = 'RATE_LIMITED'
+  }
+}
+
+// Enumeration-safe, mirrors forgotPassword() above: UserNotFoundException is
+// swallowed so the caller sees the same outcome whether or not the email has
+// an account. LimitExceededException is a real user-facing state (not an
+// enumeration leak) so it's re-thrown for the route to map to 429. Anything
+// else -- including "already confirmed" (InvalidParameterException), which
+// requires already knowing the account exists to observe -- propagates as a
+// genuine provider error.
+export async function resendConfirmationCode(email: string): Promise<void> {
+  try {
+    await cognitoAdminClient.send(new ResendConfirmationCodeCommand({ ClientId: clientId, Username: email }))
+  } catch (err) {
+    const error = err as CognitoServiceError
+    if (error.name === 'UserNotFoundException') return
+    if (error.name === 'LimitExceededException') {
+      throw new ResendConfirmationCodeError('Too many requests. Please wait a moment and try again.')
+    }
+    throw new Error(`Failed to resend confirmation code: ${error.message ?? String(err)}`)
   }
 }
