@@ -8,9 +8,10 @@ import {
   updateKBEntry as updateKBEntryRepo,
 } from '../repositories/kb-repository.js'
 import { indexKnowledgeBaseEntry } from './rag-service.js'
+import { deleteChunksByEntryId } from '../repositories/vector-repository.js'
 import { checkEntitlement } from './entitlement-service.js'
 import { getBotConfig } from './bot-service.js'
-import { generatePresignedUploadUrl } from '../lib/s3.js'
+import { deleteObject, generatePresignedUploadUrl } from '../lib/s3.js'
 import { enqueueCrawlerJob } from '../lib/sqs.js'
 import type { KnowledgeBaseEntry } from '../types/index.js'
 
@@ -195,6 +196,31 @@ export async function removeKBEntry(botId: string, entryId: string, clientId: st
   if (!entry || entry.clientId !== clientId) {
     throw new Error('KB entry not found')
   }
+
+  // Deleting mid-job risks a zombie row: claimKBFileIndexingJob()'s
+  // UpdateCommand has no ConditionExpression requiring the item to still
+  // exist, so the worker's later status write would resurrect a
+  // partial row (indexingStatus/content/indexingError only, missing
+  // title/clientId/everything else) after this delete completes.
+  if (entry.indexingStatus === 'processing') {
+    throw new Error('KB entry is still being processed')
+  }
+
+  if (entry.sourceFileKey) {
+    try {
+      await deleteObject(entry.sourceFileKey)
+    } catch (error) {
+      // Log-don't-fail: an orphaned S3 object is a storage-cost nuisance,
+      // not a correctness problem the way stale Pinecone vectors are (those
+      // stay queryable and would keep surfacing in RAG results).
+      console.error(`Failed to delete S3 object ${entry.sourceFileKey} for KB entry ${entryId}:`, error)
+    }
+  }
+
+  // Hard-fail on this one: stale vectors remain queryable in Pinecone and
+  // would keep surfacing in RAG results for a bot whose KB entry no longer
+  // exists -- a correctness problem, unlike the S3 cleanup above.
+  await deleteChunksByEntryId(botId, entryId)
 
   try {
     await deleteKBEntry(botId, entryId)

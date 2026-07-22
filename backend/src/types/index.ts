@@ -140,9 +140,23 @@ export interface VoiceKnowledgeBaseEntry {
   agentId: string
   clientId: string
   title: string
+  // Required even for file-upload rows, which write '' here until a future
+  // module extracts real text -- see indexingStatus below for the source of
+  // truth on whether content is actually populated yet. Mirrors
+  // KnowledgeBaseEntry. Fields below are unused by any code path on main
+  // today (file upload for voice agents isn't wired up here yet) -- added
+  // now, additively, so fix/kb-delete-cleanup's guard/S3-cleanup logic
+  // type-checks and is ready the moment that upload path lands.
   content: string
   createdAt: string
   updatedAt: string
+
+  sourceFileKey?: string
+  fileType?: 'pdf' | 'docx' | 'text'
+  fileSizeBytes?: number
+  indexingStatus?: 'queued' | 'processing' | 'complete' | 'failed'
+  indexingJobId?: string
+  indexingError?: string
 }
 
 export interface Chunk {

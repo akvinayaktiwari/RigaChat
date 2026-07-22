@@ -426,6 +426,9 @@ voiceRoutes.delete('/:id/kb/:entryId', requireAuth, async (c) => {
     if (isNotFoundError(error)) {
       return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 404)
     }
+    if (error instanceof Error && error.message === 'Knowledge base entry is still being processed') {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 409)
+    }
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }
 })

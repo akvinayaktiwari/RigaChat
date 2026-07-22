@@ -226,6 +226,9 @@ kbRoutes.delete('/:botId/:entryId', requireAuth, async (c) => {
     if (error instanceof Error && error.message === 'KB entry not found') {
       return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
     }
+    if (error instanceof Error && error.message === 'KB entry is still being processed') {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 409)
+    }
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }
 })
