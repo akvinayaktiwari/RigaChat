@@ -3,6 +3,7 @@ import type {
   BotConfig,
   ClientRecord,
   ConfirmKBUploadInput,
+  ConfirmVoiceKBUploadInput,
   ConnectWhatsAppInput,
   CRMConnection,
   CreateBotInput,
@@ -363,4 +364,19 @@ export function updateVoiceKBEntry(
 
 export function removeVoiceKBEntry(agentId: string, entryId: string): Promise<ApiResponse<null>> {
   return apiClient<null>(`/api/voice-agents/${agentId}/kb/${entryId}`, 'DELETE')
+}
+
+export interface GetVoiceKBUploadUrlInput {
+  agentId: string
+  filename: string
+  fileType: KBFileType
+  fileSizeBytes: number
+}
+
+export function getVoiceKBUploadUrl(data: GetVoiceKBUploadUrlInput): Promise<ApiResponse<KBUploadUrlResult>> {
+  return apiClient<KBUploadUrlResult>(`/api/voice-agents/${data.agentId}/kb/upload-url`, 'POST', data)
+}
+
+export function confirmVoiceKBUpload(data: ConfirmVoiceKBUploadInput): Promise<ApiResponse<VoiceKnowledgeBaseEntry>> {
+  return apiClient<VoiceKnowledgeBaseEntry>(`/api/voice-agents/${data.agentId}/kb/confirm-upload`, 'POST', data)
 }

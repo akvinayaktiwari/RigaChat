@@ -93,6 +93,15 @@ export interface ConfirmKBUploadInput {
   s3Key: string
 }
 
+export interface ConfirmVoiceKBUploadInput {
+  agentId: string
+  entryId: string
+  filename: string
+  fileType: KBFileType
+  fileSizeBytes: number
+  s3Key: string
+}
+
 export interface Chunk {
   chunkId: string
   botId: string
@@ -343,6 +352,10 @@ export interface VoiceUsageSummary {
   recentCalls: VoiceCallLog[]
 }
 
+// indexingStatus is undefined for text-only entries (added via the plain
+// title+content form) — only file-upload entries carry these fields, mirrors
+// KnowledgeBaseEntry above and backend/src/types/index.ts's
+// VoiceKnowledgeBaseEntry exactly.
 export interface VoiceKnowledgeBaseEntry {
   entryId: string
   agentId: string
@@ -351,6 +364,12 @@ export interface VoiceKnowledgeBaseEntry {
   content: string
   createdAt: string
   updatedAt: string
+  sourceFileKey?: string
+  fileType?: KBFileType
+  fileSizeBytes?: number
+  indexingStatus?: 'queued' | 'processing' | 'complete' | 'failed'
+  indexingJobId?: string
+  indexingError?: string
 }
 
 export interface VoiceAgentPublicConfig {
