@@ -140,9 +140,10 @@ export interface VoiceKnowledgeBaseEntry {
   agentId: string
   clientId: string
   title: string
-  // Required even for file-upload rows, which write '' here until extraction
-  // populates it -- see indexingStatus below for the source of truth on
-  // whether content is actually populated yet. Mirrors KnowledgeBaseEntry.
+  // Required even for file-upload rows, which write '' here until
+  // extraction populates it -- see indexingStatus below for the source of
+  // truth on whether content is actually populated yet. Mirrors
+  // KnowledgeBaseEntry.
   content: string
   createdAt: string
   updatedAt: string

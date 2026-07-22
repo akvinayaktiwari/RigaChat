@@ -18,7 +18,7 @@ import { enqueueCrawlerJob } from '../lib/sqs.js'
 import { indexKnowledgeBaseEntry } from './rag-service.js'
 import { deleteChunksByEntryId } from '../repositories/vector-repository.js'
 import { checkEntitlement } from './entitlement-service.js'
-import { generatePresignedUploadUrl } from '../lib/s3.js'
+import { generatePresignedUploadUrl, deleteObject } from '../lib/s3.js'
 import { deriveTitleFromFilename, KB_FILE_CONTENT_TYPES } from './kb-service.js'
 import type { KBFileType, KBUploadUrlResult } from './kb-service.js'
 import type { CreateVoiceAgentInput, VoiceAgent, VoiceKnowledgeBaseEntry, VoiceUsageSummary } from '../types/index.js'
@@ -300,6 +300,23 @@ export async function removeVoiceKBEntry(agentId: string, clientId: string, entr
   const entry = await getVoiceKBEntry(agentId, entryId)
   if (!entry) {
     throw new Error('Knowledge base entry not found')
+  }
+
+  // Same zombie-row risk as kb-service.ts's removeKBEntry() -- no file
+  // upload path writes indexingStatus on main yet, so this guard is
+  // unreachable today and becomes live once that path lands.
+  if (entry.indexingStatus === 'processing') {
+    throw new Error('Knowledge base entry is still being processed')
+  }
+
+  if (entry.sourceFileKey) {
+    try {
+      await deleteObject(entry.sourceFileKey)
+    } catch (error) {
+      // Log-don't-fail, same reasoning as the bot path: an orphaned S3
+      // object is a storage-cost nuisance, not a correctness problem.
+      console.error(`Failed to delete S3 object ${entry.sourceFileKey} for voice KB entry ${entryId}:`, error)
+    }
   }
 
   await deleteChunksByEntryId(agentId, entryId)
