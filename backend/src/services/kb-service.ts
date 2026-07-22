@@ -80,7 +80,7 @@ interface ConfirmKBUploadInput {
 // going with the simplest, most predictable rule (strip the extension) since
 // anything fancier (hyphen/underscore-to-space, title-casing) risks mangling
 // filenames it can't safely guess the intent of.
-function deriveTitleFromFilename(filename: string): string {
+export function deriveTitleFromFilename(filename: string): string {
   const lastDot = filename.lastIndexOf('.')
   return lastDot > 0 ? filename.slice(0, lastDot) : filename
 }

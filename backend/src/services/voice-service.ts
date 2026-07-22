@@ -19,7 +19,7 @@ import { indexKnowledgeBaseEntry } from './rag-service.js'
 import { deleteChunksByEntryId } from '../repositories/vector-repository.js'
 import { checkEntitlement } from './entitlement-service.js'
 import { generatePresignedUploadUrl } from '../lib/s3.js'
-import { KB_FILE_CONTENT_TYPES } from './kb-service.js'
+import { deriveTitleFromFilename, KB_FILE_CONTENT_TYPES } from './kb-service.js'
 import type { KBFileType, KBUploadUrlResult } from './kb-service.js'
 import type { CreateVoiceAgentInput, VoiceAgent, VoiceKnowledgeBaseEntry, VoiceUsageSummary } from '../types/index.js'
 
@@ -190,6 +190,66 @@ export async function getVoiceKBUploadUrl(input: GetVoiceKBUploadUrlInput): Prom
   const uploadUrl = await generatePresignedUploadUrl(key, KB_FILE_CONTENT_TYPES[input.fileType])
 
   return { uploadUrl, key, entryId }
+}
+
+interface ConfirmVoiceKBUploadInput {
+  agentId: string
+  clientId: string
+  entryId: string
+  filename: string
+  fileType: KBFileType
+  fileSizeBytes: number
+  s3Key: string
+}
+
+// Only creates the DynamoDB row and enqueues the indexing job -- no
+// extraction happens here. See crawler-worker-service.ts's
+// processVoiceKBFileJob() (stub) for the consumer side. createVoiceKBEntry()
+// is reused as-is: unlike the bot table's createKBEntry(), it never mints
+// its own entryId, so it already accepts the fully-formed entry built below.
+export async function confirmVoiceKBUpload(input: ConfirmVoiceKBUploadInput): Promise<VoiceKnowledgeBaseEntry> {
+  await getOwnedVoiceAgent(input.agentId, input.clientId)
+
+  const expectedKey = `${input.clientId}/voice-agents/${input.agentId}/${input.entryId}/${input.filename}`
+  if (input.s3Key !== expectedKey) {
+    throw new Error('s3Key does not match expected upload location')
+  }
+
+  const jobId = uuidv4()
+  const now = new Date().toISOString()
+
+  const entry: VoiceKnowledgeBaseEntry = {
+    entryId: input.entryId,
+    agentId: input.agentId,
+    clientId: input.clientId,
+    title: deriveTitleFromFilename(input.filename),
+    content: '',
+    createdAt: now,
+    updatedAt: now,
+    sourceFileKey: input.s3Key,
+    fileType: input.fileType,
+    fileSizeBytes: input.fileSizeBytes,
+    indexingStatus: 'queued',
+    indexingJobId: jobId,
+  }
+
+  await createVoiceKBEntry(entry)
+
+  // If this throws, the entry is left stuck at 'queued' -- the same
+  // pre-existing gap already documented for the bot KB file pipeline (no
+  // reaper exists for a DB row written just before its SQS enqueue fails).
+  // Not new here, not fixed here.
+  await enqueueCrawlerJob({
+    jobId,
+    type: 'voice_kb_file',
+    agentId: input.agentId,
+    clientId: input.clientId,
+    entryId: input.entryId,
+    s3Key: input.s3Key,
+    fileType: input.fileType,
+  })
+
+  return entry
 }
 
 export async function addVoiceKBEntry(

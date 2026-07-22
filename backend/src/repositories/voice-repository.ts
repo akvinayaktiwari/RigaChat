@@ -331,6 +331,70 @@ export async function updateVoiceKBEntry(
   }
 }
 
+// Atomic claim to guard against SQS at-least-once delivery causing two
+// concurrent Lambda invocations both processing the same voice_kb_file job.
+// Mirrors kb-repository.ts's claimKBFileIndexingJob, but against the
+// voice_kb table and its agentId partition key -- kept as a full parallel
+// rather than a generalized table-parameter function, matching how
+// claimVoiceCrawlerJob above already parallels claimCrawlerJob instead of
+// sharing one generic implementation.
+export async function claimVoiceKBFileIndexingJob(agentId: string, entryId: string, jobId: string): Promise<boolean> {
+  try {
+    await dynamoClient.send(
+      new UpdateCommand({
+        TableName: getVoiceKBTableName(),
+        Key: { agentId, entryId },
+        UpdateExpression: 'SET indexingStatus = :processing',
+        ConditionExpression: 'indexingJobId = :jobId AND indexingStatus = :queued',
+        ExpressionAttributeValues: {
+          ':processing': 'processing',
+          ':queued': 'queued',
+          ':jobId': jobId,
+        },
+      })
+    )
+    return true
+  } catch (error) {
+    if (error instanceof Error && error.name === 'ConditionalCheckFailedException') {
+      return false
+    }
+    console.error(`Failed to claim voice KB file indexing job ${jobId} for entry ${entryId}:`, error)
+    return false
+  }
+}
+
+export async function updateVoiceKBIndexingStatus(
+  agentId: string,
+  entryId: string,
+  updates: Partial<Pick<VoiceKnowledgeBaseEntry, 'indexingStatus' | 'indexingError' | 'content'>>
+): Promise<void> {
+  const updateExpressionParts: string[] = []
+  const expressionAttributeNames: Record<string, string> = {}
+  const expressionAttributeValues: Record<string, unknown> = {}
+
+  for (const [key, value] of Object.entries(updates)) {
+    updateExpressionParts.push(`#${key} = :${key}`)
+    expressionAttributeNames[`#${key}`] = key
+    expressionAttributeValues[`:${key}`] = value
+  }
+
+  try {
+    await dynamoClient.send(
+      new UpdateCommand({
+        TableName: getVoiceKBTableName(),
+        Key: { agentId, entryId },
+        UpdateExpression: `SET ${updateExpressionParts.join(', ')}`,
+        ExpressionAttributeNames: expressionAttributeNames,
+        ExpressionAttributeValues: expressionAttributeValues,
+      })
+    )
+  } catch (error) {
+    throw new Error(
+      `Failed to update indexing status for voice KB entry ${entryId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
 export async function deleteVoiceKBEntry(agentId: string, entryId: string): Promise<void> {
   try {
     await dynamoClient.send(

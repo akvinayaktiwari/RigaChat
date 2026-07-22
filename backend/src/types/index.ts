@@ -140,9 +140,21 @@ export interface VoiceKnowledgeBaseEntry {
   agentId: string
   clientId: string
   title: string
+  // Required even for file-upload rows, which write '' here until extraction
+  // populates it -- see indexingStatus below for the source of truth on
+  // whether content is actually populated yet. Mirrors KnowledgeBaseEntry.
   content: string
   createdAt: string
   updatedAt: string
+
+  // File-upload path only (see voice-service.ts's confirmVoiceKBUpload()) --
+  // absent on rows created via the text-entry addVoiceKBEntry() path.
+  sourceFileKey?: string
+  fileType?: 'pdf' | 'docx' | 'text'
+  fileSizeBytes?: number
+  indexingStatus?: 'queued' | 'processing' | 'complete' | 'failed'
+  indexingJobId?: string
+  indexingError?: string
 }
 
 export interface Chunk {

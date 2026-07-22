@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import { requireAuth } from '../lib/cognito.js'
 import {
   addVoiceKBEntry,
+  confirmVoiceKBUpload,
   createVoiceAgent,
   deleteVoiceAgent,
   getVoiceAgentById,
@@ -65,6 +66,14 @@ interface VoiceKBUploadUrlBody {
   filename?: string
   fileType?: string
   fileSizeBytes?: number
+}
+
+interface VoiceKBConfirmUploadBody {
+  entryId?: string
+  filename?: string
+  fileType?: string
+  fileSizeBytes?: number
+  s3Key?: string
 }
 
 function errorMessage(error: unknown): string {
@@ -442,6 +451,53 @@ voiceRoutes.post('/:id/kb/upload-url', requireAuth, async (c) => {
     if (error instanceof EntitlementError) {
       const { status, body: errBody } = toEntitlementErrorResponse(error)
       return c.json(errBody, status)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+voiceRoutes.post('/:id/kb/confirm-upload', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const agentId = c.req.param('id')
+  const body = await c.req.json<VoiceKBConfirmUploadBody>()
+
+  if (
+    !body.entryId ||
+    !body.filename ||
+    !body.fileType ||
+    typeof body.fileSizeBytes !== 'number' ||
+    !body.s3Key
+  ) {
+    return c.json<ApiResponse<null>>(
+      { success: false, error: 'entryId, filename, fileType, fileSizeBytes, and s3Key are required' },
+      400
+    )
+  }
+
+  if (!VOICE_KB_FILE_TYPES.includes(body.fileType as KBFileType)) {
+    return c.json<ApiResponse<null>>(
+      { success: false, error: `fileType must be one of: ${VOICE_KB_FILE_TYPES.join(', ')}` },
+      400
+    )
+  }
+
+  try {
+    const entry = await confirmVoiceKBUpload({
+      agentId,
+      clientId,
+      entryId: body.entryId,
+      filename: body.filename,
+      fileType: body.fileType as KBFileType,
+      fileSizeBytes: body.fileSizeBytes,
+      s3Key: body.s3Key,
+    })
+    return c.json<ApiResponse<VoiceKnowledgeBaseEntry>>({ success: true, data: entry }, 201)
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      return c.json<ApiResponse<null>>({ success: false, error: 'Voice agent not found' }, 404)
+    }
+    if (error instanceof Error && error.message === 's3Key does not match expected upload location') {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 400)
     }
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }

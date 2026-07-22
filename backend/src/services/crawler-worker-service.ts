@@ -12,14 +12,21 @@ import {
 } from '../repositories/bot-repository.js'
 import {
   claimVoiceCrawlerJob,
+  claimVoiceKBFileIndexingJob,
   getVoiceAgentById,
   updateVoiceAgent,
   updateVoiceIndexingJob,
+  updateVoiceKBIndexingStatus,
 } from '../repositories/voice-repository.js'
 import { claimKBFileIndexingJob, getKBEntryById, updateKBIndexingStatus } from '../repositories/kb-repository.js'
 import { getObjectAsBuffer } from '../lib/s3.js'
 import { generateAndPrewarmSuggestions } from './suggestion-service.js'
-import type { CrawlerJobMessage, KBFileCrawlerJobMessage, WebsiteCrawlerJobMessage } from '../lib/sqs.js'
+import type {
+  CrawlerJobMessage,
+  KBFileCrawlerJobMessage,
+  VoiceKBFileCrawlerJobMessage,
+  WebsiteCrawlerJobMessage,
+} from '../lib/sqs.js'
 import type { KBFileType } from './kb-service.js'
 import type { Chunk, IndexingJob } from '../types/index.js'
 
@@ -305,9 +312,35 @@ async function processKBFileJob(job: KBFileCrawlerJobMessage): Promise<void> {
   }
 }
 
+// Stub only -- proves the route -> DynamoDB -> SQS -> worker -> status
+// plumbing, same as processKBFileJob()'s original pre-unpdf stub. Real
+// extraction (fetch -> extractText -> chunk/embed/upsert) is the next
+// module, once this shape is confirmed working end to end.
+async function processVoiceKBFileJob(job: VoiceKBFileCrawlerJobMessage): Promise<void> {
+  const claimed = await claimVoiceKBFileIndexingJob(job.agentId, job.entryId, job.jobId)
+  if (!claimed) {
+    console.log(`Voice KB file job ${job.jobId} already claimed by another invocation — skipping duplicate`)
+    return
+  }
+
+  console.log(
+    `Received voice KB file job for entry ${job.entryId} (agent ${job.agentId}): fileType=${job.fileType}, key=${job.s3Key} — status now 'processing'`
+  )
+
+  await updateVoiceKBIndexingStatus(job.agentId, job.entryId, {
+    indexingStatus: 'failed',
+    indexingError: 'extraction not yet implemented',
+  })
+}
+
 export async function processCrawlerJob(job: CrawlerJobMessage): Promise<void> {
   if (job.type === 'kb_file') {
     await processKBFileJob(job)
+    return
+  }
+
+  if (job.type === 'voice_kb_file') {
+    await processVoiceKBFileJob(job)
     return
   }
 

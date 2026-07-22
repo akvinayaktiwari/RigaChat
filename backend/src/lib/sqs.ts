@@ -28,7 +28,21 @@ export interface KBFileCrawlerJobMessage extends CrawlerJobMessageBase {
   fileType: 'pdf' | 'docx' | 'text'
 }
 
-export type CrawlerJobMessage = WebsiteCrawlerJobMessage | KBFileCrawlerJobMessage
+// Deliberately not extending CrawlerJobMessageBase -- its botId field
+// doesn't apply to a voice agent's own KB file job, and reusing it to carry
+// an agentId would be misleading. See crawler-worker-service.ts's
+// processVoiceKBFileJob().
+export interface VoiceKBFileCrawlerJobMessage {
+  type: 'voice_kb_file'
+  jobId: string
+  agentId: string
+  clientId: string
+  entryId: string
+  s3Key: string
+  fileType: 'pdf' | 'docx' | 'text'
+}
+
+export type CrawlerJobMessage = WebsiteCrawlerJobMessage | KBFileCrawlerJobMessage | VoiceKBFileCrawlerJobMessage
 
 export async function enqueueCrawlerJob(job: CrawlerJobMessage): Promise<void> {
   await client.send(
