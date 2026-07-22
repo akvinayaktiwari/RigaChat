@@ -1,6 +1,6 @@
 import { createContext, createElement, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { confirmSignup, setAuthToken, syncMe } from '../services/api'
+import { setAuthToken, syncMe } from '../services/api'
 
 export interface AuthUser {
   clientId: string
@@ -89,9 +89,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user: null,
     token: null,
   })
-  // Stashed during signUp() so a future email-verification/resend flow has it
-  // on hand. Not part of AuthState/AuthContextValue — internal only for now.
-  const [, setPendingSignupEmail] = useState<string | null>(null)
 
   useEffect(() => {
     // Restore a session saved by a previous handleCallback()/signIn() call so
@@ -306,18 +303,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(errorBody.message ?? 'Sign up failed. Please try again.')
     }
 
-    setPendingSignupEmail(email)
-
-    // Email verification is out of scope for this sprint. New users land in
-    // Cognito's UNCONFIRMED state, which InitiateAuth rejects with
-    // UserNotConfirmedException — so auto-confirm server-side (via an admin
-    // API call the backend makes on our behalf) before signing them in.
-    const confirmResponse = await confirmSignup(email)
-    if (!confirmResponse.success) {
-      throw new Error(confirmResponse.error ?? 'Failed to confirm account. Please try again.')
-    }
-
-    await signIn(email, password)
+    // Cognito now emails a real verification code and leaves the user
+    // UNCONFIRMED (see the signup email verification / OTP module) — no
+    // auto-confirm or auto-sign-in here, since InitiateAuth would just reject
+    // with UserNotConfirmedException until VerifyEmailPage's confirmSignup()
+    // call succeeds. The caller (SignupPage) is responsible for routing the
+    // user to /verify-email next.
   }
 
   return createElement(

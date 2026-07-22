@@ -136,7 +136,7 @@ export default function SignupPage() {
     setLoading(true)
     try {
       await signUp(name.trim(), email.trim(), password)
-      navigate('/dashboard')
+      navigate(`/verify-email?email=${encodeURIComponent(email.trim())}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign up failed. Please try again.')
       setLoading(false)
