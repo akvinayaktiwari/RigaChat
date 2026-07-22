@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, Bot, Mail, RotateCcw } from 'lucide-react'
+import VyostraLogo from '../VyostraLogo'
 
 const BACKEND_URL = import.meta.env.VITE_API_URL as string
 const BOT_ID = 'bda51d13-2060-4a8c-9650-d623e344c80e'
@@ -189,15 +190,7 @@ export default function DemoChat() {
         className="relative flex flex-col w-full bg-white/75 backdrop-blur-2xl border border-white/80 rounded-2xl shadow-2xl shadow-violet-100/60 overflow-hidden"
       >
         <div className="shrink-0 bg-linear-to-r from-violet-600 to-purple-500 px-5 py-4 flex items-center gap-3">
-          <svg width={32} height={32} viewBox="0 0 64 64" fill="none" className="shrink-0">
-            <rect width="64" height="64" rx="14" fill="rgba(255,255,255,0.2)" />
-            <path
-              d="M10 13C10 11.3 11.3 10 13 10H51C52.7 10 54 11.3 54 13V38C54 39.7 52.7 41 51 41H38L32 50L26 41H13C11.3 41 10 39.7 10 38V13Z"
-              fill="white"
-              fillOpacity="0.25"
-            />
-            <path d="M19 19L32 39L45 19H37.5L32 31L26.5 19H19Z" fill="white" />
-          </svg>
+          <VyostraLogo size={32} animate={false} className="shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-white font-semibold text-sm leading-tight">{BOT_NAME}</p>
             <div className="flex items-center gap-1.5 mt-0.5">
