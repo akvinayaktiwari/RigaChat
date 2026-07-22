@@ -6,6 +6,9 @@ import { ToastContainer } from './src/components/Toast/Toast'
 import LandingPage from './src/pages/LandingPage'
 import LoginPage from './src/pages/LoginPage'
 import SignupPage from './src/pages/SignupPage'
+import ForgotPasswordPage from './src/pages/ForgotPasswordPage'
+import ResetPasswordPage from './src/pages/ResetPasswordPage'
+import VerifyEmailPage from './src/pages/VerifyEmailPage'
 import AuthCallbackPage from './src/pages/AuthCallbackPage'
 import WidgetTestPage from './src/pages/WidgetTestPage'
 import WidgetTestPreviewPage from './src/pages/WidgetTestPreviewPage'
@@ -60,6 +63,9 @@ function App() {
           }
         />
         <Route path="/signup" element={<SignupPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route path="/widget-test" element={<WidgetTestPage />} />
         <Route path="/widget-test/preview" element={<WidgetTestPreviewPage />} />

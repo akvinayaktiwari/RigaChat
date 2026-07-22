@@ -217,8 +217,44 @@ export function subscribeToTier(tier: 'starter' | 'growth' | 'agency'): Promise<
 
 // Auth API
 
-export function confirmSignup(username: string): Promise<ApiResponse<null>> {
-  return apiClient<null>('/api/auth/confirm', 'POST', { username })
+export type ConfirmSignupErrorCode = 'INVALID_CODE' | 'CODE_EXPIRED' | 'ALREADY_CONFIRMED' | 'PROVIDER_ERROR'
+
+// Mirrors ConfirmForgotPasswordResponse's pattern below -- auth-routes.ts
+// sends the same extra `code` field on ConfirmSignupError responses.
+export interface ConfirmSignupResponse extends ApiResponse<null> {
+  code?: ConfirmSignupErrorCode
+}
+
+export function confirmSignup(email: string, code: string): Promise<ConfirmSignupResponse> {
+  return apiClient<null>('/api/auth/confirm-signup', 'POST', { email, code }) as Promise<ConfirmSignupResponse>
+}
+
+export interface ResendConfirmationCodeResult {
+  message: string
+  rateLimited: boolean
+}
+
+// resend-confirmation-code's backend contract is a flat { message } on
+// 200/429, exactly like forgot-password below -- same reasoning applies for
+// bypassing apiClient<T>() here.
+export async function resendConfirmationCode(email: string): Promise<ResendConfirmationCodeResult> {
+  const response = await fetch(`${BASE_URL}/api/auth/resend-confirmation-code`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  })
+  const parsed = (await response.json()) as { message?: string; error?: string }
+
+  if (response.status === 429) {
+    return { message: parsed.message ?? 'Too many requests. Please wait a moment and try again.', rateLimited: true }
+  }
+  if (!response.ok) {
+    throw new Error(parsed.error ?? 'Something went wrong. Please try again.')
+  }
+  return {
+    message: parsed.message ?? 'If that email is registered and unverified, a new code has been sent.',
+    rateLimited: false,
+  }
 }
 
 export interface QuickSignupResult {
@@ -236,6 +272,48 @@ export interface QuickSignupResponse extends ApiResponse<QuickSignupResult> {
 
 export function quickSignup(email: string, password: string): Promise<QuickSignupResponse> {
   return apiClient<QuickSignupResult>('/api/auth/quick-signup', 'POST', { email, password }) as Promise<QuickSignupResponse>
+}
+
+export interface ForgotPasswordResult {
+  message: string
+  rateLimited: boolean
+}
+
+// forgot-password's backend contract is a flat { message } on 200/429, not the
+// { success, data, error } shape apiClient<T>() assumes -- routing this
+// through that helper would either lose the 429 message (its !response.ok
+// branch only reads parsed.error) or misreport the success payload's shape.
+export async function forgotPassword(email: string): Promise<ForgotPasswordResult> {
+  const response = await fetch(`${BASE_URL}/api/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  })
+  const parsed = (await response.json()) as { message?: string; error?: string }
+
+  if (response.status === 429) {
+    return { message: parsed.message ?? 'Too many requests. Please wait a moment and try again.', rateLimited: true }
+  }
+  if (!response.ok) {
+    throw new Error(parsed.error ?? 'Something went wrong. Please try again.')
+  }
+  return { message: parsed.message ?? 'If that email is registered, a code has been sent.', rateLimited: false }
+}
+
+export type ConfirmForgotPasswordErrorCode = 'INVALID_CODE' | 'CODE_EXPIRED' | 'INVALID_PASSWORD' | 'PROVIDER_ERROR'
+
+// Mirrors QuickSignupResponse's pattern above -- auth-routes.ts sends the same
+// extra `code` field on ConfirmForgotPasswordError responses.
+export interface ConfirmForgotPasswordResponse extends ApiResponse<null> {
+  code?: ConfirmForgotPasswordErrorCode
+}
+
+export function confirmForgotPassword(
+  email: string,
+  code: string,
+  newPassword: string
+): Promise<ConfirmForgotPasswordResponse> {
+  return apiClient<null>('/api/auth/confirm-forgot-password', 'POST', { email, code, newPassword }) as Promise<ConfirmForgotPasswordResponse>
 }
 
 // Form API
