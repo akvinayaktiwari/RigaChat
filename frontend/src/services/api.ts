@@ -238,6 +238,48 @@ export function quickSignup(email: string, password: string): Promise<QuickSignu
   return apiClient<QuickSignupResult>('/api/auth/quick-signup', 'POST', { email, password }) as Promise<QuickSignupResponse>
 }
 
+export interface ForgotPasswordResult {
+  message: string
+  rateLimited: boolean
+}
+
+// forgot-password's backend contract is a flat { message } on 200/429, not the
+// { success, data, error } shape apiClient<T>() assumes -- routing this
+// through that helper would either lose the 429 message (its !response.ok
+// branch only reads parsed.error) or misreport the success payload's shape.
+export async function forgotPassword(email: string): Promise<ForgotPasswordResult> {
+  const response = await fetch(`${BASE_URL}/api/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  })
+  const parsed = (await response.json()) as { message?: string; error?: string }
+
+  if (response.status === 429) {
+    return { message: parsed.message ?? 'Too many requests. Please wait a moment and try again.', rateLimited: true }
+  }
+  if (!response.ok) {
+    throw new Error(parsed.error ?? 'Something went wrong. Please try again.')
+  }
+  return { message: parsed.message ?? 'If that email is registered, a code has been sent.', rateLimited: false }
+}
+
+export type ConfirmForgotPasswordErrorCode = 'INVALID_CODE' | 'CODE_EXPIRED' | 'INVALID_PASSWORD' | 'PROVIDER_ERROR'
+
+// Mirrors QuickSignupResponse's pattern above -- auth-routes.ts sends the same
+// extra `code` field on ConfirmForgotPasswordError responses.
+export interface ConfirmForgotPasswordResponse extends ApiResponse<null> {
+  code?: ConfirmForgotPasswordErrorCode
+}
+
+export function confirmForgotPassword(
+  email: string,
+  code: string,
+  newPassword: string
+): Promise<ConfirmForgotPasswordResponse> {
+  return apiClient<null>('/api/auth/confirm-forgot-password', 'POST', { email, code, newPassword }) as Promise<ConfirmForgotPasswordResponse>
+}
+
 // Form API
 
 export function createForm(data: CreateFormInput): Promise<ApiResponse<FormConfig>> {
