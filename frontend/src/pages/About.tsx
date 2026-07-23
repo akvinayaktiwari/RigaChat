@@ -30,14 +30,14 @@ const FOUNDERS: FounderInfo[] = [
     name: 'Adarsh Jee Pandey',
     role: 'Co-Founder & Performance Marketer',
     description:
-      'Drives growth and customer acquisition for VyostraAI. Performance marketer at Drsyeta Corp, Bangalore.',
+      'Drives growth and customer acquisition for VyostraAI. Performance marketer at VyostraAI, Bangalore.',
     avatarGradient: 'from-emerald-600 to-teal-500',
   },
   {
     name: 'Vinayak Tiwari',
     role: 'Co-Founder & Builder',
     description:
-      'Built VyostraAI to help businesses capture every lead automatically. Full-stack engineer at Drsyeta Corp, Bangalore.',
+      'Built VyostraAI to help businesses capture every lead automatically. Full-stack engineer at VyostraAI, Bangalore.',
     avatarGradient: 'from-purple-600 to-indigo-500',
   },
 ]
@@ -74,7 +74,7 @@ function HeroBanner() {
           </span>
         </h1>
         <p className="mt-4 text-base md:text-lg text-on-surface-variant max-w-2xl mx-auto leading-relaxed">
-          VyostraAI is an AI-powered lead generation platform built by Drsyeta Corp, Bangalore. We bridge the gap
+          VyostraAI is an AI-powered lead generation platform built by VyostraAI, Bangalore. We bridge the gap
           between initial customer contact and closed deals.
         </p>
       </div>
@@ -147,7 +147,7 @@ function StoryBlockTwo() {
         <div className="relative h-80 rounded-3xl overflow-hidden border border-outline-variant/30 bg-gradient-to-br from-indigo-900 via-slate-900 to-primary p-8 text-white flex flex-col justify-between shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-xs bg-white/10 border border-white/10 px-3 py-1 rounded-full font-bold uppercase tracking-widest">
-              Drsyeta Corp
+              VyostraAI
             </span>
             <Globe className="w-5 h-5 text-white/50" />
           </div>
@@ -156,20 +156,20 @@ function StoryBlockTwo() {
               "Integrating AI with WhatsApp to make sure no lead ever goes unanswered."
             </p>
             <p className="text-xs text-white/70 mt-2 font-medium tracking-wide">
-              Drsyeta Corp Headquarters, Bangalore, India
+              VyostraAI Headquarters, Bangalore, India
             </p>
           </div>
         </div>
       </div>
       <div className="lg:col-span-6 flex flex-col gap-6">
         <div className="text-xs font-extrabold uppercase tracking-widest text-secondary bg-secondary/10 px-3 py-1.5 rounded-full w-fit">
-          Drsyeta Corp
+          VyostraAI
         </div>
         <h2 className="text-3xl md:text-4xl font-extrabold text-on-surface tracking-tight leading-tight">
           Built in Bangalore. Designed for growth.
         </h2>
         <p className="text-base md:text-lg text-on-surface-variant leading-relaxed">
-          Drsyeta Corp is a performance marketing and technology company based in Bangalore, India. We build tools
+          VyostraAI is a performance marketing and technology company based in Bangalore, India. We build tools
           that help businesses grow faster using AI, automation, and data.
         </p>
       </div>
