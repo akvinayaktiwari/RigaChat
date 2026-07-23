@@ -143,6 +143,83 @@
       }
     }
 
+    // Panel-header mark: converges to a centered shape on call start and
+    // holds there for the whole call — no shape animation tied to audio.
+    // Only the glow reacts, driven by a smoothed state.isPlayingAudio
+    // boolean (no AnalyserNode on the playback path). Entirely separate
+    // from `state` above — read only by the functions below, never
+    // branched on by connection/session logic.
+    var PANEL_CONVERGED_Y1 = 26;
+    var PANEL_CONVERGED_Y2 = 38;
+    var GLOW_EASE = 0.12;
+    var panelMorph = { lines: null, logoEl: null, raf: 0, phase: 'resting' };
+    var agentLevel = 0;
+
+    function setPanelBar(i, y1, y2) {
+      var ln = panelMorph.lines && panelMorph.lines[i];
+      if (!ln) return;
+      ln.setAttribute('y1', String(y1));
+      ln.setAttribute('y2', String(y2));
+    }
+
+    function easeInOutCubic(t) {
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+
+    function morphPanelToConverged() {
+      if (!panelMorph.lines || panelMorph.lines.length !== 5) return;
+      if (panelMorph.phase !== 'resting') return;
+      panelMorph.phase = 'morphing';
+      agentLevel = 0;
+      var t0 = performance.now();
+      var dur = 900;
+      function frame(now) {
+        var p = Math.min(1, (now - t0) / dur);
+        var e = easeInOutCubic(p);
+        for (var i = 0; i < 5; i++) {
+          setPanelBar(
+            i,
+            LOGO_Y1[i] + (PANEL_CONVERGED_Y1 - LOGO_Y1[i]) * e,
+            LOGO_Y2[i] + (PANEL_CONVERGED_Y2 - LOGO_Y2[i]) * e
+          );
+        }
+        if (p < 1) {
+          panelMorph.raf = requestAnimationFrame(frame);
+        } else {
+          panelMorph.phase = 'converged';
+          panelMorph.raf = 0;
+        }
+      }
+      panelMorph.raf = requestAnimationFrame(frame);
+    }
+
+    // Instant snap, no animation — must never delay cleanup()/collapseWidget().
+    // Naturally idempotent: a repeat call after 'resting' is a harmless no-op.
+    function snapPanelToV() {
+      if (panelMorph.raf) {
+        cancelAnimationFrame(panelMorph.raf);
+        panelMorph.raf = 0;
+      }
+      if (panelMorph.phase === 'resting') return;
+      panelMorph.phase = 'resting';
+      if (panelMorph.logoEl) panelMorph.logoEl.style.filter = '';
+      if (!panelMorph.lines || panelMorph.lines.length !== 5) return;
+      for (var i = 0; i < 5; i++) setPanelBar(i, LOGO_Y1[i], LOGO_Y2[i]);
+    }
+
+    function updatePanelGlow() {
+      if (!panelMorph.logoEl) return;
+      var target = state.isPlayingAudio ? 1 : 0;
+      agentLevel += (target - agentLevel) * GLOW_EASE;
+      var level = state.isPlayingAudio ? agentLevel : 0;
+      var now = performance.now();
+      var breathe = 0.15 + 0.15 * Math.sin((now * 2 * Math.PI) / 3200);
+      var pulse = Math.max(breathe, level);
+      var blur = 4 + pulse * 12;
+      var alpha = 0.25 + pulse * 0.45;
+      panelMorph.logoEl.style.filter = 'drop-shadow(0 0 ' + blur.toFixed(2) + 'px rgba(255,255,255,' + alpha.toFixed(2) + '))';
+    }
+
     var state = {
       config: null,
       shadowRoot: null,
@@ -209,6 +286,8 @@
         expanded.className = 'vw-hidden';
         var expandedLogo = document.createElement('span');
         expandedLogo.innerHTML = LOGO_SVG;
+        panelMorph.lines = expandedLogo.querySelectorAll('line');
+        panelMorph.logoEl = expandedLogo;
         var barsContainer = document.createElement('div');
         barsContainer.id = 'vw-bars';
         for (var i = 0; i < BAR_COUNT; i++) {
@@ -298,6 +377,7 @@
       state.els.expanded.classList.remove('vw-hidden');
       clearError();
       startAnimationLoop();
+      morphPanelToConverged();
 
       navigator.mediaDevices.getUserMedia({ audio: true })
         .then(function (stream) {
@@ -488,6 +568,7 @@
             bar.style.height = height + 'px';
           });
         }
+        updatePanelGlow();
         state.animFrame = requestAnimationFrame(tick);
       }
       state.animFrame = requestAnimationFrame(tick);
@@ -541,6 +622,7 @@
         bar.style.height = '3px';
       });
       if (state.els.error) clearError();
+      snapPanelToV();
     }
 
     if (document.readyState === 'loading') {
