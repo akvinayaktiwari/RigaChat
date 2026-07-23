@@ -102,8 +102,8 @@ function SupportCard() {
       </div>
       <div>
         <h4 className="font-bold text-xs text-outline uppercase tracking-wider">Incident Reports</h4>
-        <a href="mailto:admin@drsyeta.in" className="text-base font-bold text-on-surface hover:text-primary transition-colors">
-          admin@drsyeta.in
+        <a href="mailto:support@vyostra.com" className="text-base font-bold text-on-surface hover:text-primary transition-colors">
+          support@vyostra.com
         </a>
       </div>
     </div>

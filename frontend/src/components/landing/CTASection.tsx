@@ -49,7 +49,7 @@ export default function CTASection({ onStartTrial, region }: CTASectionProps) {
                 <ArrowRight className="w-4 h-4" />
               </button>
               <a
-                href="mailto:admin@drsyeta.in"
+                href="mailto:support@vyostra.com"
                 className="inline-flex items-center justify-center gap-2 bg-white/10 border border-white/20 text-white font-semibold px-7 py-4 rounded-xl hover:bg-white/20 transition-colors text-sm"
               >
                 Talk to sales

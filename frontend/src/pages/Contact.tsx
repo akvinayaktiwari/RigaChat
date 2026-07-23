@@ -119,10 +119,10 @@ export default function Contact() {
                   For general questions, demos, and partnerships.
                 </p>
                 <a
-                  href="mailto:admin@drsyeta.in"
+                  href="mailto:support@vyostra.com"
                   className="mt-auto inline-flex items-center justify-center cta-accent text-white font-semibold px-6 py-3 rounded-xl transition-all hover:shadow-lg"
                 >
-                  admin@drsyeta.in
+                  support@vyostra.com
                 </a>
               </div>
 

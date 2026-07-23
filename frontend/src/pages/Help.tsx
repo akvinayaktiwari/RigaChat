@@ -314,7 +314,7 @@ function SupportCta() {
         </p>
         <div className="flex flex-wrap justify-center gap-4">
           <a
-            href="mailto:admin@drsyeta.in"
+            href="mailto:support@vyostra.com"
             className="bg-primary hover:bg-primary-container text-white px-8 py-4 rounded-xl text-sm font-bold flex items-center gap-2.5 hover:shadow-md transition-all cursor-pointer shadow-sm"
             id="cta-email-support"
           >
@@ -322,7 +322,7 @@ function SupportCta() {
             <span>Contact Support</span>
           </a>
           <a
-            href="mailto:admin@drsyeta.in"
+            href="mailto:support@vyostra.com"
             className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-8 py-4 rounded-xl text-sm font-bold flex items-center gap-2.5 transition-all cursor-pointer"
             id="cta-book-demo"
           >

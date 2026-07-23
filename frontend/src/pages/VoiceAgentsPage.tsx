@@ -55,7 +55,7 @@ function VoiceUpsellCard() {
         Voice Agents aren&apos;t included in your current plan. Contact us to enable this for your account.
       </p>
       <a
-        href="mailto:admin@drsyeta.in?subject=Enable Voice Agents for my account"
+        href="mailto:support@vyostra.com?subject=Enable Voice Agents for my account"
         className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity"
       >
         <Mail size={16} />

@@ -527,7 +527,7 @@ export default function VoiceKnowledgeBasePage() {
               <p className="text-sm text-amber-700">{upsellMessage}</p>
               <div className="flex items-center gap-3 mt-3">
                 <a
-                  href="mailto:admin@drsyeta.in?subject=Upgrade my BeepBoop plan"
+                  href="mailto:support@vyostra.com?subject=Upgrade my BeepBoop plan"
                   className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity"
                 >
                   <Mail size={14} />

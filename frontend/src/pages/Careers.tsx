@@ -76,12 +76,12 @@ function CareersHero() {
           BeepBoop is a fully remote team building AI products that help businesses capture and convert leads. We move fast, build lean, and care about craft.
         </p>
         <a
-          href="mailto:admin@drsyeta.in"
+          href="mailto:support@vyostra.com"
           className="inline-flex items-center gap-2 mt-8 bg-primary text-white font-bold text-base px-8 py-4 rounded-2xl hover:scale-[1.02] transition-all"
           id="careers-hero-cta"
         >
           <Mail className="w-4.5 h-4.5" />
-          Send Your Resume to admin@drsyeta.in
+          Send Your Resume to support@vyostra.com
         </a>
       </div>
     </section>
@@ -142,7 +142,7 @@ function RoleCardItem({ role }: { role: RoleCard }) {
         </div>
       </div>
       <a
-        href="mailto:admin@drsyeta.in"
+        href="mailto:support@vyostra.com"
         className="shrink-0 bg-primary text-white px-5 py-2.5 rounded-xl text-sm font-bold text-center hover:opacity-95 transition-all"
       >
         Apply Now
@@ -173,11 +173,11 @@ function GeneralApplicationCta() {
         We always want to hear from talented people. Send us your resume and tell us how you would contribute to BeepBoop.
       </p>
       <a
-        href="mailto:admin@drsyeta.in?subject=Resume — BeepBoop Application"
+        href="mailto:support@vyostra.com?subject=Resume — BeepBoop Application"
         className="inline-flex items-center gap-2 bg-primary text-white px-8 py-4 rounded-xl font-bold hover:opacity-95 transition-all"
       >
         <Mail className="w-4.5 h-4.5" />
-        Send Resume to admin@drsyeta.in
+        Send Resume to support@vyostra.com
       </a>
     </section>
   )
@@ -192,7 +192,7 @@ export default function Careers() {
         <title>Careers at BeepBoop — Work Remotely</title>
         <meta
           name="description"
-          content="Join BeepBoop. Fully remote. Build AI products that help businesses grow. Send your resume to admin@drsyeta.in"
+          content="Join BeepBoop. Fully remote. Build AI products that help businesses grow. Send your resume to support@vyostra.com"
         />
       </Helmet>
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />

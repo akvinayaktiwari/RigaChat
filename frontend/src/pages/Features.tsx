@@ -113,7 +113,7 @@ function FeaturesCta() {
           Get Started Free
         </button>
         <a
-          href="mailto:admin@drsyeta.in"
+          href="mailto:support@vyostra.com"
           className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-8 py-4 rounded-xl font-bold transition-all"
         >
           Book a Demo

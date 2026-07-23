@@ -202,7 +202,7 @@ export default function BotsPage() {
           </div>
         ) : atCap ? (
           <a
-            href="mailto:admin@drsyeta.in?subject=Upgrade my BeepBoop plan"
+            href="mailto:support@vyostra.com?subject=Upgrade my BeepBoop plan"
             className="inline-flex items-center gap-2 bg-amber-50 text-amber-700 border border-amber-200 font-medium px-4 py-2.5 rounded-xl text-sm hover:bg-amber-100 transition-colors"
           >
             <Lock size={14} />
@@ -236,7 +236,7 @@ export default function BotsPage() {
               Upgrade to add more.
             </p>
             <a
-              href="mailto:admin@drsyeta.in?subject=Upgrade my BeepBoop plan"
+              href="mailto:support@vyostra.com?subject=Upgrade my BeepBoop plan"
               className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity"
             >
               <Mail size={16} />

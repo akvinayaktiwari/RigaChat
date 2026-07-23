@@ -8,7 +8,7 @@ const MOST_POPULAR_TIER: BillableTier = 'growth'
 
 // International tiers are display-only — no international payment provider
 // exists yet, so their CTA routes to this mailto instead of useTierCheckout.
-const INTL_CONTACT_EMAIL = 'admin@drsyeta.in'
+const INTL_CONTACT_EMAIL = 'support@vyostra.com'
 
 interface PricingSectionProps {
   // Not wired up yet — checkout/signup wiring is a later module. Defaults to

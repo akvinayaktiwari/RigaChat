@@ -147,7 +147,7 @@ function CtaSection({ ctaHeadline, ctaBody }: Pick<UseCaseLayoutProps, 'ctaHeadl
           Get Started Free
         </button>
         <a
-          href="mailto:admin@drsyeta.in"
+          href="mailto:support@vyostra.com"
           className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-8 py-4 rounded-xl font-bold transition-all"
           id="use-case-cta-demo"
         >

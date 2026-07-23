@@ -5,7 +5,7 @@ import VyostraLogo from '../VyostraLogo'
 const BACKEND_URL = import.meta.env.VITE_API_URL as string
 const BOT_ID = 'bda51d13-2060-4a8c-9650-d623e344c80e'
 const BOT_NAME = 'VyostraAI'
-const SUPPORT_EMAIL = 'admin@drsyeta.in'
+const SUPPORT_EMAIL = 'support@vyostra.com'
 const FALLBACK_GREETING = "Hi! I'm here to help. Ask me anything about VyostraAI."
 
 const SUGGESTED_QUESTIONS = [

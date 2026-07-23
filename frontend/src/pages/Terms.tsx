@@ -160,7 +160,7 @@ function TocSidebar({ activeSection, onNavigate }: { activeSection: string; onNa
       <div className="hidden lg:block mt-6 p-6 bg-gradient-to-br from-primary to-primary-container text-white rounded-2xl shadow-xs">
         <p className="text-sm font-semibold opacity-90 mb-4 leading-relaxed">Have questions about these terms?</p>
         <a
-          href="mailto:admin@drsyeta.in"
+          href="mailto:support@vyostra.com"
           className="inline-flex items-center gap-2 text-sm font-bold bg-white text-primary px-4 py-2.5 rounded-xl hover:shadow-xs hover:opacity-95 transition-all"
         >
           <Mail className="w-4 h-4" />
@@ -202,8 +202,8 @@ function ContactSection() {
           </div>
           <div>
             <h4 className="font-bold text-xs text-outline uppercase tracking-wider">Email Inquiries</h4>
-            <a href="mailto:admin@drsyeta.in" className="text-base font-bold text-on-surface hover:text-primary transition-colors">
-              admin@drsyeta.in
+            <a href="mailto:support@vyostra.com" className="text-base font-bold text-on-surface hover:text-primary transition-colors">
+              support@vyostra.com
             </a>
           </div>
         </div>
