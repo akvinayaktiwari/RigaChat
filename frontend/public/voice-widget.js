@@ -30,13 +30,17 @@
       return;
     }
 
+    var LOGO_X = [10.5, 21.25, 32, 42.75, 53.5];
+    var LOGO_Y1 = [9.5, 17.5, 27.5, 17.5, 9.5];
+    var LOGO_Y2 = [22.5, 36.5, 52.5, 36.5, 22.5];
+
     var LOGO_SVG =
-      '<svg width="20" height="20" viewBox="0 0 28 28" fill="none">' +
-      '<rect width="28" height="28" rx="8" fill="rgba(255,255,255,0.18)"/>' +
-      '<path d="M8 19L14 9L20 19" stroke="white" stroke-width="2.2" ' +
-      'stroke-linecap="round" stroke-linejoin="round"/>' +
-      '<path d="M10.5 15.5H17.5" stroke="white" stroke-width="1.8" ' +
-      'stroke-linecap="round"/>' +
+      '<svg width="20" height="20" viewBox="0 0 64 64" fill="none">' +
+      '<line x1="' + LOGO_X[0] + '" y1="' + LOGO_Y1[0] + '" x2="' + LOGO_X[0] + '" y2="' + LOGO_Y2[0] + '" stroke="#ffffff" stroke-width="7" stroke-linecap="round"/>' +
+      '<line x1="' + LOGO_X[1] + '" y1="' + LOGO_Y1[1] + '" x2="' + LOGO_X[1] + '" y2="' + LOGO_Y2[1] + '" stroke="#ffffff" stroke-width="7" stroke-linecap="round"/>' +
+      '<line x1="' + LOGO_X[2] + '" y1="' + LOGO_Y1[2] + '" x2="' + LOGO_X[2] + '" y2="' + LOGO_Y2[2] + '" stroke="#ffffff" stroke-width="7" stroke-linecap="round"/>' +
+      '<line x1="' + LOGO_X[3] + '" y1="' + LOGO_Y1[3] + '" x2="' + LOGO_X[3] + '" y2="' + LOGO_Y2[3] + '" stroke="#ffffff" stroke-width="7" stroke-linecap="round"/>' +
+      '<line x1="' + LOGO_X[4] + '" y1="' + LOGO_Y1[4] + '" x2="' + LOGO_X[4] + '" y2="' + LOGO_Y2[4] + '" stroke="#ffffff" stroke-width="7" stroke-linecap="round"/>' +
       '</svg>';
 
     var BAR_COUNT = 20;
@@ -59,7 +63,11 @@
       '#vw-error{color:#fff;font-size:11px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
       '#vw-close{width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.13);' +
       'border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;' +
-      'font-size:14px;line-height:1;flex-shrink:0;padding:0}';
+      'font-size:14px;line-height:1;flex-shrink:0;padding:0}' +
+      '@keyframes vyostraVoiceGlow{0%,100%{filter:drop-shadow(0 0 4px rgba(255,255,255,.25))}' +
+      '50%{filter:drop-shadow(0 0 12px rgba(255,255,255,.5))}}' +
+      '.vw-logo-glow{animation:vyostraVoiceGlow 3.2s ease-in-out infinite}' +
+      '@media (prefers-reduced-motion:reduce){.vw-logo-glow{animation:none!important}}';
 
     function getPositionCss(position) {
       if (position === 'bottom-left') {
@@ -69,6 +77,70 @@
         return 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%)';
       }
       return 'position:fixed;bottom:24px;right:24px';
+    }
+
+    // Idle glow + ripple for the launcher's Signal mark. Fully separate from
+    // `state` above (the call/session store) — read by nothing but the
+    // functions below, so it can't affect connection logic.
+    var launcherRipple = { lines: null, raf: 0, timeoutId: 0, intervalId: 0, stopped: true };
+    var launcherGuard = { tabVisible: true, inView: true };
+
+    function setLogoBar(i, y1, y2) {
+      var ln = launcherRipple.lines && launcherRipple.lines[i];
+      if (!ln) return;
+      ln.setAttribute('y1', String(y1));
+      ln.setAttribute('y2', String(y2));
+    }
+
+    function resetLogoBars() {
+      for (var i = 0; i < 5; i++) setLogoBar(i, LOGO_Y1[i], LOGO_Y2[i]);
+    }
+
+    function rippleOnce() {
+      var t0 = performance.now();
+      var dur = 900;
+      function frame(now) {
+        if (launcherRipple.stopped) return;
+        var p = (now - t0) / dur;
+        if (p >= 1) {
+          resetLogoBars();
+          return;
+        }
+        for (var i = 0; i < 5; i++) {
+          var local = Math.min(1, Math.max(0, p * 1.7 - i * 0.14));
+          var bump = Math.sin(local * Math.PI) * 3.2;
+          setLogoBar(i, LOGO_Y1[i] - bump, LOGO_Y2[i] + bump);
+        }
+        launcherRipple.raf = requestAnimationFrame(frame);
+      }
+      launcherRipple.raf = requestAnimationFrame(frame);
+    }
+
+    function startLauncherRipple() {
+      if (!launcherRipple.lines || launcherRipple.lines.length !== 5) return;
+      if (!launcherRipple.stopped) return;
+      launcherRipple.stopped = false;
+      launcherRipple.timeoutId = setTimeout(rippleOnce, 900);
+      launcherRipple.intervalId = setInterval(rippleOnce, 4200);
+    }
+
+    function stopLauncherRipple() {
+      launcherRipple.stopped = true;
+      if (launcherRipple.raf) cancelAnimationFrame(launcherRipple.raf);
+      if (launcherRipple.timeoutId) clearTimeout(launcherRipple.timeoutId);
+      if (launcherRipple.intervalId) clearInterval(launcherRipple.intervalId);
+      launcherRipple.raf = 0;
+      launcherRipple.timeoutId = 0;
+      launcherRipple.intervalId = 0;
+      resetLogoBars();
+    }
+
+    function refreshLauncherRipple() {
+      if (launcherGuard.tabVisible && launcherGuard.inView) {
+        startLauncherRipple();
+      } else {
+        stopLauncherRipple();
+      }
     }
 
     var state = {
@@ -176,6 +248,31 @@
 
         collapsed.addEventListener('click', handleExpandClick);
         closeBtn.addEventListener('click', handleCloseClick);
+
+        var reducedMotion = window.matchMedia &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        if (!reducedMotion) {
+          launcherRipple.lines = collapsedLogo.querySelectorAll('line');
+          collapsedLogo.classList.add('vw-logo-glow');
+
+          launcherGuard.tabVisible = document.visibilityState === 'visible';
+
+          document.addEventListener('visibilitychange', function () {
+            launcherGuard.tabVisible = document.visibilityState === 'visible';
+            refreshLauncherRipple();
+          });
+
+          if (window.IntersectionObserver) {
+            var observer = new IntersectionObserver(function (entries) {
+              launcherGuard.inView = entries[0].isIntersecting;
+              refreshLauncherRipple();
+            });
+            observer.observe(collapsed);
+          } else {
+            refreshLauncherRipple();
+          }
+        }
       } catch (e) {
         /* never break the host site */
       }
