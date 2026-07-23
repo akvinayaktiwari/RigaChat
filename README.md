@@ -12,7 +12,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![Made in India](https://img.shields.io/badge/Made%20in-India-FF9933) 🇮🇳
 
-[🚀 Live Demo](https://beepboop.drsyeta.in) · [📺 Follow the Build](https://github.com/akvinayaktiwari/RigaChat) · [📩 Request Early Access](mailto:support@vyostra.com?subject=VyostraAI%20Early%20Access)
+[🚀 Live Demo](https://vyostra.com) · [📺 Follow the Build](https://github.com/akvinayaktiwari/RigaChat) · [📩 Request Early Access](mailto:support@vyostra.com?subject=VyostraAI%20Early%20Access)
 
 </div>
 
