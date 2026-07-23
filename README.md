@@ -12,7 +12,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![Made in India](https://img.shields.io/badge/Made%20in-India-FF9933) 🇮🇳
 
-[🚀 Live Demo](https://beepboop.drsyeta.in) · [📺 Follow the Build](https://github.com/akvinayaktiwari/RigaChat) · [📩 Request Early Access](mailto:admin@drsyeta.in?subject=VyostraAI%20Early%20Access)
+[🚀 Live Demo](https://beepboop.drsyeta.in) · [📺 Follow the Build](https://github.com/akvinayaktiwari/RigaChat) · [📩 Request Early Access](mailto:support@vyostra.com?subject=VyostraAI%20Early%20Access)
 
 </div>
 
@@ -309,5 +309,5 @@ This product is being built in public. Watch the repo to follow the journey from
 <p align="center">
 Built with ☕ in India 🇮🇳
 <br/>
-© 2026 VyostraAI by Drsyeta Corp
+© 2026 VyostraAI, a product of Aashirwad Trading Enterprises
 </p>

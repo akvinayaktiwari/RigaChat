@@ -367,7 +367,7 @@ Buttons:
   Secondary: bg-white/10 border-white/20 text-white
              px-7 py-4 rounded-xl
              "Talk to sales"
-             href="mailto:admin@drsyeta.in"
+             href="mailto:support@vyostra.com"
 
 Footer note: text-white/50 text-xs
   "Plans from ₹1,999/mo · Cancel anytime"
@@ -389,7 +389,7 @@ Brand col (col-span-2):
   Legal: Privacy, Terms, Security
 
 Bottom bar:
-  "© 2026 VyostraAI by Drsyeta Corp. All rights reserved."
+  "© 2026 VyostraAI, a product of Aashirwad Trading Enterprises. All rights reserved."
   Integration badges: WhatsApp (green), Zoho (red) + "+2 more"
 
 All footer links: href="#" for now (mark TODO)

@@ -71,7 +71,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-gray-100 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-gray-400">© 2026 VyostraAI by Drsyeta Corp. All rights reserved.</p>
+          <p className="text-xs text-gray-400">© 2026 VyostraAI, a product of Aashirwad Trading Enterprises. All rights reserved.</p>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1.5 text-xs text-gray-400">
               <WhatsAppIcon className="w-3.5 h-3.5 text-green-600" />
