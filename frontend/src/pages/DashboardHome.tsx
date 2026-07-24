@@ -5,18 +5,20 @@ import { getAllLeads, getMyBots } from '../services/api'
 import { useAuth } from '../hooks/useAuth'
 import Sparkline from '../components/charts/Sparkline'
 import TrendChart from '../components/charts/TrendChart'
-import { buildCsv, downloadCsv } from '../lib/csv'
+import { exportLeadsCsv } from '../lib/csv'
+import { formatRelativeDate } from '../lib/date'
 import type { BotConfig, BotStatus, Lead } from '../types/index'
 
 const RECENT_LEADS_COUNT = 5
 const GLANCE_BOTS_COUNT = 5
+const WEEK_OVER_WEEK_DAYS = 7
 const SPARKLINE_WINDOW_DAYS = 14
 const TREND_CHART_WINDOW_DAYS = 30
 
 // Reuses the same honest status -> label/color mapping already established in
 // BotsPage.tsx / BotDetailPage.tsx, rather than inventing new label names —
 // these are the real BotStatus values, nothing is renamed for this panel.
-const STATUS_BADGES: Record<'active' | 'processing' | 'crawl_failed' | 'kb_only', { label: string; classes: string }> = {
+const STATUS_BADGES: Record<BotStatus, { label: string; classes: string }> = {
   active: { label: 'Active', classes: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   processing: { label: 'Processing', classes: 'bg-violet-50 text-violet-700 border-violet-200' },
   crawl_failed: { label: 'Failed', classes: 'bg-red-50 text-red-700 border-red-200' },
@@ -36,21 +38,6 @@ function getGreeting(hour: number): string {
 
 function isActiveBot(bot: BotConfig): boolean {
   return bot.status !== 'processing' && bot.status !== 'crawl_failed'
-}
-
-function formatRelativeDate(date: Date): string {
-  const now = new Date()
-  // Clamp to 0: a date in the client's future (server/client clock drift,
-  // not just malformed input) would otherwise render as "-5 minutes ago".
-  const diff = Math.max(0, now.getTime() - date.getTime())
-  const minutes = Math.floor(diff / 60000)
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
-
-  if (minutes < 60) return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`
-  if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`
-  if (days < 7) return days === 1 ? '1 day ago' : `${days} days ago`
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 interface DailyBucket {
@@ -287,9 +274,13 @@ export default function DashboardHome() {
   }
 
   const weekAgo = new Date()
-  weekAgo.setDate(weekAgo.getDate() - 7)
+  weekAgo.setDate(weekAgo.getDate() - WEEK_OVER_WEEK_DAYS)
   const twoWeeksAgo = new Date()
-  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14)
+  // Deliberately its own constant, not SPARKLINE_WINDOW_DAYS (also 14) -
+  // this window is "two comparison weeks", a different concept that just
+  // happens to share the number today; they shouldn't drift together if
+  // either changes later.
+  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - WEEK_OVER_WEEK_DAYS * 2)
 
   const thisWeekLeads = leads.filter((lead) => new Date(lead.createdAt) >= weekAgo)
   const previousWeekLeads = leads.filter((lead) => {
@@ -333,16 +324,7 @@ export default function DashboardHome() {
   const thisWeekSparkline = dailyBuckets14.slice(SPARKLINE_WINDOW_DAYS - 7).map((bucket) => bucket.count)
 
   function handleExportLeadsCsv() {
-    const headers = ['Name', 'Email', 'Phone', 'Bot', 'Date', 'Status']
-    const rows = leads.map((lead) => [
-      lead.name ?? '',
-      lead.email ?? '',
-      lead.phone ?? '',
-      botName(lead.botId),
-      new Date(lead.createdAt).toLocaleDateString(),
-      'New',
-    ])
-    downloadCsv('vyostra-leads.csv', buildCsv(headers, rows))
+    exportLeadsCsv('vyostra-leads.csv', leads, botName)
   }
 
   return (

@@ -5,7 +5,8 @@ import { ChevronLeft, ChevronRight, Download, Mail, Phone, Users } from 'lucide-
 import { getAllLeads, getMyBots } from '../services/api'
 import FilterBar from '../components/FilterBar/FilterBar'
 import type { FilterChip } from '../components/FilterBar/FilterBar'
-import { buildCsv, downloadCsv } from '../lib/csv'
+import { exportLeadsCsv } from '../lib/csv'
+import { formatRelativeDate } from '../lib/date'
 import type { BotConfig, Lead } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -20,21 +21,6 @@ const DATE_RANGE_OPTIONS: { value: DateRange; label: string; days: number | null
   { value: '30d', label: 'Last 30 days', days: 30 },
   { value: '90d', label: 'Last 90 days', days: 90 },
 ]
-
-function formatRelativeDate(date: Date): string {
-  const now = new Date()
-  // Clamp to 0: a date in the client's future (server/client clock drift,
-  // not just malformed input) would otherwise render as "-5 minutes ago".
-  const diff = Math.max(0, now.getTime() - date.getTime())
-  const minutes = Math.floor(diff / 60000)
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
-
-  if (minutes < 60) return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`
-  if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`
-  if (days < 7) return days === 1 ? '1 day ago' : `${days} days ago`
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
 
 function getInitials(name: string | undefined): string {
   if (!name) return '?'
@@ -140,16 +126,7 @@ export default function LeadsPage() {
   const paginatedLeads = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   function handleExportCsv() {
-    const headers = ['Name', 'Email', 'Phone', 'Bot', 'Date', 'Status']
-    const rows = filtered.map((lead) => [
-      lead.name ?? '',
-      lead.email ?? '',
-      lead.phone ?? '',
-      getBotName(lead.botId),
-      new Date(lead.createdAt).toLocaleDateString(),
-      'New',
-    ])
-    downloadCsv('vyostra-leads.csv', buildCsv(headers, rows))
+    exportLeadsCsv('vyostra-leads.csv', filtered, getBotName)
   }
 
   const chips: FilterChip[] = []
