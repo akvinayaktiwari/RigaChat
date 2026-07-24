@@ -1,12 +1,30 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bot, CheckCircle, Plus, TrendingUp, Users } from 'lucide-react'
+import { ArrowRight, Bot, CheckCircle, Download, Plus, TrendingUp, Users } from 'lucide-react'
 import { getAllLeads, getMyBots } from '../services/api'
 import { useAuth } from '../hooks/useAuth'
-import type { BotConfig, Lead } from '../types/index'
+import Sparkline from '../components/charts/Sparkline'
+import TrendChart from '../components/charts/TrendChart'
+import type { BotConfig, BotStatus, Lead } from '../types/index'
 
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 const RECENT_LEADS_COUNT = 5
+const GLANCE_BOTS_COUNT = 5
+const SPARKLINE_WINDOW_DAYS = 14
+const TREND_CHART_WINDOW_DAYS = 30
+
+// Reuses the same honest status -> label/color mapping already established in
+// BotsPage.tsx / BotDetailPage.tsx, rather than inventing new label names —
+// these are the real BotStatus values, nothing is renamed for this panel.
+const STATUS_BADGES: Record<'active' | 'processing' | 'crawl_failed' | 'kb_only', { label: string; classes: string }> = {
+  active: { label: 'Active', classes: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  processing: { label: 'Processing', classes: 'bg-violet-50 text-violet-700 border-violet-200' },
+  crawl_failed: { label: 'Failed', classes: 'bg-red-50 text-red-700 border-red-200' },
+  kb_only: { label: 'KB Only', classes: 'bg-blue-50 text-blue-700 border-blue-200' },
+}
+
+function getStatusBadge(status?: BotStatus): { label: string; classes: string } {
+  return STATUS_BADGES[status ?? 'active']
+}
 
 function getGreeting(hour: number): string {
   if (hour >= 5 && hour < 12) return 'Good morning'
@@ -30,6 +48,38 @@ function formatRelativeDate(date: Date): string {
   if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`
   if (days < 7) return days === 1 ? '1 day ago' : `${days} days ago`
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function csvEscape(value: string): string {
+  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
+}
+
+interface DailyBucket {
+  date: string
+  count: number
+}
+
+/** Real day-by-day lead counts for the last `days` calendar days (today inclusive), oldest first. Days with no leads are honestly 0, never omitted or fabricated. */
+function bucketLeadsByDay(leads: Lead[], days: number): DailyBucket[] {
+  const now = new Date()
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+  const buckets: DailyBucket[] = []
+  for (let i = days - 1; i >= 0; i--) {
+    const day = new Date(startOfToday)
+    day.setDate(day.getDate() - i)
+    buckets.push({ date: day.toISOString().slice(0, 10), count: 0 })
+  }
+
+  const indexByDate = new Map(buckets.map((bucket, index) => [bucket.date, index]))
+  for (const lead of leads) {
+    const leadDate = new Date(lead.createdAt)
+    const key = new Date(leadDate.getFullYear(), leadDate.getMonth(), leadDate.getDate()).toISOString().slice(0, 10)
+    const index = indexByDate.get(key)
+    if (index !== undefined) buckets[index].count += 1
+  }
+
+  return buckets
 }
 
 function StatsSkeleton() {
@@ -61,24 +111,65 @@ function TableSkeleton() {
   )
 }
 
+interface TrendChipProps {
+  /** Percentage change, or null when there's no honest baseline to compare against (never a fabricated placeholder). */
+  changePct: number | null
+}
+
+function TrendChip({ changePct }: TrendChipProps) {
+  if (changePct === null) return null
+  const rounded = Math.round(changePct)
+  const positive = rounded >= 0
+  return (
+    <span
+      className={`inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full ${
+        positive ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
+      }`}
+    >
+      {positive ? '↑' : '↓'}
+      {Math.abs(rounded)}%
+    </span>
+  )
+}
+
 interface StatCardProps {
   icon: typeof Bot
   iconClasses: string
   iconWrapClasses: string
   value: number
   label: string
+  sparklineData?: number[]
+  sparklineColor?: string
+  trendChangePct?: number | null
 }
 
-function StatCard({ icon: Icon, iconClasses, iconWrapClasses, value, label }: StatCardProps) {
+function StatCard({
+  icon: Icon,
+  iconClasses,
+  iconWrapClasses,
+  value,
+  label,
+  sparklineData,
+  sparklineColor,
+  trendChangePct,
+}: StatCardProps) {
   return (
     <div className="bg-white rounded-2xl p-6 border border-black/5 shadow-sm">
-      <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${iconWrapClasses}`}>
-        <Icon className={`w-6 h-6 ${iconClasses}`} />
+      <div className="flex items-start justify-between mb-4">
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${iconWrapClasses}`}>
+          <Icon className={`w-6 h-6 ${iconClasses}`} />
+        </div>
+        {trendChangePct !== undefined && <TrendChip changePct={trendChangePct} />}
       </div>
       <p className="text-3xl font-extrabold text-gray-900 mb-1" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
         {value}
       </p>
       <p className="text-sm text-gray-500 font-medium">{label}</p>
+      {sparklineData && sparklineColor && (
+        <div className="mt-3">
+          <Sparkline data={sparklineData} color={sparklineColor} />
+        </div>
+      )}
     </div>
   )
 }
@@ -120,12 +211,67 @@ export default function DashboardHome() {
 
   const weekAgo = new Date()
   weekAgo.setDate(weekAgo.getDate() - 7)
+  const twoWeeksAgo = new Date()
+  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14)
+
   const thisWeekLeads = leads.filter((lead) => new Date(lead.createdAt) >= weekAgo)
+  const previousWeekLeads = leads.filter((lead) => {
+    const createdAt = new Date(lead.createdAt)
+    return createdAt >= twoWeeksAgo && createdAt < weekAgo
+  })
   const activeBots = bots.filter(isActiveBot)
 
   const recentLeads = [...leads]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, RECENT_LEADS_COUNT)
+
+  const glanceBots = bots.slice(0, GLANCE_BOTS_COUNT)
+
+  // Real daily buckets — no fabricated data. Used to draw the sparklines and
+  // the "leads over time" chart, and to derive the two trend chips below.
+  const dailyBuckets14 = bucketLeadsByDay(leads, SPARKLINE_WINDOW_DAYS)
+  const dailyBuckets30 = bucketLeadsByDay(leads, TREND_CHART_WINDOW_DAYS)
+
+  // "Leads This Week" trend: this week's count vs. the previous 7-day window.
+  // Left null (no chip rendered) when there's no prior week to compare
+  // against — a % change against zero would be meaningless, not honest.
+  const weekOverWeekChangePct =
+    previousWeekLeads.length > 0 ? ((thisWeekLeads.length - previousWeekLeads.length) / previousWeekLeads.length) * 100 : null
+
+  // "Total Leads" trend: how much this week's new leads grew the existing
+  // total. Also left null when there's no pre-existing base to grow from.
+  const leadsBeforeThisWeek = leads.length - thisWeekLeads.length
+  const totalGrowthPct = leadsBeforeThisWeek > 0 ? (thisWeekLeads.length / leadsBeforeThisWeek) * 100 : null
+
+  // Cumulative running total across the 14-day sparkline window, seeded from
+  // the real count of leads that already existed before the window started.
+  const cumulativeBaseline = leads.length - dailyBuckets14.reduce((sum, bucket) => sum + bucket.count, 0)
+  const totalLeadsSparkline = (() => {
+    let running = cumulativeBaseline
+    return dailyBuckets14.map((bucket) => {
+      running += bucket.count
+      return running
+    })
+  })()
+  const thisWeekSparkline = dailyBuckets14.slice(SPARKLINE_WINDOW_DAYS - 7).map((bucket) => bucket.count)
+
+  function handleExportLeadsCsv() {
+    const headers = ['Name', 'Email', 'Phone', 'Bot', 'Date', 'Status']
+    const rows = leads.map((lead) =>
+      [lead.name ?? '', lead.email ?? '', lead.phone ?? '', botName(lead.botId), new Date(lead.createdAt).toLocaleDateString(), 'New']
+        .map(csvEscape)
+        .join(',')
+    )
+    const csv = [headers.join(','), ...rows].join('\n')
+
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'vyostra-leads.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div className="space-y-8">
@@ -169,6 +315,9 @@ export default function DashboardHome() {
             iconClasses="text-white"
             value={bots.length}
             label="Total Bots"
+            // No historical/time-series data exists for bot counts (unlike
+            // leads, which carry real createdAt timestamps) — omitted rather
+            // than faked, same ethos as the lead-status comment below.
           />
           <StatCard
             icon={CheckCircle}
@@ -183,6 +332,9 @@ export default function DashboardHome() {
             iconClasses="text-blue-600"
             value={leads.length}
             label="Total Leads"
+            sparklineData={totalLeadsSparkline}
+            sparklineColor="#2563eb"
+            trendChangePct={totalGrowthPct}
           />
           <StatCard
             icon={TrendingUp}
@@ -190,6 +342,9 @@ export default function DashboardHome() {
             iconClasses="text-amber-600"
             value={thisWeekLeads.length}
             label="Leads This Week"
+            sparklineData={thisWeekSparkline}
+            sparklineColor="#d97706"
+            trendChangePct={weekOverWeekChangePct}
           />
         </div>
       )}
@@ -214,60 +369,153 @@ export default function DashboardHome() {
             Create Your First Bot
           </button>
         </div>
-      ) : (
+      ) : loading ? (
         <div className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-6 py-3.5">
             <h2 className="font-bold text-gray-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               Recent Leads
             </h2>
-            <button
-              type="button"
-              onClick={() => navigate('/dashboard/leads')}
-              className="text-violet-600 text-sm font-medium hover:text-violet-700 transition-colors"
-            >
-              View all &rarr;
-            </button>
+          </div>
+          <TableSkeleton />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-8 space-y-6">
+            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-bold text-gray-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  Leads over time
+                </h2>
+                <span className="text-xs text-gray-400">Last {TREND_CHART_WINDOW_DAYS} days</span>
+              </div>
+              <TrendChart data={dailyBuckets30.map((bucket) => ({ date: bucket.date, value: bucket.count }))} />
+            </div>
+
+            <div className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-3.5">
+                <h2 className="font-bold text-gray-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  Recent Leads
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => navigate('/dashboard/leads')}
+                  className="text-violet-600 text-sm font-medium hover:text-violet-700 transition-colors"
+                >
+                  View all &rarr;
+                </button>
+              </div>
+
+              {recentLeads.length === 0 ? (
+                <p className="text-gray-500 text-sm py-8 text-center">No leads yet</p>
+              ) : (
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50/80 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                      <th className="text-left px-6 py-3.5 font-semibold">Name</th>
+                      <th className="text-left px-6 py-3.5 font-semibold">Email</th>
+                      <th className="text-left px-6 py-3.5 font-semibold">Bot</th>
+                      <th className="text-left px-6 py-3.5 font-semibold">Date</th>
+                      {/* Real per-lead status tracking (Contacted/Converted) doesn't
+                          exist in our data model yet — every captured lead is
+                          honestly "New" until that's added as its own feature. */}
+                      <th className="text-left px-6 py-3.5 font-semibold">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentLeads.map((lead) => (
+                      <tr
+                        key={lead.leadId}
+                        className="border-b border-gray-50 hover:bg-violet-50/20 cursor-pointer transition-colors duration-100"
+                        onClick={() => navigate(`/dashboard/leads/${lead.leadId}?botId=${lead.botId}`)}
+                      >
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{lead.name}</td>
+                        <td className="px-6 py-4 text-sm text-gray-500">{lead.email}</td>
+                        <td className="px-6 py-4 text-sm text-gray-700">{botName(lead.botId)}</td>
+                        <td className="px-6 py-4 text-sm text-gray-400">{formatRelativeDate(new Date(lead.createdAt))}</td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold px-2.5 py-1 rounded-full">
+                            New
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
 
-          {loading ? (
-            <TableSkeleton />
-          ) : recentLeads.length === 0 ? (
-            <p className="text-gray-500 text-sm py-8 text-center">No leads yet</p>
-          ) : (
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-gray-50/80 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  <th className="text-left px-6 py-3.5 font-semibold">Name</th>
-                  <th className="text-left px-6 py-3.5 font-semibold">Email</th>
-                  <th className="text-left px-6 py-3.5 font-semibold">Bot</th>
-                  <th className="text-left px-6 py-3.5 font-semibold">Date</th>
-                  {/* Real per-lead status tracking (Contacted/Converted) doesn't
-                      exist in our data model yet — every captured lead is
-                      honestly "New" until that's added as its own feature. */}
-                  <th className="text-left px-6 py-3.5 font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentLeads.map((lead) => (
-                  <tr
-                    key={lead.leadId}
-                    className="border-b border-gray-50 hover:bg-violet-50/20 cursor-pointer transition-colors duration-100"
-                    onClick={() => navigate(`/dashboard/leads/${lead.leadId}?botId=${lead.botId}`)}
-                  >
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{lead.name}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{lead.email}</td>
-                    <td className="px-6 py-4 text-sm text-gray-700">{botName(lead.botId)}</td>
-                    <td className="px-6 py-4 text-sm text-gray-400">{formatRelativeDate(new Date(lead.createdAt))}</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold px-2.5 py-1 rounded-full">
-                        New
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          <div className="lg:col-span-4 space-y-6">
+            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
+              <h2 className="font-bold text-gray-900 mb-4" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                Bots at a glance
+              </h2>
+              {glanceBots.length === 0 ? (
+                <p className="text-sm text-gray-500">No bots yet</p>
+              ) : (
+                <ul className="space-y-1">
+                  {glanceBots.map((bot) => {
+                    const badge = getStatusBadge(bot.status)
+                    return (
+                      <li key={bot.botId}>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/dashboard/bots/${bot.botId}`)}
+                          className="w-full flex items-center justify-between gap-3 px-2 py-2.5 rounded-xl hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <span className="text-sm font-medium text-gray-900 truncate">{bot.name}</span>
+                          <span className={`shrink-0 inline-flex text-xs font-semibold px-2.5 py-1 rounded-full border ${badge.classes}`}>
+                            {badge.label}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+
+            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
+              <h2 className="font-bold text-gray-900 mb-4" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                Quick actions
+              </h2>
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => navigate('/dashboard/bots/new')}
+                  className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <Plus className="w-4 h-4 text-violet-600" />
+                    Create new bot
+                  </span>
+                  <ArrowRight className="w-4 h-4 text-gray-300" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/dashboard/bots')}
+                  className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <Bot className="w-4 h-4 text-violet-600" />
+                    View all bots
+                  </span>
+                  <ArrowRight className="w-4 h-4 text-gray-300" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportLeadsCsv}
+                  className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <Download className="w-4 h-4 text-violet-600" />
+                    Export leads (CSV)
+                  </span>
+                  <ArrowRight className="w-4 h-4 text-gray-300" />
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
