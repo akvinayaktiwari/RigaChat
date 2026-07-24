@@ -1,3 +1,5 @@
+import { useId } from 'react'
+
 export interface TrendChartPoint {
   date: string
   value: number
@@ -31,7 +33,13 @@ function buildPath(values: number[], width: number, height: number, min: number,
 }
 
 function defaultFormatLabel(date: string): string {
-  const parsed = new Date(date)
+  // `date` is a plain "YYYY-MM-DD" calendar-day key (see bucketLeadsByDay).
+  // Parsed bare, the spec treats it as UTC midnight, but toLocaleDateString
+  // below renders in the viewer's local timezone — for any timezone behind
+  // UTC that silently shows the wrong day (e.g. a bucket keyed "2026-07-24"
+  // displaying as "Jul 23"). Appending a local-midnight time component makes
+  // the parse match the local calendar day the key actually represents.
+  const parsed = new Date(`${date}T00:00:00`)
   if (Number.isNaN(parsed.getTime())) return date
   return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
@@ -51,6 +59,12 @@ export default function TrendChart({
   height = 160,
   formatLabel = defaultFormatLabel,
 }: TrendChartProps) {
+  // SVG <linearGradient id> is global to the document, not scoped to this
+  // component instance — a second <TrendChart> on the same page would
+  // silently pick up the first one's gradient stops via url(#...) collision
+  // without useId() giving each instance its own id.
+  const gradientId = `trend-chart-fill-${useId()}`
+
   if (data.length < 2) {
     return (
       <div className="flex items-center justify-center text-sm text-gray-400" style={{ height }}>
@@ -80,7 +94,7 @@ export default function TrendChart({
     <div>
       <svg viewBox={`0 0 ${VIEW_WIDTH} ${height}`} width="100%" height={height} preserveAspectRatio="none">
         <defs>
-          <linearGradient id="trend-chart-fill" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={color} stopOpacity={0.18} />
             <stop offset="100%" stopColor={color} stopOpacity={0} />
           </linearGradient>
@@ -90,7 +104,7 @@ export default function TrendChart({
           <line key={y} x1={0} y1={y} x2={VIEW_WIDTH} y2={y} stroke="#f1f0f5" strokeWidth={1} />
         ))}
 
-        <path d={areaPath} fill="url(#trend-chart-fill)" stroke="none" />
+        <path d={areaPath} fill={`url(#${gradientId})`} stroke="none" />
         <path d={linePath} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
         {secondaryPath && (
           <path d={secondaryPath} fill="none" stroke={secondaryColor} strokeWidth={1.5} strokeDasharray="4 3" strokeLinecap="round" />

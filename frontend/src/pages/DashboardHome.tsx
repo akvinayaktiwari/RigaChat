@@ -5,6 +5,7 @@ import { getAllLeads, getMyBots } from '../services/api'
 import { useAuth } from '../hooks/useAuth'
 import Sparkline from '../components/charts/Sparkline'
 import TrendChart from '../components/charts/TrendChart'
+import { buildCsv, downloadCsv } from '../lib/csv'
 import type { BotConfig, BotStatus, Lead } from '../types/index'
 
 const RECENT_LEADS_COUNT = 5
@@ -50,13 +51,21 @@ function formatRelativeDate(date: Date): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function csvEscape(value: string): string {
-  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
-}
-
 interface DailyBucket {
   date: string
   count: number
+}
+
+// toISOString() converts to UTC before formatting, so calling it on a
+// local-midnight Date silently rolls the date back a day for anyone in a
+// timezone ahead of UTC (IST included — this product's stated target market
+// is Indian SMBs, so this isn't a theoretical edge case). Build the key from
+// local Y/M/D components directly instead.
+function localDateKey(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 /** Real day-by-day lead counts for the last `days` calendar days (today inclusive), oldest first. Days with no leads are honestly 0, never omitted or fabricated. */
@@ -68,15 +77,30 @@ function bucketLeadsByDay(leads: Lead[], days: number): DailyBucket[] {
   for (let i = days - 1; i >= 0; i--) {
     const day = new Date(startOfToday)
     day.setDate(day.getDate() - i)
-    buckets.push({ date: day.toISOString().slice(0, 10), count: 0 })
+    buckets.push({ date: localDateKey(day), count: 0 })
   }
 
   const indexByDate = new Map(buckets.map((bucket, index) => [bucket.date, index]))
   for (const lead of leads) {
     const leadDate = new Date(lead.createdAt)
-    const key = new Date(leadDate.getFullYear(), leadDate.getMonth(), leadDate.getDate()).toISOString().slice(0, 10)
+    // A single lead with a malformed createdAt would otherwise throw a
+    // RangeError out of toISOString() below and crash the whole page —
+    // there's no ErrorBoundary in this app to contain that. Skip it instead;
+    // it just won't be counted in the trend, same as it wouldn't match any
+    // date-based filter elsewhere in the app.
+    if (Number.isNaN(leadDate.getTime())) continue
+    const key = localDateKey(leadDate)
     const index = indexByDate.get(key)
-    if (index !== undefined) buckets[index].count += 1
+    if (index !== undefined) {
+      buckets[index].count += 1
+    } else if (buckets.length > 0 && key > buckets[buckets.length - 1].date) {
+      // A createdAt dated after "today" (client/server clock drift, not an
+      // attack) would otherwise be dropped here but still counted in
+      // leads.length elsewhere — quietly under-counting this window's total
+      // relative to the real total. Clamp into today's bucket instead so the
+      // cumulative sparkline never drifts from the real leads.length.
+      buckets[buckets.length - 1].count += 1
+    }
   }
 
   return buckets
@@ -107,6 +131,51 @@ function TableSkeleton() {
           <div className="h-4 bg-gray-100 rounded" />
         </div>
       ))}
+    </div>
+  )
+}
+
+function SidePanelSkeleton({ rows }: { rows: number }) {
+  return (
+    <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
+      <div className="h-5 w-32 bg-gray-100 rounded mb-4 animate-pulse" />
+      <div className="space-y-3">
+        {Array.from({ length: rows }, (_, i) => (
+          <div key={i} className="h-9 bg-gray-50 rounded-xl animate-pulse" />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Mirrors the real loaded-state 8/4 grid shape (chart + table left, bots +
+// quick actions right) so the layout doesn't jump once data arrives.
+function DashboardGridSkeleton() {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="lg:col-span-8 space-y-6">
+        <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="h-5 w-28 bg-gray-100 rounded animate-pulse" />
+            <div className="h-3 w-16 bg-gray-50 rounded animate-pulse" />
+          </div>
+          <div className="h-40 bg-gray-50 rounded-xl animate-pulse" />
+        </div>
+
+        <div className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-3.5">
+            <h2 className="font-bold text-gray-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+              Recent Leads
+            </h2>
+          </div>
+          <TableSkeleton />
+        </div>
+      </div>
+
+      <div className="lg:col-span-4 space-y-6">
+        <SidePanelSkeleton rows={4} />
+        <SidePanelSkeleton rows={3} />
+      </div>
     </div>
   )
 }
@@ -257,20 +326,15 @@ export default function DashboardHome() {
 
   function handleExportLeadsCsv() {
     const headers = ['Name', 'Email', 'Phone', 'Bot', 'Date', 'Status']
-    const rows = leads.map((lead) =>
-      [lead.name ?? '', lead.email ?? '', lead.phone ?? '', botName(lead.botId), new Date(lead.createdAt).toLocaleDateString(), 'New']
-        .map(csvEscape)
-        .join(',')
-    )
-    const csv = [headers.join(','), ...rows].join('\n')
-
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'vyostra-leads.csv'
-    a.click()
-    URL.revokeObjectURL(url)
+    const rows = leads.map((lead) => [
+      lead.name ?? '',
+      lead.email ?? '',
+      lead.phone ?? '',
+      botName(lead.botId),
+      new Date(lead.createdAt).toLocaleDateString(),
+      'New',
+    ])
+    downloadCsv('vyostra-leads.csv', buildCsv(headers, rows))
   }
 
   return (
@@ -370,14 +434,7 @@ export default function DashboardHome() {
           </button>
         </div>
       ) : loading ? (
-        <div className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-3.5">
-            <h2 className="font-bold text-gray-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-              Recent Leads
-            </h2>
-          </div>
-          <TableSkeleton />
-        </div>
+        <DashboardGridSkeleton />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-8 space-y-6">

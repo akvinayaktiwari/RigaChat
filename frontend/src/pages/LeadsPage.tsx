@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Download, Mail, Phone, Users } from 'lucide-
 import { getAllLeads, getMyBots } from '../services/api'
 import FilterBar from '../components/FilterBar/FilterBar'
 import type { FilterChip } from '../components/FilterBar/FilterBar'
+import { buildCsv, downloadCsv } from '../lib/csv'
 import type { BotConfig, Lead } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -41,10 +42,6 @@ function getInitials(name: string | undefined): string {
     .slice(0, 2)
     .join('')
     .toUpperCase()
-}
-
-function csvEscape(value: string): string {
-  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
 }
 
 function TableSkeleton() {
@@ -135,27 +132,15 @@ export default function LeadsPage() {
 
   function handleExportCsv() {
     const headers = ['Name', 'Email', 'Phone', 'Bot', 'Date', 'Status']
-    const rows = filtered.map((lead) =>
-      [
-        lead.name ?? '',
-        lead.email ?? '',
-        lead.phone ?? '',
-        getBotName(lead.botId),
-        new Date(lead.createdAt).toLocaleDateString(),
-        'New',
-      ]
-        .map(csvEscape)
-        .join(',')
-    )
-    const csv = [headers.join(','), ...rows].join('\n')
-
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'vyostra-leads.csv'
-    a.click()
-    URL.revokeObjectURL(url)
+    const rows = filtered.map((lead) => [
+      lead.name ?? '',
+      lead.email ?? '',
+      lead.phone ?? '',
+      getBotName(lead.botId),
+      new Date(lead.createdAt).toLocaleDateString(),
+      'New',
+    ])
+    downloadCsv('vyostra-leads.csv', buildCsv(headers, rows))
   }
 
   const chips: FilterChip[] = []
