@@ -1,25 +1,26 @@
 import { useEffect, useState } from 'react'
 import type { ComponentProps } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Download, Mail, Phone, Search, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, Mail, Phone, Users } from 'lucide-react'
 import { getAllLeads, getMyBots } from '../services/api'
+import FilterBar from '../components/FilterBar/FilterBar'
+import type { FilterChip } from '../components/FilterBar/FilterBar'
+import { exportLeadsCsv } from '../lib/csv'
+import { formatRelativeDate } from '../lib/date'
 import type { BotConfig, Lead } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 const PAGE_SIZE = 10
+const DAY_MS = 24 * 60 * 60 * 1000
 
-function formatRelativeDate(date: Date): string {
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  const minutes = Math.floor(diff / 60000)
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
+type DateRange = 'all' | '7d' | '30d' | '90d'
 
-  if (minutes < 60) return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`
-  if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`
-  if (days < 7) return days === 1 ? '1 day ago' : `${days} days ago`
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
+const DATE_RANGE_OPTIONS: { value: DateRange; label: string; days: number | null }[] = [
+  { value: 'all', label: 'All time', days: null },
+  { value: '7d', label: 'Last 7 days', days: 7 },
+  { value: '30d', label: 'Last 30 days', days: 30 },
+  { value: '90d', label: 'Last 90 days', days: 90 },
+]
 
 function getInitials(name: string | undefined): string {
   if (!name) return '?'
@@ -29,10 +30,6 @@ function getInitials(name: string | undefined): string {
     .slice(0, 2)
     .join('')
     .toUpperCase()
-}
-
-function csvEscape(value: string): string {
-  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
 }
 
 function TableSkeleton() {
@@ -77,14 +74,22 @@ export default function LeadsPage() {
   const [loading, setLoading] = useState(true)
   const [selectedBotId, setSelectedBotId] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [dateRange, setDateRange] = useState<DateRange>('all')
   const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
+    let cancelled = false
+    // Guards against setState-after-unmount if the user navigates away
+    // before this resolves — same pattern DashboardHome.tsx already uses.
     Promise.all([getAllLeads(), getMyBots()]).then(([leadsRes, botsRes]) => {
+      if (cancelled) return
       setLeads(leadsRes.data ?? [])
       setBots(botsRes.data ?? [])
       setLoading(false)
     })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
@@ -94,11 +99,13 @@ export default function LeadsPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [selectedBotId, searchQuery])
+  }, [selectedBotId, searchQuery, dateRange])
 
   function getBotName(botId: string): string {
     return bots.find((b) => b.botId === botId)?.name ?? 'Unknown Bot'
   }
+
+  const selectedDateRangeOption = DATE_RANGE_OPTIONS.find((option) => option.value === dateRange) ?? DATE_RANGE_OPTIONS[0]
 
   let filtered = leads
   if (selectedBotId !== 'all') {
@@ -110,33 +117,45 @@ export default function LeadsPage() {
       (l) => (l.name ?? '').toLowerCase().includes(q) || (l.email ?? '').toLowerCase().includes(q)
     )
   }
+  if (selectedDateRangeOption.days !== null) {
+    const cutoff = Date.now() - selectedDateRangeOption.days * DAY_MS
+    filtered = filtered.filter((l) => new Date(l.createdAt).getTime() >= cutoff)
+  }
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paginatedLeads = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   function handleExportCsv() {
-    const headers = ['Name', 'Email', 'Phone', 'Bot', 'Date', 'Status']
-    const rows = filtered.map((lead) =>
-      [
-        lead.name ?? '',
-        lead.email ?? '',
-        lead.phone ?? '',
-        getBotName(lead.botId),
-        new Date(lead.createdAt).toLocaleDateString(),
-        'New',
-      ]
-        .map(csvEscape)
-        .join(',')
-    )
-    const csv = [headers.join(','), ...rows].join('\n')
+    exportLeadsCsv('vyostra-leads.csv', filtered, getBotName)
+  }
 
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'vyostra-leads.csv'
-    a.click()
-    URL.revokeObjectURL(url)
+  const chips: FilterChip[] = []
+  if (selectedBotId !== 'all') {
+    chips.push({
+      key: 'bot',
+      label: `Chatbot: ${getBotName(selectedBotId)}`,
+      onRemove: () => setSelectedBotId('all'),
+    })
+  }
+  if (searchQuery) {
+    chips.push({
+      key: 'search',
+      label: `Search: "${searchQuery}"`,
+      onRemove: () => setSearchQuery(''),
+    })
+  }
+  if (dateRange !== 'all') {
+    chips.push({
+      key: 'dateRange',
+      label: selectedDateRangeOption.label,
+      onRemove: () => setDateRange('all'),
+    })
+  }
+
+  function handleClearFilters() {
+    setSelectedBotId('all')
+    setSearchQuery('')
+    setDateRange('all')
   }
 
   return (
@@ -158,30 +177,39 @@ export default function LeadsPage() {
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-black/5 p-4 mt-6 shadow-sm flex gap-3 items-center flex-wrap">
-        <select
-          value={selectedBotId}
-          onChange={(e) => setSelectedBotId(e.target.value)}
-          className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 bg-white cursor-pointer min-w-48 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors"
+      <div className="mt-6">
+        <FilterBar
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchPlaceholder="Search by name or email..."
+          chips={chips}
+          onClearAll={handleClearFilters}
         >
-          <option value="all">All Chatbots</option>
-          {bots.map((bot) => (
-            <option key={bot.botId} value={bot.botId}>
-              {bot.name}
-            </option>
-          ))}
-        </select>
+          <select
+            value={selectedBotId}
+            onChange={(e) => setSelectedBotId(e.target.value)}
+            className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 bg-white cursor-pointer min-w-48 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors"
+          >
+            <option value="all">All Chatbots</option>
+            {bots.map((bot) => (
+              <option key={bot.botId} value={bot.botId}>
+                {bot.name}
+              </option>
+            ))}
+          </select>
 
-        <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by name or email..."
-            className="border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-sm w-64 bg-white outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors"
-          />
-        </div>
+          <select
+            value={dateRange}
+            onChange={(e) => setDateRange(e.target.value as DateRange)}
+            className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 bg-white cursor-pointer outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors"
+          >
+            {DATE_RANGE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </FilterBar>
       </div>
 
       {loading ? (
@@ -190,9 +218,22 @@ export default function LeadsPage() {
         <div className="py-16 flex flex-col items-center text-center">
           <Users size={48} className="text-violet-300 mb-4" />
           <p className="font-bold text-xl text-gray-900" style={JAKARTA_FONT}>
-            No leads yet
+            {chips.length > 0 ? 'No leads match your filters' : 'No leads yet'}
           </p>
-          <p className="text-sm text-gray-500 mt-2">Leads captured by your chatbots will appear here</p>
+          <p className="text-sm text-gray-500 mt-2">
+            {chips.length > 0
+              ? "Try adjusting or clearing your filters — there's nothing captured for this combination yet."
+              : 'Leads captured by your chatbots will appear here'}
+          </p>
+          {chips.length > 0 && (
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              className="mt-4 text-violet-600 text-sm font-medium hover:text-violet-700 transition-colors"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-black/5 shadow-sm mt-6 overflow-hidden">

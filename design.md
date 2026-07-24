@@ -733,6 +733,99 @@ New (leads):
 
 ---
 
+### Filter Bar
+
+```
+Used on: list pages with more than one real filter
+         (e.g. Leads page: chatbot, search, date range)
+
+Container: bg-white rounded-2xl p-4
+           border border-black/[0.05] shadow-sm
+
+Controls row: flex gap-3 items-center flex-wrap
+  Search input:
+    relative wrapper, Search icon (lucide) absolute
+    left-3 top-1/2 -translate-y-1/2 text-gray-400 size=16
+    input: border border-gray-200 rounded-xl
+           pl-9 pr-4 py-2.5 text-sm w-64 bg-white
+           outline-none focus:border-violet-400
+           focus:ring-2 focus:ring-violet-100
+
+  Filter dropdown (select):
+    border border-gray-200 rounded-xl
+    px-4 py-2.5 text-sm text-gray-700 bg-white
+    cursor-pointer outline-none
+    focus:border-violet-400 focus:ring-2 focus:ring-violet-100
+    (matches Form Inputs spec below — filters are just
+    selects passed into the bar, no separate style)
+
+Active-filter chips row (only rendered when >=1 filter active):
+  Wrapper: flex items-center gap-2 flex-wrap
+           mt-3 pt-3 border-t border-gray-50
+
+  Chip: bg-violet-50 text-violet-700
+        border border-violet-200
+        text-xs font-medium pl-2.5 pr-1.5 py-1
+        rounded-full, inline-flex items-center gap-1.5
+    Remove (x) button: hover:bg-violet-100 rounded-full
+                        p-0.5, X icon size=12
+
+  "Clear filters": text-gray-500 text-xs font-medium
+                   hover:text-gray-700, px-2 py-1
+
+Rule: only add a filter that maps to real, queryable data.
+      Never add a filter (e.g. status) with nothing real
+      behind it — see the "New"-only status comment in
+      lib/csv.ts (buildLeadsCsvRows) and DashboardHome.tsx's
+      Recent Leads table.
+```
+
+---
+
+### Charts
+
+```
+No charting library — hand-rolled inline SVG components only
+(components/charts/Sparkline.tsx, components/charts/TrendChart.tsx)
+
+Sparkline (stat card inline trend):
+  Height: ~26px, width: 100% of card
+  Stroke: 1.75px, round cap/join, no fill, no axes/labels
+  Color: matches the stat card's icon accent
+         (e.g. blue-600 #2563eb for Total Leads,
+         amber-600 #d97706 for Leads This Week)
+  Only rendered when the metric has real day-bucketed
+  history behind it (see Trend chip rule below)
+
+Trend chip (stat card, top-right):
+  bg-emerald-50 text-emerald-600  (positive/zero change)
+  bg-red-50 text-red-500          (negative change)
+  text-xs font-semibold px-2 py-0.5 rounded-full
+  Content: ↑ or ↓ + rounded absolute percent, e.g. "↑12%"
+  Rule: omit the chip entirely (render nothing) when there is
+        no honest baseline to compare against — never show a
+        fabricated or zero-baseline percentage. Bot-count
+        stats (Total Bots, Active Bots) never get a chip:
+        there is no time-series data for bot counts today.
+
+TrendChart (area + line, e.g. "Leads over time"):
+  Container: bg-white rounded-2xl border border-black/[0.05]
+             shadow-sm p-6 (standard card, see Cards above)
+  SVG viewBox 600×160 (scales to container width)
+  Gridlines: 5 horizontal lines, stroke #f1f0f5, 1px
+  Area fill: linearGradient of the line color,
+             18% opacity top -> 0% bottom
+  Line: stroke violet-600 #7c3aed, 2px, round cap/join
+  Optional secondary series: violet-300 #c4b5fd,
+             1.5px, dashed (4 3)
+  Latest point: white-filled circle, r=4,
+                stroke = line color, stroke-width 2
+  Axis labels: only first/last date shown,
+               text-xs text-gray-400, below the chart
+```
+
+---
+
 ### Form Inputs
 
 ```
