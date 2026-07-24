@@ -273,20 +273,6 @@ export default function DashboardHome() {
     return bots.find((bot) => bot.botId === botId)?.name ?? 'Unknown'
   }
 
-  const weekAgo = new Date()
-  weekAgo.setDate(weekAgo.getDate() - WEEK_OVER_WEEK_DAYS)
-  const twoWeeksAgo = new Date()
-  // Deliberately its own constant, not SPARKLINE_WINDOW_DAYS (also 14) -
-  // this window is "two comparison weeks", a different concept that just
-  // happens to share the number today; they shouldn't drift together if
-  // either changes later.
-  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - WEEK_OVER_WEEK_DAYS * 2)
-
-  const thisWeekLeads = leads.filter((lead) => new Date(lead.createdAt) >= weekAgo)
-  const previousWeekLeads = leads.filter((lead) => {
-    const createdAt = new Date(lead.createdAt)
-    return createdAt >= twoWeeksAgo && createdAt < weekAgo
-  })
   const activeBots = bots.filter(isActiveBot)
 
   const recentLeads = [...leads]
@@ -300,16 +286,26 @@ export default function DashboardHome() {
   const dailyBuckets14 = bucketLeadsByDay(leads, SPARKLINE_WINDOW_DAYS)
   const dailyBuckets30 = bucketLeadsByDay(leads, TREND_CHART_WINDOW_DAYS)
 
+  // "This week" is defined ONCE, from the same calendar-day buckets that
+  // draw the sparkline below — not from a separate `now - 7*24h` rolling
+  // window. Two different definitions of "this week" (rolling vs.
+  // calendar-day) would only agree when `now` is exactly local midnight;
+  // any other time of day, the stat card's number and its own sparkline
+  // could silently disagree on whether a lead near the boundary counts.
+  const thisWeekBuckets = dailyBuckets14.slice(SPARKLINE_WINDOW_DAYS - WEEK_OVER_WEEK_DAYS)
+  const previousWeekBuckets = dailyBuckets14.slice(0, SPARKLINE_WINDOW_DAYS - WEEK_OVER_WEEK_DAYS)
+  const thisWeekCount = thisWeekBuckets.reduce((sum, bucket) => sum + bucket.count, 0)
+  const previousWeekCount = previousWeekBuckets.reduce((sum, bucket) => sum + bucket.count, 0)
+
   // "Leads This Week" trend: this week's count vs. the previous 7-day window.
   // Left null (no chip rendered) when there's no prior week to compare
   // against — a % change against zero would be meaningless, not honest.
-  const weekOverWeekChangePct =
-    previousWeekLeads.length > 0 ? ((thisWeekLeads.length - previousWeekLeads.length) / previousWeekLeads.length) * 100 : null
+  const weekOverWeekChangePct = previousWeekCount > 0 ? ((thisWeekCount - previousWeekCount) / previousWeekCount) * 100 : null
 
   // "Total Leads" trend: how much this week's new leads grew the existing
   // total. Also left null when there's no pre-existing base to grow from.
-  const leadsBeforeThisWeek = leads.length - thisWeekLeads.length
-  const totalGrowthPct = leadsBeforeThisWeek > 0 ? (thisWeekLeads.length / leadsBeforeThisWeek) * 100 : null
+  const leadsBeforeThisWeek = leads.length - thisWeekCount
+  const totalGrowthPct = leadsBeforeThisWeek > 0 ? (thisWeekCount / leadsBeforeThisWeek) * 100 : null
 
   // Cumulative running total across the 14-day sparkline window, seeded from
   // the real count of leads that already existed before the window started.
@@ -321,7 +317,7 @@ export default function DashboardHome() {
       return running
     })
   })()
-  const thisWeekSparkline = dailyBuckets14.slice(SPARKLINE_WINDOW_DAYS - 7).map((bucket) => bucket.count)
+  const thisWeekSparkline = thisWeekBuckets.map((bucket) => bucket.count)
 
   function handleExportLeadsCsv() {
     exportLeadsCsv('vyostra-leads.csv', leads, botName)
@@ -394,7 +390,7 @@ export default function DashboardHome() {
             icon={TrendingUp}
             iconWrapClasses="bg-amber-50"
             iconClasses="text-amber-600"
-            value={thisWeekLeads.length}
+            value={thisWeekCount}
             label="Leads This Week"
             sparklineData={thisWeekSparkline}
             sparklineColor="#d97706"

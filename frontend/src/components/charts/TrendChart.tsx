@@ -76,6 +76,11 @@ export default function TrendChart({
   const values = data.map((d) => d.value)
   const secondaryValues = secondaryData?.map((d) => d.value) ?? []
   const allValues = [...values, ...secondaryValues]
+  // Assumes non-negative values (true for every caller today - daily counts
+  // can't be negative). A series that goes negative would compute y > height
+  // and get clipped by the SVG's default overflow:hidden instead of
+  // rendering below the baseline - if you add a delta/net-change caller,
+  // this floor needs to become Math.min(...allValues) instead.
   const min = Math.min(0, ...allValues)
   const max = Math.max(...allValues, 1)
   const range = max - min || 1
