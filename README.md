@@ -272,6 +272,7 @@ RigaChat/
 - [x] Support email auto-extraction
 - [x] Landing page (VyostraAI design)
 - [x] Interactive demo AI agent on landing
+- [x] Dashboard home redesign (sparklines, trend chart, filter bar) + leads CSV export
 
 ### 🔨 Building Now
 - [ ] PDF/DOCX knowledge base upload

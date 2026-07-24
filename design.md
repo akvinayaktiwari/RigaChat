@@ -775,7 +775,9 @@ Active-filter chips row (only rendered when >=1 filter active):
 
 Rule: only add a filter that maps to real, queryable data.
       Never add a filter (e.g. status) with nothing real
-      behind it — see Leads page "New"-only status comment.
+      behind it — see the "New"-only status comment in
+      lib/csv.ts (buildLeadsCsvRows) and DashboardHome.tsx's
+      Recent Leads table.
 ```
 
 ---
