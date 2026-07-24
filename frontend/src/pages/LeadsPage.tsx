@@ -23,7 +23,9 @@ const DATE_RANGE_OPTIONS: { value: DateRange; label: string; days: number | null
 
 function formatRelativeDate(date: Date): string {
   const now = new Date()
-  const diff = now.getTime() - date.getTime()
+  // Clamp to 0: a date in the client's future (server/client clock drift,
+  // not just malformed input) would otherwise render as "-5 minutes ago".
+  const diff = Math.max(0, now.getTime() - date.getTime())
   const minutes = Math.floor(diff / 60000)
   const hours = Math.floor(diff / 3600000)
   const days = Math.floor(diff / 86400000)
@@ -90,11 +92,18 @@ export default function LeadsPage() {
   const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
+    let cancelled = false
+    // Guards against setState-after-unmount if the user navigates away
+    // before this resolves — same pattern DashboardHome.tsx already uses.
     Promise.all([getAllLeads(), getMyBots()]).then(([leadsRes, botsRes]) => {
+      if (cancelled) return
       setLeads(leadsRes.data ?? [])
       setBots(botsRes.data ?? [])
       setLoading(false)
     })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
@@ -232,9 +241,22 @@ export default function LeadsPage() {
         <div className="py-16 flex flex-col items-center text-center">
           <Users size={48} className="text-violet-300 mb-4" />
           <p className="font-bold text-xl text-gray-900" style={JAKARTA_FONT}>
-            No leads yet
+            {chips.length > 0 ? 'No leads match your filters' : 'No leads yet'}
           </p>
-          <p className="text-sm text-gray-500 mt-2">Leads captured by your chatbots will appear here</p>
+          <p className="text-sm text-gray-500 mt-2">
+            {chips.length > 0
+              ? "Try adjusting or clearing your filters — there's nothing captured for this combination yet."
+              : 'Leads captured by your chatbots will appear here'}
+          </p>
+          {chips.length > 0 && (
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              className="mt-4 text-violet-600 text-sm font-medium hover:text-violet-700 transition-colors"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-black/5 shadow-sm mt-6 overflow-hidden">

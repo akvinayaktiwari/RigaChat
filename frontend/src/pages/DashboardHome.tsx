@@ -40,7 +40,9 @@ function isActiveBot(bot: BotConfig): boolean {
 
 function formatRelativeDate(date: Date): string {
   const now = new Date()
-  const diff = now.getTime() - date.getTime()
+  // Clamp to 0: a date in the client's future (server/client clock drift,
+  // not just malformed input) would otherwise render as "-5 minutes ago".
+  const diff = Math.max(0, now.getTime() - date.getTime())
   const minutes = Math.floor(diff / 60000)
   const hours = Math.floor(diff / 3600000)
   const days = Math.floor(diff / 86400000)
@@ -188,7 +190,10 @@ interface TrendChipProps {
 function TrendChip({ changePct }: TrendChipProps) {
   if (changePct === null) return null
   const rounded = Math.round(changePct)
-  const positive = rounded >= 0
+  // Check the sign on the un-rounded value, not `rounded >= 0` — a small
+  // real decline like -0.3% rounds to -0, and `-0 >= 0` is true in JS, so
+  // that check alone would render a decline as a green "up" chip.
+  const positive = changePct >= 0
   return (
     <span
       className={`inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full ${
@@ -267,7 +272,10 @@ export default function DashboardHome() {
     }
   }, [])
 
-  const rawName = user?.name ?? user?.email ?? 'there'
+  // `||` not `??`: an empty-string user.name (not just a missing one) must
+  // also fall through to email, or firstName below resolves to '' and the
+  // greeting reads "Good morning, 👋" with no name.
+  const rawName = user?.name || user?.email || 'there'
   // user.name can fall back to the email local-part (no spaces) when Cognito's
   // name claim is unset, so split(' ')[0] alone returned the whole string.
   const firstNamePart = rawName.split(' ')[0].split('@')[0]
