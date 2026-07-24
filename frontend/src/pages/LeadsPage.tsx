@@ -1,12 +1,24 @@
 import { useEffect, useState } from 'react'
 import type { ComponentProps } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Download, Mail, Phone, Search, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, Mail, Phone, Users } from 'lucide-react'
 import { getAllLeads, getMyBots } from '../services/api'
+import FilterBar from '../components/FilterBar/FilterBar'
+import type { FilterChip } from '../components/FilterBar/FilterBar'
 import type { BotConfig, Lead } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 const PAGE_SIZE = 10
+const DAY_MS = 24 * 60 * 60 * 1000
+
+type DateRange = 'all' | '7d' | '30d' | '90d'
+
+const DATE_RANGE_OPTIONS: { value: DateRange; label: string; days: number | null }[] = [
+  { value: 'all', label: 'All time', days: null },
+  { value: '7d', label: 'Last 7 days', days: 7 },
+  { value: '30d', label: 'Last 30 days', days: 30 },
+  { value: '90d', label: 'Last 90 days', days: 90 },
+]
 
 function formatRelativeDate(date: Date): string {
   const now = new Date()
@@ -77,6 +89,7 @@ export default function LeadsPage() {
   const [loading, setLoading] = useState(true)
   const [selectedBotId, setSelectedBotId] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [dateRange, setDateRange] = useState<DateRange>('all')
   const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
@@ -94,11 +107,13 @@ export default function LeadsPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [selectedBotId, searchQuery])
+  }, [selectedBotId, searchQuery, dateRange])
 
   function getBotName(botId: string): string {
     return bots.find((b) => b.botId === botId)?.name ?? 'Unknown Bot'
   }
+
+  const selectedDateRangeOption = DATE_RANGE_OPTIONS.find((option) => option.value === dateRange) ?? DATE_RANGE_OPTIONS[0]
 
   let filtered = leads
   if (selectedBotId !== 'all') {
@@ -109,6 +124,10 @@ export default function LeadsPage() {
     filtered = filtered.filter(
       (l) => (l.name ?? '').toLowerCase().includes(q) || (l.email ?? '').toLowerCase().includes(q)
     )
+  }
+  if (selectedDateRangeOption.days !== null) {
+    const cutoff = Date.now() - selectedDateRangeOption.days * DAY_MS
+    filtered = filtered.filter((l) => new Date(l.createdAt).getTime() >= cutoff)
   }
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
@@ -139,6 +158,35 @@ export default function LeadsPage() {
     URL.revokeObjectURL(url)
   }
 
+  const chips: FilterChip[] = []
+  if (selectedBotId !== 'all') {
+    chips.push({
+      key: 'bot',
+      label: `Chatbot: ${getBotName(selectedBotId)}`,
+      onRemove: () => setSelectedBotId('all'),
+    })
+  }
+  if (searchQuery) {
+    chips.push({
+      key: 'search',
+      label: `Search: "${searchQuery}"`,
+      onRemove: () => setSearchQuery(''),
+    })
+  }
+  if (dateRange !== 'all') {
+    chips.push({
+      key: 'dateRange',
+      label: selectedDateRangeOption.label,
+      onRemove: () => setDateRange('all'),
+    })
+  }
+
+  function handleClearFilters() {
+    setSelectedBotId('all')
+    setSearchQuery('')
+    setDateRange('all')
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between">
@@ -158,30 +206,39 @@ export default function LeadsPage() {
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-black/5 p-4 mt-6 shadow-sm flex gap-3 items-center flex-wrap">
-        <select
-          value={selectedBotId}
-          onChange={(e) => setSelectedBotId(e.target.value)}
-          className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 bg-white cursor-pointer min-w-48 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors"
+      <div className="mt-6">
+        <FilterBar
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchPlaceholder="Search by name or email..."
+          chips={chips}
+          onClearAll={handleClearFilters}
         >
-          <option value="all">All Chatbots</option>
-          {bots.map((bot) => (
-            <option key={bot.botId} value={bot.botId}>
-              {bot.name}
-            </option>
-          ))}
-        </select>
+          <select
+            value={selectedBotId}
+            onChange={(e) => setSelectedBotId(e.target.value)}
+            className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 bg-white cursor-pointer min-w-48 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors"
+          >
+            <option value="all">All Chatbots</option>
+            {bots.map((bot) => (
+              <option key={bot.botId} value={bot.botId}>
+                {bot.name}
+              </option>
+            ))}
+          </select>
 
-        <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by name or email..."
-            className="border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-sm w-64 bg-white outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors"
-          />
-        </div>
+          <select
+            value={dateRange}
+            onChange={(e) => setDateRange(e.target.value as DateRange)}
+            className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 bg-white cursor-pointer outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors"
+          >
+            {DATE_RANGE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </FilterBar>
       </div>
 
       {loading ? (
