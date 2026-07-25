@@ -1,10 +1,19 @@
+import crypto from 'node:crypto'
 import { Hono } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
 import { requireAuth, requireAuthFromQuery } from '../lib/cognito.js'
 import { zohoProvider } from '../providers/zoho-provider.js'
+import { metaProvider } from '../providers/meta-provider.js'
 import { connectZohoCRM, disconnectCRM, getCRMStatus } from '../services/crm-service.js'
 import { connectGupshup, disconnectWhatsApp, getWhatsAppStatus } from '../services/whatsapp-service.js'
-import type { ApiResponse, CRMConnection, WhatsAppConnection } from '../types/index.js'
+import {
+  connectMetaAds,
+  disconnectMetaAds,
+  getMetaLeadsForClient,
+  getMetaStatus,
+  MetaPageAlreadyConnectedError,
+} from '../services/meta-lead-service.js'
+import type { ApiResponse, CRMConnection, MetaConnection, MetaLead, WhatsAppConnection } from '../types/index.js'
 
 interface AuthEnv {
   Variables: {
@@ -15,6 +24,7 @@ interface AuthEnv {
 export const integrationRoutes = new Hono<AuthEnv>()
 
 const STATE_COOKIE = 'zoho_oauth_state'
+const META_STATE_COOKIE = 'meta_oauth_state'
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173'
 
 function errorMessage(error: unknown): string {
@@ -121,6 +131,81 @@ integrationRoutes.get('/whatsapp/status', requireAuth, async (c) => {
   try {
     const status = await getWhatsAppStatus(clientId)
     return c.json<ApiResponse<Omit<WhatsAppConnection, 'apiKeyEncrypted'> | null>>({ success: true, data: status }, 200)
+  } catch (error) {
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+integrationRoutes.get('/meta/connect', requireAuthFromQuery, (c) => {
+  const clientId = c.get('user').sub
+  const random = crypto.randomBytes(16).toString('hex')
+  const state = `${clientId}:${random}`
+
+  setCookie(c, META_STATE_COOKIE, state, {
+    httpOnly: true,
+    maxAge: 600,
+    path: '/',
+    sameSite: 'Lax',
+    secure: process.env.NODE_ENV === 'production',
+  })
+
+  return c.redirect(metaProvider.getOAuthUrl(state))
+})
+
+integrationRoutes.get('/meta/callback', async (c) => {
+  const code = c.req.query('code')
+  const state = c.req.query('state')
+  const storedState = getCookie(c, META_STATE_COOKIE)
+
+  setCookie(c, META_STATE_COOKIE, '', { path: '/', maxAge: 0 })
+
+  if (!code || !state || !storedState || state !== storedState) {
+    return c.redirect(`${FRONTEND_URL}/dashboard/meta-ads?meta=error&reason=invalid_state`)
+  }
+
+  const clientId = state.split(':')[0]
+
+  try {
+    await connectMetaAds(clientId, code)
+    return c.redirect(`${FRONTEND_URL}/dashboard/meta-ads?meta=connected`)
+  } catch (error) {
+    console.error('Meta connect error:', errorMessage(error))
+    const reason = error instanceof MetaPageAlreadyConnectedError ? 'page_already_connected' : 'auth_failed'
+    return c.redirect(`${FRONTEND_URL}/dashboard/meta-ads?meta=error&reason=${reason}`)
+  }
+})
+
+integrationRoutes.delete('/meta/disconnect', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+
+  try {
+    await disconnectMetaAds(clientId)
+    return c.json<ApiResponse<{ success: boolean }>>({ success: true, data: { success: true } }, 200)
+  } catch (error) {
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+integrationRoutes.get('/meta/status', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+
+  try {
+    const status = await getMetaStatus(clientId)
+    return c.json<ApiResponse<Omit<MetaConnection, 'pageAccessTokenEncrypted'> | null>>(
+      { success: true, data: status },
+      200
+    )
+  } catch (error) {
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+integrationRoutes.get('/meta/leads', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+
+  try {
+    const leads = await getMetaLeadsForClient(clientId)
+    return c.json<ApiResponse<MetaLead[]>>({ success: true, data: leads }, 200)
   } catch (error) {
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }
