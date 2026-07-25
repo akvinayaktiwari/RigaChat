@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid'
-import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
+import { updatePartialFields } from '../lib/dynamo-update.js'
 import type { FormLead } from '../types/index.js'
 
 const TABLE_NAME = getTableName('form_leads')
@@ -90,29 +91,8 @@ export async function updateFormLeadSyncStatus(
   leadId: string,
   status: FormLeadSyncStatus
 ): Promise<void> {
-  const fields: Record<string, unknown> = { ...status, updatedAt: new Date().toISOString() }
-
-  const updateExpressionParts: string[] = []
-  const expressionAttributeNames: Record<string, string> = {}
-  const expressionAttributeValues: Record<string, unknown> = {}
-
-  for (const [key, value] of Object.entries(fields)) {
-    if (value === undefined) continue
-    updateExpressionParts.push(`#${key} = :${key}`)
-    expressionAttributeNames[`#${key}`] = key
-    expressionAttributeValues[`:${key}`] = value
-  }
-
   try {
-    await dynamoClient.send(
-      new UpdateCommand({
-        TableName: TABLE_NAME,
-        Key: { formId, leadId },
-        UpdateExpression: `SET ${updateExpressionParts.join(', ')}`,
-        ExpressionAttributeNames: expressionAttributeNames,
-        ExpressionAttributeValues: expressionAttributeValues,
-      })
-    )
+    await updatePartialFields(TABLE_NAME, { formId, leadId }, status as Record<string, unknown>)
   } catch (error) {
     throw new Error(
       `Failed to update sync status for form lead ${leadId}: ${error instanceof Error ? error.message : String(error)}`
