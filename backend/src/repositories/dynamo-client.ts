@@ -20,6 +20,8 @@ type TableKey =
   | 'audit_log'
   | 'webhook_events'
   | 'payment_history'
+  | 'meta_leads'
+  | 'meta_page_lookup'
 
 const tableEnvVarNames: Record<TableKey, string> = {
   clients: 'DYNAMODB_TABLE_CLIENTS',
@@ -34,6 +36,8 @@ const tableEnvVarNames: Record<TableKey, string> = {
   audit_log: 'DYNAMODB_TABLE_AUDIT_LOG',
   webhook_events: 'DYNAMODB_TABLE_WEBHOOK_EVENTS',
   payment_history: 'DYNAMODB_TABLE_PAYMENT_HISTORY',
+  meta_leads: 'DYNAMODB_TABLE_META_LEADS',
+  meta_page_lookup: 'DYNAMODB_TABLE_META_PAGE_LOOKUP',
 }
 
 export function getTableName(key: TableKey): string {

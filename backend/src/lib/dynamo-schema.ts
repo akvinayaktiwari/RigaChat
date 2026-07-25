@@ -131,6 +131,53 @@ export const tableDefinitions: Record<string, TableDefinition> = {
     BillingMode: 'PAY_PER_REQUEST',
   },
 
+  // Meta Lead Ads submissions. Partition key is clientId (not pageId) since
+  // the dashboard always reads "all of this client's Meta leads" -- pageId
+  // is looked up separately via meta_page_lookup, then only used to resolve
+  // clientId, never to query leads directly.
+  //
+  // Range key is leadId (a generated UUID), NOT createdAt: two submissions
+  // for the same client in the same millisecond are plausible under real ad
+  // traffic, and an ISO-timestamp range key would let the second overwrite
+  // the first with zero error (matches form_leads' leadId-as-range-key
+  // choice, not the plain leads table's createdAt-keyed pattern). The
+  // clientId-createdAt-index GSI below provides chronological listing,
+  // since the primary key's range (leadId) doesn't sort by time.
+  meta_leads: {
+    TableName: 'DYNAMODB_TABLE_META_LEADS', // reads from process.env.DYNAMODB_TABLE_META_LEADS
+    KeySchema: [
+      { AttributeName: 'clientId', KeyType: 'HASH' },
+      { AttributeName: 'leadId', KeyType: 'RANGE' },
+    ],
+    AttributeDefinitions: [
+      { AttributeName: 'clientId', AttributeType: 'S' },
+      { AttributeName: 'leadId', AttributeType: 'S' },
+      { AttributeName: 'createdAt', AttributeType: 'S' },
+    ],
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: 'clientId-createdAt-index',
+        KeySchema: [
+          { AttributeName: 'clientId', KeyType: 'HASH' },
+          { AttributeName: 'createdAt', KeyType: 'RANGE' },
+        ],
+        Projection: { ProjectionType: 'ALL' },
+      },
+    ],
+    BillingMode: 'PAY_PER_REQUEST',
+  },
+
+  // pageId -> clientId lookup for routing the shared app-level Meta webhook.
+  // One row per connected Page today (MVP: one Page per client), but keyed
+  // by pageId (not embedded on clients) so a client connecting a second Page
+  // later is an additive new row, not a schema change.
+  meta_page_lookup: {
+    TableName: 'DYNAMODB_TABLE_META_PAGE_LOOKUP', // reads from process.env.DYNAMODB_TABLE_META_PAGE_LOOKUP
+    KeySchema: [{ AttributeName: 'pageId', KeyType: 'HASH' }],
+    AttributeDefinitions: [{ AttributeName: 'pageId', AttributeType: 'S' }],
+    BillingMode: 'PAY_PER_REQUEST',
+  },
+
   // Durable payment ledger, separate from the subscriptions table (which only
   // holds current state, not history). One row per subscription.charged event.
   payment_history: {
