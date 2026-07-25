@@ -132,6 +132,11 @@ CORS: `dashboardCors`.
 | POST | `/whatsapp/connect` | auth |
 | DELETE | `/whatsapp/disconnect` | auth |
 | GET | `/whatsapp/status` | auth |
+| GET | `/meta/connect` | `requireAuthFromQuery` — same OAuth-redirect pattern as `/zoho/connect` |
+| GET | `/meta/callback` | public — OAuth callback, can't carry a bearer token |
+| DELETE | `/meta/disconnect` | auth |
+| GET | `/meta/status` | auth |
+| GET | `/meta/leads` | auth |
 
 ## `/api/voice-agents` — voice-routes.ts
 
@@ -159,6 +164,10 @@ CORS: `widgetCors` for `/public/*`, `/context/*`, exactly `/token`, and exactly 
 | Method | Path | Auth |
 |---|---|---|
 | POST | `/gupshup` | public — inbound WhatsApp webhook, verified by provider signature rather than Cognito (not independently confirmed for this doc set — check `backend/src/lib/gupshup-webhook.ts` if that guarantee matters to you) |
+| GET | `/meta` | public — one-time Meta webhook verification handshake (`hub.challenge`), gated on `META_WEBHOOK_VERIFY_TOKEN` matching, not Cognito |
+| POST | `/meta` | public — inbound Lead Ads webhook, verified via `X-Hub-Signature-256` HMAC (`meta-lead-service.ts`), not Cognito |
+| POST | `/meta/deauthorize` | public — Meta platform deauthorize callback, verified via signed_request, not Cognito |
+| POST | `/meta/data-deletion` | public — Meta platform data-deletion callback, verified via signed_request, not Cognito |
 
 ## Health check
 

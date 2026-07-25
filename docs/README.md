@@ -29,6 +29,7 @@ Grounded in `backend/src/routes/index.ts` and `backend/src/services/`:
 - Lead capture, both from the chat widget and from standalone forms (`form-widget.js`)
 - A built-in CRM/leads dashboard, plus optional Zoho CRM sync (`integration-routes.ts`, `zoho-provider.ts`)
 - WhatsApp integration via Gupshup, including a weekly-report cron (EventBridge → Lambda)
+- Meta Lead Ads integration: OAuth-connect a Facebook Page, inbound `leadgen` webhook (HMAC-verified) synced to the CRM and WhatsApp, plus the platform-required deauthorize/data-deletion callbacks (`meta-provider.ts`, `meta-lead-service.ts`)
 - Voice agents on the OpenAI Realtime API (`gpt-realtime`), relayed through an EC2-hosted WS server, with the same RAG pipeline available as a function-calling tool
 - Plan/entitlements system (trial, free/starter/growth/agency tiers, usage tracking) — `backend/src/config/entitlements-config.ts`
 - A separate internal admin console with its own Cognito pool (`admin-routes.ts`, `cognito-staff.ts`)

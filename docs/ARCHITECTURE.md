@@ -13,7 +13,7 @@
 backend/src/
   config/          entitlements-config.ts (only file here)
   lib/             OpenAI/Pinecone/Cognito clients, KMS, SQS, utilities
-  providers/       gupshup-provider.ts, zoho-provider.ts
+  providers/       gupshup-provider.ts, zoho-provider.ts, meta-provider.ts (+ razorpay-provider.ts, voice-provider.ts, redis/ — pre-existing, not re-audited here)
   repositories/     14 files — DynamoDB, Pinecone, Redis, one per domain
   routes/           11 route files, Hono handlers only
   services/         20 files — all business logic
@@ -187,13 +187,21 @@ pipeline needed for it.
 
 ## DynamoDB tables
 
-9 tables (env-var-driven names, not hardcoded), vs. 5 listed in the root
-`CLAUDE.md`:
+9 tables as of the 2026-07-20 audit (env-var-driven names, not hardcoded),
+vs. 5 listed in the root `CLAUDE.md`, plus 2 more added by the Meta Lead Ads
+integration since:
 
 ```
 CLIENTS   BOTS   LEADS   CONVERSATIONS   KB                    <- in CLAUDE.md
 SUBSCRIPTIONS   VOICE_AGENTS   VOICE_CALL_LOGS   VOICE_KB      <- added since, undocumented in CLAUDE.md
+META_LEADS   META_PAGE_LOOKUP                                  <- added by Meta Lead Ads integration (partition keys: clientId+leadId / pageId, see backend/src/lib/dynamo-schema.ts)
 ```
+
+(`backend/src/repositories/dynamo-client.ts`'s `tableEnvVarNames` map lists
+more table keys than this section enumerates — e.g. `forms`, `form_leads`,
+`usage`, `audit_log`, `webhook_events`, `payment_history` — that drift
+predates the Meta integration and isn't re-audited here; META_LEADS and
+META_PAGE_LOOKUP are added by name since they're this branch's own diff.)
 
 `voice-repository.ts` reads its three table names through
 `process.env[CONST_NAME]` where `CONST_NAME` is itself a string constant
