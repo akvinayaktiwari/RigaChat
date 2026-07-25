@@ -64,7 +64,11 @@ const COLLECT_BULLETS: InfoBullet[] = [
 const USE_BLOCKS: UseBlock[] = [
   { icon: 'Activity', label: 'Improve Platform', text: 'To provide, maintain, and improve VyostraAI service and interface performance.' },
   { icon: 'Bell', label: 'Lead Alerts', text: 'To send lead notifications via WhatsApp and other integrated channels.' },
-  { icon: 'RefreshCw', label: 'CRM Sync', text: 'To sync captured leads with connected CRMs including Zoho CRM.' },
+  {
+    icon: 'RefreshCw',
+    label: 'CRM Sync',
+    text: 'To sync captured leads with connected CRMs including Zoho CRM. Leads sourced from Meta Lead Ads are handled identically to leads captured via chatbot or forms — synced to CRM and never sold or shared.',
+  },
   {
     icon: 'ShieldCheck',
     label: 'Privacy First',
@@ -78,11 +82,18 @@ const PARTNERS: Partner[] = [
   { name: 'Gupshup', role: 'WhatsApp BSP Delivery', icon: 'Send' },
   { name: 'Zoho CRM', role: 'Lead Synchronization', icon: 'Layers' },
   { name: 'OpenAI', role: 'LLM & AI Intelligence', icon: 'Sparkles' },
+  {
+    name: 'Meta (Facebook/Instagram Lead Ads)',
+    role: 'Lead data submitted via Facebook/Instagram Lead Ads forms, retrieved through the Meta Marketing API when a client connects their ad account.',
+    icon: 'Layers',
+  },
 ]
 
 const RIGHTS_BULLETS: InfoBullet[] = [
   { text: 'Access your account data and captured leads anytime via the dashboard.' },
-  { text: 'Request full account or lead data deletion at any time by emailing support@vyostra.com.' },
+  {
+    text: 'Request full account or lead data deletion at any time — including data received via Meta integrations — by emailing support@vyostra.com.',
+  },
   { text: 'Export your leads, analytics, and chats in CSV or JSON formats.' },
 ]
 
@@ -290,6 +301,20 @@ function StorageSection() {
               <h5 className="font-bold text-on-surface text-sm md:text-base mb-1">AWS KMS Key Envelope</h5>
               <p className="text-sm text-on-surface-variant leading-relaxed">
                 Client-specific API credentials, including WhatsApp and Zoho CRM secrets, are fully encrypted with envelope keys managed by AWS KMS.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-4 items-start">
+            <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              <Calendar className="w-4.5 h-4.5" />
+            </div>
+            <div>
+              <h5 className="font-bold text-on-surface text-sm md:text-base mb-1">Data Retention</h5>
+              <p className="text-sm text-on-surface-variant leading-relaxed">
+                Account and lead data, including data sourced via Meta integrations, is retained for the duration of
+                the client's active subscription plus 90 days, or until a deletion request is received. If you
+                disconnect a Meta integration, no further lead data is retrieved from Meta after disconnection;
+                already-synced records remain subject to this retention policy.
               </p>
             </div>
           </div>

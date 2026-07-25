@@ -17,9 +17,10 @@
 ## Backend environment variables
 
 The **root `CLAUDE.md`'s env var list is out of date** — it lists 10 vars;
-the code actually reads 24 direct `process.env.X` references plus 4 more
+the code actually reads 24 direct `process.env.X` references plus 8 more
 through a `requireEnv()` helper (`backend/src/providers/zoho-provider.ts`,
-`backend/src/lib/kms.ts`) that a naive grep for `process.env.` misses entirely.
+`backend/src/providers/meta-provider.ts`, `backend/src/lib/kms.ts`) that a
+naive grep for `process.env.` misses entirely.
 
 Direct `process.env.*` reads:
 
@@ -41,12 +42,30 @@ Read via `process.env[dynamicName]` in `backend/src/repositories/voice-repositor
 DYNAMODB_TABLE_VOICE_CALL_LOGS   DYNAMODB_TABLE_VOICE_KB
 ```
 
-Read via `requireEnv('NAME')` — **these throw at module load time if unset**,
-not lazily on first use (see [SECURITY.md](./SECURITY.md) for why that matters
-for the crawler Lambda specifically):
+Same indirection pattern in `backend/src/repositories/dynamo-client.ts`'s
+`tableEnvVarNames` map (pre-dates this list, not fully re-audited here) —
+added by the Meta Lead Ads integration specifically:
+
+```
+DYNAMODB_TABLE_META_LEADS   DYNAMODB_TABLE_META_PAGE_LOOKUP
+```
+
+Read via `requireEnv('NAME')` — **the WhatsApp/Zoho ones throw at module load
+time if unset**, not lazily on first use (see [SECURITY.md](./SECURITY.md)
+for why that matters for the crawler Lambda specifically):
 
 ```
 WHATSAPP_KMS_KEY_ID   ZOHO_CLIENT_ID   ZOHO_CLIENT_SECRET   ZOHO_REDIRECT_URI
+```
+
+The four Meta ones are also read via a `requireEnv('NAME')` helper (a
+separate, local copy of it defined in `meta-provider.ts`), but **throw lazily
+instead** — each call site is inside an OAuth/webhook handler function, not
+at module top level, so an unset Meta var doesn't affect Lambda cold start
+the way the Zoho ones do:
+
+```
+META_APP_ID   META_APP_SECRET   META_REDIRECT_URI   META_WEBHOOK_VERIFY_TOKEN
 ```
 
 `.env` (git-ignored, confirmed via `.gitignore`) is loaded by

@@ -17,3 +17,4 @@ frontend/.env.local
 frontend/.env.production
 frontend/.env.production.local
 frontend/*.zip
+.gstack/

@@ -117,7 +117,7 @@ esbuild for bundling, aws-jwt-verify for Cognito JWT validation.
 Two Lambda functions (buffered `rigachat-api` + streaming `rigachat-streaming`), DynamoDB (7 tables, PAY_PER_REQUEST), S3 + CloudFront (separate distributions for dashboard and widget CDN), Cognito, SQS, AWS KMS for credential encryption.
 
 **Integrations**
-Gupshup (WhatsApp), Zoho CRM
+Gupshup (WhatsApp), Zoho CRM, Meta Lead Ads
 
 **DevOps**
 GitHub Actions CI/CD, AWS CLI
@@ -220,6 +220,12 @@ npm run dev
 | `ZOHO_CLIENT_ID` | Optional | Zoho CRM OAuth |
 | `ZOHO_CLIENT_SECRET` | Optional | Zoho CRM OAuth |
 | `ZOHO_REDIRECT_URI` | Optional | Zoho CRM OAuth callback |
+| `META_APP_ID` | Optional | Meta Lead Ads OAuth |
+| `META_APP_SECRET` | Optional | Meta Lead Ads OAuth + webhook signature verification |
+| `META_REDIRECT_URI` | Optional | Meta Lead Ads OAuth callback |
+| `META_WEBHOOK_VERIFY_TOKEN` | Optional | Meta Lead Ads webhook handshake |
+| `DYNAMODB_TABLE_META_LEADS` | Optional | Meta Lead Ads leads table name |
+| `DYNAMODB_TABLE_META_PAGE_LOOKUP` | Optional | Meta Page → client routing table name |
 | `SQS_CRAWLER_QUEUE_URL` | Required | Crawler job queue |
 | `LAMBDA_FUNCTION_NAME` | Required | Buffered Lambda, used by deploy script |
 | `LAMBDA_STREAMING_FUNCTION_NAME` | Required | Streaming Lambda, used by deploy script |
@@ -273,6 +279,7 @@ RigaChat/
 - [x] Landing page (VyostraAI design)
 - [x] Interactive demo AI agent on landing
 - [x] Dashboard home redesign (sparklines, trend chart, filter bar) + leads CSV export
+- [x] Meta Lead Ads integration
 
 ### 🔨 Building Now
 - [ ] PDF/DOCX knowledge base upload
@@ -284,7 +291,6 @@ RigaChat/
 - [ ] VyostraAI production domain launch
 - [ ] Puppeteer crawler (SPA support)
 - [ ] HubSpot CRM integration
-- [ ] Meta Lead Ads integration
 - [ ] White label agency tier
 - [ ] Analytics dashboard
 - [ ] MCP server for client onboarding

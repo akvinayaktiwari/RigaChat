@@ -131,6 +131,23 @@ export async function removeClientWhatsAppConnection(clientId: string): Promise<
   }
 }
 
+export async function removeClientMetaConnection(clientId: string): Promise<void> {
+  try {
+    await dynamoClient.send(
+      new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { clientId },
+        UpdateExpression: 'REMOVE metaConnection SET updatedAt = :updatedAt',
+        ExpressionAttributeValues: { ':updatedAt': new Date().toISOString() },
+      })
+    )
+  } catch (error) {
+    throw new Error(
+      `Failed to remove Meta connection for client ${clientId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
 export async function getAllClients(): Promise<ClientRecord[]> {
   try {
     const clients: ClientRecord[] = []

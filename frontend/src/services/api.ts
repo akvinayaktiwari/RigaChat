@@ -17,6 +17,8 @@ import type {
   KBUploadUrlResult,
   KnowledgeBaseEntry,
   Lead,
+  MetaConnection,
+  MetaLead,
   ResyncResult,
   SetupBotResult,
   StartIndexingResult,
@@ -381,6 +383,28 @@ export function connectWhatsApp(data: ConnectWhatsAppInput): Promise<ApiResponse
 
 export function disconnectWhatsApp(): Promise<ApiResponse<{ success: boolean }>> {
   return apiClient<{ success: boolean }>('/api/integrations/whatsapp/disconnect', 'DELETE')
+}
+
+// Meta Lead Ads Integration API
+
+export function getMetaStatus(): Promise<ApiResponse<MetaConnection | null>> {
+  return apiClient<MetaConnection | null>('/api/integrations/meta/status')
+}
+
+// GET /meta/connect is a top-level browser redirect (not a fetch call), same
+// reasoning as connectZoho above — the auth token travels as a query param,
+// verified server-side by requireAuthFromQuery.
+export function connectMeta(): void {
+  if (!authToken) return
+  window.location.href = `${BASE_URL}/api/integrations/meta/connect?token=${encodeURIComponent(authToken)}`
+}
+
+export function disconnectMeta(): Promise<ApiResponse<{ success: boolean }>> {
+  return apiClient<{ success: boolean }>('/api/integrations/meta/disconnect', 'DELETE')
+}
+
+export function getMetaLeads(): Promise<ApiResponse<MetaLead[]>> {
+  return apiClient<MetaLead[]>('/api/integrations/meta/leads')
 }
 
 // Voice Agents
