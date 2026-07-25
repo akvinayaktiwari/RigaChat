@@ -281,6 +281,34 @@ export interface ConnectWhatsAppInput {
   notificationNumber: string
 }
 
+export interface MetaConnection {
+  provider: 'meta'
+  connected: boolean
+  pageId: string
+  pageName: string
+  connectedAt: string
+}
+
+export interface MetaLead {
+  leadId: string
+  pageId: string
+  clientId: string
+  source: 'meta'
+  name?: string
+  phone?: string
+  email?: string
+  propertyInterest?: string
+  budgetRange?: string
+  customFields: string | Record<string, string>
+  sourceUrl: string
+  createdAt: string
+  crmSynced?: boolean
+  crmSyncedAt?: string
+  crmExternalId?: string
+  crmSyncError?: string
+  crmSyncAttempts?: number
+}
+
 export interface Preferences {
   emailNotifications: boolean
   desktopAlerts: boolean

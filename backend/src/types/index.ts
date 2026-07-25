@@ -197,6 +197,15 @@ export interface WhatsAppConnection {
   connectedAt: string
 }
 
+export interface MetaConnection {
+  provider: 'meta'
+  connected: boolean
+  pageId: string
+  pageName: string
+  pageAccessTokenEncrypted: string
+  connectedAt: string
+}
+
 export interface ForgotPasswordInput {
   email: string
 }
@@ -232,6 +241,7 @@ export interface ClientRecord {
   plan: 'starter' | 'growth' | 'agency'
   crmConnection?: CRMConnection
   whatsappConnection?: WhatsAppConnection
+  metaConnection?: MetaConnection
   createdAt: string
   updatedAt: string
 }
@@ -294,6 +304,34 @@ export interface FormLead {
   formId: string
   clientId: string
   source: 'form'
+  customFields: string
+  sourceUrl: string
+  createdAt: string
+  updatedAt?: string
+  crmSynced?: boolean
+  crmSyncedAt?: string
+  crmExternalId?: string
+  crmSyncError?: string
+  crmSyncAttempts?: number
+}
+
+// Meta Lead Ads submission. Unlike FormLead (tied to a formId the client
+// built with the form builder's FormField[] definitions), Meta forms are
+// authored inside Meta's own Ads Manager -- we never see field types up
+// front, only whatever question labels the client's Instant Form happens to
+// use. name/phone/email/propertyInterest/budgetRange are populated via
+// best-effort label matching in meta-lead-service.ts; anything unmatched
+// stays in customFields, same fallback FormLead already uses for its blob.
+export interface MetaLead {
+  leadId: string
+  pageId: string
+  clientId: string
+  source: 'meta'
+  name?: string
+  phone?: string
+  email?: string
+  propertyInterest?: string
+  budgetRange?: string
   customFields: string
   sourceUrl: string
   createdAt: string
