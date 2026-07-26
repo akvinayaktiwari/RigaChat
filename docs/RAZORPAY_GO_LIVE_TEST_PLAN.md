@@ -256,3 +256,59 @@ from the AWS Console directly, not from this file.
 Also corrected: the webhook route is `POST /api/webhooks/razorpay`, not
 `POST /webhooks/razorpay` as earlier in this doc — mounted under
 `/api/webhooks` in `routes/index.ts`.
+
+## Update 2026-07-26 (continued): live browser QA found a real billing bug
+
+Ran `/qa` against this branch: provisioned a real throwaway Cognito account
+(`admin-create-user` + `admin-set-user-password`, bypassing email
+verification), logged into the actual dashboard, and drove the real
+Upgrade-plan → Razorpay checkout flow in a browser. Confirmed real
+Razorpay API calls, correct price/terms in the checkout modal, correct
+"Test Mode" banner. The cross-origin Razorpay iframe couldn't be driven by
+the browser tool (a tooling limitation, not a RigaChat issue), so
+completing the card payment was simulated with a correctly-signed webhook
+for that exact real subscription — standing in for what Razorpay's servers
+send after a real card charge succeeds.
+
+**Found: `Subscription.plan` is never updated anywhere in the subscribe →
+activate flow.** After activation, `status` correctly flipped to `active`,
+but `plan` stayed `free` — confirmed directly in DynamoDB, not just a UI
+glitch. Since `entitlement-service.ts` computes limits via `PLANS[plan]`,
+**a customer who pays for Starter/Growth/Agency would keep free-tier limits
+(50 conversations/25 leads) indefinitely** despite being charged
+correctly and `status` showing active. This is a pre-existing bug on
+`main`, unrelated to this branch's other work — it surfaced now because
+this was the first time anyone walked the full subscribe → activate loop
+end-to-end instead of reviewing the webhook handler in isolation.
+
+**Fixed**: `billing-service.ts`'s `subscribeToTier()` already sends
+`{ clientId, tier }` as the Razorpay subscription's `notes` at creation
+time, and Razorpay echoes `notes` back on every webhook for that
+subscription — `webhook-service.ts` just never read `notes.tier` back out.
+Now sets `Subscription.plan` from it whenever present and a recognized
+billable tier.
+
+**Re-verified after the fix**, in the same real browser session: re-sent a
+signed `subscription.charged` webhook for the same real subscription,
+confirmed `plan` flipped `free` → `starter` in DynamoDB, then confirmed in
+the UI — Settings now shows "Starter / Active" with the correct 500
+conversations/50 leads limits (was 50/25 before the fix), and the Billing
+page correctly lists both payments (₹1,999.00, Paid, invoice column
+gracefully shows "—" since no GSTIN is configured yet).
+
+**No other bugs found.** Nav layout (desktop + mobile) verified clean with
+the new Billing entry — an initial apparent mobile regression turned out to
+be a testing artifact (resized viewport without navigating) rather than a
+real bug; a fresh navigation at 375px collapses to the mobile hamburger
+layout correctly, matching the rest of the app.
+
+Test account, DynamoDB rows, and the Razorpay test-mode subscription were
+all cleaned up after testing (Cognito user deleted, `subscriptions`/
+`clients`/`payment_history` rows deleted, Razorpay subscription cancelled
+via API). `webhook_events` rows from testing were left in place (90-day
+TTL, same as production behavior, no cleanup needed).
+
+**Given this finding, the recommendation changes**: this branch
+(`fix/razorpay-go-live-p0`) should land before flipping to live keys, not
+just be a nice-to-have. Going live without it means every paying customer
+this week would be silently under-entitled relative to what they paid for.
