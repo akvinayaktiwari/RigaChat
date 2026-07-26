@@ -503,6 +503,11 @@ export interface PaymentRecord {
   currency: string
   status: string
   createdAt: string
+  // Razorpay-hosted invoice page (short_url from their Invoices API), only
+  // present when the account's Razorpay settings have GST/invoicing
+  // configured. null when Razorpay didn't generate an invoice for this
+  // charge, or the lookup failed - never blocks payment recording.
+  invoiceUrl?: string | null
 }
 
 export type AuditAction = 'toggle_internal' | 'extend_trial' | 'change_plan' | 'set_overrides'

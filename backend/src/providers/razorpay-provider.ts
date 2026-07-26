@@ -47,6 +47,21 @@ export class RazorpayProvider {
 
     return crypto.timingSafeEqual(expectedBuffer, signatureBuffer)
   }
+
+  // Returns null (never throws) on any lookup failure - this is called from
+  // webhook processing, where a broken invoice-URL lookup must not block
+  // recording the payment itself. short_url is Razorpay's hosted invoice
+  // page; whether it carries GST/tax details depends on the account's
+  // Razorpay settings, not on anything this app controls.
+  async fetchInvoiceShortUrl(invoiceId: string): Promise<string | null> {
+    try {
+      const invoice = await razorpayClient.invoices.fetch(invoiceId)
+      return invoice.short_url ?? null
+    } catch (error) {
+      console.error(`Failed to fetch Razorpay invoice ${invoiceId}:`, error)
+      return null
+    }
+  }
 }
 
 export const razorpayProvider = new RazorpayProvider()

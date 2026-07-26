@@ -11,6 +11,7 @@ import {
   Menu,
   MessageSquare,
   Mic,
+  Receipt,
   Settings,
   Users,
 } from 'lucide-react'
@@ -25,6 +26,7 @@ const NAV_LINKS: { to: string; label: string; icon: LucideIcon; end: boolean }[]
   { to: '/dashboard/leads', label: 'Leads', icon: Users, end: false },
   { to: '/dashboard/whatsapp', label: 'WhatsApp', icon: MessageSquare, end: false },
   { to: '/dashboard/meta-ads', label: 'Meta Ads', icon: Megaphone, end: false },
+  { to: '/dashboard/billing', label: 'Billing', icon: Receipt, end: false },
   { to: '/dashboard/settings', label: 'Settings', icon: Settings, end: false },
 ]
 
@@ -44,6 +46,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith('/dashboard/kb')) return 'Knowledge Base'
   if (pathname === '/dashboard/whatsapp') return 'WhatsApp'
   if (pathname === '/dashboard/meta-ads') return 'Meta Ads'
+  if (pathname === '/dashboard/billing') return 'Billing'
   if (pathname === '/dashboard/settings') return 'Settings'
   return 'Dashboard'
 }

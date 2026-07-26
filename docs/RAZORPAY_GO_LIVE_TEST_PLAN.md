@@ -25,7 +25,7 @@
   enough data (`providerSubscriptionId`, `razorpayKeyId`) for the frontend
   to reopen the *same* Razorpay subscription rather than creating a
   duplicate.
-- **Webhook**: `POST /webhooks/razorpay` — HMAC-SHA256 signature check
+- **Webhook**: `POST /api/webhooks/razorpay` — HMAC-SHA256 signature check
   (`timingSafeEqual`, not `===`), idempotency via `x-razorpay-event-id` +
   `webhook_events` table, `clientId` cross-checked against
   `subscription.notes.clientId` before any write, payment logged to
@@ -189,3 +189,70 @@ announcing the switch.
   fast-follow, not a go-live blocker.
 - Anything on `feature/meta-ads-integration` (Meta Lead Ads, WhatsApp
   agent/journeys) — unrelated, unmerged.
+
+## Update 2026-07-26: fixes shipped + invoicing resolved + E2E verified
+
+Branch `fix/razorpay-go-live-p0` (off `main`, not yet pushed/merged) closes
+findings #1 and #3, and adds the GST invoicing gap from finding #2.
+
+**Findings #1 and #3 fixed:**
+- `webhook-service.ts` now logs `payment.failed` explicitly (payment id,
+  Razorpay error code/description, resolved clientId if any) instead of
+  silently dropping it. Deliberately does not touch subscription `status` —
+  that stays driven by Razorpay's own lifecycle events, to avoid a race.
+- `.env.example` now documents all 4 `RAZORPAY_*` vars plus the previously
+  undocumented `DYNAMODB_TABLE_USAGE`, `DYNAMODB_TABLE_WEBHOOK_EVENTS`,
+  `DYNAMODB_TABLE_PAYMENT_HISTORY`.
+
+**Finding #2 (invoicing) resolved as: Razorpay issues the invoice, RigaChat
+links to it.** Decision, not a guess — confirmed against Razorpay's actual
+API docs before building: subscription charges carry a `payment.invoice_id`
+in the webhook payload when the account's Razorpay settings have GST
+details configured; `GET /v1/invoices/{id}` (`razorpayClient.invoices.fetch`)
+returns a `short_url` — Razorpay's hosted, customer-facing invoice/receipt
+page, tax-compliant per Razorpay's own account-level GST configuration.
+RigaChat does not generate or store tax data itself.
+- **Your action, not code**: add your GSTIN in the Razorpay Dashboard
+  account settings. Without it, Razorpay won't generate invoices and
+  `invoiceUrl` will just stay empty for every payment — the feature degrades
+  gracefully (list still shows, no crash), it just won't have invoice links
+  until that's configured.
+- Shipped: `webhook-service.ts` fetches and stores `invoiceUrl` per payment
+  (best-effort — a failed invoice lookup never blocks recording the
+  payment itself). New `GET /api/billing/payments` route, `Billing` page in
+  the client dashboard (nav entry added) showing date/amount/status/payment
+  ID/invoice link per charge.
+
+**E2E verified**, not just code-reviewed — ran a real local backend
+(`npm run dev`, real test-mode Razorpay keys, real dev DynamoDB tables) and
+POSTed correctly HMAC-signed webhook payloads covering all of these, all
+passing:
+invalid signature (400) · missing event-id header (400) ·
+`subscription.activated` (status → active) ·
+`subscription.charged` (payment_history row written, `currentPeriodEnd`
+bumped, `invoiceUrl` correctly null when no `invoice_id` present) ·
+duplicate event delivery (idempotent, no double-write) ·
+`payment.failed` (logged, subscription status untouched) ·
+subscription-id mismatch (ignored, no cross-account write) ·
+unknown clientId (ignored, no crash) · unmapped event type (ignored) ·
+`subscription.cancelled` (status → cancelled). Also verified
+`getPaymentHistory` returns rows newest-first with `invoiceUrl` intact.
+
+**Not yet E2E tested** (needs a real Cognito login, not just a script):
+the actual browser checkout flow (`/api/billing/subscribe` → Razorpay
+hosted checkout modal → activation), and the new Billing page rendering in
+a real browser. Recommend running `/qa` against a real signup + checkout
+before flipping to live keys.
+
+**New finding, not yet fixed — hygiene, not urgent**: local `backend/.env`
+has two different `RAZORPAY_WEBHOOK_SECRET=` lines (duplicate key, different
+values). Node's `--env-file` silently uses the *last* one — confirmed by
+testing, not assumed — so the server works, but this is confusing and worth
+cleaning up locally: delete the stale line and confirm the remaining value
+matches what's registered in Razorpay's dashboard for this webhook. Local
+file only — doesn't affect the deployed Lambdas, which get their env vars
+from the AWS Console directly, not from this file.
+
+Also corrected: the webhook route is `POST /api/webhooks/razorpay`, not
+`POST /webhooks/razorpay` as earlier in this doc — mounted under
+`/api/webhooks` in `routes/index.ts`.

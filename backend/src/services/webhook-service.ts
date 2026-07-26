@@ -48,6 +48,10 @@ interface RazorpayPaymentEntity {
   // these directly, not nested under a generic "error" object.
   error_code?: string
   error_description?: string
+  // Set when this charge has an associated Razorpay Invoice (subscription
+  // charges get one automatically when the account's Razorpay settings have
+  // GST/invoicing configured). Absent otherwise.
+  invoice_id?: string
 }
 
 interface RazorpayWebhookPayload {
@@ -204,6 +208,12 @@ export async function processRazorpayWebhook(
 
     const paymentEntity = parsed.payload.payment?.entity
     if (paymentEntity) {
+      // Best-effort: a failed invoice lookup must not block recording the
+      // payment itself, so this never throws (see fetchInvoiceShortUrl).
+      const invoiceUrl = paymentEntity.invoice_id
+        ? await razorpayProvider.fetchInvoiceShortUrl(paymentEntity.invoice_id)
+        : null
+
       await logPayment({
         accountId: clientId,
         paidAt: new Date().toISOString(),
@@ -212,6 +222,7 @@ export async function processRazorpayWebhook(
         amount: paymentEntity.amount,
         currency: paymentEntity.currency,
         status: paymentEntity.status,
+        invoiceUrl,
       })
     } else {
       console.error(`Razorpay webhook subscription.charged has no payload.payment.entity`, { eventId })

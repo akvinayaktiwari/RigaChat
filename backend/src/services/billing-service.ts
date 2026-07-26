@@ -1,5 +1,7 @@
 import { getByAccountId, updatePartial } from '../repositories/subscription-repository.js'
+import { getPaymentHistory as getPaymentHistoryFromRepo } from '../repositories/payment-history-repository.js'
 import { razorpayProvider } from '../providers/razorpay-provider.js'
+import type { PaymentRecord } from '../types/index.js'
 
 export type BillableTier = 'starter' | 'growth' | 'agency'
 
@@ -109,4 +111,8 @@ export async function subscribeToTier(clientId: string, tier: BillableTier): Pro
   })
 
   return { subscriptionId: created.id, razorpayKeyId }
+}
+
+export async function getPaymentHistory(clientId: string): Promise<PaymentRecord[]> {
+  return getPaymentHistoryFromRepo(clientId)
 }
