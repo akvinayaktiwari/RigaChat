@@ -44,6 +44,10 @@ interface RazorpayPaymentEntity {
   amount: number
   currency: string
   status: string
+  // Only present on a failed payment. Razorpay's payment entity carries
+  // these directly, not nested under a generic "error" object.
+  error_code?: string
+  error_description?: string
 }
 
 interface RazorpayWebhookPayload {
@@ -122,6 +126,28 @@ export async function processRazorpayWebhook(
 
   const eventType = parsed.event
   const subscriptionEntity = parsed.payload.subscription?.entity
+
+  // payment.failed isn't in RAZORPAY_STATUS_MAP: a declined recurring charge
+  // doesn't change subscription status on its own (Razorpay's own retry
+  // schedule does that later via subscription.pending/halted). Without this
+  // branch the event either falls into "no subscription entity, ignored" or
+  // "unmapped event type, ignored" below and the failure is never logged
+  // anywhere — the account keeps showing 'active' with no visible signal
+  // that a charge just failed. This branch only logs; it deliberately does
+  // not touch subscription status, to avoid racing the later lifecycle event.
+  if (eventType === 'payment.failed') {
+    const paymentEntity = parsed.payload.payment?.entity
+    console.error(`Razorpay payment failed`, {
+      eventId,
+      subscriptionId: subscriptionEntity?.id ?? null,
+      clientId: subscriptionEntity?.notes?.clientId ?? null,
+      paymentId: paymentEntity?.id ?? null,
+      errorCode: paymentEntity?.error_code ?? null,
+      errorDescription: paymentEntity?.error_description ?? null,
+    })
+    await markProcessed(eventId, 'razorpay', eventType)
+    return { status: 200, message: 'Payment failure logged' }
+  }
 
   if (!subscriptionEntity) {
     console.error(`Razorpay webhook ${eventType} has no payload.subscription.entity`, { eventId })
