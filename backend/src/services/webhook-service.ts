@@ -4,7 +4,9 @@ import { getByAccountId, updatePartial } from '../repositories/subscription-repo
 import { hasProcessed, markProcessed } from '../repositories/webhook-event-repository.js'
 import { logPayment } from '../repositories/payment-history-repository.js'
 import { invalidateEntitlementsCache } from './entitlement-service.js'
-import type { Subscription, SubscriptionStatus } from '../types/index.js'
+import type { PlanTier, Subscription, SubscriptionStatus } from '../types/index.js'
+
+const BILLABLE_TIERS: ReadonlySet<PlanTier> = new Set(['starter', 'growth', 'agency'])
 
 export function logGupshupWebhookEvent(body: unknown): void {
   if (isGupshupDeliveryEvent(body)) {
@@ -200,6 +202,19 @@ export async function processRazorpayWebhook(
   }
 
   const updates: Partial<Omit<Subscription, 'accountId' | 'createdAt'>> = { status: mappedStatus }
+
+  // billing-service.ts's subscribeToTier() sends { clientId, tier } as the
+  // Razorpay subscription's notes at creation time, and Razorpay echoes
+  // notes back on every webhook for that subscription - so this is the only
+  // place `plan` ever gets set post-checkout. Without it, a client's `plan`
+  // stays whatever it was before subscribing (e.g. 'free'), so a paying
+  // Starter/Growth/Agency customer's entitlements (PLANS[plan] in
+  // entitlement-service.ts) never actually upgrade despite status going
+  // active and being charged. Found via live E2E testing, not a hypothetical.
+  const notedTier = subscriptionEntity.notes?.tier
+  if (notedTier && BILLABLE_TIERS.has(notedTier as PlanTier)) {
+    updates.plan = notedTier as PlanTier
+  }
 
   if (eventType === 'subscription.charged') {
     if (subscriptionEntity.current_end) {
