@@ -10,6 +10,43 @@
 > `razorpay-provider.ts`, `lib/razorpay.ts`, `.env.example`,
 > `.github/workflows/deploy.yml`), not assumed.
 
+## 🚧 CURRENT BLOCKER (as of 2026-07-26, evening): Subscriptions product not yet approved by Razorpay
+
+**This is now the actual timeline driver, not engineering readiness.** Every
+checkout attempt (test mode AND live mode) fails at Razorpay with:
+
+```json
+{"error":{"code":"BAD_REQUEST_ERROR","description":"Your payment was not
+successful as the seller does not support recurring payments...",
+"reason":"recurring_payment_not_enabled"}}
+```
+
+Confirmed via Razorpay's own API (zero payment records exist at all — every
+attempt fails before Razorpay ever processes a card) and via the dashboard:
+Razorpay's Subscriptions product for this account shows **"in the process
+of going live"** — i.e. still under Razorpay's own review/activation
+pipeline. This blocks recurring checkouts in *both* test and live mode,
+which is why it wasn't caught by testing sooner — no amount of retrying
+with different test cards would have worked.
+
+**Nothing on the code side is blocked by this** — the webhook/activation
+logic (payment.failed logging, invoice capture, the plan-not-updating fix)
+is already built and verified via signed-webhook simulation, since a real
+click-through literally cannot succeed until this clears. **Action item:
+contact Razorpay support directly to ask for status/timeline**, since
+"in the process of going live" has no visible ETA from the dashboard alone.
+
+**Once this clears**: do one real click-through in test mode with the test
+cards below to confirm the full loop end-to-end for real (not simulated),
+then the one small live-mode transaction from the cutover sequence before
+announcing the switch.
+
+Razorpay's official test cards (test mode only — confirmed against their
+own docs, not guessed): Visa `4100 2800 0000 1007`, Mastercard
+`5500 6700 0000 1002`, RuPay `6527 6589 0000 1005`. Any future expiry, any
+CVV. For the OTP step: 4-10 digits simulates success, fewer than 4 digits
+simulates a decline (useful for testing the `payment.failed` fix for real).
+
 ## What's already built (main branch)
 
 - **Subscription checkout**: `POST /api/billing/subscribe` (auth required) →
