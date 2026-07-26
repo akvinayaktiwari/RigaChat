@@ -4,7 +4,9 @@ import { getByAccountId, updatePartial } from '../repositories/subscription-repo
 import { hasProcessed, markProcessed } from '../repositories/webhook-event-repository.js'
 import { logPayment } from '../repositories/payment-history-repository.js'
 import { invalidateEntitlementsCache } from './entitlement-service.js'
-import type { Subscription, SubscriptionStatus } from '../types/index.js'
+import type { PlanTier, Subscription, SubscriptionStatus } from '../types/index.js'
+
+const BILLABLE_TIERS: ReadonlySet<PlanTier> = new Set(['starter', 'growth', 'agency'])
 
 export function logGupshupWebhookEvent(body: unknown): void {
   if (isGupshupDeliveryEvent(body)) {
@@ -44,6 +46,14 @@ interface RazorpayPaymentEntity {
   amount: number
   currency: string
   status: string
+  // Only present on a failed payment. Razorpay's payment entity carries
+  // these directly, not nested under a generic "error" object.
+  error_code?: string
+  error_description?: string
+  // Set when this charge has an associated Razorpay Invoice (subscription
+  // charges get one automatically when the account's Razorpay settings have
+  // GST/invoicing configured). Absent otherwise.
+  invoice_id?: string
 }
 
 interface RazorpayWebhookPayload {
@@ -123,6 +133,28 @@ export async function processRazorpayWebhook(
   const eventType = parsed.event
   const subscriptionEntity = parsed.payload.subscription?.entity
 
+  // payment.failed isn't in RAZORPAY_STATUS_MAP: a declined recurring charge
+  // doesn't change subscription status on its own (Razorpay's own retry
+  // schedule does that later via subscription.pending/halted). Without this
+  // branch the event either falls into "no subscription entity, ignored" or
+  // "unmapped event type, ignored" below and the failure is never logged
+  // anywhere — the account keeps showing 'active' with no visible signal
+  // that a charge just failed. This branch only logs; it deliberately does
+  // not touch subscription status, to avoid racing the later lifecycle event.
+  if (eventType === 'payment.failed') {
+    const paymentEntity = parsed.payload.payment?.entity
+    console.error(`Razorpay payment failed`, {
+      eventId,
+      subscriptionId: subscriptionEntity?.id ?? null,
+      clientId: subscriptionEntity?.notes?.clientId ?? null,
+      paymentId: paymentEntity?.id ?? null,
+      errorCode: paymentEntity?.error_code ?? null,
+      errorDescription: paymentEntity?.error_description ?? null,
+    })
+    await markProcessed(eventId, 'razorpay', eventType)
+    return { status: 200, message: 'Payment failure logged' }
+  }
+
   if (!subscriptionEntity) {
     console.error(`Razorpay webhook ${eventType} has no payload.subscription.entity`, { eventId })
     await markProcessed(eventId, 'razorpay', eventType)
@@ -171,6 +203,19 @@ export async function processRazorpayWebhook(
 
   const updates: Partial<Omit<Subscription, 'accountId' | 'createdAt'>> = { status: mappedStatus }
 
+  // billing-service.ts's subscribeToTier() sends { clientId, tier } as the
+  // Razorpay subscription's notes at creation time, and Razorpay echoes
+  // notes back on every webhook for that subscription - so this is the only
+  // place `plan` ever gets set post-checkout. Without it, a client's `plan`
+  // stays whatever it was before subscribing (e.g. 'free'), so a paying
+  // Starter/Growth/Agency customer's entitlements (PLANS[plan] in
+  // entitlement-service.ts) never actually upgrade despite status going
+  // active and being charged. Found via live E2E testing, not a hypothetical.
+  const notedTier = subscriptionEntity.notes?.tier
+  if (notedTier && BILLABLE_TIERS.has(notedTier as PlanTier)) {
+    updates.plan = notedTier as PlanTier
+  }
+
   if (eventType === 'subscription.charged') {
     if (subscriptionEntity.current_end) {
       updates.currentPeriodEnd = new Date(subscriptionEntity.current_end * 1000).toISOString()
@@ -178,6 +223,12 @@ export async function processRazorpayWebhook(
 
     const paymentEntity = parsed.payload.payment?.entity
     if (paymentEntity) {
+      // Best-effort: a failed invoice lookup must not block recording the
+      // payment itself, so this never throws (see fetchInvoiceShortUrl).
+      const invoiceUrl = paymentEntity.invoice_id
+        ? await razorpayProvider.fetchInvoiceShortUrl(paymentEntity.invoice_id)
+        : null
+
       await logPayment({
         accountId: clientId,
         paidAt: new Date().toISOString(),
@@ -186,6 +237,7 @@ export async function processRazorpayWebhook(
         amount: paymentEntity.amount,
         currency: paymentEntity.currency,
         status: paymentEntity.status,
+        invoiceUrl,
       })
     } else {
       console.error(`Razorpay webhook subscription.charged has no payload.payment.entity`, { eventId })

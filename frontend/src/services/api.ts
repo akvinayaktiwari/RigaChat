@@ -19,6 +19,7 @@ import type {
   Lead,
   MetaConnection,
   MetaLead,
+  PaymentRecord,
   ResyncResult,
   SetupBotResult,
   StartIndexingResult,
@@ -215,6 +216,10 @@ export interface SubscribeResponse extends ApiResponse<SubscribeResult> {
 
 export function subscribeToTier(tier: 'starter' | 'growth' | 'agency'): Promise<SubscribeResponse> {
   return apiClient<SubscribeResult>('/api/billing/subscribe', 'POST', { tier }) as Promise<SubscribeResponse>
+}
+
+export function getPaymentHistory(): Promise<ApiResponse<PaymentRecord[]>> {
+  return apiClient<PaymentRecord[]>('/api/billing/payments')
 }
 
 // Auth API

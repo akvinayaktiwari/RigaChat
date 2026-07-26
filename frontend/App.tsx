@@ -23,6 +23,7 @@ import VoiceKnowledgeBasePage from './src/pages/VoiceKnowledgeBasePage'
 import Settings from './src/pages/Settings'
 import WhatsApp from './src/pages/WhatsApp'
 import MetaAds from './src/pages/MetaAds'
+import BillingPage from './src/pages/BillingPage'
 import FormsPage from './src/pages/FormsPage'
 import NewFormPage from './src/pages/NewFormPage'
 import FormDetailPage from './src/pages/FormDetailPage'
@@ -112,6 +113,7 @@ function App() {
           <Route path="kb/:botId" element={<KnowledgeBasePage />} />
           <Route path="whatsapp" element={<WhatsApp />} />
           <Route path="meta-ads" element={<MetaAds />} />
+          <Route path="billing" element={<BillingPage />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>

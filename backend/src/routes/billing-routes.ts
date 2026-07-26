@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import { requireAuth } from '../lib/cognito.js'
-import { BillingError, subscribeToTier } from '../services/billing-service.js'
+import { BillingError, getPaymentHistory, subscribeToTier } from '../services/billing-service.js'
 import type { BillableTier, SubscribeResult } from '../services/billing-service.js'
-import type { ApiResponse } from '../types/index.js'
+import type { ApiResponse, PaymentRecord } from '../types/index.js'
 
 interface AuthEnv {
   Variables: {
@@ -61,6 +61,18 @@ billingRoutes.post('/subscribe', requireAuth, async (c) => {
       )
     }
     console.error('Billing subscribe error:', error)
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+billingRoutes.get('/payments', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+
+  try {
+    const payments = await getPaymentHistory(clientId)
+    return c.json<ApiResponse<PaymentRecord[]>>({ success: true, data: payments }, 200)
+  } catch (error) {
+    console.error('Billing payment history error:', error)
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }
 })

@@ -429,3 +429,15 @@ export interface SubscriptionSummary {
   features: EntitlementFeatures
   usage: { chatConversations: number }
 }
+
+export interface PaymentRecord {
+  accountId: string
+  paidAt: string
+  paymentId: string
+  subscriptionId: string
+  amount: number
+  currency: string
+  status: string
+  createdAt: string
+  invoiceUrl?: string | null
+}
