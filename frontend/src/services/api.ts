@@ -4,6 +4,7 @@ import type {
   ClientRecord,
   ConfirmKBUploadInput,
   ConfirmVoiceKBUploadInput,
+  ConnectMetaWhatsAppInput,
   ConnectWhatsAppInput,
   CRMConnection,
   CreateBotInput,
@@ -18,6 +19,7 @@ import type {
   KnowledgeBaseEntry,
   Lead,
   MetaConnection,
+  MetaDirectWhatsAppConnection,
   MetaLead,
   PaymentRecord,
   ResyncResult,
@@ -388,6 +390,20 @@ export function connectWhatsApp(data: ConnectWhatsAppInput): Promise<ApiResponse
 
 export function disconnectWhatsApp(): Promise<ApiResponse<{ success: boolean }>> {
   return apiClient<{ success: boolean }>('/api/integrations/whatsapp/disconnect', 'DELETE')
+}
+
+// Meta Direct WhatsApp Integration API
+
+export function getMetaWhatsAppStatus(): Promise<ApiResponse<MetaDirectWhatsAppConnection | null>> {
+  return apiClient<MetaDirectWhatsAppConnection | null>('/api/integrations/meta-whatsapp/status')
+}
+
+export function connectMetaWhatsApp(data: ConnectMetaWhatsAppInput): Promise<ApiResponse<{ success: boolean }>> {
+  return apiClient<{ success: boolean }>('/api/integrations/meta-whatsapp/callback', 'POST', data)
+}
+
+export function disconnectMetaWhatsApp(): Promise<ApiResponse<{ success: boolean }>> {
+  return apiClient<{ success: boolean }>('/api/integrations/meta-whatsapp/disconnect', 'DELETE')
 }
 
 // Meta Lead Ads Integration API
