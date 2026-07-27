@@ -2,6 +2,18 @@
 
 ## Frontend
 
+### Add aria-live region to Toast component
+
+**What:** `frontend/src/components/Toast/Toast.tsx` has no `aria-live` region — confirmed via grep, zero matches for `aria-live` or `role=` in the file. Every toast notification in the app (success, error, info) is silent to screen-reader users.
+
+**Why:** Surfaced during `/plan-design-review` of the WhatsApp Meta Direct card, where the Embedded Signup connect/error flow depends on toast feedback being announced (same pattern the existing Gupshup connect flow already uses) — but this is app-wide, not specific to that feature. Every existing toast call site is affected today.
+
+**Context:** Small fix — add `aria-live="polite"` (or `"assertive"` for errors) to the toast container. Should land as its own change, not bundled silently into an unrelated feature PR.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
 ### Add error handling to data-load effects app-wide
 
 **What:** 13 pages (including `DashboardHome.tsx`, `LeadsPage.tsx`, `BotsPage.tsx`, `BotDetailPage.tsx`, `FormDetailPage.tsx`, `FormsPage.tsx`, `KnowledgeBasePage.tsx`, `LeadDetailPage.tsx`, `FormLeadsPage.tsx`, `NewBotPage.tsx`, `VoiceKnowledgeBasePage.tsx`, `VoiceAgentDetailPage.tsx`, `AuthCallbackPage.tsx`) load data via `Promise.all([...]).then(...)` with no `.catch()`. A rejected fetch leaves `loading` stuck `true` forever — the user sees an infinite skeleton with no error message and no way to retry.
@@ -147,5 +159,29 @@
 **Effort:** S
 **Priority:** P3
 **Depends on:** None
+
+### WhatsApp Meta Direct — PR #2 (webhook routing, disconnect/migration UX, token lifecycle)
+
+**What:** Follow-up to the Meta Direct WhatsApp integration (PR #1: provider, Embedded Signup, DB fields, dispatch wiring). Three pieces deferred out of PR #1: (1) webhook routing / phone-number lookup table for identifying which client an inbound WhatsApp message belongs to, (2) disconnect/migration UX for moving a client between Gupshup and Meta Direct (or back), (3) Meta access-token lifecycle handling — expiry, refresh, and what happens on client-initiated disconnect or Meta-initiated revocation.
+
+**Why:** Currently these only exist as Open Questions in a design doc (`akvinayaktiwari-feature-whatsapp-meta-direct-design-20260727-173508.md`) that stops being anyone's active focus the moment PR #1 ships. Without a tracked item, this relies on someone remembering a design doc months later.
+
+**Context:** The webhook routing table's exact payload shape is still unverified against real Meta Cloud API webhooks (should reuse the `meta_page_lookup` atomic-claim pattern from `meta-lead-repository.ts` as the model, per the design doc's Premise 6). Re-verify whether this is still needed before building — if the Agents/Journeys pilot (the intended consumer) hasn't started within a few months of PR #1 shipping, treat the routing-table shape as provisional and re-check it against whatever that work actually needs.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** PR #1 (WhatsApp Meta Direct provider + Embedded Signup) shipped and proven first.
+
+### Fully remove Gupshup once Meta Direct is proven
+
+**What:** Sunset the Gupshup WhatsApp connector entirely once the Meta Direct integration has real production usage and the cost/dependency thesis is validated.
+
+**Why:** Stated founder intent during the Meta Direct design session ("i will remove gupshup entirely in future") — removes a third-party BSP dependency and its markup on top of Meta's own conversation fees. No tracking existed for this beyond the conversation itself.
+
+**Context:** No committed timeline. Blocked on: Meta Direct (PR #1 + PR #2) shipped, proven with real client volume, and the actual Gupshup-vs-Meta cost delta confirmed (never quantified — see the design doc's Open Question 1). Revisit this item once those conditions are met rather than acting on a vague "eventually."
+
+**Effort:** L (migrating existing connected clients, removing Gupshup code paths, updating docs/env vars)
+**Priority:** P3
+**Depends on:** Meta Direct PR #1 + PR #2 shipped and proven in production.
 
 ## Completed
