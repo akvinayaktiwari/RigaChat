@@ -1,4 +1,5 @@
 import { gupshupProvider } from '../providers/gupshup-provider.js'
+import { metaWhatsAppProvider } from '../providers/meta-whatsapp-provider.js'
 import { decrypt, encrypt } from '../lib/kms.js'
 import type { WhatsAppCredentials, WhatsAppProvider, WhatsAppSendResult } from '../lib/whatsapp-provider.js'
 import {
@@ -9,7 +10,7 @@ import {
 } from '../repositories/client-repository.js'
 import { getLeadsForClient as getChatLeadsForClient } from './lead-service.js'
 import { getLeadsForClient as getFormLeadsForClient } from './form-lead-service.js'
-import type { WhatsAppConnection } from '../types/index.js'
+import type { ClientRecord, WhatsAppConnection } from '../types/index.js'
 
 const MAX_RETRY_ATTEMPTS = 3
 const RETRY_DELAY_MS = 1000
@@ -24,6 +25,59 @@ interface ConnectGupshupInput {
 
 function getProvider(providerName: string): WhatsAppProvider | null {
   if (providerName === 'gupshup') return gupshupProvider
+  if (providerName === 'meta_direct') return metaWhatsAppProvider
+  return null
+}
+
+interface ActiveWhatsAppSender {
+  provider: WhatsAppProvider
+  credentials: WhatsAppCredentials
+  notificationNumber: string
+}
+
+// The only place that resolves "which provider actually sends for this
+// client" - a client can have both Gupshup and Meta Direct connected, but
+// only one is ever active (client.activeWhatsappProvider). Clients that
+// connected Gupshup before this field existed have it unset; treating unset
+// + a connected Gupshup connection as active 'gupshup' is a deliberate
+// fallback (not just an oversight - see design doc Premise 8) so a missed or
+// partial backfill run can't silently stop existing notifications.
+async function getActiveProviderAndCredentials(client: ClientRecord): Promise<ActiveWhatsAppSender | null> {
+  const active = client.activeWhatsappProvider ?? (client.whatsappConnection?.connected ? 'gupshup' : undefined)
+
+  if (active === 'gupshup' && client.whatsappConnection?.connected) {
+    const provider = getProvider('gupshup')
+    if (!provider) return null
+
+    const apiKey = await decrypt(client.whatsappConnection.apiKeyEncrypted)
+    return {
+      provider,
+      credentials: {
+        provider: 'gupshup',
+        apiKey,
+        appName: client.whatsappConnection.appName,
+        sourceNumber: client.whatsappConnection.sourceNumber,
+      },
+      notificationNumber: client.whatsappConnection.notificationNumber,
+    }
+  }
+
+  if (active === 'meta_direct' && client.metaDirectWhatsAppConnection?.connected) {
+    const provider = getProvider('meta_direct')
+    if (!provider) return null
+
+    const accessToken = await decrypt(client.metaDirectWhatsAppConnection.accessTokenEncrypted)
+    return {
+      provider,
+      credentials: {
+        provider: 'meta_direct',
+        phoneNumberId: client.metaDirectWhatsAppConnection.phoneNumberId,
+        accessToken,
+      },
+      notificationNumber: client.metaDirectWhatsAppConnection.notificationNumber,
+    }
+  }
+
   return null
 }
 
@@ -86,31 +140,21 @@ export async function getWhatsAppStatus(clientId: string): Promise<Omit<WhatsApp
 export async function sendLeadNotification(clientId: string, leadSummary: string): Promise<void> {
   try {
     const client = await getClientById(clientId)
-    if (!client?.whatsappConnection?.connected) {
-      console.log('WhatsApp notification skipped: not connected')
+    if (!client) return
+
+    const sender = await getActiveProviderAndCredentials(client)
+    if (!sender) {
+      console.log('WhatsApp notification skipped: no active connection')
       return
     }
 
-    const provider = getProvider(client.whatsappConnection.provider)
-    if (!provider) {
-      console.log(`WhatsApp notification skipped: unknown provider ${client.whatsappConnection.provider}`)
-      return
-    }
-
-    const apiKey = await decrypt(client.whatsappConnection.apiKeyEncrypted)
-    const credentials: WhatsAppCredentials = {
-      apiKey,
-      appName: client.whatsappConnection.appName,
-      sourceNumber: client.whatsappConnection.sourceNumber,
-    }
-
-    console.log('WhatsApp notification sending to:', client.whatsappConnection.notificationNumber)
+    console.log('WhatsApp notification sending to:', sender.notificationNumber)
 
     const result = await sendWithRetry(
-      client.whatsappConnection.notificationNumber,
+      sender.notificationNumber,
       `New lead captured!\n\n${leadSummary}`,
-      provider,
-      credentials
+      sender.provider,
+      sender.credentials
     )
 
     console.log('WhatsApp notification result:', result)
@@ -121,10 +165,10 @@ export async function sendLeadNotification(clientId: string, leadSummary: string
 
 export async function sendWeeklyReport(clientId: string): Promise<void> {
   const client = await getClientById(clientId)
-  if (!client?.whatsappConnection?.connected) return
+  if (!client) return
 
-  const provider = getProvider(client.whatsappConnection.provider)
-  if (!provider) return
+  const sender = await getActiveProviderAndCredentials(client)
+  if (!sender) return
 
   const since = Date.now() - WEEK_MS
   const [chatLeads, formLeads] = await Promise.all([
@@ -142,14 +186,7 @@ export async function sendWeeklyReport(clientId: string): Promise<void> {
     `- Chat widget: ${chatLeadCount}\n` +
     `- Forms: ${formLeadCount}`
 
-  const apiKey = await decrypt(client.whatsappConnection.apiKeyEncrypted)
-  const credentials: WhatsAppCredentials = {
-    apiKey,
-    appName: client.whatsappConnection.appName,
-    sourceNumber: client.whatsappConnection.sourceNumber,
-  }
-
-  await sendWithRetry(client.whatsappConnection.notificationNumber, message, provider, credentials)
+  await sendWithRetry(sender.notificationNumber, message, sender.provider, sender.credentials)
 }
 
 export async function sendWeeklyReportsForAllClients(): Promise<void> {

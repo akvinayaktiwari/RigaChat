@@ -181,7 +181,11 @@ export async function getConnectedWhatsAppClients(): Promise<ClientRecord[]> {
       const result = await dynamoClient.send(
         new ScanCommand({
           TableName: TABLE_NAME,
-          FilterExpression: 'whatsappConnection.connected = :connected',
+          // OR'd across both connection shapes so a client connected ONLY via
+          // Meta Direct (no Gupshup connection at all) still gets picked up -
+          // this scan used to check whatsappConnection alone, which silently
+          // excluded Meta-only clients from weekly reports.
+          FilterExpression: 'whatsappConnection.connected = :connected OR metaDirectWhatsAppConnection.connected = :connected',
           ExpressionAttributeValues: { ':connected': true },
           ExclusiveStartKey: exclusiveStartKey,
         })

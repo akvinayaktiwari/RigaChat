@@ -206,6 +206,20 @@ export interface MetaConnection {
   connectedAt: string
 }
 
+export interface MetaDirectWhatsAppConnection {
+  provider: 'meta_direct'
+  connected: boolean
+  wabaId: string
+  phoneNumberId: string
+  businessAccountId: string
+  accessTokenEncrypted: string
+  displayPhoneNumber: string
+  notificationNumber: string
+  connectedAt: string
+}
+
+export type WhatsAppActiveProvider = 'gupshup' | 'meta_direct'
+
 export interface ForgotPasswordInput {
   email: string
 }
@@ -241,6 +255,8 @@ export interface ClientRecord {
   plan: 'starter' | 'growth' | 'agency'
   crmConnection?: CRMConnection
   whatsappConnection?: WhatsAppConnection
+  metaDirectWhatsAppConnection?: MetaDirectWhatsAppConnection
+  activeWhatsappProvider?: WhatsAppActiveProvider
   metaConnection?: MetaConnection
   createdAt: string
   updatedAt: string

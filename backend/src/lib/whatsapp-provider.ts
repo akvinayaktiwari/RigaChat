@@ -1,8 +1,17 @@
-export interface WhatsAppCredentials {
+export interface GupshupCredentials {
+  provider: 'gupshup'
   apiKey: string
   appName: string
   sourceNumber: string
 }
+
+export interface MetaDirectCredentials {
+  provider: 'meta_direct'
+  phoneNumberId: string
+  accessToken: string
+}
+
+export type WhatsAppCredentials = GupshupCredentials | MetaDirectCredentials
 
 export interface WhatsAppSendResult {
   success: boolean
