@@ -1,5 +1,5 @@
-import { MessageSquare } from 'lucide-react'
 import { WhatsAppIcon, ZohoIcon } from './BrandIcons'
+import VyostraLogo from '../VyostraLogo'
 
 const LINK_COLUMNS = [
   {
@@ -37,9 +37,7 @@ export default function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
           <div className="col-span-2">
             <a href="/" className="flex items-center gap-2.5 mb-4">
-              <div className="w-8 h-8 bg-linear-to-br from-violet-600 to-purple-500 rounded-xl flex items-center justify-center">
-                <MessageSquare className="w-4 h-4 text-white" />
-              </div>
+              <VyostraLogo size={32} animate={false} />
               <span className="font-bold text-gray-900 text-lg" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                 VyostraAI
               </span>

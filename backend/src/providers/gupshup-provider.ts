@@ -14,6 +14,10 @@ export class GupshupProvider implements WhatsAppProvider {
   }
 
   async sendMessage(to: string, message: string, credentials: WhatsAppCredentials): Promise<WhatsAppSendResult> {
+    if (credentials.provider !== 'gupshup') {
+      return { success: false, error: 'GupshupProvider received non-Gupshup credentials', retryable: false }
+    }
+
     const body = new URLSearchParams({
       channel: 'whatsapp',
       source: credentials.sourceNumber,

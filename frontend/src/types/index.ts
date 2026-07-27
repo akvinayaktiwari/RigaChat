@@ -272,12 +272,32 @@ export interface WhatsAppConnection {
   sourceNumber: string
   notificationNumber: string
   connectedAt: string
+  active: boolean
 }
 
 export interface ConnectWhatsAppInput {
   apiKey: string
   appName: string
   sourceNumber: string
+  notificationNumber: string
+}
+
+export interface MetaDirectWhatsAppConnection {
+  provider: 'meta_direct'
+  connected: boolean
+  wabaId: string
+  phoneNumberId: string
+  businessAccountId: string
+  displayPhoneNumber: string
+  notificationNumber: string
+  connectedAt: string
+  active: boolean
+}
+
+export interface ConnectMetaWhatsAppInput {
+  code: string
+  wabaId: string
+  phoneNumberId: string
   notificationNumber: string
 }
 
