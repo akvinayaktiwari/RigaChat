@@ -144,7 +144,10 @@ integrationRoutes.get('/whatsapp/status', requireAuth, async (c) => {
 
   try {
     const status = await getWhatsAppStatus(clientId)
-    return c.json<ApiResponse<Omit<WhatsAppConnection, 'apiKeyEncrypted'> | null>>({ success: true, data: status }, 200)
+    return c.json<ApiResponse<(Omit<WhatsAppConnection, 'apiKeyEncrypted'> & { active: boolean }) | null>>(
+      { success: true, data: status },
+      200
+    )
   } catch (error) {
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }
@@ -194,7 +197,7 @@ integrationRoutes.get('/meta-whatsapp/status', requireAuth, async (c) => {
 
   try {
     const status = await getMetaWhatsAppStatus(clientId)
-    return c.json<ApiResponse<Omit<MetaDirectWhatsAppConnection, 'accessTokenEncrypted'> | null>>(
+    return c.json<ApiResponse<(Omit<MetaDirectWhatsAppConnection, 'accessTokenEncrypted'> & { active: boolean }) | null>>(
       { success: true, data: status },
       200
     )

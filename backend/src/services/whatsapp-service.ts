@@ -37,15 +37,19 @@ interface ActiveWhatsAppSender {
   notificationNumber: string
 }
 
-// The only place that resolves "which provider actually sends for this
+// The single place that resolves "which provider is active for this
 // client" - a client can have both Gupshup and Meta Direct connected, but
 // only one is ever active (client.activeWhatsappProvider). Clients that
 // connected Gupshup before this field existed have it unset; treating unset
 // + a connected Gupshup connection as active 'gupshup' is a deliberate
 // fallback (not just an oversight - see design doc Premise 8) so a missed or
 // partial backfill run can't silently stop existing notifications.
+function resolveActiveProvider(client: ClientRecord): 'gupshup' | 'meta_direct' | null {
+  return client.activeWhatsappProvider ?? (client.whatsappConnection?.connected ? 'gupshup' : null)
+}
+
 async function getActiveProviderAndCredentials(client: ClientRecord): Promise<ActiveWhatsAppSender | null> {
-  const active = client.activeWhatsappProvider ?? (client.whatsappConnection?.connected ? 'gupshup' : undefined)
+  const active = resolveActiveProvider(client)
 
   if (active === 'gupshup' && client.whatsappConnection?.connected) {
     const provider = getProvider('gupshup')
@@ -178,7 +182,7 @@ export async function disconnectWhatsApp(clientId: string): Promise<void> {
   // back to Meta Direct if it's connected, otherwise clears the field so the
   // defensive fallback logic in getActiveProviderAndCredentials treats this
   // client as having no active connection.
-  if (client?.activeWhatsappProvider === 'gupshup' || (!client?.activeWhatsappProvider && client?.whatsappConnection?.connected)) {
+  if (client && resolveActiveProvider(client) === 'gupshup') {
     if (client?.metaDirectWhatsAppConnection?.connected) {
       await updateClient(clientId, { activeWhatsappProvider: 'meta_direct' })
     } else {
@@ -200,22 +204,24 @@ export async function disconnectMetaWhatsApp(clientId: string): Promise<void> {
   }
 }
 
-export async function getWhatsAppStatus(clientId: string): Promise<Omit<WhatsAppConnection, 'apiKeyEncrypted'> | null> {
+export async function getWhatsAppStatus(
+  clientId: string
+): Promise<(Omit<WhatsAppConnection, 'apiKeyEncrypted'> & { active: boolean }) | null> {
   const client = await getClientById(clientId)
   if (!client?.whatsappConnection) return null
 
   const { apiKeyEncrypted: _apiKeyEncrypted, ...status } = client.whatsappConnection
-  return status
+  return { ...status, active: resolveActiveProvider(client) === 'gupshup' }
 }
 
 export async function getMetaWhatsAppStatus(
   clientId: string
-): Promise<Omit<MetaDirectWhatsAppConnection, 'accessTokenEncrypted'> | null> {
+): Promise<(Omit<MetaDirectWhatsAppConnection, 'accessTokenEncrypted'> & { active: boolean }) | null> {
   const client = await getClientById(clientId)
   if (!client?.metaDirectWhatsAppConnection) return null
 
   const { accessTokenEncrypted: _accessTokenEncrypted, ...status } = client.metaDirectWhatsAppConnection
-  return status
+  return { ...status, active: resolveActiveProvider(client) === 'meta_direct' }
 }
 
 export async function sendLeadNotification(clientId: string, leadSummary: string): Promise<void> {
