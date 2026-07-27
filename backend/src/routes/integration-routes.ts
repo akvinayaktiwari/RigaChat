@@ -5,7 +5,14 @@ import { requireAuth, requireAuthFromQuery } from '../lib/cognito.js'
 import { zohoProvider } from '../providers/zoho-provider.js'
 import { metaProvider } from '../providers/meta-provider.js'
 import { connectZohoCRM, disconnectCRM, getCRMStatus } from '../services/crm-service.js'
-import { connectGupshup, disconnectWhatsApp, getWhatsAppStatus } from '../services/whatsapp-service.js'
+import {
+  connectGupshup,
+  connectMetaWhatsApp,
+  disconnectMetaWhatsApp,
+  disconnectWhatsApp,
+  getMetaWhatsAppStatus,
+  getWhatsAppStatus,
+} from '../services/whatsapp-service.js'
 import {
   connectMetaAds,
   disconnectMetaAds,
@@ -13,7 +20,14 @@ import {
   getMetaStatus,
   MetaPageAlreadyConnectedError,
 } from '../services/meta-lead-service.js'
-import type { ApiResponse, CRMConnection, MetaConnection, MetaLead, WhatsAppConnection } from '../types/index.js'
+import type {
+  ApiResponse,
+  CRMConnection,
+  MetaConnection,
+  MetaDirectWhatsAppConnection,
+  MetaLead,
+  WhatsAppConnection,
+} from '../types/index.js'
 
 interface AuthEnv {
   Variables: {
@@ -131,6 +145,59 @@ integrationRoutes.get('/whatsapp/status', requireAuth, async (c) => {
   try {
     const status = await getWhatsAppStatus(clientId)
     return c.json<ApiResponse<Omit<WhatsAppConnection, 'apiKeyEncrypted'> | null>>({ success: true, data: status }, 200)
+  } catch (error) {
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+interface ConnectMetaWhatsAppBody {
+  code: string
+  wabaId: string
+  phoneNumberId: string
+  notificationNumber: string
+}
+
+// Meta's WhatsApp Embedded Signup is a JS SDK popup flow, not a redirect -
+// the frontend gets the code via a postMessage event and POSTs it here with
+// a normal Authorization header, unlike /meta/callback above which is a GET
+// redirect route reading code+state from query params (see design doc
+// Architecture Issue 1).
+integrationRoutes.post('/meta-whatsapp/callback', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const body = await c.req.json<ConnectMetaWhatsAppBody>()
+
+  if (!body.code?.trim() || !body.wabaId?.trim() || !body.phoneNumberId?.trim() || !body.notificationNumber?.trim()) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'Missing required Embedded Signup fields' }, 400)
+  }
+
+  try {
+    await connectMetaWhatsApp(clientId, body)
+    return c.json<ApiResponse<{ success: boolean }>>({ success: true, data: { success: true } }, 200)
+  } catch (error) {
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+integrationRoutes.delete('/meta-whatsapp/disconnect', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+
+  try {
+    await disconnectMetaWhatsApp(clientId)
+    return c.json<ApiResponse<{ success: boolean }>>({ success: true, data: { success: true } }, 200)
+  } catch (error) {
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+integrationRoutes.get('/meta-whatsapp/status', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+
+  try {
+    const status = await getMetaWhatsAppStatus(clientId)
+    return c.json<ApiResponse<Omit<MetaDirectWhatsAppConnection, 'accessTokenEncrypted'> | null>>(
+      { success: true, data: status },
+      200
+    )
   } catch (error) {
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }

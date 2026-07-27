@@ -3,14 +3,16 @@ import { metaWhatsAppProvider } from '../providers/meta-whatsapp-provider.js'
 import { decrypt, encrypt } from '../lib/kms.js'
 import type { WhatsAppCredentials, WhatsAppProvider, WhatsAppSendResult } from '../lib/whatsapp-provider.js'
 import {
+  clearActiveWhatsappProvider,
   getClientById,
   getConnectedWhatsAppClients,
+  removeClientMetaDirectWhatsAppConnection,
   removeClientWhatsAppConnection,
   updateClient,
 } from '../repositories/client-repository.js'
 import { getLeadsForClient as getChatLeadsForClient } from './lead-service.js'
 import { getLeadsForClient as getFormLeadsForClient } from './form-lead-service.js'
-import type { ClientRecord, WhatsAppConnection } from '../types/index.js'
+import type { ClientRecord, MetaDirectWhatsAppConnection, WhatsAppConnection } from '../types/index.js'
 
 const MAX_RETRY_ATTEMPTS = 3
 const RETRY_DELAY_MS = 1000
@@ -125,8 +127,77 @@ export async function connectGupshup(clientId: string, input: ConnectGupshupInpu
   })
 }
 
+interface ConnectMetaWhatsAppInput {
+  code: string
+  wabaId: string
+  phoneNumberId: string
+  notificationNumber: string
+}
+
+export async function connectMetaWhatsApp(clientId: string, input: ConnectMetaWhatsAppInput): Promise<void> {
+  const { accessToken, displayPhoneNumber } = await metaWhatsAppProvider.exchangeCodeForCredentials(
+    input.code,
+    input.phoneNumberId
+  )
+  const accessTokenEncrypted = await encrypt(accessToken)
+
+  const client = await getClientById(clientId)
+  // A brand-new client with no active Gupshup connection gets Meta Direct
+  // set active automatically (nothing to switch from). A client who already
+  // has Gupshup active keeps it active - connecting Meta alongside it does
+  // not silently switch which provider actually sends (design doc Premise 8;
+  // switching providers is a deferred, explicit UX - see Open Question 7).
+  const hasActiveGupshup = (client?.activeWhatsappProvider ?? (client?.whatsappConnection?.connected ? 'gupshup' : undefined)) === 'gupshup'
+
+  await updateClient(clientId, {
+    metaDirectWhatsAppConnection: {
+      provider: 'meta_direct',
+      connected: true,
+      wabaId: input.wabaId,
+      phoneNumberId: input.phoneNumberId,
+      // Meta distinguishes a WABA from the business that owns it; this
+      // implementation doesn't look up a separate business ID and reuses
+      // wabaId as a placeholder - needs verification against Meta's
+      // Embedded Signup docs (see design doc Open Question 3).
+      businessAccountId: input.wabaId,
+      accessTokenEncrypted,
+      displayPhoneNumber,
+      notificationNumber: input.notificationNumber,
+      connectedAt: new Date().toISOString(),
+    },
+    ...(hasActiveGupshup ? {} : { activeWhatsappProvider: 'meta_direct' }),
+  })
+}
+
 export async function disconnectWhatsApp(clientId: string): Promise<void> {
+  const client = await getClientById(clientId)
   await removeClientWhatsAppConnection(clientId)
+
+  // Disconnecting the currently-active provider needs a new active provider,
+  // not a dangling reference to a connection that no longer exists. Falls
+  // back to Meta Direct if it's connected, otherwise clears the field so the
+  // defensive fallback logic in getActiveProviderAndCredentials treats this
+  // client as having no active connection.
+  if (client?.activeWhatsappProvider === 'gupshup' || (!client?.activeWhatsappProvider && client?.whatsappConnection?.connected)) {
+    if (client?.metaDirectWhatsAppConnection?.connected) {
+      await updateClient(clientId, { activeWhatsappProvider: 'meta_direct' })
+    } else {
+      await clearActiveWhatsappProvider(clientId)
+    }
+  }
+}
+
+export async function disconnectMetaWhatsApp(clientId: string): Promise<void> {
+  const client = await getClientById(clientId)
+  await removeClientMetaDirectWhatsAppConnection(clientId)
+
+  if (client?.activeWhatsappProvider === 'meta_direct') {
+    if (client?.whatsappConnection?.connected) {
+      await updateClient(clientId, { activeWhatsappProvider: 'gupshup' })
+    } else {
+      await clearActiveWhatsappProvider(clientId)
+    }
+  }
 }
 
 export async function getWhatsAppStatus(clientId: string): Promise<Omit<WhatsAppConnection, 'apiKeyEncrypted'> | null> {
@@ -134,6 +205,16 @@ export async function getWhatsAppStatus(clientId: string): Promise<Omit<WhatsApp
   if (!client?.whatsappConnection) return null
 
   const { apiKeyEncrypted: _apiKeyEncrypted, ...status } = client.whatsappConnection
+  return status
+}
+
+export async function getMetaWhatsAppStatus(
+  clientId: string
+): Promise<Omit<MetaDirectWhatsAppConnection, 'accessTokenEncrypted'> | null> {
+  const client = await getClientById(clientId)
+  if (!client?.metaDirectWhatsAppConnection) return null
+
+  const { accessTokenEncrypted: _accessTokenEncrypted, ...status } = client.metaDirectWhatsAppConnection
   return status
 }
 

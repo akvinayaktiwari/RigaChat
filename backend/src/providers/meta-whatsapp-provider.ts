@@ -7,9 +7,62 @@ interface MetaSendResponse {
   error?: { message?: string; code?: number; error_subcode?: number }
 }
 
+interface MetaTokenResponse {
+  access_token?: string
+  error?: { message?: string }
+}
+
+interface MetaPhoneNumberResponse {
+  display_phone_number?: string
+  error?: { message?: string }
+}
+
+function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) {
+    throw new Error(
+      `Missing required environment variable ${name}. Set it in your .env file before starting the server.`
+    )
+  }
+  return value
+}
+
+export interface MetaWhatsAppCredentialsExchange {
+  accessToken: string
+  displayPhoneNumber: string
+}
+
 export class MetaWhatsAppProvider implements WhatsAppProvider {
   getProviderName(): string {
     return 'meta_direct'
+  }
+
+  // Embedded Signup is an SDK popup flow, not a redirect - the code it
+  // returns is exchanged without a redirect_uri, unlike the Lead Ads OAuth
+  // flow in meta-provider.ts (see design doc Architecture Issue 1). Meta's
+  // exact Embedded Signup config_id/token requirements weren't verified
+  // against the live dashboard during design - flagged as Open Question 3.
+  async exchangeCodeForCredentials(code: string, phoneNumberId: string): Promise<MetaWhatsAppCredentialsExchange> {
+    const clientId = requireEnv('META_APP_ID')
+    const clientSecret = requireEnv('META_APP_SECRET')
+
+    const tokenParams = new URLSearchParams({ client_id: clientId, client_secret: clientSecret, code })
+    const tokenResponse = await fetch(`${GRAPH_API_BASE}/oauth/access_token?${tokenParams.toString()}`)
+    const tokenData = (await tokenResponse.json()) as MetaTokenResponse
+
+    if (!tokenData.access_token) {
+      throw new Error(`Meta WhatsApp token exchange failed: ${tokenData.error?.message ?? 'Unknown error'}`)
+    }
+
+    const phoneParams = new URLSearchParams({ access_token: tokenData.access_token, fields: 'display_phone_number' })
+    const phoneResponse = await fetch(`${GRAPH_API_BASE}/${phoneNumberId}?${phoneParams.toString()}`)
+    const phoneData = (await phoneResponse.json()) as MetaPhoneNumberResponse
+
+    if (!phoneData.display_phone_number) {
+      throw new Error(`Meta phone number lookup failed: ${phoneData.error?.message ?? 'Unknown error'}`)
+    }
+
+    return { accessToken: tokenData.access_token, displayPhoneNumber: phoneData.display_phone_number }
   }
 
   async sendMessage(to: string, message: string, credentials: WhatsAppCredentials): Promise<WhatsAppSendResult> {

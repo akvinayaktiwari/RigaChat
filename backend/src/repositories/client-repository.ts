@@ -131,6 +131,40 @@ export async function removeClientWhatsAppConnection(clientId: string): Promise<
   }
 }
 
+export async function removeClientMetaDirectWhatsAppConnection(clientId: string): Promise<void> {
+  try {
+    await dynamoClient.send(
+      new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { clientId },
+        UpdateExpression: 'REMOVE metaDirectWhatsAppConnection SET updatedAt = :updatedAt',
+        ExpressionAttributeValues: { ':updatedAt': new Date().toISOString() },
+      })
+    )
+  } catch (error) {
+    throw new Error(
+      `Failed to remove Meta Direct WhatsApp connection for client ${clientId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
+export async function clearActiveWhatsappProvider(clientId: string): Promise<void> {
+  try {
+    await dynamoClient.send(
+      new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { clientId },
+        UpdateExpression: 'REMOVE activeWhatsappProvider SET updatedAt = :updatedAt',
+        ExpressionAttributeValues: { ':updatedAt': new Date().toISOString() },
+      })
+    )
+  } catch (error) {
+    throw new Error(
+      `Failed to clear active WhatsApp provider for client ${clientId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
 export async function removeClientMetaConnection(clientId: string): Promise<void> {
   try {
     await dynamoClient.send(
