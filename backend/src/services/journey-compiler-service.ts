@@ -36,6 +36,20 @@ export class JourneyCompileError extends Error {
   }
 }
 
+// Every Task state's Parameters replaces the current $ entirely (ASL
+// Parameters is a full replacement, not a merge) -- without explicitly
+// re-declaring these, a step 3 states into the execution would lose the
+// botId/bundleId/leadId/channel that journey-executor-service.ts needs to
+// know which bot/bundle/lead/channel it's acting on. Referenced via
+// JSONPath ('.$' suffix) so each Task receives whatever the execution's own
+// input carried, not a static value baked in at compile time.
+const CONTEXT_PASSTHROUGH_PARAMETERS = {
+  'botId.$': '$.botId',
+  'bundleId.$': '$.bundleId',
+  'leadId.$': '$.leadId',
+  'channel.$': '$.channel',
+}
+
 // Every step reference (next/onTrue/onFalse/onSatisfied/onExhausted) must
 // point to a LATER array index than the referring step. This is what makes
 // a JourneyDefinition a DAG by construction -- no general graph-cycle
@@ -133,14 +147,26 @@ function compileWaitAndRecheckStep(
     Next: recheckStateName,
   } satisfies AslWaitState
 
+  // iterationCount is deliberately NOT threaded through Step Functions'
+  // JSON state (a prior version tried '$.iterationCount' via JSONPath --
+  // that never actually advanced, since nothing ever promoted the
+  // incremented value from $.recheckResult back to the top-level path the
+  // next iteration's Task read from). journey-executor-service.ts tracks it
+  // itself instead, via an atomic DynamoDB counter keyed by leadId+stepId
+  // (see journey-execution-repository.ts) -- a stable key across every
+  // iteration of this specific step for this specific lead, regardless of
+  // what Step Functions' own state happens to carry. maxIterations is
+  // passed statically (from the step definition, known at compile time) so
+  // the executor knows the threshold to enforce.
   states[recheckStateName] = {
     Type: 'Task',
     Resource: journeyExecutorLambdaArn as string,
     Parameters: {
-      'operation': 'wait_and_recheck_check',
-      'stepId': step.stepId,
-      'recheckField': step.recheckField,
-      'iterationCount.$': '$.iterationCount',
+      operation: 'wait_and_recheck_check',
+      stepId: step.stepId,
+      recheckField: step.recheckField,
+      maxIterations: step.maxIterations,
+      ...CONTEXT_PASSTHROUGH_PARAMETERS,
     },
     ResultPath: '$.recheckResult',
     Next: choiceStateName,
@@ -150,10 +176,13 @@ function compileWaitAndRecheckStep(
   states[choiceStateName] = {
     Type: 'Choice',
     Choices: [
-      { Variable: '$.recheckResult.satisfied', StringEquals: 'true', Next: resolve(step.onSatisfied) },
-      { Variable: '$.recheckResult.iterationCount', NumericLessThanEquals: step.maxIterations, Next: waitStateName },
+      { Variable: '$.recheckResult.satisfied', BooleanEquals: true, Next: resolve(step.onSatisfied) },
+      { Variable: '$.recheckResult.exhausted', BooleanEquals: true, Next: resolve(step.onExhausted) },
     ],
-    Default: resolve(step.onExhausted),
+    // Neither satisfied nor exhausted -- loop back and wait again. The
+    // executor, not this Choice state, is what actually enforces
+    // maxIterations (by setting exhausted: true once its counter hits it).
+    Default: waitStateName,
   } satisfies AslChoiceState
 }
 
@@ -174,7 +203,12 @@ export function compileJourneyToAsl(journey: JourneyDefinition): AslStateMachine
         states[step.stepId] = {
           Type: 'Task',
           Resource: journeyExecutorLambdaArn as string,
-          Parameters: { operation: 'send_message', stepId: step.stepId, messageHint: step.messageHint },
+          Parameters: {
+            operation: 'send_message',
+            stepId: step.stepId,
+            messageHint: step.messageHint,
+            ...CONTEXT_PASSTHROUGH_PARAMETERS,
+          },
           ...(step.next ? { Next: resolve(step.next) } : { End: true }),
           Retry: [{ ErrorEquals: ['States.TaskFailed'], MaxAttempts: 3, IntervalSeconds: 30, BackoffRate: 2 }],
         } satisfies AslTaskState
@@ -204,7 +238,12 @@ export function compileJourneyToAsl(journey: JourneyDefinition): AslStateMachine
         states[step.stepId] = {
           Type: 'Task',
           Resource: journeyExecutorLambdaArn as string,
-          Parameters: { operation: 'tool_call', toolName: step.toolName, toolInput: step.toolInput },
+          Parameters: {
+            operation: 'tool_call',
+            toolName: step.toolName,
+            toolInput: step.toolInput,
+            ...CONTEXT_PASSTHROUGH_PARAMETERS,
+          },
           ...(step.next ? { Next: resolve(step.next) } : { End: true }),
           Retry: [{ ErrorEquals: ['States.TaskFailed'], MaxAttempts: 3, IntervalSeconds: 30, BackoffRate: 2 }],
         } satisfies AslTaskState
@@ -214,7 +253,12 @@ export function compileJourneyToAsl(journey: JourneyDefinition): AslStateMachine
         states[step.stepId] = {
           Type: 'Task',
           Resource: journeyExecutorLambdaArn as string,
-          Parameters: { operation: 'human_handoff', stepId: step.stepId, reason: step.reason },
+          Parameters: {
+            operation: 'human_handoff',
+            stepId: step.stepId,
+            reason: step.reason,
+            ...CONTEXT_PASSTHROUGH_PARAMETERS,
+          },
           End: true,
         } satisfies AslTaskState
         break

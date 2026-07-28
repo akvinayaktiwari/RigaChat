@@ -24,6 +24,7 @@ type TableKey =
   | 'meta_page_lookup'
   | 'journeys'
   | 'scheduled_actions'
+  | 'journey_executions'
 
 const tableEnvVarNames: Record<TableKey, string> = {
   clients: 'DYNAMODB_TABLE_CLIENTS',
@@ -42,6 +43,7 @@ const tableEnvVarNames: Record<TableKey, string> = {
   meta_page_lookup: 'DYNAMODB_TABLE_META_PAGE_LOOKUP',
   journeys: 'DYNAMODB_TABLE_JOURNEYS',
   scheduled_actions: 'DYNAMODB_TABLE_SCHEDULED_ACTIONS',
+  journey_executions: 'DYNAMODB_TABLE_JOURNEY_EXECUTIONS',
 }
 
 export function getTableName(key: TableKey): string {

@@ -717,7 +717,7 @@ export interface AslTaskState {
 export interface AslChoiceRule {
   Variable: string
   StringEquals?: string
-  NumericLessThanEquals?: number
+  BooleanEquals?: boolean
   Next: string
 }
 
@@ -771,4 +771,46 @@ export interface ScheduledAction {
   enabled: boolean
   createdAt: string
   updatedAt: string
+}
+
+// --- Journey Executor ---
+// journey-executor-service.ts's runtime counterpart to the compile-time
+// guardrails in journey-compiler-service.ts. A wait_and_recheck step's
+// iteration count is tracked here (keyed by leadId+stepId, stable across
+// every loop iteration for that specific lead on that specific step)
+// rather than threaded through Step Functions' own JSON state -- see
+// journey-compiler-service.ts's compileWaitAndRecheckStep() for why the
+// JSONPath-threaded version didn't actually work.
+export interface WaitAndRecheckIteration {
+  leadId: string
+  stepId: string
+  iterationCount: number
+  updatedAt: string
+}
+
+export type JourneyExecutorOperation = 'send_message' | 'tool_call' | 'wait_and_recheck_check' | 'human_handoff'
+
+// The shape every compiled Task state's Parameters produces (see
+// CONTEXT_PASSTHROUGH_PARAMETERS in journey-compiler-service.ts), and what
+// backend/index.ts's Lambda handler receives when Step Functions invokes it
+// directly for a Task state. Fields beyond the shared context are
+// operation-specific -- present depending on `operation`, not all at once.
+export interface JourneyExecutorEvent {
+  operation: JourneyExecutorOperation
+  botId: string
+  bundleId: string
+  leadId: string
+  channel: JourneyChannel
+  stepId?: string
+  messageHint?: string
+  toolName?: string
+  toolInput?: Record<string, unknown>
+  recheckField?: 'replied' | 'lead_score' | 'appointment_booked'
+  maxIterations?: number
+  reason?: string
+}
+
+export interface WaitAndRecheckResult {
+  satisfied: boolean
+  exhausted: boolean
 }

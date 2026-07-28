@@ -94,14 +94,74 @@ describe('compileJourneyToAsl', () => {
     const asl = compileJourneyToAsl(journey)
 
     expect(asl.States.poll_wait).toMatchObject({ Type: 'Wait', Seconds: 2 * 86400, Next: 'poll_recheck' })
-    expect(asl.States.poll_recheck).toMatchObject({ Type: 'Task', Next: 'poll_choice' })
-    expect(asl.States.poll_choice).toMatchObject({ Type: 'Choice', Default: 'handoff' })
-    const choice = asl.States.poll_choice as { Type: 'Choice'; Choices: { Next: string }[] }
-    // The self-loop back to poll_wait is intentional (bounded by
-    // maxIterations, checked in the Choice state) -- this is the one
-    // sanctioned repeat primitive, not a violation of the forward-reference
-    // rule, which only applies to JourneyStep-level references.
-    expect(choice.Choices.map((c) => c.Next)).toEqual(['booked', 'poll_wait'])
+    const recheck = asl.States.poll_recheck as { Type: 'Task'; Next: string; Parameters: Record<string, unknown> }
+    expect(recheck).toMatchObject({ Type: 'Task', Next: 'poll_choice' })
+    // maxIterations travels as a static value (known at compile time); no
+    // iterationCount is threaded through Step Functions' own JSON state --
+    // journey-executor-service.ts tracks that itself. See the "regression"
+    // test below for what broke when it WAS threaded this way.
+    expect(recheck.Parameters).toMatchObject({ maxIterations: 5 })
+    expect(recheck.Parameters).not.toHaveProperty('iterationCount.$')
+
+    // Default is the loop-back (bounded by the executor's own maxIterations
+    // enforcement, not by this Choice state) -- onSatisfied/onExhausted are
+    // both explicit BooleanEquals branches, never the fallthrough.
+    const choice = asl.States.poll_choice as {
+      Type: 'Choice'
+      Default: string
+      Choices: { Variable: string; BooleanEquals?: boolean; Next: string }[]
+    }
+    expect(choice.Default).toBe('poll_wait')
+    expect(choice.Choices).toEqual([
+      { Variable: '$.recheckResult.satisfied', BooleanEquals: true, Next: 'booked' },
+      { Variable: '$.recheckResult.exhausted', BooleanEquals: true, Next: 'handoff' },
+    ])
+  })
+
+  // Regression test for the bug this compiler shipped with initially: the
+  // Choice state used to read $.iterationCount fresh on every loop
+  // iteration, but nothing ever promoted the incremented count from
+  // $.recheckResult back to that top-level path (Task Parameters fully
+  // replaces $, it doesn't merge) -- the counter never actually advanced,
+  // so a "bounded" loop was runtime-unbounded in practice. Iteration
+  // counting now lives entirely in journey-executor-service.ts via an
+  // atomic DynamoDB counter, not in Step Functions' own state.
+  it('does not thread an iteration counter through Step Functions JSON state', () => {
+    const journey = baseJourney([
+      {
+        stepId: 'poll',
+        type: 'wait_and_recheck',
+        name: 'Poll',
+        waitDays: 1,
+        maxIterations: 3,
+        recheckField: 'replied',
+        onSatisfied: 'end',
+        onExhausted: 'end',
+      },
+      { stepId: 'end', type: 'human_handoff', name: 'End' },
+    ])
+
+    const asl = compileJourneyToAsl(journey)
+
+    const choice = asl.States.poll_choice as { Choices: { Variable: string }[] }
+    expect(choice.Choices.every((c) => !c.Variable.includes('iterationCount'))).toBe(true)
+  })
+
+  it('passes execution context (botId/bundleId/leadId/channel) through to every Task state', () => {
+    const journey = baseJourney([
+      { stepId: 'greet', type: 'send_message', name: 'Greet', next: 'handoff' },
+      { stepId: 'handoff', type: 'human_handoff', name: 'Handoff' },
+    ])
+
+    const asl = compileJourneyToAsl(journey)
+
+    const greet = asl.States.greet as { Parameters: Record<string, unknown> }
+    expect(greet.Parameters).toMatchObject({
+      'botId.$': '$.botId',
+      'bundleId.$': '$.bundleId',
+      'leadId.$': '$.leadId',
+      'channel.$': '$.channel',
+    })
   })
 
   // A reference to a wait_and_recheck step's bare stepId (e.g. from a

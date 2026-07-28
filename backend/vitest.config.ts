@@ -18,6 +18,7 @@ export default defineConfig({
       DYNAMODB_TABLE_SCHEDULED_ACTIONS: 'test-scheduled-actions-table',
       SCHEDULER_TARGET_LAMBDA_ARN: 'arn:aws:lambda:ap-south-1:000000000000:function:test-scheduler-target',
       SCHEDULER_EXECUTION_ROLE_ARN: 'arn:aws:iam::000000000000:role/test-scheduler-execution-role',
+      DYNAMODB_TABLE_JOURNEY_EXECUTIONS: 'test-journey-executions-table',
     },
   },
 })

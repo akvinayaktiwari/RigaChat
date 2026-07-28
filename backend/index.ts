@@ -4,9 +4,10 @@ import type { LambdaEvent } from 'hono/aws-lambda'
 import { app } from './src/routes/index.js'
 import { sendWeeklyReportsForAllClients } from './src/services/whatsapp-service.js'
 import { executeScheduledAction } from './src/services/scheduler-service.js'
+import { executeJourneyStep } from './src/services/journey-executor-service.js'
 import { processCrawlerJob } from './src/services/crawler-worker-service.js'
 import type { CrawlerJobMessage } from './src/lib/sqs.js'
-import type { ScheduledActionType } from './src/types/index.js'
+import type { JourneyExecutorEvent, ScheduledActionType } from './src/types/index.js'
 
 // Lambda Function URL only supports one invocation mode (BUFFERED or RESPONSE_STREAM)
 // per function, so this same bundle is deployed to two separate Lambda functions:
@@ -60,13 +61,23 @@ interface SQSTriggerEvent {
 const bufferedHandler = handle(app)
 
 export const handler = async (
-  event: LambdaEvent | ScheduledEvent | SQSTriggerEvent,
+  event: LambdaEvent | ScheduledEvent | SQSTriggerEvent | JourneyExecutorEvent,
   lambdaContext?: Parameters<typeof bufferedHandler>[1]
 ) => {
   if ('Records' in event && event.Records?.[0]?.eventSource === 'aws:sqs') {
     const job = JSON.parse(event.Records[0].body) as CrawlerJobMessage
     await processCrawlerJob(job)
     return { statusCode: 200 }
+  }
+
+  // journey-compiler-service.ts's compiled Task states set Resource
+  // directly to JOURNEY_EXECUTOR_LAMBDA_ARN (this Lambda's own ARN) rather
+  // than the arn:aws:states:::lambda:invoke integration, so Step Functions
+  // invokes this handler with the Task's Parameters AS the raw event --
+  // no wrapping. 'operation' only appears on that shape; nothing else this
+  // handler receives has it.
+  if ('operation' in event) {
+    return executeJourneyStep(event)
   }
 
   if ('source' in event && event.source === 'aws.events' && event['detail-type'] === 'whatsapp-weekly-report') {

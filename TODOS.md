@@ -208,6 +208,42 @@
 **Priority:** P1
 **Depends on:** Should land before the Agents/Journeys pilot wires tool-calling into /api/chat or the WhatsApp webhook
 
+### Implement the real journey-executor send_message channel integration
+
+**What:** `journey-executor-service.ts`'s `handleSendMessage()` is a deliberate stub — it logs the intent (bot/bundle/lead/channel/step/messageHint) and returns `{ sent: false, stub: true }` without ever sending anything. The real implementation needs to route through the bot's existing chat/RAG pipeline (`chat-service.ts`/`rag-service.ts`) and dispatch via the right `MessageChannel` implementation for whatever `channel` the Journey execution carries.
+
+**Why:** This is what makes a Journey's `send_message` step actually do something instead of a no-op. Scoped out of the executor pass deliberately (per the Agent Scheduler & Journey Flow session's explicit agreement: prove the Journey/Step-Functions loop end-to-end with stubs before building the real send integration).
+
+**Context:** The existing `MessageChannel` interface (`receiveMessage`/`sendResponse`) was designed around a user-initiated message triggering a response, not a Journey-initiated send with no prior inbound message — needs its own design pass to confirm the interface still fits a Journey-initiated send, or whether it needs a new method/variant. Also depends on the channel actually being safe to send on: WhatsApp send needs the Gupshup webhook signature fix (P1, tracked separately) and the request-authenticity TODO above if going through `/api/chat`-adjacent infra.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** Gupshup webhook signature verification (if targeting WhatsApp); /api/chat request-authenticity TODO above (if targeting the web widget with real-world-action tool-calling)
+
+### Build the real MCP toolbox (booking, quotation, brochure, reminder)
+
+**What:** `journey-executor-service.ts`'s `handleToolCall()` is a deliberate stub — logs the tool name/input and returns `{ stub: true }` without calling anything real. Per the approved agents-schedulers-journeys design, these should be Vyostra-owned MCP capability route groups (`/mcp/booking`, `/mcp/quotation`, etc.) on the existing single Lambda, using MCP's Streamable HTTP transport (stateless mode), each capability scoped per-request by client the same way Pinecone queries are scoped by `botId` today.
+
+**Why:** `tool_call` steps and bounded agent toolboxes (`AgentConfig.mcpToolbox`) are core to the approved architecture's "agent can take a real action" requirement — without real tools, every prebuilt agent bundle can only send messages and wait, not actually book anything.
+
+**Context:** This is real, net-new protocol work (MCP session handshake, capability discovery, JSON-RPC framing), not just routing — flagged as such in the original design ("not new infrastructure" undersold implementing MCP itself). The design doc's own recommendation to use the real MCP protocol rather than a lighter internal tool-calling registry was never validated against this codebase with a technical spike; treat as provisional until one is done. Needs its own scoping pass — likely its own `/office-hours` given the size.
+
+**Effort:** L
+**Priority:** P2
+**Depends on:** None technically, but low value until send_message (above) is real too — a Journey that can book but can't message a lead about it is incomplete
+
+### Implement a real wait_and_recheck satisfied-check
+
+**What:** `journey-executor-service.ts`'s `handleWaitAndRecheckCheck()` hardcodes `satisfied: false` unconditionally — checking whether a lead has actually replied, or their real `lead_score`/`appointment_booked` state, needs data that doesn't exist on any record yet (`Lead` has no `replied` or `lead_score` field; there's no booking record since `tool_call` is stubbed above).
+
+**Why:** Right now every `wait_and_recheck` step in a compiled Journey will always run to `maxIterations` and hit `onExhausted`, never `onSatisfied` — the primitive compiles and executes correctly, but can't reflect real lead state yet.
+
+**Context:** Needs a real design decision on where `replied`/`lead_score`/`appointment_booked` state lives (new fields on `Lead`? A separate `LeadJourneyState` record?) and who writes it (the chat pipeline marking `replied` when an inbound message arrives during a Journey execution? A human explicitly scoring a lead, per the original design's Premise on manual vs. AI scoring?). Blocked on send_message being real first, in most cases — "has the lead replied" needs a real send to have gone out.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** send_message channel integration (above), for the `replied` check specifically; the MCP toolbox (above), for the `appointment_booked` check specifically
+
 ### Migrate the global weekly-report EventBridge rule to per-client ScheduledActions
 
 **What:** `backend/index.ts`'s Lambda handler still has the original hardcoded `'whatsapp-weekly-report'` branch, backed by a single global EventBridge rule (created outside this repo) that fires `sendWeeklyReportsForAllClients()` for every connected WhatsApp client on the same fixed cadence. The new `scheduler-service.ts`/`'scheduled-action'` branch (added alongside it, not replacing it) lets each client get their own `ScheduledAction` with its own cadence via `POST /api/scheduler`. The old rule is left running untouched.
