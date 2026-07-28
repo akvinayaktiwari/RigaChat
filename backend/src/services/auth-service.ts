@@ -1,6 +1,7 @@
 import {
   AdminConfirmSignUpCommand,
   AdminGetUserCommand,
+  AdminUpdateUserAttributesCommand,
   ConfirmForgotPasswordCommand,
   ConfirmSignUpCommand,
   ForgotPasswordCommand,
@@ -51,9 +52,19 @@ export class QuickSignupError extends Error {
 // -- see the "signup email verification (OTP)" module.
 // NotAuthorizedException covers "already confirmed" (harmless — the user can
 // already sign in) and InvalidParameterException covers "no such user" (the
-// signup itself failed upstream, nothing to confirm). Both are treated as a
-// no-op success so quickSignup()'s immediate sign-in isn't blocked by a
-// confirmation error that doesn't actually indicate a problem.
+// signup itself failed upstream, nothing to confirm). The former still has a
+// real user to fix up, so it falls through to the email_verified step below;
+// the latter has nothing to fix up and returns as a no-op, same as before, so
+// quickSignup()'s immediate sign-in isn't blocked by a confirmation error
+// that doesn't actually indicate a problem.
+//
+// AdminConfirmSignUpCommand only flips UserStatus to CONFIRMED -- unlike the
+// real ConfirmSignUpCommand code-verification path, it does NOT mark the
+// email attribute itself as verified. Left alone, that leaves quick-signup
+// users with email_verified=false forever, which later makes ForgotPassword
+// fail with "no registered/verified email or phone_number" since Cognito has
+// no verified channel to deliver the reset code to. AdminUpdateUserAttributes
+// closes that gap explicitly.
 export async function confirmSignup(username: string): Promise<void> {
   try {
     await cognitoAdminClient.send(
@@ -64,10 +75,25 @@ export async function confirmSignup(username: string): Promise<void> {
     )
   } catch (err) {
     const error = err as CognitoServiceError
-    if (error.name === 'NotAuthorizedException' || error.name === 'InvalidParameterException') {
+    if (error.name === 'InvalidParameterException') {
       return
     }
-    throw new Error(`Failed to confirm signup for ${username}: ${error.message ?? String(err)}`)
+    if (error.name !== 'NotAuthorizedException') {
+      throw new Error(`Failed to confirm signup for ${username}: ${error.message ?? String(err)}`)
+    }
+  }
+
+  try {
+    await cognitoAdminClient.send(
+      new AdminUpdateUserAttributesCommand({
+        UserPoolId: userPoolId,
+        Username: username,
+        UserAttributes: [{ Name: 'email_verified', Value: 'true' }],
+      })
+    )
+  } catch (err) {
+    const error = err as CognitoServiceError
+    throw new Error(`Failed to mark email verified for ${username}: ${error.message ?? String(err)}`)
   }
 }
 
