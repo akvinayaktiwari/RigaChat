@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD
 
 on:
   push:
@@ -62,3 +62,272 @@ jobs:
           VITE_COGNITO_REDIRECT_URI: ${{ vars.VITE_COGNITO_REDIRECT_URI }}
           VITE_CDN_URL: ${{ vars.VITE_CDN_URL }}
         run: npm run build
+
+  # Deploy jobs only run for real pushes to main (never for PRs or other
+  # branches), and only start once their matching check-* job has passed --
+  # that `needs:` is the actual CI-gates-CD guarantee. Deploy steps below are
+  # otherwise byte-for-byte what deploy.yml ran before this merge; kept
+  # untouched to avoid introducing risk into the production deploy path.
+  deploy-backend:
+    needs: check-backend
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Build
+        working-directory: backend
+        run: npm run build
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Zip build output
+        run: cd backend/dist && zip -r ../function.zip index.js
+
+      - name: Deploy to main Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
+            --zip-file fileb://backend/function.zip \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Wait for main Lambda update
+        run: |
+          aws lambda wait function-updated \
+            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Update main Lambda environment variables
+        run: |
+          MERGED_ENV=$(aws lambda get-function-configuration \
+            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }} \
+            --query 'Environment.Variables' --output json | jq \
+            --arg whatsapp_provider "${{ vars.WHATSAPP_PROVIDER }}" \
+            --arg whatsapp_master_number "${{ secrets.WHATSAPP_MASTER_NUMBER }}" \
+            --arg whatsapp_kms_key_id "${{ secrets.WHATSAPP_KMS_KEY_ID }}" \
+            --arg redis_provider "${{ vars.REDIS_PROVIDER }}" \
+            --arg upstash_redis_rest_url "${{ secrets.UPSTASH_REDIS_REST_URL }}" \
+            --arg upstash_redis_rest_token "${{ secrets.UPSTASH_REDIS_REST_TOKEN }}" \
+            --arg sqs_crawler_queue_url "${{ secrets.SQS_CRAWLER_QUEUE_URL }}" \
+            '. + {WHATSAPP_PROVIDER: $whatsapp_provider, WHATSAPP_MASTER_NUMBER: $whatsapp_master_number, WHATSAPP_KMS_KEY_ID: $whatsapp_kms_key_id, REDIS_PROVIDER: $redis_provider, UPSTASH_REDIS_REST_URL: $upstash_redis_rest_url, UPSTASH_REDIS_REST_TOKEN: $upstash_redis_rest_token, SQS_CRAWLER_QUEUE_URL: $sqs_crawler_queue_url}')
+          aws lambda update-function-configuration \
+            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }} \
+            --environment "{\"Variables\":$MERGED_ENV}"
+
+      - name: Wait for main Lambda environment update
+        run: |
+          aws lambda wait function-updated \
+            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Deploy to streaming Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ secrets.LAMBDA_STREAMING_FUNCTION_NAME }} \
+            --zip-file fileb://backend/function.zip \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Wait for streaming Lambda update
+        run: |
+          aws lambda wait function-updated \
+            --function-name ${{ secrets.LAMBDA_STREAMING_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Update streaming Lambda environment variables
+        run: |
+          MERGED_ENV=$(aws lambda get-function-configuration \
+            --function-name ${{ secrets.LAMBDA_STREAMING_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }} \
+            --query 'Environment.Variables' --output json | jq \
+            --arg whatsapp_provider "${{ vars.WHATSAPP_PROVIDER }}" \
+            --arg whatsapp_master_number "${{ secrets.WHATSAPP_MASTER_NUMBER }}" \
+            --arg whatsapp_kms_key_id "${{ secrets.WHATSAPP_KMS_KEY_ID }}" \
+            --arg redis_provider "${{ vars.REDIS_PROVIDER }}" \
+            --arg upstash_redis_rest_url "${{ secrets.UPSTASH_REDIS_REST_URL }}" \
+            --arg upstash_redis_rest_token "${{ secrets.UPSTASH_REDIS_REST_TOKEN }}" \
+            --arg sqs_crawler_queue_url "${{ secrets.SQS_CRAWLER_QUEUE_URL }}" \
+            '. + {WHATSAPP_PROVIDER: $whatsapp_provider, WHATSAPP_MASTER_NUMBER: $whatsapp_master_number, WHATSAPP_KMS_KEY_ID: $whatsapp_kms_key_id, REDIS_PROVIDER: $redis_provider, UPSTASH_REDIS_REST_URL: $upstash_redis_rest_url, UPSTASH_REDIS_REST_TOKEN: $upstash_redis_rest_token, SQS_CRAWLER_QUEUE_URL: $sqs_crawler_queue_url}')
+          aws lambda update-function-configuration \
+            --function-name ${{ secrets.LAMBDA_STREAMING_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }} \
+            --environment "{\"Variables\":$MERGED_ENV}"
+
+      - name: Wait for streaming Lambda environment update
+        run: |
+          aws lambda wait function-updated \
+            --function-name ${{ secrets.LAMBDA_STREAMING_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Deploy to crawler Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ secrets.LAMBDA_CRAWLER_FUNCTION_NAME }} \
+            --zip-file fileb://backend/function.zip \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Wait for crawler Lambda update
+        run: |
+          aws lambda wait function-updated \
+            --function-name ${{ secrets.LAMBDA_CRAWLER_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Update crawler Lambda environment variables
+        run: |
+          MERGED_ENV=$(aws lambda get-function-configuration \
+            --function-name ${{ secrets.LAMBDA_CRAWLER_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }} \
+            --query 'Environment.Variables' --output json | jq \
+            --arg sqs_url "${{ secrets.SQS_CRAWLER_QUEUE_URL }}" \
+            --arg crawler_name "${{ secrets.LAMBDA_CRAWLER_FUNCTION_NAME }}" \
+            '. + {
+              SQS_CRAWLER_QUEUE_URL: $sqs_url,
+              LAMBDA_CRAWLER_FUNCTION_NAME: $crawler_name
+            }')
+          aws lambda update-function-configuration \
+            --function-name ${{ secrets.LAMBDA_CRAWLER_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }} \
+            --environment "{\"Variables\":$MERGED_ENV}"
+
+      - name: Wait for crawler Lambda environment update
+        run: |
+          aws lambda wait function-updated \
+            --function-name ${{ secrets.LAMBDA_CRAWLER_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Health check main Lambda
+        run: |
+          RESPONSE=$(curl -s -o /tmp/health.json -w "%{http_code}" "${{ secrets.BACKEND_URL }}/api/bots/health-check/config")
+          echo "HTTP status: $RESPONSE"
+          cat /tmp/health.json
+          echo
+          if [ "$RESPONSE" -ge 500 ]; then
+            echo "Lambda returned $RESPONSE — failing deploy"
+            exit 1
+          fi
+
+      - name: Deployment success
+        run: echo "Backend deployed successfully at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+  deploy-frontend:
+    needs: check-frontend
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_COGNITO_DOMAIN: ${{ vars.VITE_COGNITO_DOMAIN }}
+          VITE_COGNITO_CLIENT_ID: ${{ vars.VITE_COGNITO_CLIENT_ID }}
+          VITE_COGNITO_REDIRECT_URI: ${{ vars.VITE_COGNITO_REDIRECT_URI }}
+          VITE_CDN_URL: ${{ vars.VITE_CDN_URL }}
+          VITE_STAFF_COGNITO_CLIENT_ID: ${{ vars.VITE_STAFF_COGNITO_CLIENT_ID }}
+          VITE_STAFF_COGNITO_REGION: ${{ vars.VITE_STAFF_COGNITO_REGION }}
+        run: npm run build
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Inject BACKEND_URL into widget.js and form-widget.js
+        run: |
+          sed -i 's|__BACKEND_URL__|${{ secrets.BACKEND_URL }}|g' frontend/dist/widget.js
+          sed -i 's|__BACKEND_URL__|${{ secrets.BACKEND_URL }}|g' frontend/dist/form-widget.js
+
+      - name: Inject BACKEND_URL and VOICE_WS_URL into voice-widget.js
+        run: |
+          sed -i 's|__BACKEND_URL__|${{ secrets.BACKEND_URL }}|g' frontend/dist/voice-widget.js
+          sed -i "s|__WS_URL__|${{ secrets.VOICE_WS_URL }}|g" frontend/dist/voice-widget.js
+
+      - name: Upload widget.js to S3
+        run: |
+          aws s3 cp frontend/dist/widget.js \
+            s3://${{ secrets.S3_BUCKET_WIDGET }}/widget.js \
+            --cache-control "public, max-age=3600" \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Upload form-widget.js to S3
+        run: |
+          aws s3 cp frontend/dist/form-widget.js \
+            s3://${{ secrets.S3_BUCKET_WIDGET }}/form-widget.js \
+            --cache-control "public, max-age=3600" \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Upload voice-widget.js to S3
+        run: |
+          aws s3 cp frontend/dist/voice-widget.js \
+            s3://${{ secrets.S3_BUCKET_WIDGET }}/voice-widget.js \
+            --cache-control "public, max-age=3600" \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Sync dashboard assets to S3 (excluding index.html)
+        run: |
+          aws s3 sync frontend/dist/ \
+            s3://${{ secrets.S3_BUCKET_FRONTEND }} \
+            --exclude "index.html" \
+            --cache-control "public, max-age=31536000, immutable" \
+            --delete \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Upload index.html with no-cache
+        run: |
+          aws s3 cp frontend/dist/index.html \
+            s3://${{ secrets.S3_BUCKET_FRONTEND }}/index.html \
+            --cache-control "no-cache, no-store, must-revalidate" \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Invalidate dashboard CloudFront distribution
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
+
+      - name: Invalidate widget CloudFront distribution
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_WIDGET_DISTRIBUTION_ID }} \
+            --paths "/*"
+
+      - name: Deployment success
+        run: echo "Frontend and widget deployed successfully at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+  deploy-summary:
+    runs-on: ubuntu-latest
+    needs: [deploy-backend, deploy-frontend]
+    steps:
+      - name: Print deployment summary
+        run: |
+          echo "Backend: both Lambda functions updated"
+          echo "Frontend: S3 synced, CloudFront invalidated"
+          echo "Widget: deployed to CDN with BACKEND_URL injected"
+          echo "Time: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
