@@ -54,6 +54,10 @@ GET  /api/journeys/:botId/:bundleId      -> fetch one JourneyBundle (auth requir
 PATCH /api/journeys/:botId/:bundleId     -> update a JourneyBundle (auth required)
 DELETE /api/journeys/:botId/:bundleId    -> delete a JourneyBundle (auth required)
 POST /api/journeys/:botId/:bundleId/publish -> compile + mark published, no live infra provisioned yet (auth required)
+POST /api/scheduler                      -> create a ScheduledAction (EventBridge Scheduler) (auth required)
+GET  /api/scheduler                      -> list the caller's ScheduledActions (auth required)
+PATCH /api/scheduler/:scheduleId         -> update a ScheduledAction's cadence (auth required)
+DELETE /api/scheduler/:scheduleId        -> delete a ScheduledAction (auth required)
 
 ## Key Interfaces
 interface MessageChannel {
@@ -114,10 +118,13 @@ DYNAMODB_TABLE_LEADS
 DYNAMODB_TABLE_CONVERSATIONS
 DYNAMODB_TABLE_KB
 DYNAMODB_TABLE_JOURNEYS
+DYNAMODB_TABLE_SCHEDULED_ACTIONS
 COGNITO_USER_POOL_ID
 COGNITO_CLIENT_ID
 FRONTEND_URL
 JOURNEY_EXECUTOR_LAMBDA_ARN
+SCHEDULER_TARGET_LAMBDA_ARN
+SCHEDULER_EXECUTION_ROLE_ARN
 
 ## Build and Run Commands
 Backend:

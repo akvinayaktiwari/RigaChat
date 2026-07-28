@@ -738,3 +738,37 @@ export interface AslStateMachine {
   StartAt: string
   States: Record<string, AslState>
 }
+
+// --- Scheduler (EventBridge Scheduler) ---
+// The "wait" half of the approved architecture that isn't a Journey's own
+// per-lead timeline: client-configured recurring or one-off wall-clock-time
+// actions (e.g. "send my report every N days"), created as a real
+// EventBridge Scheduler schedule object per client via a runtime API call --
+// not a hardcoded cron entry in code. Replaces the single global EventBridge
+// rule that currently fires sendWeeklyReportsForAllClients() for every
+// connected client on the same fixed cadence (backend/index.ts's
+// 'whatsapp-weekly-report' branch) with a per-client, per-action primitive.
+// The existing hardcoded rule is left running -- see TODOS.md for the
+// migration/cutover, which is a deploy-time decision, not a code one.
+
+// Only 'weekly_report' exists today (folding the hardcoded feature into
+// this general primitive, per the approved design). More action types get
+// added here as they're built -- e.g. a Journey step that needs a
+// wall-clock (not relative) trigger.
+export type ScheduledActionType = 'weekly_report'
+
+export type ScheduleCadence =
+  | { type: 'interval_days'; intervalDays: number }
+  // ISO 8601 datetime -- EventBridge Scheduler deletes/disables a one-off
+  // schedule after it fires once (see lib/eventbridge-scheduler.ts).
+  | { type: 'one_off'; at: string }
+
+export interface ScheduledAction {
+  scheduleId: string
+  clientId: string
+  actionType: ScheduledActionType
+  cadence: ScheduleCadence
+  enabled: boolean
+  createdAt: string
+  updatedAt: string
+}

@@ -3,8 +3,10 @@ import { handle, streamHandle } from 'hono/aws-lambda'
 import type { LambdaEvent } from 'hono/aws-lambda'
 import { app } from './src/routes/index.js'
 import { sendWeeklyReportsForAllClients } from './src/services/whatsapp-service.js'
+import { executeScheduledAction } from './src/services/scheduler-service.js'
 import { processCrawlerJob } from './src/services/crawler-worker-service.js'
 import type { CrawlerJobMessage } from './src/lib/sqs.js'
+import type { ScheduledActionType } from './src/types/index.js'
 
 // Lambda Function URL only supports one invocation mode (BUFFERED or RESPONSE_STREAM)
 // per function, so this same bundle is deployed to two separate Lambda functions:
@@ -30,11 +32,22 @@ interface LambdaStreamingGlobal {
 // EventBridge Scheduler invokes this Lambda directly (no Function URL event
 // shape) with `source: 'aws.events'` and a custom detail-type identifying the
 // job. Function URL invocations never carry that shape, so branching on it
-// here lets one Lambda serve both the HTTP app and the weekly-report cron
+// here lets one Lambda serve both the HTTP app and every scheduled job
 // without a new function or new deploy pipeline entry.
+//
+// 'whatsapp-weekly-report' is the original hardcoded global rule (fires
+// sendWeeklyReportsForAllClients() for every connected client on one fixed
+// cadence) -- left running as-is, not migrated here. 'scheduled-action' is
+// the new per-client primitive scheduler-service.ts creates one schedule
+// object per ScheduledAction for, each carrying its own clientId/actionType
+// in `detail` (see lib/eventbridge-scheduler.ts's buildTarget()). Migrating
+// existing weekly-report clients off the old global rule onto individual
+// scheduled-action schedules, then deleting the old rule, is a deploy-time
+// cutover -- see TODOS.md.
 interface ScheduledEvent {
   source?: string
   'detail-type'?: string
+  detail?: { clientId?: string; actionType?: ScheduledActionType }
 }
 
 // The crawler worker Lambda (rigachat-crawler) shares this same bundle and
@@ -58,6 +71,16 @@ export const handler = async (
 
   if ('source' in event && event.source === 'aws.events' && event['detail-type'] === 'whatsapp-weekly-report') {
     await sendWeeklyReportsForAllClients()
+    return
+  }
+
+  if ('source' in event && event.source === 'aws.events' && event['detail-type'] === 'scheduled-action') {
+    const { clientId, actionType } = event.detail ?? {}
+    if (!clientId || !actionType) {
+      console.error('scheduled-action event missing clientId or actionType:', event.detail)
+      return
+    }
+    await executeScheduledAction(clientId, actionType)
     return
   }
 

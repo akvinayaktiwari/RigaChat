@@ -208,6 +208,18 @@
 **Priority:** P1
 **Depends on:** Should land before the Agents/Journeys pilot wires tool-calling into /api/chat or the WhatsApp webhook
 
+### Migrate the global weekly-report EventBridge rule to per-client ScheduledActions
+
+**What:** `backend/index.ts`'s Lambda handler still has the original hardcoded `'whatsapp-weekly-report'` branch, backed by a single global EventBridge rule (created outside this repo) that fires `sendWeeklyReportsForAllClients()` for every connected WhatsApp client on the same fixed cadence. The new `scheduler-service.ts`/`'scheduled-action'` branch (added alongside it, not replacing it) lets each client get their own `ScheduledAction` with its own cadence via `POST /api/scheduler`. The old rule is left running untouched.
+
+**Why:** Per the approved agents-schedulers-journeys design, the hardcoded weekly-report feature is meant to "fold into" the general Scheduler primitive as one instance, not remain a permanent special case. Right now both paths coexist, which works but means two different code paths accomplish the same thing.
+
+**Context:** Needs: (1) provisioning `SCHEDULER_TARGET_LAMBDA_ARN` and `SCHEDULER_EXECUTION_ROLE_ARN` (the real IAM role EventBridge Scheduler assumes to invoke the Lambda — not created by any code in this repo, a deploy-time/infra decision), (2) a backfill that creates a `weekly_report` `ScheduledAction` (7-day `interval_days` cadence) for every client currently connected via `getConnectedWhatsAppClients()`, mirroring the pattern `backend/scripts/backfill-quick-signup-email-verified.ts` used for the `activeWhatsappProvider` backfill, (3) deleting the old global EventBridge rule once the backfill is verified working, (4) removing the now-dead `'whatsapp-weekly-report'` branch and `sendWeeklyReportsForAllClients()`.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** SCHEDULER_TARGET_LAMBDA_ARN / SCHEDULER_EXECUTION_ROLE_ARN provisioned in AWS first
+
 ### Fully remove Gupshup once Meta Direct is proven
 
 **What:** Sunset the Gupshup WhatsApp connector entirely once the Meta Direct integration has real production usage and the cost/dependency thesis is validated.
