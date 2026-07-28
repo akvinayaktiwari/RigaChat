@@ -147,7 +147,7 @@ describe('compileJourneyToAsl', () => {
     expect(choice.Choices.every((c) => !c.Variable.includes('iterationCount'))).toBe(true)
   })
 
-  it('passes execution context (botId/bundleId/leadId/channel) through to every Task state', () => {
+  it('passes execution context (botId/bundleId/clientId/leadId/channel) through to every Task state', () => {
     const journey = baseJourney([
       { stepId: 'greet', type: 'send_message', name: 'Greet', next: 'handoff' },
       { stepId: 'handoff', type: 'human_handoff', name: 'Handoff' },
@@ -159,6 +159,7 @@ describe('compileJourneyToAsl', () => {
     expect(greet.Parameters).toMatchObject({
       'botId.$': '$.botId',
       'bundleId.$': '$.bundleId',
+      'clientId.$': '$.clientId',
       'leadId.$': '$.leadId',
       'channel.$': '$.channel',
     })

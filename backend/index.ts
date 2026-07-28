@@ -48,7 +48,7 @@ interface LambdaStreamingGlobal {
 interface ScheduledEvent {
   source?: string
   'detail-type'?: string
-  detail?: { clientId?: string; actionType?: ScheduledActionType }
+  detail?: { clientId?: string; actionType?: ScheduledActionType; leadId?: string; botId?: string }
 }
 
 // The crawler worker Lambda (rigachat-crawler) shares this same bundle and
@@ -86,12 +86,12 @@ export const handler = async (
   }
 
   if ('source' in event && event.source === 'aws.events' && event['detail-type'] === 'scheduled-action') {
-    const { clientId, actionType } = event.detail ?? {}
+    const { clientId, actionType, leadId, botId } = event.detail ?? {}
     if (!clientId || !actionType) {
       console.error('scheduled-action event missing clientId or actionType:', event.detail)
       return
     }
-    await executeScheduledAction(clientId, actionType)
+    await executeScheduledAction(clientId, actionType, { leadId, botId })
     return
   }
 

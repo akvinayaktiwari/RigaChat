@@ -58,6 +58,10 @@ POST /api/scheduler                      -> create a ScheduledAction (EventBridg
 GET  /api/scheduler                      -> list the caller's ScheduledActions (auth required)
 PATCH /api/scheduler/:scheduleId         -> update a ScheduledAction's cadence (auth required)
 DELETE /api/scheduler/:scheduleId        -> delete a ScheduledAction (auth required)
+POST /mcp/booking    -> MCP server, book_appointment tool (real: persists an AppointmentRequest). Interim shared-secret auth, not Cognito.
+POST /mcp/reminder   -> MCP server, schedule_reminder tool (real: creates a lead_reminder ScheduledAction). Interim shared-secret auth, not Cognito.
+POST /mcp/quotation  -> MCP server, get_quotation tool (STUB -- no pricing-rule data model exists yet). Interim shared-secret auth, not Cognito.
+POST /mcp/brochure   -> MCP server, send_brochure tool (STUB -- no document/asset management exists yet). Interim shared-secret auth, not Cognito.
 
 ## Key Interfaces
 interface MessageChannel {
@@ -106,6 +110,10 @@ interface KnowledgeBaseEntry {
 - leads — partition key: botId, sort key: createdAt
 - conversations — partition key: botId, sort key: conversationId
 - knowledge_base — partition key: botId, sort key: entryId
+- journeys — partition key: botId, sort key: bundleId
+- scheduled_actions — partition key: clientId, sort key: scheduleId
+- journey_executions — partition key: leadId, sort key: stepId (wait_and_recheck iteration counters)
+- appointment_requests — partition key: botId, sort key: requestId
 
 ## Environment Variables
 OPENAI_API_KEY
@@ -120,12 +128,14 @@ DYNAMODB_TABLE_KB
 DYNAMODB_TABLE_JOURNEYS
 DYNAMODB_TABLE_SCHEDULED_ACTIONS
 DYNAMODB_TABLE_JOURNEY_EXECUTIONS
+DYNAMODB_TABLE_APPOINTMENT_REQUESTS
 COGNITO_USER_POOL_ID
 COGNITO_CLIENT_ID
 FRONTEND_URL
 JOURNEY_EXECUTOR_LAMBDA_ARN
 SCHEDULER_TARGET_LAMBDA_ARN
 SCHEDULER_EXECUTION_ROLE_ARN
+MCP_INTERNAL_SHARED_SECRET
 
 ## Build and Run Commands
 Backend:

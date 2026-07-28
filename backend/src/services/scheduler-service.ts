@@ -51,13 +51,22 @@ interface CreateScheduledActionInput {
   clientId: string
   actionType: ScheduledActionType
   cadence: ScheduleCadence
+  // Only meaningful for lead-scoped actions (lead_reminder) -- absent for
+  // account-level ones (weekly_report). See ScheduledAction's own comment.
+  leadId?: string
+  botId?: string
 }
 
 export async function createScheduledAction(input: CreateScheduledActionInput): Promise<ScheduledAction> {
   const scheduleExpression = compileScheduleExpression(input.cadence)
   const scheduleId = uuidv4()
 
-  await createSchedule(scheduleId, scheduleExpression, { clientId: input.clientId, actionType: input.actionType })
+  await createSchedule(scheduleId, scheduleExpression, {
+    clientId: input.clientId,
+    actionType: input.actionType,
+    leadId: input.leadId,
+    botId: input.botId,
+  })
 
   try {
     return await createScheduledActionRepo({
@@ -65,6 +74,8 @@ export async function createScheduledAction(input: CreateScheduledActionInput): 
       clientId: input.clientId,
       actionType: input.actionType,
       cadence: input.cadence,
+      leadId: input.leadId,
+      botId: input.botId,
       enabled: true,
     })
   } catch (error) {
@@ -114,11 +125,26 @@ export async function deleteScheduledAction(clientId: string, scheduleId: string
 // Called by backend/index.ts's Lambda handler when EventBridge Scheduler
 // invokes a per-client schedule. Routes to the right action's real
 // execution logic -- the single place a new ScheduledActionType's handler
-// gets registered as more action types are added beyond weekly_report.
-export async function executeScheduledAction(clientId: string, actionType: ScheduledActionType): Promise<void> {
+// gets registered as more action types are added.
+export async function executeScheduledAction(
+  clientId: string,
+  actionType: ScheduledActionType,
+  context?: { leadId?: string; botId?: string }
+): Promise<void> {
   switch (actionType) {
     case 'weekly_report':
       await sendWeeklyReport(clientId)
+      return
+    case 'lead_reminder':
+      // STUB, same as journey-executor-service.ts's send-related stubs: no
+      // notification infra exists yet to actually remind anyone. The real,
+      // non-stub part of this feature is that a live EventBridge schedule
+      // got created for this specific lead at the client-requested time
+      // (backend/src/mcp/reminder-mcp-server.ts) -- what happens when it
+      // fires is the same undesigned piece as send_message.
+      console.log(
+        `[scheduler] STUB lead_reminder fired: client=${clientId} lead=${context?.leadId} bot=${context?.botId}`
+      )
       return
   }
 }

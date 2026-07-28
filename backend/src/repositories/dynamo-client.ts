@@ -25,6 +25,7 @@ type TableKey =
   | 'journeys'
   | 'scheduled_actions'
   | 'journey_executions'
+  | 'appointment_requests'
 
 const tableEnvVarNames: Record<TableKey, string> = {
   clients: 'DYNAMODB_TABLE_CLIENTS',
@@ -44,6 +45,7 @@ const tableEnvVarNames: Record<TableKey, string> = {
   journeys: 'DYNAMODB_TABLE_JOURNEYS',
   scheduled_actions: 'DYNAMODB_TABLE_SCHEDULED_ACTIONS',
   journey_executions: 'DYNAMODB_TABLE_JOURNEY_EXECUTIONS',
+  appointment_requests: 'DYNAMODB_TABLE_APPOINTMENT_REQUESTS',
 }
 
 export function getTableName(key: TableKey): string {

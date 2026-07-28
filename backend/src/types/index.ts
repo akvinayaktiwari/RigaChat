@@ -751,11 +751,12 @@ export interface AslStateMachine {
 // The existing hardcoded rule is left running -- see TODOS.md for the
 // migration/cutover, which is a deploy-time decision, not a code one.
 
-// Only 'weekly_report' exists today (folding the hardcoded feature into
-// this general primitive, per the approved design). More action types get
-// added here as they're built -- e.g. a Journey step that needs a
-// wall-clock (not relative) trigger.
-export type ScheduledActionType = 'weekly_report'
+// 'weekly_report' folds the hardcoded feature into this general primitive,
+// per the approved design. 'lead_reminder' is the MCP reminder tool's
+// wall-clock trigger (backend/src/mcp/reminder-mcp-server.ts) -- a Journey
+// step that needs to fire at a specific future moment for a specific lead,
+// as opposed to a Journey's own relative (wait N days) timeline.
+export type ScheduledActionType = 'weekly_report' | 'lead_reminder'
 
 export type ScheduleCadence =
   | { type: 'interval_days'; intervalDays: number }
@@ -769,6 +770,13 @@ export interface ScheduledAction {
   actionType: ScheduledActionType
   cadence: ScheduleCadence
   enabled: boolean
+  // Present only for lead-scoped actions (lead_reminder); absent for
+  // account-level ones (weekly_report). Threaded through to the EventBridge
+  // Scheduler target's Input (lib/eventbridge-scheduler.ts) so
+  // executeScheduledAction() knows which lead/bot a lead-scoped action fired
+  // for.
+  leadId?: string
+  botId?: string
   createdAt: string
   updatedAt: string
 }
@@ -799,6 +807,7 @@ export interface JourneyExecutorEvent {
   operation: JourneyExecutorOperation
   botId: string
   bundleId: string
+  clientId: string
   leadId: string
   channel: JourneyChannel
   stepId?: string
@@ -813,4 +822,21 @@ export interface JourneyExecutorEvent {
 export interface WaitAndRecheckResult {
   satisfied: boolean
   exhausted: boolean
+}
+
+// --- MCP Toolbox ---
+// Real record backing the booking MCP tool (backend/src/mcp/booking-mcp-server.ts).
+// Deliberately just a request record, not a real calendar/appointment
+// system -- no calendar integration exists in this codebase. Genuinely
+// useful without one: a client can see that a lead requested a specific
+// time, even before any real scheduling logic exists to confirm it.
+export interface AppointmentRequest {
+  requestId: string
+  botId: string
+  clientId: string
+  leadId: string
+  requestedAt: string
+  notes?: string
+  status: 'requested'
+  createdAt: string
 }

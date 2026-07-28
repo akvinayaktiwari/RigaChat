@@ -11,6 +11,7 @@ import { integrationRoutes } from './integration-routes.js'
 import { journeyRoutes } from './journey-routes.js'
 import { kbRoutes } from './kb-routes.js'
 import { leadRoutes } from './lead-routes.js'
+import { mcpRoutes } from './mcp-routes.js'
 import { schedulerRoutes } from './scheduler-routes.js'
 import { voiceRoutes } from './voice-routes.js'
 import { webhookRoutes } from './webhooks.js'
@@ -133,6 +134,13 @@ app.route('/api/forms', formRoutes)
 app.route('/api/integrations', integrationRoutes)
 app.route('/api/voice-agents', voiceRoutes)
 app.route('/api/webhooks', webhookRoutes)
+
+// Not under /api/* on purpose: these are MCP capability servers meant to be
+// called server-to-server (by journey-executor-service.ts in-process today,
+// by a real external MCP client in the future), not by the dashboard
+// browser -- no CORS config applies or is needed. Auth is mcp-routes.ts's
+// own interim shared-secret middleware, not Cognito.
+app.route('/mcp', mcpRoutes)
 
 app.notFound((c) => {
   return c.json<ApiResponse<null>>({

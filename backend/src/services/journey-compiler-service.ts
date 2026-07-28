@@ -46,6 +46,7 @@ export class JourneyCompileError extends Error {
 const CONTEXT_PASSTHROUGH_PARAMETERS = {
   'botId.$': '$.botId',
   'bundleId.$': '$.bundleId',
+  'clientId.$': '$.clientId',
   'leadId.$': '$.leadId',
   'channel.$': '$.channel',
 }

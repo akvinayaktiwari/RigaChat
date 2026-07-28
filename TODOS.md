@@ -220,29 +220,41 @@
 **Priority:** P2
 **Depends on:** Gupshup webhook signature verification (if targeting WhatsApp); /api/chat request-authenticity TODO above (if targeting the web widget with real-world-action tool-calling)
 
-### Build the real MCP toolbox (booking, quotation, brochure, reminder)
+### Design the real MCP auth model (replace the interim shared-secret)
 
-**What:** `journey-executor-service.ts`'s `handleToolCall()` is a deliberate stub — logs the tool name/input and returns `{ stub: true }` without calling anything real. Per the approved agents-schedulers-journeys design, these should be Vyostra-owned MCP capability route groups (`/mcp/booking`, `/mcp/quotation`, etc.) on the existing single Lambda, using MCP's Streamable HTTP transport (stateless mode), each capability scoped per-request by client the same way Pinecone queries are scoped by `botId` today.
+**What:** `mcp-routes.ts` guards all four `/mcp/*` capability servers with a single shared bearer secret (`MCP_INTERNAL_SHARED_SECRET`), checked on every request. That's explicitly interim, not a real per-client/per-agent auth model — anyone who has the one shared secret can call any capability for any `botId`/`clientId` they put in the tool arguments, since the routes trust whatever scoping the caller's arguments claim.
 
-**Why:** `tool_call` steps and bounded agent toolboxes (`AgentConfig.mcpToolbox`) are core to the approved architecture's "agent can take a real action" requirement — without real tools, every prebuilt agent bundle can only send messages and wait, not actually book anything.
+**Why:** This was flagged as an open question in the original approved design (Open Question #2: "MCP server auth/security model for the future 'clients bring their own external MCP server' roadmap item is entirely undesigned") and deliberately not resolved when the MCP protocol layer was built (2026-07-29 session) — the shared secret only proves "this caller is inside our own infra," not "this caller is entitled to act on this specific botId/clientId."
 
-**Context:** This is real, net-new protocol work (MCP session handshake, capability discovery, JSON-RPC framing), not just routing — flagged as such in the original design ("not new infrastructure" undersold implementing MCP itself). The design doc's own recommendation to use the real MCP protocol rather than a lighter internal tool-calling registry was never validated against this codebase with a technical spike; treat as provisional until one is done. Needs its own scoping pass — likely its own `/office-hours` given the size.
-
-**Effort:** L
-**Priority:** P2
-**Depends on:** None technically, but low value until send_message (above) is real too — a Journey that can book but can't message a lead about it is incomplete
-
-### Implement a real wait_and_recheck satisfied-check
-
-**What:** `journey-executor-service.ts`'s `handleWaitAndRecheckCheck()` hardcodes `satisfied: false` unconditionally — checking whether a lead has actually replied, or their real `lead_score`/`appointment_booked` state, needs data that doesn't exist on any record yet (`Lead` has no `replied` or `lead_score` field; there's no booking record since `tool_call` is stubbed above).
-
-**Why:** Right now every `wait_and_recheck` step in a compiled Journey will always run to `maxIterations` and hit `onExhausted`, never `onSatisfied` — the primitive compiles and executes correctly, but can't reflect real lead state yet.
-
-**Context:** Needs a real design decision on where `replied`/`lead_score`/`appointment_booked` state lives (new fields on `Lead`? A separate `LeadJourneyState` record?) and who writes it (the chat pipeline marking `replied` when an inbound message arrives during a Journey execution? A human explicitly scoring a lead, per the original design's Premise on manual vs. AI scoring?). Blocked on send_message being real first, in most cases — "has the lead replied" needs a real send to have gone out.
+**Context:** Today `journey-executor-service.ts` never actually calls these routes over HTTP (it calls `bookAppointment()`/`scheduleReminder()`/etc. directly, in-process — see `booking-mcp-server.ts`'s own comment on why), so the real-world exposure is currently limited to whoever has network access to call the Lambda's Function URL directly with the right secret. Gets more urgent the moment either (a) a real external MCP client integration is built, or (b) the shared secret needs rotation/scoping per capability. Needs a real design decision: per-request signed tokens scoped to a specific botId? Full mTLS? Something else?
 
 **Effort:** M
 **Priority:** P2
-**Depends on:** send_message channel integration (above), for the `replied` check specifically; the MCP toolbox (above), for the `appointment_booked` check specifically
+**Depends on:** None technically, but low urgency until an external MCP client actually exists
+
+### Build real quotation and brochure logic
+
+**What:** `quotation-mcp-server.ts`'s `get_quotation` and `brochure-mcp-server.ts`'s `send_brochure` are deliberate stubs — both return a canned `{ stub: true, message: '...' }` regardless of input. Unlike booking (persists a real `AppointmentRequest`) and reminder (creates a real `ScheduledAction`), neither has any real data model to build against yet.
+
+**Why:** Two of the four MCP capabilities named in the approved design remain non-functional — a client's prebuilt agent bundle can request a quote or a brochure, but nothing happens.
+
+**Context:** Quotation needs a real pricing-rule data model (per-property? per-client-configurable rules? a flat rate card?) — undesigned. Brochure needs document/asset management (which brochure maps to which property, how does a client upload/manage them) — also undesigned, and the actual "send" side shares the same undesigned channel-send gap as `send_message` (see the TODO above). Both are smaller, more contained builds than the MCP protocol layer itself was — each is plausibly its own short design-and-build pass, not a joint `/office-hours`-sized effort like the original "build the MCP toolbox" TODO this replaces.
+
+**Effort:** M (each)
+**Priority:** P3
+**Depends on:** Brochure's send side depends on the send_message channel-integration TODO above
+
+### Implement a real wait_and_recheck satisfied-check
+
+**What:** `journey-executor-service.ts`'s `handleWaitAndRecheckCheck()` hardcodes `satisfied: false` unconditionally — checking whether a lead has actually replied, or their real `lead_score` state, needs data that doesn't exist on any record yet (`Lead` has no `replied` or `lead_score` field). `appointment_booked` now has a real `AppointmentRequest` record to check (booking landed 2026-07-29), but that record's `status` is always `'requested'` today — there's no confirmation step yet, so even `appointment_booked` can't be checked meaningfully until booking has a real status transition.
+
+**Why:** Right now every `wait_and_recheck` step in a compiled Journey will always run to `maxIterations` and hit `onExhausted`, never `onSatisfied` — the primitive compiles and executes correctly, but can't reflect real lead state yet.
+
+**Context:** Needs a real design decision on where `replied`/`lead_score` state lives (new fields on `Lead`? A separate `LeadJourneyState` record?) and who writes it (the chat pipeline marking `replied` when an inbound message arrives during a Journey execution? A human explicitly scoring a lead, per the original design's Premise on manual vs. AI scoring?). For `appointment_booked` specifically: needs `AppointmentRequest.status` to gain a real transition beyond `'requested'` (who confirms it, and how).
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** send_message channel integration (above), for the `replied` check specifically; a real status transition on `AppointmentRequest` (no dedicated TODO yet -- small enough to fold into whoever picks this up), for `appointment_booked`
 
 ### Migrate the global weekly-report EventBridge rule to per-client ScheduledActions
 

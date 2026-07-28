@@ -17,11 +17,13 @@ interface AuthEnv {
 
 export const schedulerRoutes = new Hono<AuthEnv>()
 
-const SCHEDULED_ACTION_TYPES: ScheduledActionType[] = ['weekly_report']
+const SCHEDULED_ACTION_TYPES: ScheduledActionType[] = ['weekly_report', 'lead_reminder']
 
 interface CreateScheduledActionBody {
   actionType?: string
   cadence?: ScheduleCadence
+  leadId?: string
+  botId?: string
 }
 
 interface UpdateScheduledActionBody {
@@ -51,6 +53,8 @@ schedulerRoutes.post('/', requireAuth, async (c) => {
       clientId,
       actionType: body.actionType as ScheduledActionType,
       cadence: body.cadence,
+      leadId: body.leadId,
+      botId: body.botId,
     })
     return c.json<ApiResponse<ScheduledAction>>({ success: true, data: action }, 201)
   } catch (error) {
