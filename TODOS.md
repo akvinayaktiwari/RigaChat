@@ -208,17 +208,27 @@
 **Priority:** P1
 **Depends on:** Should land before the Agents/Journeys pilot wires tool-calling into /api/chat or the WhatsApp webhook
 
-### Build real inbound WhatsApp message tracking (unlocks the send_message session guard)
+### [RESOLVED 2026-07-29] Real inbound WhatsApp message tracking — send_message session guard now works for real
 
-**What:** `journey-executor-service.ts`'s `handleSendMessage()` is now real for the whatsapp channel (2026-07-29) — it looks up the lead's phone, checks `whatsapp-service.ts`'s `hasActiveWhatsAppSession()`, and sends via `sendWhatsAppMessageToLead()`. But `hasActiveWhatsAppSession()` is hardcoded to always return `false`, because no inbound WhatsApp message handling exists anywhere in this codebase to check a real 24-hour session window against (Meta requires a pre-approved template for any business-initiated send outside the window that started with the lead's own most recent inbound message). Today every Journey-initiated WhatsApp send is refused with a `no_active_session` result.
+**What shipped:** `webhook-service.ts`'s Gupshup inbound-message handler now resolves a real `leadId` for every genuine inbound message (via `gupshup_app_lookup`'s `app` -> `clientId` mapping, then a phone match — see below — across that client's leads) and records the timestamp in the new `whatsapp_inbound_activity` table. `whatsapp-service.ts`'s `hasActiveWhatsAppSession()` reads it and checks Meta's real 24h window. `journey-executor-service.ts`'s `handleSendMessage()` now actually sends for a lead who's messaged within 24h, instead of always refusing.
 
-**Why:** Investigation during this session (2026-07-29) confirmed the web widget structurally cannot receive a Journey-initiated send at all (no push, no history-replay-on-load) — WhatsApp is the only realistic channel for a Journey's delayed/nurture sends, and this session guard is the one thing standing between "real send pipeline" and "actually sends anything."
+**Multi-tenant routing:** confirmed via Gupshup's real webhook docs that every inbound event carries a top-level `app` field naming the Gupshup app (matches `client.whatsappConnection.appName` at connect time) — this is what makes routing the single shared `/webhooks/gupshup` endpoint to the right client possible at all. `gupshup-app-lookup-repository.ts` mirrors `meta-lead-repository.ts`'s proven `meta_page_lookup` pattern exactly (atomic claim, same reasoning). `connectGupshup`/`disconnectWhatsApp` write/remove the mapping.
 
-**Context:** Needs real inbound message timestamp tracking (e.g., record `leadId -> lastInboundMessageAt` when a genuine inbound WhatsApp webhook event arrives) — trusting unverified webhook data to decide "is it safe to send this lead a free-text message" would have just moved the vulnerability, not closed it, which is why this explicitly wasn't started until the Gupshup webhook token check (above) landed. Now unblocked: `webhooks.ts`'s `/gupshup` handler is a trustworthy place to record inbound events from. The remaining piece is looking up which `leadId` an inbound Gupshup message's phone number (`GupshupIncomingMessagePayload.source`) belongs to (no existing phone-number-to-lead index) and writing the timestamp somewhere queryable by `leadId`. Once real tracking exists, only `hasActiveWhatsAppSession()`'s body needs to change; its call site in `journey-executor-service.ts` doesn't.
+**Known limitation, tracked separately below:** phone matching is a best-effort heuristic (last-10-digits comparison after stripping formatting), not exact — see the new TODO immediately below for what a more rigorous fix looks like.
+
+**Also known:** `appName` uniqueness is only guaranteed within one Gupshup account, not globally across every client's own separate account — a genuine, if unlikely, collision risk flagged in `gupshup-app-lookup-repository.ts`'s own comment, not silently assumed away.
+
+### Normalize phone numbers to E.164 at lead-capture time (replace the last-10-digits heuristic)
+
+**What:** `lib/phone-match.ts`'s `phonesMatch()` compares the last 10 digits of two phone numbers after stripping non-digit characters, because `Lead.phone` has no canonical format — whatever a client's lead-capture form or agent recorded goes in as-is. This is what `webhook-service.ts` uses to match an inbound Gupshup message's phone number to a lead.
+
+**Why:** The heuristic is honest about its own limitation (documented in the file itself): it can produce a false match if two different real phone numbers happen to share the same last 10 digits (rare but not impossible), and a false negative for numbers with fewer than 10 significant digits.
+
+**Context:** A real fix means normalizing to E.164 (`+<countrycode><number>`) at every point a phone number enters the system — the chat lead-capture form, the CRM, wherever a client can edit a lead's phone number — not just in the matcher. That's a bigger, cross-cutting change touching every lead-intake path in the app, not a one-file fix. Worth doing once real inbound-message volume shows the heuristic actually causing mismatches, not preemptively.
 
 **Effort:** M
-**Priority:** P1
-**Depends on:** None further (Gupshup webhook token verification shipped 2026-07-29)
+**Priority:** P3
+**Depends on:** None
 
 ### Support real AI-composed send_message text (replace literal messageHint)
 

@@ -26,6 +26,8 @@ type TableKey =
   | 'scheduled_actions'
   | 'journey_executions'
   | 'appointment_requests'
+  | 'gupshup_app_lookup'
+  | 'whatsapp_inbound_activity'
 
 const tableEnvVarNames: Record<TableKey, string> = {
   clients: 'DYNAMODB_TABLE_CLIENTS',
@@ -46,6 +48,8 @@ const tableEnvVarNames: Record<TableKey, string> = {
   scheduled_actions: 'DYNAMODB_TABLE_SCHEDULED_ACTIONS',
   journey_executions: 'DYNAMODB_TABLE_JOURNEY_EXECUTIONS',
   appointment_requests: 'DYNAMODB_TABLE_APPOINTMENT_REQUESTS',
+  gupshup_app_lookup: 'DYNAMODB_TABLE_GUPSHUP_APP_LOOKUP',
+  whatsapp_inbound_activity: 'DYNAMODB_TABLE_WHATSAPP_INBOUND_ACTIVITY',
 }
 
 export function getTableName(key: TableKey): string {

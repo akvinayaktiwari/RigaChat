@@ -21,6 +21,8 @@ export default defineConfig({
       DYNAMODB_TABLE_JOURNEY_EXECUTIONS: 'test-journey-executions-table',
       DYNAMODB_TABLE_PAYMENT_HISTORY: 'test-payment-history-table',
       DYNAMODB_TABLE_WEBHOOK_EVENTS: 'test-webhook-events-table',
+      DYNAMODB_TABLE_GUPSHUP_APP_LOOKUP: 'test-gupshup-app-lookup-table',
+      DYNAMODB_TABLE_WHATSAPP_INBOUND_ACTIVITY: 'test-whatsapp-inbound-activity-table',
     },
   },
 })

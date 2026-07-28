@@ -1,10 +1,19 @@
 import crypto from 'crypto'
-import { getWebhookType, isGupshupDeliveryEvent, isGupshupIncomingMessage } from '../lib/gupshup-webhook.js'
+import {
+  getWebhookType,
+  isGupshupDeliveryEvent,
+  isGupshupIncomingMessage,
+  type GupshupIncomingMessage,
+} from '../lib/gupshup-webhook.js'
+import { phonesMatch } from '../lib/phone-match.js'
 import { razorpayProvider } from '../providers/razorpay-provider.js'
 import { getByAccountId, updatePartial } from '../repositories/subscription-repository.js'
 import { hasProcessed, markProcessed } from '../repositories/webhook-event-repository.js'
 import { logPayment } from '../repositories/payment-history-repository.js'
+import { getClientIdForGupshupApp } from '../repositories/gupshup-app-lookup-repository.js'
+import { recordInboundMessage } from '../repositories/whatsapp-inbound-activity-repository.js'
 import { invalidateEntitlementsCache } from './entitlement-service.js'
+import { getLeadsForClient } from './lead-service.js'
 import type { PlanTier, Subscription, SubscriptionStatus } from '../types/index.js'
 
 const BILLABLE_TIERS: ReadonlySet<PlanTier> = new Set(['starter', 'growth', 'agency'])
@@ -40,7 +49,42 @@ export function verifyGupshupWebhookToken(token: string | undefined): boolean {
   return crypto.timingSafeEqual(expectedBuffer, providedBuffer)
 }
 
-export function logGupshupWebhookEvent(body: unknown): void {
+// Resolves an inbound message to a lead (app -> clientId via
+// gupshup-app-lookup-repository.ts, then phone match across that client's
+// leads) and records the timestamp real-inbound-tracking depends on
+// (whatsapp-service.ts's hasActiveWhatsAppSession()). Deliberately never
+// throws: this is best-effort enrichment on top of an otherwise-successful
+// webhook delivery, not something that should turn "we got your event"
+// into a 500 that makes Gupshup retry a message that was actually received
+// fine. Every miss (no app field, unknown app, no matching lead) is logged,
+// not silent -- distinguishable from a real bug in this function itself.
+async function resolveAndRecordInboundMessage(event: GupshupIncomingMessage): Promise<void> {
+  try {
+    if (!event.app) {
+      console.error('Gupshup incoming message missing top-level "app" field, cannot resolve client')
+      return
+    }
+
+    const clientId = await getClientIdForGupshupApp(event.app)
+    if (!clientId) {
+      console.error(`Gupshup incoming message for unmapped app "${event.app}"`)
+      return
+    }
+
+    const leads = await getLeadsForClient(clientId)
+    const matchingLead = leads.find((lead) => lead.phone && phonesMatch(lead.phone, event.payload.source))
+    if (!matchingLead) {
+      console.log(`Gupshup incoming message from ${event.payload.source} (client ${clientId}) matched no lead`)
+      return
+    }
+
+    await recordInboundMessage(matchingLead.leadId)
+  } catch (error) {
+    console.error('Failed to resolve/record Gupshup incoming message:', error)
+  }
+}
+
+export async function logGupshupWebhookEvent(body: unknown): Promise<void> {
   if (isGupshupDeliveryEvent(body)) {
     console.log('WhatsApp delivery event:', {
       messageId: body.payload.id,
@@ -58,7 +102,11 @@ export function logGupshupWebhookEvent(body: unknown): void {
       text: body.payload.payload.text,
       messageId: body.payload.id,
     })
-    // Feature 2 (WhatsApp chatbot) backlog — do not process further yet.
+    // Feature 2 (WhatsApp chatbot conversational handling) is still
+    // backlog -- this only records the inbound-activity timestamp real
+    // session-window checks need, it doesn't respond to or act on the
+    // message content.
+    await resolveAndRecordInboundMessage(body)
     return
   }
 

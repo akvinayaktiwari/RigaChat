@@ -22,7 +22,12 @@ webhookRoutes.post('/gupshup', async (c) => {
   }
 
   const body: unknown = await c.req.json().catch(() => null)
-  logGupshupWebhookEvent(body)
+  // Must be awaited, not fire-and-forget: AWS Lambda freezes the execution
+  // environment as soon as the handler's response promise resolves (same
+  // reasoning already documented on form-lead-service.ts's CRM sync call) --
+  // an un-awaited call here could be aborted mid-flight before the inbound
+  // message ever gets recorded.
+  await logGupshupWebhookEvent(body)
   return c.body(null, 200)
 })
 

@@ -10,6 +10,11 @@ import {
   removeClientWhatsAppConnection,
   updateClient,
 } from '../repositories/client-repository.js'
+import {
+  removeGupshupAppClientMapping,
+  setGupshupAppClientMapping,
+} from '../repositories/gupshup-app-lookup-repository.js'
+import { getLastInboundMessageAt } from '../repositories/whatsapp-inbound-activity-repository.js'
 import { getLeadsForClient as getChatLeadsForClient } from './lead-service.js'
 import { getLeadsForClient as getFormLeadsForClient } from './form-lead-service.js'
 import type { ClientRecord, MetaDirectWhatsAppConnection, WhatsAppConnection } from '../types/index.js'
@@ -118,6 +123,15 @@ async function sendWithRetry(
 export async function connectGupshup(clientId: string, input: ConnectGupshupInput): Promise<void> {
   const apiKeyEncrypted = await encrypt(input.apiKey)
 
+  // Written before updateClient, not after: if the app name is already
+  // claimed by a different client, GupshupAppConflictError should stop this
+  // connect attempt before the client record ever reflects "connected".
+  // appName uniqueness is only guaranteed within one Gupshup account, not
+  // globally -- see gupshup-app-lookup-repository.ts's own comment on this
+  // being a real, if unlikely, collision risk across different clients'
+  // separate Gupshup accounts.
+  await setGupshupAppClientMapping(input.appName, clientId)
+
   await updateClient(clientId, {
     whatsappConnection: {
       provider: 'gupshup',
@@ -175,6 +189,14 @@ export async function connectMetaWhatsApp(clientId: string, input: ConnectMetaWh
 
 export async function disconnectWhatsApp(clientId: string): Promise<void> {
   const client = await getClientById(clientId)
+
+  // Captured before removeClientWhatsAppConnection wipes the connection
+  // field below -- this is the only place the appName the mapping was
+  // keyed by is still available.
+  if (client?.whatsappConnection?.appName) {
+    await removeGupshupAppClientMapping(client.whatsappConnection.appName)
+  }
+
   await removeClientWhatsAppConnection(clientId)
 
   // Disconnecting the currently-active provider needs a new active provider,
@@ -274,23 +296,25 @@ export async function sendWhatsAppMessageToLead(
   return sendWithRetry(toNumber, message, sender.provider, sender.credentials)
 }
 
+const WHATSAPP_SESSION_WINDOW_MS = 24 * 60 * 60 * 1000
+
 // Meta requires a pre-approved message template for any business-initiated
 // send outside a 24-hour customer-service window that started with the
 // lead's own most recent inbound message (Gupshup sits on the same
-// underlying platform policy). This codebase has NO inbound WhatsApp
-// message handling at all yet -- the webhook only logs (and has no
-// signature verification, tracked separately in TODOS.md as P1) -- so
-// there is no real data anywhere to check a genuine session window
-// against. Hardcoded false is the only HONEST answer given that: treating
-// an unknown/untracked session as "not active" is the conservative,
-// correct default, not a placeholder pretending to check something real.
-// Real inbound message timestamp tracking (itself gated behind the webhook
-// signature fix, since trusting unverified webhook data for this decision
-// would be a real vulnerability) is what turns this into a genuine check --
-// see TODOS.md. The guard's call sites don't need to change when that
-// lands, only this function's body.
-export async function hasActiveWhatsAppSession(_leadId: string): Promise<boolean> {
-  return false
+// underlying platform policy). Real as of 2026-07-29: webhook-service.ts's
+// Gupshup inbound handler now resolves an incoming message to a lead (via
+// the app -> clientId lookup, then a phone match across that client's
+// leads) and records the timestamp here via
+// whatsapp-inbound-activity-repository.ts, once the webhook's own
+// authenticity check (verifyGupshupWebhookToken) made trusting that data
+// safe. No inbound record at all still means "not active," same
+// conservative default as before -- a lead who has genuinely never
+// messaged in has no session to be inside of.
+export async function hasActiveWhatsAppSession(leadId: string): Promise<boolean> {
+  const lastInboundAt = await getLastInboundMessageAt(leadId)
+  if (!lastInboundAt) return false
+
+  return Date.now() - new Date(lastInboundAt).getTime() < WHATSAPP_SESSION_WINDOW_MS
 }
 
 export async function sendWeeklyReport(clientId: string): Promise<void> {

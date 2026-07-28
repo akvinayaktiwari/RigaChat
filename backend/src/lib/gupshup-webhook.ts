@@ -16,18 +16,26 @@ export interface GupshupIncomingMessagePayload {
 export interface GupshupDeliveryEvent {
   type: 'message-event'
   timestamp: number
+  app?: string
   payload: GupshupDeliveryEventPayload
 }
 
 export interface GupshupIncomingMessage {
   type: 'message'
   timestamp: number
+  // Top-level field naming which Gupshup app the event is for (confirmed
+  // against Gupshup's own docs) -- matches client.whatsappConnection.appName
+  // at connect time. This is what makes routing the single shared
+  // /webhooks/gupshup endpoint to the right client possible; see
+  // gupshup-app-lookup-repository.ts.
+  app?: string
   payload: GupshupIncomingMessagePayload
 }
 
 interface GupshupWebhookBody {
   type?: unknown
   timestamp?: unknown
+  app?: unknown
   payload?: unknown
 }
 
