@@ -48,6 +48,12 @@ POST /api/leads             -> save lead from chat form
 GET  /api/leads             -> fetch all leads for CRM (auth required)
 POST /api/kb                -> add knowledge base entry + embed it
 GET  /api/kb                -> fetch all KB entries (auth required)
+POST /api/journeys                       -> create a JourneyBundle (auth required)
+GET  /api/journeys/:botId                -> list JourneyBundles for a bot (auth required)
+GET  /api/journeys/:botId/:bundleId      -> fetch one JourneyBundle (auth required)
+PATCH /api/journeys/:botId/:bundleId     -> update a JourneyBundle (auth required)
+DELETE /api/journeys/:botId/:bundleId    -> delete a JourneyBundle (auth required)
+POST /api/journeys/:botId/:bundleId/publish -> compile + mark published, no live infra provisioned yet (auth required)
 
 ## Key Interfaces
 interface MessageChannel {

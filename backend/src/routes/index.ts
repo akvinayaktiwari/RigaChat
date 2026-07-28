@@ -8,6 +8,7 @@ import { chatRoutes } from './chat-routes.js'
 import { clientRoutes } from './client-routes.js'
 import { formRoutes } from './form-routes.js'
 import { integrationRoutes } from './integration-routes.js'
+import { journeyRoutes } from './journey-routes.js'
 import { kbRoutes } from './kb-routes.js'
 import { leadRoutes } from './lead-routes.js'
 import { voiceRoutes } from './voice-routes.js'
@@ -52,6 +53,7 @@ app.use('/api/admin/*', adminCors)
 app.use('/api/clients/*', dashboardCors)
 app.use('/api/billing/*', dashboardCors)
 app.use('/api/kb/*', dashboardCors)
+app.use('/api/journeys/*', dashboardCors)
 app.use('/api/integrations/*', dashboardCors)
 // /api/auth/confirm is called by the dashboard frontend right after signup,
 // before the user has a token — public, but still dashboard-origin only, not
@@ -122,6 +124,7 @@ app.route('/api/bots', botRoutes)
 app.route('/api/chat', chatRoutes)
 app.route('/api/leads', leadRoutes)
 app.route('/api/kb', kbRoutes)
+app.route('/api/journeys', journeyRoutes)
 app.route('/api/clients', clientRoutes)
 app.route('/api/forms', formRoutes)
 app.route('/api/integrations', integrationRoutes)
