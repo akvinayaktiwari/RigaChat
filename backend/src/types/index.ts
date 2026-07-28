@@ -538,3 +538,203 @@ export interface AuditEntry {
   before: Record<string, unknown>
   after: Record<string, unknown>
 }
+
+// --- Agent Scheduler & Journey Flow ---
+// Resolves Open Question #7 of the approved agents-schedulers-journeys design
+// (2026-07-26): the client-authored Journey builder was never scoped as its
+// own deliverable. See the 2026-07-29 design addendum
+// (~/.gstack/projects/akvinayaktiwari-RigaChat/akvinayaktiwari-agents-schedulers-journeys-builder-ux-design-*.md)
+// for the full architecture discussion behind the shapes below.
+
+export type JourneyChannel = 'web_widget' | 'whatsapp'
+
+export type JourneyTriggerType = 'lead_captured' | 'manual_score' | 'site_visit_done'
+
+interface JourneyStepBase {
+  stepId: string
+  name: string
+}
+
+export interface SendMessageStep extends JourneyStepBase {
+  type: 'send_message'
+  // Agent composes the actual message from its systemPrompt/KB context; this
+  // is an optional steer, not a hard template (WhatsApp's hard template
+  // requirement lives on AgentChannelConfig, not here).
+  messageHint?: string
+  next?: string
+}
+
+export interface WaitStep extends JourneyStepBase {
+  type: 'wait'
+  // Whole days only, deliberately -- not seconds/minutes. This is the first
+  // half of the polling-loop guardrail from the design addendum: a client
+  // physically cannot express "check every 5 minutes" through this step,
+  // because the unit itself forecloses it. See WaitAndRecheckStep below for
+  // the one legitimate bounded-repeat primitive.
+  waitDays: number
+  next?: string
+}
+
+// The one sanctioned way to express "try again if not satisfied" in this
+// step-list model. A general graph cycle (any step pointing back to an
+// earlier step) is deliberately NOT supported anywhere in JourneyStep --
+// journey-compiler-service.ts enforces steps as strictly forward-referencing
+// (a DAG by construction, validated via array position, not graph traversal)
+// specifically so the "step-list, not graph canvas" UX decision (2026-07-29)
+// holds at the data-model level too, not just in the UI. This step is the
+// deliberate escape hatch: bounded by both waitDays (>= MIN_WAIT_DAYS) and
+// maxIterations (<= MAX_WAIT_AND_RECHECK_ITERATIONS), both enforced by the
+// compiler before ASL generation.
+export interface WaitAndRecheckStep extends JourneyStepBase {
+  type: 'wait_and_recheck'
+  waitDays: number
+  maxIterations: number
+  recheckField: 'replied' | 'lead_score' | 'appointment_booked'
+  onSatisfied: string
+  onExhausted: string
+}
+
+export interface ConditionStep extends JourneyStepBase {
+  type: 'condition'
+  field: 'replied' | 'lead_score' | 'appointment_booked'
+  operator: 'equals' | 'not_equals'
+  value: string
+  onTrue: string
+  onFalse: string
+}
+
+export interface ToolCallStep extends JourneyStepBase {
+  type: 'tool_call'
+  // Must be present in the owning JourneyBundle's AgentConfig.mcpToolbox --
+  // validated by journey-service.ts before persisting, not by the type
+  // system (the toolbox is per-bundle, not known at this type's definition).
+  toolName: string
+  toolInput?: Record<string, unknown>
+  next?: string
+}
+
+export interface HumanHandoffStep extends JourneyStepBase {
+  type: 'human_handoff'
+  reason?: string
+}
+
+export type JourneyStep =
+  | SendMessageStep
+  | WaitStep
+  | WaitAndRecheckStep
+  | ConditionStep
+  | ToolCallStep
+  | HumanHandoffStep
+
+export interface JourneyDefinition {
+  journeyId: string
+  botId: string
+  clientId: string
+  name: string
+  triggerType: JourneyTriggerType
+  startStepId: string
+  // Ordered array is load-bearing, not cosmetic: journey-compiler-service.ts
+  // validates that every step reference (next/onTrue/onFalse/onSatisfied/
+  // onExhausted) points to a step at a LATER array index than the referring
+  // step, which is what makes this a DAG by construction. Reordering this
+  // array without updating references would silently change that
+  // validation's outcome.
+  steps: JourneyStep[]
+}
+
+// Channel-specific fields only -- e.g. WhatsApp's pre-approved
+// message-template requirement outside a 24h session window (per the
+// WhatsApp Meta Direct design's Premise 9), which doesn't apply to the web
+// widget. Kept separate from AgentConfig's channel-agnostic fields so
+// "add a channel later" means adding one of these blocks, not restructuring
+// the fused bundle -- see JourneyBundle below and Decision #2's caveat in
+// the design addendum.
+export interface AgentChannelConfig {
+  messageTemplateName?: string
+  messageTemplateParams?: string[]
+}
+
+// Channel-agnostic: tone, bounded tool palette, qualification logic. Reused
+// across whichever channels this agent is wired into.
+export interface AgentConfig {
+  agentId: string
+  name: string
+  systemPrompt: string
+  toneDescription?: string
+  // Bounded MCP tool palette per the approved design -- NOT full autonomy.
+  mcpToolbox: string[]
+  channelConfig: Partial<Record<JourneyChannel, AgentChannelConfig>>
+}
+
+export type JourneyBundleStatus = 'draft' | 'published'
+
+// Fused Journey + Agent + toolbox, per the 2026-07-29 architecture session's
+// Decision #2: a prebuilt "agent" (lead-qualification, appointment-booking,
+// etc.) is one editable unit, not a decoupled Journey/Agent composition.
+// This is what gets stored, listed, and cloned when a client picks a
+// template from the prebuilt library.
+export interface JourneyBundle {
+  bundleId: string
+  botId: string
+  clientId: string
+  name: string
+  description?: string
+  isPrebuiltTemplate: boolean
+  // Set when cloned from a prebuilt template, so template updates can
+  // eventually be tracked against clones -- that tracking mechanism itself
+  // is not built in this pass.
+  sourceTemplateId?: string
+  journey: JourneyDefinition
+  agent: AgentConfig
+  status: JourneyBundleStatus
+  // Set once status transitions to 'published' and journey-compiler-service
+  // successfully compiles+deploys the state machine. Absent for drafts.
+  compiledStateMachineArn?: string
+  createdAt: string
+  updatedAt: string
+}
+
+// Minimal typed subset of AWS Step Functions' Amazon States Language --
+// only the states this compiler actually emits (Wait, Task, Choice,
+// Succeed), not the full ASL spec.
+export interface AslWaitState {
+  Type: 'Wait'
+  Seconds: number
+  Next?: string
+  End?: boolean
+}
+
+export interface AslTaskState {
+  Type: 'Task'
+  Resource: string
+  Parameters?: Record<string, unknown>
+  ResultPath?: string
+  Next?: string
+  End?: boolean
+  Retry?: { ErrorEquals: string[]; MaxAttempts: number; IntervalSeconds: number; BackoffRate?: number }[]
+}
+
+export interface AslChoiceRule {
+  Variable: string
+  StringEquals?: string
+  NumericLessThanEquals?: number
+  Next: string
+}
+
+export interface AslChoiceState {
+  Type: 'Choice'
+  Choices: AslChoiceRule[]
+  Default: string
+}
+
+export interface AslSucceedState {
+  Type: 'Succeed'
+}
+
+export type AslState = AslWaitState | AslTaskState | AslChoiceState | AslSucceedState
+
+export interface AslStateMachine {
+  Comment?: string
+  StartAt: string
+  States: Record<string, AslState>
+}
