@@ -1,0 +1,14 @@
+{
+  "name": "rigachat-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --env-file=../backend/.env ./node_modules/.bin/playwright test",
+    "test:headed": "node --env-file=../backend/.env ./node_modules/.bin/playwright test --headed"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@aws-sdk/client-cognito-identity-provider": "^3.1083.0"
+  }
+}
