@@ -26,6 +26,10 @@ jobs:
         working-directory: backend
         run: npx tsc --noEmit
 
+      - name: Test
+        working-directory: backend
+        run: npm test
+
       - name: Build
         working-directory: backend
         run: npm run build
