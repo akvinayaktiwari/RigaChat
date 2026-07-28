@@ -160,6 +160,18 @@
 **Priority:** P3
 **Depends on:** None
 
+### Gupshup WhatsApp webhook has no signature/authenticity verification
+
+**What:** `POST /webhooks/gupshup` (`webhooks.ts`) accepts any request with no HMAC or signature check at all, unlike the Razorpay and Meta webhooks defined in the same file, which both verify a signature before trusting the payload.
+
+**Why:** Today the impact is small — the handler only logs incoming events. Once the Agents/Schedulers/Journeys pilot wires this endpoint to a real conversational agent that can book site visits and send WhatsApp messages, an unverified request means anyone who discovers the URL can inject fake messages that trigger real agent actions.
+
+**Context:** Found during `/plan-eng-review` of the Agents/Schedulers/Journeys pilot design (`akvinayaktiwari-agents-schedulers-journeys-design-20260726-033818.md`). Gupshup's specific verification mechanism (shared secret, HMAC scheme, etc.) wasn't confirmed from public docs during that review — needs a look at Gupshup's own dashboard/developer docs to find the actual mechanism before implementing, following the same pattern already used for Razorpay (`X-Razorpay-Signature`) and Meta (`X-Hub-Signature-256`).
+
+**Effort:** S (once the mechanism is confirmed)
+**Priority:** P1
+**Depends on:** Should land before the WhatsApp conversational agent pilot handles meaningful volume.
+
 ### WhatsApp Meta Direct — PR #2 (webhook routing, disconnect/migration UX, token lifecycle)
 
 **What:** Follow-up to the Meta Direct WhatsApp integration (PR #1: provider, Embedded Signup, DB fields, dispatch wiring). Three pieces deferred out of PR #1: (1) webhook routing / phone-number lookup table for identifying which client an inbound WhatsApp message belongs to, (2) disconnect/migration UX for moving a client between Gupshup and Meta Direct (or back), (3) Meta access-token lifecycle handling — expiry, refresh, and what happens on client-initiated disconnect or Meta-initiated revocation.
@@ -171,6 +183,30 @@
 **Effort:** M
 **Priority:** P2
 **Depends on:** PR #1 (WhatsApp Meta Direct provider + Embedded Signup) shipped and proven first.
+
+### Design the Journey step-list data model + Step Functions compiler
+
+**What:** A dedicated design pass for how a client's step-list Journey (trigger → action → wait → condition → action, per the "no graph builder" UX decided in the Agent Scheduler & Journey Flow architecture session) gets stored in DynamoDB and compiled into a real AWS Step Functions Amazon States Language definition at runtime. Must include two guardrails surfaced during that session's outside-voice review: (1) the compiler must reject/forbid unbounded or tight-interval polling patterns (e.g. "check every 5 minutes for 90 days") in favor of a single long Wait state for "wait until X" semantics — realistic Journey shapes land around 200-500 Step Functions execution-history events, nowhere near the 25,000 ceiling, but a naive polling-loop compile pattern could approach it; (2) the Agent config schema must separate channel-specific fields (e.g. WhatsApp's pre-approved message-template requirement, which doesn't apply to the web widget) from channel-agnostic fields (tone, tool palette, qualification logic) from day one, so adding a channel later means adding a config block, not restructuring the fused Journey+Agent+toolbox bundle.
+
+**Why:** Today's session decided the UX shape (step-list, not graph canvas) and the bundling model (fused Journey+Agent+toolbox, one editable unit) but not the data model underneath either. This is the actual translation layer between "client-friendly form" and "Step Functions JSON" — skip this and the builder UI has nothing real to save to, and skip the two guardrails above and they surface mid-implementation instead of at design time.
+
+**Context:** Builds on the approved `agents-schedulers-journeys` design (2026-07-26) and the Agent Scheduler & Journey Flow session (2026-07-29, `plan-eng-review`) that resolved that doc's Open Question #7 (the visual Journey builder was never named as its own deliverable). Still-open from the original design and not resolved by this TODO: Journey-edit-while-in-flight semantics (what happens to a lead's in-progress execution when the client edits the Journey), and the translation from raw Step Functions execution state into the client-facing "where is my lead right now" timeline view.
+
+**Effort:** L
+**Priority:** P1
+**Depends on:** None, but blocks any Journey builder UI work
+
+### Design request-authenticity / abuse-prevention for /api/chat before agents get real-world-action tool-calling
+
+**What:** `/api/chat` is public/unauthenticated by design (per CLAUDE.md's API routes spec). That's fine today because the endpoint only does RAG-retrieval + OpenAI chat. Once a bounded MCP-tool-calling agent sits behind it (per the Agents/Journeys architecture) with real-world side effects — booking appointments, sending confirmations — a spoofed or scripted request could trigger those actions without ever going through a real user conversation.
+
+**Why:** Surfaced during the Agent Scheduler & Journey Flow architecture session (2026-07-29) via outside-voice review: the session's original reasoning for building the pilot on the web widget first framed it as "safer" than WhatsApp's known-unauthenticated Gupshup webhook — but `/api/chat` has the same no-auth shape, just without a named/tracked gap. Web-first is still the right sequencing call (existing MessageChannel implementation, no new inbound plumbing), but it doesn't close this gap on either channel.
+
+**Context:** Needs a real design decision, not a blanket auth requirement (the endpoint must stay public for the widget to work for anonymous site visitors) — likely some combination of rate limiting, bot-session binding (e.g. a widget-issued session token bound to the botId + origin), and/or scoping which MCP tools are reachable from an unauthenticated session vs. a verified one. Should land before any agent gets real-world-action tool-calling wired to a public endpoint, on whichever channel ships first.
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** Should land before the Agents/Journeys pilot wires tool-calling into /api/chat or the WhatsApp webhook
 
 ### Fully remove Gupshup once Meta Direct is proven
 
