@@ -1,13 +1,18 @@
 # GitHub Actions Workflows
 
-## ci.yml
-Runs on every push (any branch) and on pull requests targeting `main`. Type-checks and
-builds the backend and frontend in parallel jobs (`check-backend`, `check-frontend`).
+## ci.yml (workflow name: "CI/CD")
+Runs on every push (any branch) and on pull requests targeting `main`.
 
-## deploy.yml
-Runs on push to `main` only. Deploys the backend to both Lambda functions and the
-frontend/widget to S3 + CloudFront, in parallel jobs (`deploy-backend`, `deploy-frontend`),
-followed by a `deploy-summary` job.
+- `check-backend` / `check-frontend`: type-check, test (backend only), and build. Run
+  for every push and PR.
+- `deploy-backend` / `deploy-frontend`: only run for pushes to `main`, and only after
+  their matching `check-*` job succeeds (`needs:`) -- a failing type-check, test, or
+  build blocks the deploy instead of racing it. Deploys the backend to both Lambda
+  functions and the frontend/widget to S3 + CloudFront.
+- `deploy-summary`: runs after both deploy jobs succeed.
+
+(`deploy.yml` used to be a separate workflow, triggered independently on push to
+`main` with no dependency on `ci.yml` -- merged in so CI actually gates CD.)
 
 ## Required GitHub Secrets
 

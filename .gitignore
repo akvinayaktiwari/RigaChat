@@ -18,3 +18,6 @@ frontend/.env.production
 frontend/.env.production.local
 frontend/*.zip
 .gstack/
+
+e2e/test-results/
+e2e/playwright-report/
