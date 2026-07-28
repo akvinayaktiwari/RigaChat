@@ -1,29 +1,64 @@
 import { incrementWaitAndRecheckIteration } from '../repositories/journey-execution-repository.js'
+import { getLeadById } from '../repositories/lead-repository.js'
 import { bookAppointment } from '../mcp/booking-mcp-server.js'
 import { scheduleReminder } from '../mcp/reminder-mcp-server.js'
 import { getQuotation } from '../mcp/quotation-mcp-server.js'
 import { sendBrochure } from '../mcp/brochure-mcp-server.js'
+import { hasActiveWhatsAppSession, sendWhatsAppMessageToLead } from './whatsapp-service.js'
 import type { JourneyExecutorEvent, WaitAndRecheckResult } from '../types/index.js'
 
 // The Lambda handler journey-compiler-service.ts's compiled Task states
 // actually invoke (via journeyExecutorLambdaArn) -- see backend/index.ts's
-// dispatch. wait_and_recheck_check is fully real, and tool_call dispatches
-// to the real MCP toolbox functions for 'booking'/'reminder' (see
-// handleToolCall below) -- but 'quotation'/'brochure' inside that same
-// dispatch, and send_message/human_handoff, remain deliberate stubs (agreed
-// scope: no calendar/pricing/document/channel-send infra exists yet in this
-// codebase -- see TODOS.md for each).
+// dispatch. wait_and_recheck_check is fully real, tool_call dispatches to
+// the real MCP toolbox functions for 'booking'/'reminder' (see
+// handleToolCall below), and send_message is real for the whatsapp channel
+// (see handleSendMessage below) -- 'quotation'/'brochure' inside tool_call,
+// web_widget inside send_message, and human_handoff, remain deliberate
+// stubs (agreed scope: no pricing/document/notification infra exists yet,
+// and the web widget has no delivery mechanism for a Journey-initiated send
+// at all -- see TODOS.md for each).
 
-async function handleSendMessage(event: JourneyExecutorEvent): Promise<{ sent: boolean; stub: true }> {
-  // STUB: real implementation needs to route through the bot's existing
-  // chat/RAG pipeline (chat-service.ts/rag-service.ts) and the right
-  // MessageChannel implementation for event.channel -- undesigned; the web
-  // widget's MessageChannel wasn't built with a Journey-initiated (as
-  // opposed to user-initiated) send in mind.
-  console.log(
-    `[journey-executor] STUB send_message: bot=${event.botId} bundle=${event.bundleId} lead=${event.leadId} channel=${event.channel} step=${event.stepId} hint="${event.messageHint ?? ''}"`
-  )
-  return { sent: false, stub: true }
+const DEFAULT_SEND_MESSAGE_TEXT = 'Following up on your inquiry -- let us know if you have any questions!'
+
+// Real for the whatsapp channel; an honest, structural "not supported"
+// result for every other channel (web_widget has no delivery mechanism for
+// a Journey-initiated send at all -- confirmed by investigation, not
+// assumed: the widget is strictly request-response with no push/poll path,
+// and starts a brand-new conversationId every session with no
+// history-replay-on-load, so a message written into a lead's conversation
+// record today would never actually be seen). None of these branches throw
+// for expected, non-transient outcomes (no phone on file, no active
+// session) -- retrying a Task doesn't fix "this lead has no phone number,"
+// so failing the whole Journey execution over it would be wrong. Each
+// returns a structured result an operator (or a future client-visible
+// lead-timeline view) can read.
+async function handleSendMessage(event: JourneyExecutorEvent): Promise<Record<string, unknown>> {
+  if (event.channel !== 'whatsapp') {
+    return {
+      sent: false,
+      reason: 'unsupported_channel',
+      message: `send_message is not supported on channel "${event.channel}" yet -- it has no delivery mechanism for a Journey-initiated send. See TODOS.md.`,
+    }
+  }
+
+  const lead = await getLeadById(event.botId, event.leadId)
+  if (!lead?.phone) {
+    return { sent: false, reason: 'no_phone_number', message: 'Lead has no phone number on file.' }
+  }
+
+  // See whatsapp-service.ts's hasActiveWhatsAppSession() for why this is
+  // currently always false, and what unlocks a real check.
+  if (!(await hasActiveWhatsAppSession(event.leadId))) {
+    return {
+      sent: false,
+      reason: 'no_active_session',
+      message:
+        'Cannot send free-text outside a 24h WhatsApp session window; template-based sends are not implemented yet.',
+    }
+  }
+
+  const result = await sendWhatsAppMessageToLead(event.clientId, lead.phone, event.messageHint ?? DEFAULT_SEND_MESSAGE_TEXT)
+  return { sent: result.success, ...result }
 }
 
 // Extracts a required string field out of toolInput (a Record<string,
@@ -77,16 +112,16 @@ async function handleHumanHandoff(event: JourneyExecutorEvent): Promise<{ handed
   return { handedOff: true }
 }
 
-// The one fully real operation in this pass: increments a durable,
-// atomic counter (see journey-execution-repository.ts) and decides
-// exhausted from it. `satisfied` is deliberately hardcoded false --
-// checking whether a lead has actually replied, or what their lead_score
-// or appointment_booked state is, needs real data that doesn't exist on
-// any record yet (Lead has no `replied`/`lead_score` field, and there's no
-// booking record since tool_call is stubbed above). Wiring a real
-// satisfied-check is tracked in TODOS.md, gated on those data models
-// existing first -- returning false unconditionally here is honest about
-// that gap rather than faking a check that can't mean anything yet.
+// Increments a durable, atomic counter (see journey-execution-repository.ts)
+// and decides exhausted from it -- fully real. `satisfied` is deliberately
+// hardcoded false: checking whether a lead has actually replied, or their
+// real lead_score, needs data that doesn't exist on any record yet (Lead
+// has no `replied`/`lead_score` field). AppointmentRequest now exists
+// (booking is real), but its `status` never transitions past 'requested',
+// so even an `appointment_booked` check can't mean anything yet either.
+// Wiring a real satisfied-check is tracked in TODOS.md, gated on those data
+// models existing first -- returning false unconditionally here is honest
+// about that gap rather than faking a check that can't mean anything yet.
 async function handleWaitAndRecheckCheck(event: JourneyExecutorEvent): Promise<WaitAndRecheckResult> {
   if (!event.stepId || event.maxIterations === undefined) {
     throw new Error('wait_and_recheck_check event missing stepId or maxIterations')

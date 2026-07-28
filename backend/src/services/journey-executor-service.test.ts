@@ -5,6 +5,9 @@ const bookAppointment = vi.fn()
 const scheduleReminder = vi.fn()
 const getQuotation = vi.fn()
 const sendBrochure = vi.fn()
+const getLeadById = vi.fn()
+const hasActiveWhatsAppSession = vi.fn()
+const sendWhatsAppMessageToLead = vi.fn()
 
 vi.mock('../repositories/journey-execution-repository.js', () => ({
   incrementWaitAndRecheckIteration,
@@ -17,6 +20,8 @@ vi.mock('../mcp/booking-mcp-server.js', () => ({ bookAppointment }))
 vi.mock('../mcp/reminder-mcp-server.js', () => ({ scheduleReminder }))
 vi.mock('../mcp/quotation-mcp-server.js', () => ({ getQuotation }))
 vi.mock('../mcp/brochure-mcp-server.js', () => ({ sendBrochure }))
+vi.mock('../repositories/lead-repository.js', () => ({ getLeadById }))
+vi.mock('./whatsapp-service.js', () => ({ hasActiveWhatsAppSession, sendWhatsAppMessageToLead }))
 
 const { executeJourneyStep } = await import('./journey-executor-service.js')
 
@@ -34,6 +39,9 @@ beforeEach(() => {
   scheduleReminder.mockReset()
   getQuotation.mockReset()
   sendBrochure.mockReset()
+  getLeadById.mockReset()
+  hasActiveWhatsAppSession.mockReset()
+  sendWhatsAppMessageToLead.mockReset()
 })
 
 describe('executeJourneyStep', () => {
@@ -86,9 +94,58 @@ describe('executeJourneyStep', () => {
     })
   })
 
-  it('send_message returns an unsent stub without throwing', async () => {
-    const result = await executeJourneyStep({ ...baseContext, operation: 'send_message', stepId: 'greet' })
-    expect(result).toEqual({ sent: false, stub: true })
+  describe('send_message', () => {
+    it('is unsupported on channels other than whatsapp', async () => {
+      const result = await executeJourneyStep({ ...baseContext, operation: 'send_message', stepId: 'greet' })
+      expect(result).toMatchObject({ sent: false, reason: 'unsupported_channel' })
+      expect(getLeadById).not.toHaveBeenCalled()
+    })
+
+    it('refuses when the lead has no phone number on file', async () => {
+      getLeadById.mockResolvedValueOnce({ leadId: 'lead-1' })
+
+      const result = await executeJourneyStep({
+        ...baseContext,
+        channel: 'whatsapp',
+        operation: 'send_message',
+        stepId: 'greet',
+      })
+
+      expect(result).toMatchObject({ sent: false, reason: 'no_phone_number' })
+      expect(hasActiveWhatsAppSession).not.toHaveBeenCalled()
+    })
+
+    it('refuses outside an active WhatsApp session rather than risk a policy violation', async () => {
+      getLeadById.mockResolvedValueOnce({ leadId: 'lead-1', phone: '+15551234567' })
+      hasActiveWhatsAppSession.mockResolvedValueOnce(false)
+
+      const result = await executeJourneyStep({
+        ...baseContext,
+        channel: 'whatsapp',
+        operation: 'send_message',
+        stepId: 'greet',
+      })
+
+      expect(result).toMatchObject({ sent: false, reason: 'no_active_session' })
+      expect(sendWhatsAppMessageToLead).not.toHaveBeenCalled()
+    })
+
+    it('sends via WhatsApp when the lead has a phone number and an active session', async () => {
+      getLeadById.mockResolvedValueOnce({ leadId: 'lead-1', phone: '+15551234567' })
+      hasActiveWhatsAppSession.mockResolvedValueOnce(true)
+      sendWhatsAppMessageToLead.mockResolvedValueOnce({ success: true, messageId: 'msg-1' })
+
+      const result = await executeJourneyStep({
+        ...baseContext,
+        channel: 'whatsapp',
+        operation: 'send_message',
+        stepId: 'greet',
+        messageHint: 'Hi, checking in!',
+      })
+
+      expect(sendWhatsAppMessageToLead).toHaveBeenCalledWith('client-1', '+15551234567', 'Hi, checking in!')
+      expect(result).toMatchObject({ sent: true, messageId: 'msg-1' })
+    })
   })
 
   describe('tool_call', () => {

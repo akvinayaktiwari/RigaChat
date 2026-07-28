@@ -250,6 +250,49 @@ export async function sendLeadNotification(clientId: string, leadSummary: string
   }
 }
 
+// Unlike sendLeadNotification/sendWeeklyReport above (which always send to
+// the CLIENT's own notification number), this sends to an arbitrary LEAD's
+// phone number -- the real send primitive journey-executor-service.ts's
+// handleSendMessage() needs for a Journey's send_message step. Reuses the
+// same provider-resolution and retry logic as the client-notification
+// paths; the only difference is who the message goes to.
+export async function sendWhatsAppMessageToLead(
+  clientId: string,
+  toNumber: string,
+  message: string
+): Promise<WhatsAppSendResult> {
+  const client = await getClientById(clientId)
+  if (!client) {
+    return { success: false, error: 'Client not found', retryable: false }
+  }
+
+  const sender = await getActiveProviderAndCredentials(client)
+  if (!sender) {
+    return { success: false, error: 'No active WhatsApp connection for this client', retryable: false }
+  }
+
+  return sendWithRetry(toNumber, message, sender.provider, sender.credentials)
+}
+
+// Meta requires a pre-approved message template for any business-initiated
+// send outside a 24-hour customer-service window that started with the
+// lead's own most recent inbound message (Gupshup sits on the same
+// underlying platform policy). This codebase has NO inbound WhatsApp
+// message handling at all yet -- the webhook only logs (and has no
+// signature verification, tracked separately in TODOS.md as P1) -- so
+// there is no real data anywhere to check a genuine session window
+// against. Hardcoded false is the only HONEST answer given that: treating
+// an unknown/untracked session as "not active" is the conservative,
+// correct default, not a placeholder pretending to check something real.
+// Real inbound message timestamp tracking (itself gated behind the webhook
+// signature fix, since trusting unverified webhook data for this decision
+// would be a real vulnerability) is what turns this into a genuine check --
+// see TODOS.md. The guard's call sites don't need to change when that
+// lands, only this function's body.
+export async function hasActiveWhatsAppSession(_leadId: string): Promise<boolean> {
+  return false
+}
+
 export async function sendWeeklyReport(clientId: string): Promise<void> {
   const client = await getClientById(clientId)
   if (!client) return

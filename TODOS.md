@@ -208,17 +208,29 @@
 **Priority:** P1
 **Depends on:** Should land before the Agents/Journeys pilot wires tool-calling into /api/chat or the WhatsApp webhook
 
-### Implement the real journey-executor send_message channel integration
+### Build real inbound WhatsApp message tracking (unlocks the send_message session guard)
 
-**What:** `journey-executor-service.ts`'s `handleSendMessage()` is a deliberate stub — it logs the intent (bot/bundle/lead/channel/step/messageHint) and returns `{ sent: false, stub: true }` without ever sending anything. The real implementation needs to route through the bot's existing chat/RAG pipeline (`chat-service.ts`/`rag-service.ts`) and dispatch via the right `MessageChannel` implementation for whatever `channel` the Journey execution carries.
+**What:** `journey-executor-service.ts`'s `handleSendMessage()` is now real for the whatsapp channel (2026-07-29) — it looks up the lead's phone, checks `whatsapp-service.ts`'s `hasActiveWhatsAppSession()`, and sends via `sendWhatsAppMessageToLead()`. But `hasActiveWhatsAppSession()` is hardcoded to always return `false`, because no inbound WhatsApp message handling exists anywhere in this codebase to check a real 24-hour session window against (Meta requires a pre-approved template for any business-initiated send outside the window that started with the lead's own most recent inbound message). Today every Journey-initiated WhatsApp send is refused with a `no_active_session` result.
 
-**Why:** This is what makes a Journey's `send_message` step actually do something instead of a no-op. Scoped out of the executor pass deliberately (per the Agent Scheduler & Journey Flow session's explicit agreement: prove the Journey/Step-Functions loop end-to-end with stubs before building the real send integration).
+**Why:** Investigation during this session (2026-07-29) confirmed the web widget structurally cannot receive a Journey-initiated send at all (no push, no history-replay-on-load) — WhatsApp is the only realistic channel for a Journey's delayed/nurture sends, and this session guard is the one thing standing between "real send pipeline" and "actually sends anything."
 
-**Context:** The existing `MessageChannel` interface (`receiveMessage`/`sendResponse`) was designed around a user-initiated message triggering a response, not a Journey-initiated send with no prior inbound message — needs its own design pass to confirm the interface still fits a Journey-initiated send, or whether it needs a new method/variant. Also depends on the channel actually being safe to send on: WhatsApp send needs the Gupshup webhook signature fix (P1, tracked separately) and the request-authenticity TODO above if going through `/api/chat`-adjacent infra.
+**Context:** Needs real inbound message timestamp tracking (e.g., record `leadId -> lastInboundMessageAt` when a genuine inbound WhatsApp webhook event arrives), which requires the Gupshup webhook signature verification fix (P1, tracked separately) to land FIRST — trusting unverified webhook data to decide "is it safe to send this lead a free-text message" would just move the vulnerability, not close it. Once real tracking exists, only `hasActiveWhatsAppSession()`'s body needs to change; its call site in `journey-executor-service.ts` doesn't.
 
 **Effort:** M
-**Priority:** P2
-**Depends on:** Gupshup webhook signature verification (if targeting WhatsApp); /api/chat request-authenticity TODO above (if targeting the web widget with real-world-action tool-calling)
+**Priority:** P1
+**Depends on:** Gupshup webhook signature verification
+
+### Support real AI-composed send_message text (replace literal messageHint)
+
+**What:** `handleSendMessage()` sends `event.messageHint` as literal text (falling back to a generic default if absent) rather than composing a message through the bot's chat/RAG pipeline using the bundle's `AgentConfig.systemPrompt` and knowledge base context, as originally envisioned ("Agent composes the actual message... messageHint is an optional steer, not a hard template" — see `SendMessageStep`'s own type comment).
+
+**Why:** A literal/templated message is a real, useful v1 (a client can write "Hi {name}, checking in about your visit" as the hint), but doesn't use the bounded agent's actual conversational ability — a real implementation would sound more natural and could reference specifics from the lead's earlier conversation.
+
+**Context:** Needs its own design pass on how a Journey-initiated compose call reuses `chat-service.ts`/`rag-service.ts` without a live inbound user message to respond to (those were built around request-response, not a cold outbound send) — same class of gap flagged for the web widget's `MessageChannel`, but here it's about message *generation*, not *delivery* (delivery via WhatsApp is already real).
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
 
 ### Design the real MCP auth model (replace the interim shared-secret)
 
