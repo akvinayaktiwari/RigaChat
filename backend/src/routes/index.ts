@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { adminRoutes } from './admin-routes.js'
+import { appointmentRoutes } from './appointment-routes.js'
 import { authRoutes } from './auth-routes.js'
 import { billingRoutes } from './billing-routes.js'
 import { botRoutes } from './bot-routes.js'
@@ -57,6 +58,7 @@ app.use('/api/billing/*', dashboardCors)
 app.use('/api/kb/*', dashboardCors)
 app.use('/api/journeys/*', dashboardCors)
 app.use('/api/scheduler/*', dashboardCors)
+app.use('/api/appointments/*', dashboardCors)
 app.use('/api/integrations/*', dashboardCors)
 // /api/auth/confirm is called by the dashboard frontend right after signup,
 // before the user has a token — public, but still dashboard-origin only, not
@@ -129,6 +131,7 @@ app.route('/api/leads', leadRoutes)
 app.route('/api/kb', kbRoutes)
 app.route('/api/journeys', journeyRoutes)
 app.route('/api/scheduler', schedulerRoutes)
+app.route('/api/appointments', appointmentRoutes)
 app.route('/api/clients', clientRoutes)
 app.route('/api/forms', formRoutes)
 app.route('/api/integrations', integrationRoutes)
