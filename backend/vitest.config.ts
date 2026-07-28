@@ -19,6 +19,8 @@ export default defineConfig({
       SCHEDULER_TARGET_LAMBDA_ARN: 'arn:aws:lambda:ap-south-1:000000000000:function:test-scheduler-target',
       SCHEDULER_EXECUTION_ROLE_ARN: 'arn:aws:iam::000000000000:role/test-scheduler-execution-role',
       DYNAMODB_TABLE_JOURNEY_EXECUTIONS: 'test-journey-executions-table',
+      DYNAMODB_TABLE_PAYMENT_HISTORY: 'test-payment-history-table',
+      DYNAMODB_TABLE_WEBHOOK_EVENTS: 'test-webhook-events-table',
     },
   },
 })

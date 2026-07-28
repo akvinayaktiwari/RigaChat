@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import { getWebhookType, isGupshupDeliveryEvent, isGupshupIncomingMessage } from '../lib/gupshup-webhook.js'
 import { razorpayProvider } from '../providers/razorpay-provider.js'
 import { getByAccountId, updatePartial } from '../repositories/subscription-repository.js'
@@ -7,6 +8,37 @@ import { invalidateEntitlementsCache } from './entitlement-service.js'
 import type { PlanTier, Subscription, SubscriptionStatus } from '../types/index.js'
 
 const BILLABLE_TIERS: ReadonlySet<PlanTier> = new Set(['starter', 'growth', 'agency'])
+
+// Unlike Razorpay (X-Razorpay-Signature) and Meta (X-Hub-Signature-256),
+// Gupshup does not sign webhook payloads at all -- confirmed against their
+// own docs (docs.gupshup.io/docs/what-is-a-webhook): the only documented
+// security mechanism is IP whitelisting, which needs Gupshup support to
+// hand over their inbound IP ranges (external dependency, tracked
+// separately as optional hardening in TODOS.md) and isn't something their
+// dashboard lets you pair with a custom header anyway -- the only
+// configurable surface is the callback URL itself. An unguessable token as
+// a query param on that URL is the practical alternative fully within our
+// control: it's not a cryptographic signature over the payload, but it
+// does mean a request without the token (i.e. anyone who hasn't seen the
+// URL we registered) gets rejected before its body is ever trusted.
+// timingSafeEqual mirrors meta-provider.ts's verifyWebhookSignature --  a
+// plain === comparison here would be a timing side-channel on this
+// endpoint's only authenticity check.
+export function verifyGupshupWebhookToken(token: string | undefined): boolean {
+  const expected = process.env.GUPSHUP_WEBHOOK_TOKEN
+  if (!expected) {
+    throw new Error(
+      'Missing required environment variable GUPSHUP_WEBHOOK_TOKEN. Set it in your .env file before starting the server.'
+    )
+  }
+  if (!token) return false
+
+  const expectedBuffer = Buffer.from(expected, 'utf-8')
+  const providedBuffer = Buffer.from(token, 'utf-8')
+  if (expectedBuffer.length !== providedBuffer.length) return false
+
+  return crypto.timingSafeEqual(expectedBuffer, providedBuffer)
+}
 
 export function logGupshupWebhookEvent(body: unknown): void {
   if (isGupshupDeliveryEvent(body)) {

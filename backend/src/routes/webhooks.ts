@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { logGupshupWebhookEvent, processRazorpayWebhook } from '../services/webhook-service.js'
+import { logGupshupWebhookEvent, processRazorpayWebhook, verifyGupshupWebhookToken } from '../services/webhook-service.js'
 import {
   handleMetaDataDeletionRequest,
   handleMetaDeauthorize,
@@ -9,7 +9,18 @@ import {
 
 export const webhookRoutes = new Hono()
 
+// No auth middleware, no HMAC signature either — Gupshup doesn't sign
+// webhook payloads at all (confirmed against their docs; see
+// verifyGupshupWebhookToken's own comment). Authenticity instead comes from
+// an unguessable ?token= query param on the callback URL we register in
+// Gupshup's dashboard — the one piece of that configuration actually within
+// our control. Checked before the body is ever parsed or trusted.
 webhookRoutes.post('/gupshup', async (c) => {
+  if (!verifyGupshupWebhookToken(c.req.query('token'))) {
+    console.error('Gupshup webhook rejected: missing or invalid token')
+    return c.body(null, 401)
+  }
+
   const body: unknown = await c.req.json().catch(() => null)
   logGupshupWebhookEvent(body)
   return c.body(null, 200)

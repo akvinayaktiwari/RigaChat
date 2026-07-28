@@ -160,17 +160,17 @@
 **Priority:** P3
 **Depends on:** None
 
-### Gupshup WhatsApp webhook has no signature/authenticity verification
+### [RESOLVED 2026-07-29] Gupshup WhatsApp webhook signature verification — done via URL token, not HMAC
 
-**What:** `POST /webhooks/gupshup` (`webhooks.ts`) accepts any request with no HMAC or signature check at all, unlike the Razorpay and Meta webhooks defined in the same file, which both verify a signature before trusting the payload.
+**What it was:** `POST /webhooks/gupshup` accepted any request with no check at all. The original TODO assumed Gupshup would follow the same HMAC pattern as Razorpay (`X-Razorpay-Signature`) and Meta (`X-Hub-Signature-256`) — confirmed against Gupshup's own docs (docs.gupshup.io/docs/what-is-a-webhook) that this assumption was wrong: **Gupshup does not sign webhook payloads at all.** Their only documented security mechanism is IP whitelisting (external, requires contacting their support team), and their dashboard only lets you configure the callback URL itself, not custom headers.
 
-**Why:** Today the impact is small — the handler only logs incoming events. Once the Agents/Schedulers/Journeys pilot wires this endpoint to a real conversational agent that can book site visits and send WhatsApp messages, an unverified request means anyone who discovers the URL can inject fake messages that trigger real agent actions.
+**Fix shipped:** `webhook-service.ts`'s `verifyGupshupWebhookToken()` checks an unguessable `?token=` query param against `GUPSHUP_WEBHOOK_TOKEN`, `timingSafeEqual`-compared. `POST /webhooks/gupshup` rejects with 401 before the body is ever parsed if the token is missing or wrong.
 
-**Context:** Found during `/plan-eng-review` of the Agents/Schedulers/Journeys pilot design (`akvinayaktiwari-agents-schedulers-journeys-design-20260726-033818.md`). Gupshup's specific verification mechanism (shared secret, HMAC scheme, etc.) wasn't confirmed from public docs during that review — needs a look at Gupshup's own dashboard/developer docs to find the actual mechanism before implementing, following the same pattern already used for Razorpay (`X-Razorpay-Signature`) and Meta (`X-Hub-Signature-256`).
+**Operational step still needed (not code):** the callback URL registered in each client's Gupshup app dashboard must be updated to include `?token=<GUPSHUP_WEBHOOK_TOKEN value>` — existing connected clients' webhooks will silently start getting rejected (401, logged) until their dashboard config is updated. Since this is a single shared token across all clients (one central callback URL, per this codebase's existing "clients connect their own Gupshup app but we host one webhook endpoint" model), this is a one-time platform-level config change, not per-client work — but it must happen before/at deploy, not after.
 
-**Effort:** S (once the mechanism is confirmed)
-**Priority:** P1
-**Depends on:** Should land before the WhatsApp conversational agent pilot handles meaningful volume.
+**Follow-up (real network-level hardening, not blocking):** IP whitelisting was the option not taken here (needs Gupshup support to hand over their inbound IP ranges, plus extra work to reliably extract the true client IP behind a Lambda Function URL with no API Gateway in front). Worth revisiting once/if the URL-token approach proves insufficient (e.g., token leaks via logs/proxies) — track as its own item if it becomes a real priority, not scheduled now.
+
+**Depends on:** None further — this was the prerequisite for the "Build real inbound WhatsApp message tracking" item below, which is now unblocked.
 
 ### WhatsApp Meta Direct — PR #2 (webhook routing, disconnect/migration UX, token lifecycle)
 
@@ -214,11 +214,11 @@
 
 **Why:** Investigation during this session (2026-07-29) confirmed the web widget structurally cannot receive a Journey-initiated send at all (no push, no history-replay-on-load) — WhatsApp is the only realistic channel for a Journey's delayed/nurture sends, and this session guard is the one thing standing between "real send pipeline" and "actually sends anything."
 
-**Context:** Needs real inbound message timestamp tracking (e.g., record `leadId -> lastInboundMessageAt` when a genuine inbound WhatsApp webhook event arrives), which requires the Gupshup webhook signature verification fix (P1, tracked separately) to land FIRST — trusting unverified webhook data to decide "is it safe to send this lead a free-text message" would just move the vulnerability, not close it. Once real tracking exists, only `hasActiveWhatsAppSession()`'s body needs to change; its call site in `journey-executor-service.ts` doesn't.
+**Context:** Needs real inbound message timestamp tracking (e.g., record `leadId -> lastInboundMessageAt` when a genuine inbound WhatsApp webhook event arrives) — trusting unverified webhook data to decide "is it safe to send this lead a free-text message" would have just moved the vulnerability, not closed it, which is why this explicitly wasn't started until the Gupshup webhook token check (above) landed. Now unblocked: `webhooks.ts`'s `/gupshup` handler is a trustworthy place to record inbound events from. The remaining piece is looking up which `leadId` an inbound Gupshup message's phone number (`GupshupIncomingMessagePayload.source`) belongs to (no existing phone-number-to-lead index) and writing the timestamp somewhere queryable by `leadId`. Once real tracking exists, only `hasActiveWhatsAppSession()`'s body needs to change; its call site in `journey-executor-service.ts` doesn't.
 
 **Effort:** M
 **Priority:** P1
-**Depends on:** Gupshup webhook signature verification
+**Depends on:** None further (Gupshup webhook token verification shipped 2026-07-29)
 
 ### Support real AI-composed send_message text (replace literal messageHint)
 
