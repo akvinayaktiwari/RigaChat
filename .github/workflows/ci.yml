@@ -124,7 +124,8 @@ jobs:
             --arg upstash_redis_rest_url "${{ secrets.UPSTASH_REDIS_REST_URL }}" \
             --arg upstash_redis_rest_token "${{ secrets.UPSTASH_REDIS_REST_TOKEN }}" \
             --arg sqs_crawler_queue_url "${{ secrets.SQS_CRAWLER_QUEUE_URL }}" \
-            '. + {WHATSAPP_PROVIDER: $whatsapp_provider, WHATSAPP_MASTER_NUMBER: $whatsapp_master_number, WHATSAPP_KMS_KEY_ID: $whatsapp_kms_key_id, REDIS_PROVIDER: $redis_provider, UPSTASH_REDIS_REST_URL: $upstash_redis_rest_url, UPSTASH_REDIS_REST_TOKEN: $upstash_redis_rest_token, SQS_CRAWLER_QUEUE_URL: $sqs_crawler_queue_url}')
+            --arg email_logo_url "${{ vars.EMAIL_LOGO_URL }}" \
+            '. + {WHATSAPP_PROVIDER: $whatsapp_provider, WHATSAPP_MASTER_NUMBER: $whatsapp_master_number, WHATSAPP_KMS_KEY_ID: $whatsapp_kms_key_id, REDIS_PROVIDER: $redis_provider, UPSTASH_REDIS_REST_URL: $upstash_redis_rest_url, UPSTASH_REDIS_REST_TOKEN: $upstash_redis_rest_token, SQS_CRAWLER_QUEUE_URL: $sqs_crawler_queue_url, EMAIL_LOGO_URL: $email_logo_url}')
           aws lambda update-function-configuration \
             --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
             --region ${{ secrets.AWS_REGION }} \
@@ -162,7 +163,8 @@ jobs:
             --arg upstash_redis_rest_url "${{ secrets.UPSTASH_REDIS_REST_URL }}" \
             --arg upstash_redis_rest_token "${{ secrets.UPSTASH_REDIS_REST_TOKEN }}" \
             --arg sqs_crawler_queue_url "${{ secrets.SQS_CRAWLER_QUEUE_URL }}" \
-            '. + {WHATSAPP_PROVIDER: $whatsapp_provider, WHATSAPP_MASTER_NUMBER: $whatsapp_master_number, WHATSAPP_KMS_KEY_ID: $whatsapp_kms_key_id, REDIS_PROVIDER: $redis_provider, UPSTASH_REDIS_REST_URL: $upstash_redis_rest_url, UPSTASH_REDIS_REST_TOKEN: $upstash_redis_rest_token, SQS_CRAWLER_QUEUE_URL: $sqs_crawler_queue_url}')
+            --arg email_logo_url "${{ vars.EMAIL_LOGO_URL }}" \
+            '. + {WHATSAPP_PROVIDER: $whatsapp_provider, WHATSAPP_MASTER_NUMBER: $whatsapp_master_number, WHATSAPP_KMS_KEY_ID: $whatsapp_kms_key_id, REDIS_PROVIDER: $redis_provider, UPSTASH_REDIS_REST_URL: $upstash_redis_rest_url, UPSTASH_REDIS_REST_TOKEN: $upstash_redis_rest_token, SQS_CRAWLER_QUEUE_URL: $sqs_crawler_queue_url, EMAIL_LOGO_URL: $email_logo_url}')
           aws lambda update-function-configuration \
             --function-name ${{ secrets.LAMBDA_STREAMING_FUNCTION_NAME }} \
             --region ${{ secrets.AWS_REGION }} \
@@ -195,9 +197,11 @@ jobs:
             --query 'Environment.Variables' --output json | jq \
             --arg sqs_url "${{ secrets.SQS_CRAWLER_QUEUE_URL }}" \
             --arg crawler_name "${{ secrets.LAMBDA_CRAWLER_FUNCTION_NAME }}" \
+            --arg email_logo_url "${{ vars.EMAIL_LOGO_URL }}" \
             '. + {
               SQS_CRAWLER_QUEUE_URL: $sqs_url,
-              LAMBDA_CRAWLER_FUNCTION_NAME: $crawler_name
+              LAMBDA_CRAWLER_FUNCTION_NAME: $crawler_name,
+              EMAIL_LOGO_URL: $email_logo_url
             }')
           aws lambda update-function-configuration \
             --function-name ${{ secrets.LAMBDA_CRAWLER_FUNCTION_NAME }} \
