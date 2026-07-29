@@ -6,6 +6,7 @@ import {
   Calendar,
   Clock,
   FileText,
+  GitBranch,
   LayoutDashboard,
   LogOut,
   type LucideIcon,
@@ -26,6 +27,7 @@ const NAV_LINKS: { to: string; label: string; icon: LucideIcon; end: boolean }[]
   { to: '/dashboard/voice-agents', label: 'Voice Agents', icon: Mic, end: false },
   { to: '/dashboard/forms', label: 'Forms', icon: FileText, end: false },
   { to: '/dashboard/leads', label: 'Leads', icon: Users, end: false },
+  { to: '/dashboard/journeys', label: 'Journeys', icon: GitBranch, end: false },
   { to: '/dashboard/appointments', label: 'Appointments', icon: Calendar, end: false },
   { to: '/dashboard/scheduler', label: 'Scheduler', icon: Clock, end: false },
   { to: '/dashboard/whatsapp', label: 'WhatsApp', icon: MessageSquare, end: false },
@@ -47,6 +49,9 @@ function getPageTitle(pathname: string): string {
   if (pathname === '/dashboard/voice-agents') return 'Voice Agents'
   if (pathname === '/dashboard/leads') return 'Leads'
   if (/^\/dashboard\/leads\/[^/]+$/.test(pathname)) return 'Lead Detail'
+  if (pathname === '/dashboard/journeys') return 'Journeys'
+  if (/^\/dashboard\/journeys\/[^/]+\/new$/.test(pathname)) return 'New Journey'
+  if (/^\/dashboard\/journeys\/[^/]+\/[^/]+$/.test(pathname)) return 'Edit Journey'
   if (pathname.startsWith('/dashboard/kb')) return 'Knowledge Base'
   if (pathname === '/dashboard/whatsapp') return 'WhatsApp'
   if (pathname === '/dashboard/meta-ads') return 'Meta Ads'

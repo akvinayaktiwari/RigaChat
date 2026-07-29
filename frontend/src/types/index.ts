@@ -490,6 +490,107 @@ export interface AppointmentRequest {
   createdAt: string
 }
 
+export type JourneyChannel = 'web_widget' | 'whatsapp'
+
+export type JourneyTriggerType = 'lead_captured' | 'manual_score' | 'site_visit_done'
+
+interface JourneyStepBase {
+  stepId: string
+  name: string
+}
+
+export interface SendMessageStep extends JourneyStepBase {
+  type: 'send_message'
+  messageHint?: string
+  next?: string
+}
+
+export interface WaitStep extends JourneyStepBase {
+  type: 'wait'
+  waitDays: number
+  next?: string
+}
+
+export interface WaitAndRecheckStep extends JourneyStepBase {
+  type: 'wait_and_recheck'
+  waitDays: number
+  maxIterations: number
+  recheckField: 'replied' | 'lead_score' | 'appointment_booked'
+  onSatisfied: string
+  onExhausted: string
+}
+
+export interface ConditionStep extends JourneyStepBase {
+  type: 'condition'
+  field: 'replied' | 'lead_score' | 'appointment_booked'
+  operator: 'equals' | 'not_equals'
+  value: string
+  onTrue: string
+  onFalse: string
+}
+
+export interface ToolCallStep extends JourneyStepBase {
+  type: 'tool_call'
+  toolName: string
+  toolInput?: Record<string, unknown>
+  next?: string
+}
+
+export interface HumanHandoffStep extends JourneyStepBase {
+  type: 'human_handoff'
+  reason?: string
+}
+
+export type JourneyStep =
+  | SendMessageStep
+  | WaitStep
+  | WaitAndRecheckStep
+  | ConditionStep
+  | ToolCallStep
+  | HumanHandoffStep
+
+export interface JourneyDefinition {
+  journeyId: string
+  botId: string
+  clientId: string
+  name: string
+  triggerType: JourneyTriggerType
+  startStepId: string
+  steps: JourneyStep[]
+}
+
+export interface AgentChannelConfig {
+  messageTemplateName?: string
+  messageTemplateParams?: string[]
+}
+
+export interface AgentConfig {
+  agentId: string
+  name: string
+  systemPrompt: string
+  toneDescription?: string
+  mcpToolbox: string[]
+  channelConfig: Partial<Record<JourneyChannel, AgentChannelConfig>>
+}
+
+export type JourneyBundleStatus = 'draft' | 'published'
+
+export interface JourneyBundle {
+  bundleId: string
+  botId: string
+  clientId: string
+  name: string
+  description?: string
+  isPrebuiltTemplate: boolean
+  sourceTemplateId?: string
+  journey: JourneyDefinition
+  agent: AgentConfig
+  status: JourneyBundleStatus
+  compiledStateMachineArn?: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface CalComConnection {
   provider: 'cal_com'
   connected: boolean

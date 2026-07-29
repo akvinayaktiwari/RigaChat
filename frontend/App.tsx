@@ -20,6 +20,8 @@ import LeadsPage from './src/pages/LeadsPage'
 import LeadDetailPage from './src/pages/LeadDetailPage'
 import SchedulerPage from './src/pages/SchedulerPage'
 import AppointmentsPage from './src/pages/AppointmentsPage'
+import JourneysPage from './src/pages/JourneysPage'
+import JourneyBuilderPage from './src/pages/JourneyBuilderPage'
 import KnowledgeBasePage from './src/pages/KnowledgeBasePage'
 import VoiceKnowledgeBasePage from './src/pages/VoiceKnowledgeBasePage'
 import Settings from './src/pages/Settings'
@@ -114,6 +116,9 @@ function App() {
           <Route path="leads/:leadId" element={<LeadDetailPage />} />
           <Route path="scheduler" element={<SchedulerPage />} />
           <Route path="appointments" element={<AppointmentsPage />} />
+          <Route path="journeys" element={<JourneysPage />} />
+          <Route path="journeys/:botId/new" element={<JourneyBuilderPage />} />
+          <Route path="journeys/:botId/:bundleId" element={<JourneyBuilderPage />} />
           <Route path="kb/:botId" element={<KnowledgeBasePage />} />
           <Route path="whatsapp" element={<WhatsApp />} />
           <Route path="meta-ads" element={<MetaAds />} />

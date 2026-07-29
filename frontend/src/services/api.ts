@@ -16,7 +16,10 @@ import type {
   CreateVoiceAgentInput,
   FormConfig,
   FormLead,
+  AgentConfig,
   IndexingJob,
+  JourneyBundle,
+  JourneyDefinition,
   KBFileType,
   KBUploadUrlResult,
   KnowledgeBaseEntry,
@@ -562,4 +565,50 @@ export function deleteScheduledAction(scheduleId: string): Promise<ApiResponse<{
 
 export function getAppointmentRequests(botId: string): Promise<ApiResponse<AppointmentRequest[]>> {
   return apiClient<AppointmentRequest[]>(`/api/appointments/${botId}`)
+}
+
+// Journey API
+
+export function getJourneyBundles(botId: string): Promise<ApiResponse<JourneyBundle[]>> {
+  return apiClient<JourneyBundle[]>(`/api/journeys/${botId}`)
+}
+
+export function getJourneyBundle(botId: string, bundleId: string): Promise<ApiResponse<JourneyBundle>> {
+  return apiClient<JourneyBundle>(`/api/journeys/${botId}/${bundleId}`)
+}
+
+export interface CreateJourneyBundleInput {
+  botId: string
+  name: string
+  description?: string
+  isPrebuiltTemplate: boolean
+  journey: Omit<JourneyDefinition, 'botId' | 'clientId'>
+  agent: AgentConfig
+}
+
+export function createJourneyBundle(data: CreateJourneyBundleInput): Promise<ApiResponse<JourneyBundle>> {
+  return apiClient<JourneyBundle>('/api/journeys', 'POST', data)
+}
+
+export interface UpdateJourneyBundleInput {
+  name?: string
+  description?: string
+  journey?: Omit<JourneyDefinition, 'botId' | 'clientId'>
+  agent?: AgentConfig
+}
+
+export function updateJourneyBundle(
+  botId: string,
+  bundleId: string,
+  data: UpdateJourneyBundleInput
+): Promise<ApiResponse<JourneyBundle>> {
+  return apiClient<JourneyBundle>(`/api/journeys/${botId}/${bundleId}`, 'PATCH', data)
+}
+
+export function deleteJourneyBundle(botId: string, bundleId: string): Promise<ApiResponse<{ message: string }>> {
+  return apiClient<{ message: string }>(`/api/journeys/${botId}/${bundleId}`, 'DELETE')
+}
+
+export function publishJourneyBundle(botId: string, bundleId: string): Promise<ApiResponse<JourneyBundle>> {
+  return apiClient<JourneyBundle>(`/api/journeys/${botId}/${bundleId}/publish`, 'POST')
 }
