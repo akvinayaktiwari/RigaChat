@@ -64,18 +64,6 @@
 
 ## Backend
 
-### Fix un-awaited CRM sync in form-lead-service.ts (Lambda-freeze risk)
-
-**What:** `captureFormLead` in `form-lead-service.ts` calls `syncFormLeadToCRM(...).catch(...)` without `await`, directly above a comment explaining that the next line's WhatsApp notification *must* be awaited because "AWS Lambda freezes the execution environment as soon as the handler's response promise resolves" — an un-awaited call gets aborted mid-flight. That reasoning applies equally to the un-awaited CRM sync call, meaning form-lead CRM syncs may be silently dropped on Lambda today.
-
-**Why:** This is a real production risk affecting the CRM sync of every existing form lead for every live paying client, not a hypothetical — found while reviewing the Meta Lead Ads integration plan, not caused by it.
-
-**Context:** One-line fix (add `await`). Deferred to its own follow-up PR rather than bundled into the Meta branch, since it's unrelated to Meta specifically and there's no test coverage to verify the fix doesn't change timing-sensitive behavior elsewhere.
-
-**Effort:** S
-**Priority:** P1
-**Depends on:** None
-
 ### Introduce a backend test framework (vitest)
 
 **What:** Zero test infrastructure exists in `backend/` today — no jest/vitest config, no test files, no `test` script in `package.json`. Every integration (Zoho, Gupshup, Razorpay, and now Meta) ships and is verified manually via `/qa`.
@@ -185,3 +173,7 @@
 **Depends on:** Meta Direct PR #1 + PR #2 shipped and proven in production.
 
 ## Completed
+
+### Fix un-awaited CRM sync in form-lead-service.ts (Lambda-freeze risk)
+
+`captureFormLead` now awaits `syncFormLeadToCRM(...)` (still error-swallowed, never fails lead capture), closing the Lambda-freeze window that could drop form-lead CRM syncs mid-flight. P1/S. Verified: build + 21 backend tests pass.
