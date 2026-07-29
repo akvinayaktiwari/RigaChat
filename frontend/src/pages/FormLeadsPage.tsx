@@ -2,20 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, CheckCircle2, ClipboardList, X, XCircle } from 'lucide-react'
 import { getFormById, getFormLeads, getIntegrationStatus } from '../services/api'
+import { formatRelativeDate } from '../lib/date'
 import type { FormConfig, FormLead } from '../types/index'
-
-function formatRelativeDate(date: Date): string {
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  const minutes = Math.floor(diff / 60000)
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
-
-  if (minutes < 60) return minutes <= 0 ? 'just now' : minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`
-  if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`
-  if (days < 7) return days === 1 ? '1 day ago' : `${days} days ago`
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
 
 function getFields(lead: FormLead): Record<string, string> {
   return typeof lead.customFields === 'string' ? {} : lead.customFields

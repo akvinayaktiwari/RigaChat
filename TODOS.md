@@ -2,18 +2,6 @@
 
 ## Frontend
 
-### Add aria-live region to Toast component
-
-**What:** `frontend/src/components/Toast/Toast.tsx` has no `aria-live` region — confirmed via grep, zero matches for `aria-live` or `role=` in the file. Every toast notification in the app (success, error, info) is silent to screen-reader users.
-
-**Why:** Surfaced during `/plan-design-review` of the WhatsApp Meta Direct card, where the Embedded Signup connect/error flow depends on toast feedback being announced (same pattern the existing Gupshup connect flow already uses) — but this is app-wide, not specific to that feature. Every existing toast call site is affected today.
-
-**Context:** Small fix — add `aria-live="polite"` (or `"assertive"` for errors) to the toast container. Should land as its own change, not bundled silently into an unrelated feature PR.
-
-**Effort:** S
-**Priority:** P2
-**Depends on:** None
-
 ### Add error handling to data-load effects app-wide
 
 **What:** 13 pages (including `DashboardHome.tsx`, `LeadsPage.tsx`, `BotsPage.tsx`, `BotDetailPage.tsx`, `FormDetailPage.tsx`, `FormsPage.tsx`, `KnowledgeBasePage.tsx`, `LeadDetailPage.tsx`, `FormLeadsPage.tsx`, `NewBotPage.tsx`, `VoiceKnowledgeBasePage.tsx`, `VoiceAgentDetailPage.tsx`, `AuthCallbackPage.tsx`) load data via `Promise.all([...]).then(...)` with no `.catch()`. A rejected fetch leaves `loading` stuck `true` forever — the user sees an infinite skeleton with no error message and no way to retry.
@@ -24,18 +12,6 @@
 
 **Effort:** M
 **Priority:** P2
-**Depends on:** None
-
-### Point the remaining formatRelativeDate copies at the shared lib
-
-**What:** `FormLeadsPage.tsx`, `KnowledgeBasePage.tsx`, and `VoiceKnowledgeBasePage.tsx` each still define their own local `formatRelativeDate`, identical to the one that used to live in `DashboardHome.tsx`/`LeadsPage.tsx` before the dashboard redesign branch extracted it to `frontend/src/lib/date.ts`. These 3 copies still have the original bug: a future-dated record (client/server clock drift) renders as `"-5 minutes ago"` instead of clamping to `"0 minutes ago"`.
-
-**Why:** The fix already exists and is already in the codebase (`frontend/src/lib/date.ts`) — this is a pure find-and-replace (delete the local copy, import the shared one) plus getting the same bug fix for free in 3 more places.
-
-**Context:** Low risk, mechanical. Deferred out of the dashboard-redesign PR because those 3 files were otherwise untouched by that branch and pulling them in would have been unrelated scope creep.
-
-**Effort:** S
-**Priority:** P3
 **Depends on:** None
 
 ### Build a unified leads dashboard across chat, form, and Meta sources
@@ -177,3 +153,11 @@
 ### Fix un-awaited CRM sync in form-lead-service.ts (Lambda-freeze risk)
 
 `captureFormLead` now awaits `syncFormLeadToCRM(...)` (still error-swallowed, never fails lead capture), closing the Lambda-freeze window that could drop form-lead CRM syncs mid-flight. P1/S. Verified: build + 21 backend tests pass.
+
+### Add aria-live region to Toast component
+
+`Toast.tsx` container now has `aria-live="polite"`; error toasts escalate to `role="alert"` (assertive), success/warning use `role="status"`. Toasts are now announced to screen readers app-wide. P2/S. Verified: frontend typecheck passes.
+
+### Point the remaining formatRelativeDate copies at the shared lib
+
+Deleted the local `formatRelativeDate` copies in `FormLeadsPage.tsx`, `KnowledgeBasePage.tsx`, and `VoiceKnowledgeBasePage.tsx`; all three now import the shared `frontend/src/lib/date.ts`, which clamps future-drifted dates to "0 minutes ago". P3/S. Verified: frontend typecheck passes.
