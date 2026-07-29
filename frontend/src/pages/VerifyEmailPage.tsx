@@ -5,42 +5,13 @@ import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
 import { confirmSignup, resendConfirmationCode } from '../services/api'
 import type { ConfirmSignupResponse } from '../services/api'
 import { useToast } from '../components/Toast/Toast'
-import VyostraLogo from '../components/VyostraLogo'
+import AuthHeroPanel from '../components/auth/AuthHeroPanel'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
 const FEATURE_PILLS = ['RAG-powered AI', 'Built-in CRM', 'WhatsApp alerts']
 
 const RESEND_COOLDOWN_SECONDS = 30
-
-function BrandPanel() {
-  return (
-    <div className="hidden lg:flex flex-col items-center justify-center bg-linear-to-br from-violet-600 via-purple-600 to-indigo-700 h-full p-12 text-white text-center">
-      <div className="mb-6">
-        <VyostraLogo size={56} animate={true} />
-      </div>
-
-      <span className="text-4xl font-extrabold text-white" style={JAKARTA_FONT}>
-        VyostraAI
-      </span>
-      <p className="text-white/70 text-lg mt-3 mb-10">AI chatbots with native CRM</p>
-
-      <div className="flex flex-col items-center">
-        {FEATURE_PILLS.map((pill) => (
-          <div
-            key={pill}
-            className="bg-white/10 border border-white/20 text-white text-sm px-5 py-2.5 rounded-full mb-3 flex items-center gap-2"
-          >
-            <CheckCircle className="w-4 h-4 text-emerald-300" />
-            {pill}
-          </div>
-        ))}
-      </div>
-
-      <p className="mt-12 text-white/40 text-xs text-center">Trusted by 500+ businesses in India</p>
-    </div>
-  )
-}
 
 const inputClasses =
   'w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 bg-white outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors'
@@ -143,20 +114,17 @@ export default function VerifyEmailPage() {
   }
 
   return (
-    <div className="min-h-screen flex">
-      <div className="hidden lg:block lg:w-1/2">
-        <BrandPanel />
+    <div className="min-h-screen flex flex-col lg:flex-row">
+      <div className="w-full lg:w-1/2">
+        <AuthHeroPanel
+          tagline="AI chatbots with native CRM"
+          features={FEATURE_PILLS}
+          footnote="Trusted by 500+ businesses in India"
+        />
       </div>
 
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white min-h-screen">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white lg:min-h-screen">
         <div className="w-full max-w-sm">
-          <div className="flex items-center gap-3 mb-8 lg:hidden">
-            <VyostraLogo size={32} animate={true} />
-            <span className="font-bold text-lg text-gray-900" style={JAKARTA_FONT}>
-              VyostraAI
-            </span>
-          </div>
-
           <h1 className="font-extrabold text-2xl text-gray-900 mb-2" style={JAKARTA_FONT}>
             Verify your email
           </h1>
