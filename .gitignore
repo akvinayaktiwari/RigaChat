@@ -21,3 +21,5 @@ frontend/*.zip
 
 e2e/test-results/
 e2e/playwright-report/
+
+.DS_Store
