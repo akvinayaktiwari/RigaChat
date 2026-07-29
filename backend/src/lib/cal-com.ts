@@ -13,7 +13,11 @@
 const CAL_COM_AUTHORIZE_URL = 'https://app.cal.com/auth/oauth2/authorize'
 const CAL_COM_TOKEN_URL = 'https://api.cal.com/v2/auth/oauth2/token'
 const CAL_COM_API_BASE = 'https://api.cal.com/v2'
-const CAL_COM_API_VERSION = '2026-02-25'
+
+// Cal.com versions each endpoint independently, not globally -- using the
+// wrong value for a given endpoint 404s rather than falling back gracefully.
+const EVENT_TYPES_API_VERSION = '2024-06-14'
+const BOOKINGS_API_VERSION = '2026-02-25'
 
 function requireEnv(name: string): string {
   const value = process.env[name]
@@ -131,7 +135,7 @@ interface CalComEventTypesResponse {
 
 export async function getEventTypes(accessToken: string): Promise<CalComEventType[]> {
   const response = await fetch(`${CAL_COM_API_BASE}/event-types`, {
-    headers: { Authorization: `Bearer ${accessToken}`, 'cal-api-version': CAL_COM_API_VERSION },
+    headers: { Authorization: `Bearer ${accessToken}`, 'cal-api-version': EVENT_TYPES_API_VERSION },
   })
 
   if (!response.ok) {
@@ -173,7 +177,7 @@ export async function createBooking(accessToken: string, input: CreateBookingInp
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
-      'cal-api-version': CAL_COM_API_VERSION,
+      'cal-api-version': BOOKINGS_API_VERSION,
     },
     body: JSON.stringify({
       eventTypeId: input.eventTypeId,
