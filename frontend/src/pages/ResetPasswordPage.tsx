@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AlertCircle, CheckCircle, Eye, EyeOff, Loader2 } from 'lucide-react'
@@ -98,8 +98,10 @@ export default function ResetPasswordPage() {
   const navigate = useNavigate()
   const toast = useToast()
 
+  const codeFromLink = searchParams.get('code') ?? ''
+
   const [email, setEmail] = useState(searchParams.get('email') ?? '')
-  const [code, setCode] = useState('')
+  const [code, setCode] = useState(codeFromLink)
   const [newPassword, setNewPassword] = useState('')
   const [confirmNewPassword, setConfirmNewPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -109,6 +111,18 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null)
 
   const strength = getPasswordStrength(newPassword)
+
+  // Arriving via the "tap to copy" link in the reset-password email -- the
+  // field above is already pre-filled from the URL, so this is a convenience
+  // for pasting the code somewhere else, not a requirement for resetting.
+  useEffect(() => {
+    if (!codeFromLink) return
+    navigator.clipboard
+      ?.writeText(codeFromLink)
+      .then(() => toast.show('Code copied — just set your new password below.', 'success'))
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function validate(): boolean {
     const nextErrors: FieldErrors = {}

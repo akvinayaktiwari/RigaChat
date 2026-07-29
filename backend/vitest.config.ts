@@ -13,6 +13,7 @@ export default defineConfig({
       COGNITO_CLIENT_ID: 'test-client-id',
       DYNAMODB_TABLE_CLIENTS: 'test-clients-table',
       DYNAMODB_TABLE_SUBSCRIPTIONS: 'test-subscriptions-table',
+      EMAIL_LOGO_URL: 'https://example.com/logo.png',
     },
   },
 })

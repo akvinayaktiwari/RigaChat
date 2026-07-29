@@ -1,0 +1,174 @@
+<!--
+  VyostraAI email shell — reusable header + footer for every outbound email
+  (marketing, product updates, and transactional alike). Extend it by
+  replacing {{BODY_HTML}} with the type-specific content; everything else
+  is shared branding + CAN-SPAM footer.
+
+  Build rules (email HTML, not a web page):
+  - Table-based layout, all styles inline. No <style> selectors that touch
+    layout — Outlook/desktop strips <style> blocks or ignores flex/grid.
+    The one <style> block below is progressive-enhancement only (webfont +
+    dark-mode + mobile width) and every rule it sets has an inline fallback.
+  - Max width 600px. Single column. No JS (stripped by every client anyway).
+  - {{LOGO_URL}} must be a hosted https URL (S3/CloudFront), not base64 —
+    Outlook desktop does not render base64 images. This is the mark alone
+    (frontend/public/logo-mark.png, hosted at https://vyostra.com/logo-mark.png)
+    rendered at 26x26 next to a live "VyostraAI" text wordmark, not a
+    combined logo+text image — matches the header lockup in
+    DashboardLayout.tsx, and keeps the name as real selectable text.
+
+  Tokens to fill in at send time:
+    {{PREVIEW_TEXT}}       hidden preheader, ~40-90 chars, no lorem
+    {{EYEBROW_LABEL}}      small caps label above the headline, e.g. "PRODUCT UPDATE"
+                            leave the whole <tr id="eyebrow"> block out entirely for
+                            transactional sends (receipts, alerts) — no need to label those
+    {{HEADLINE}}
+    {{BODY_HTML}}          the type-specific content block
+    {{CTA_URL}} / {{CTA_LABEL}}   omit the whole <tr id="cta"> block if there's no CTA
+    {{LOGO_URL}}
+    {{RECIPIENT_EMAIL}}    shown in the footer ("sent to you@x.com because...")
+    {{UNSUBSCRIBE_URL}}    for MARKETING sends only — see note above the footer block
+    {{PREFERENCES_URL}}    optional; link to a granular notification-settings page
+    {{COMPANY_ADDRESS}}    CAN-SPAM requires a real physical postal address
+    {{YEAR}}
+
+  CAN-SPAM checklist this shell covers in the markup — the rest (accurate
+  From/Subject, honoring opt-outs within 10 business days, List-Unsubscribe
+  header for one-click Gmail/Yahoo unsubscribe) is enforced at send time by
+  the email service, not by this HTML:
+    [x] physical postal address in the footer
+    [x] clear statement of why the recipient is receiving this
+    [x] visible, working unsubscribe link (marketing sends)
+    [x] identified as a non-transactional message when it is one
+-->
+<div style="margin:0;padding:0;background-color:#f5f3fa;">
+  <!-- preheader: hidden in the body, shown by inbox list/preview panes -->
+  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f5f3fa;opacity:0;">
+    {{PREVIEW_TEXT}}
+  </div>
+
+  <style>
+    @media (prefers-color-scheme: dark) {
+      .vy-canvas { background-color:#15121f !important; }
+      .vy-card { background-color:#1f1a2e !important; border-color:#33294d !important; }
+      .vy-heading { color:#f2effa !important; }
+      .vy-body-text { color:#c9c2de !important; }
+      .vy-muted { color:#8f87a8 !important; }
+      .vy-divider { border-color:#33294d !important; }
+      .vy-footer-bg { background-color:#181327 !important; }
+    }
+    @media screen and (max-width:600px) {
+      .vy-container { width:100% !important; }
+      .vy-px { padding-left:20px !important; padding-right:20px !important; }
+    }
+  </style>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="vy-canvas" style="background-color:#f5f3fa;">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="vy-container" style="width:600px;max-width:600px;">
+
+          <!-- card -->
+          <tr>
+            <td class="vy-card" style="background-color:#ffffff;border:1px solid #e8e4f3;border-radius:12px;overflow:hidden;">
+
+              <!-- accent rule -->
+              <tr><td style="height:4px;line-height:4px;font-size:0;background-color:#7c3aed;background-image:linear-gradient(90deg,#7c3aed,#a855f7);">&nbsp;</td></tr>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <!-- header / logo -->
+                <tr>
+                  <td class="vy-px" style="padding:32px 40px 24px 40px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td valign="middle" style="padding-right:10px;">
+                          <img src="{{LOGO_URL}}" width="26" height="26" alt="" style="display:block;border:0;outline:none;height:26px;width:26px;" />
+                        </td>
+                        <td valign="middle">
+                          <span class="vy-heading" style="font-family:'Plus Jakarta Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:17px;font-weight:700;color:#1e1b2e;letter-spacing:-0.01em;">VyostraAI</span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- eyebrow (omit this row for transactional sends) -->
+                <tr id="eyebrow">
+                  <td class="vy-px" style="padding:0 40px;">
+                    <span style="display:inline-block;font-family:'Plus Jakarta Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12px;font-weight:700;letter-spacing:1.2px;color:#7c3aed;text-transform:uppercase;">
+                      {{EYEBROW_LABEL}}
+                    </span>
+                  </td>
+                </tr>
+
+                <!-- headline -->
+                <tr>
+                  <td class="vy-px vy-heading" style="padding:10px 40px 4px 40px;font-family:'Plus Jakarta Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:24px;line-height:1.3;font-weight:700;color:#1e1b2e;">
+                    {{HEADLINE}}
+                  </td>
+                </tr>
+
+                <!-- body content -->
+                <tr>
+                  <td class="vy-px vy-body-text" style="padding:16px 40px 8px 40px;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#4b4560;">
+                    {{BODY_HTML}}
+                  </td>
+                </tr>
+
+                <!-- CTA (omit this row entirely if the email has no call to action) -->
+                <tr id="cta">
+                  <td class="vy-px" style="padding:16px 40px 8px 40px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td align="center" style="border-radius:8px;background-color:#7c3aed;background-image:linear-gradient(90deg,#7c3aed,#a855f7);">
+                          <a href="{{CTA_URL}}" style="display:inline-block;padding:12px 24px;font-family:'Plus Jakarta Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">
+                            {{CTA_LABEL}}
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <tr><td style="height:16px;line-height:16px;font-size:0;">&nbsp;</td></tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr><td style="height:24px;line-height:24px;font-size:0;">&nbsp;</td></tr>
+
+          <!-- footer -->
+          <tr>
+            <td class="vy-footer-bg" style="padding:0 8px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td class="vy-px vy-muted" style="padding:0 32px;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12px;line-height:1.7;color:#8b849f;text-align:center;">
+                    Sent to {{RECIPIENT_EMAIL}} because you have an active VyostraAI account.
+                    <br />
+                    <!-- MARKETING SENDS ONLY: transactional mail (receipts, security
+                         alerts, appointment confirmations) must not carry an unsubscribe
+                         link tied to the account itself — omit this line for those. -->
+                    <a href="{{UNSUBSCRIBE_URL}}" style="color:#7c3aed;text-decoration:underline;">Unsubscribe from product updates</a>
+                    &nbsp;&middot;&nbsp;
+                    <a href="{{PREFERENCES_URL}}" style="color:#7c3aed;text-decoration:underline;">Manage email preferences</a>
+                    <br />
+                    Account and billing emails are separate and are not affected by this unsubscribe.
+                  </td>
+                </tr>
+                <tr><td style="height:12px;line-height:12px;font-size:0;">&nbsp;</td></tr>
+                <tr>
+                  <td class="vy-px vy-muted" style="padding:0 32px;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:11px;line-height:1.6;color:#8b849f;text-align:center;">
+                    VyostraAI &middot; {{COMPANY_ADDRESS}}
+                    <br />
+                    &copy; {{YEAR}} VyostraAI. All rights reserved.
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</div>

@@ -71,8 +71,9 @@ export default function VerifyEmailPage() {
   const navigate = useNavigate()
   const toast = useToast()
   const email = searchParams.get('email') ?? ''
+  const codeFromLink = searchParams.get('code') ?? ''
 
-  const [code, setCode] = useState('')
+  const [code, setCode] = useState(codeFromLink)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -86,6 +87,18 @@ export default function VerifyEmailPage() {
     }, 1000)
     return () => window.clearInterval(timer)
   }, [resendCooldown])
+
+  // Arriving via the "tap to copy" link in the verification email -- the
+  // field above is already pre-filled from the URL, so this is a convenience
+  // for pasting the code somewhere else, not a requirement for confirming.
+  useEffect(() => {
+    if (!codeFromLink) return
+    navigator.clipboard
+      ?.writeText(codeFromLink)
+      .then(() => toast.show('Code copied — just confirm below.', 'success'))
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()

@@ -5,6 +5,7 @@ import { app } from './src/routes/index.js'
 import { sendWeeklyReportsForAllClients } from './src/services/whatsapp-service.js'
 import { processCrawlerJob } from './src/services/crawler-worker-service.js'
 import type { CrawlerJobMessage } from './src/lib/sqs.js'
+import { applyCustomMessage, type CognitoCustomMessageEvent } from './src/services/cognito-custom-message-service.js'
 
 // Lambda Function URL only supports one invocation mode (BUFFERED or RESPONSE_STREAM)
 // per function, so this same bundle is deployed to two separate Lambda functions:
@@ -47,7 +48,7 @@ interface SQSTriggerEvent {
 const bufferedHandler = handle(app)
 
 export const handler = async (
-  event: LambdaEvent | ScheduledEvent | SQSTriggerEvent,
+  event: LambdaEvent | ScheduledEvent | SQSTriggerEvent | CognitoCustomMessageEvent,
   lambdaContext?: Parameters<typeof bufferedHandler>[1]
 ) => {
   if ('Records' in event && event.Records?.[0]?.eventSource === 'aws:sqs') {
@@ -59,6 +60,14 @@ export const handler = async (
   if ('source' in event && event.source === 'aws.events' && event['detail-type'] === 'whatsapp-weekly-report') {
     await sendWeeklyReportsForAllClients()
     return
+  }
+
+  // Cognito invokes this directly (no Function URL event shape) as the
+  // User Pool's "Custom message" Lambda trigger -- see
+  // services/cognito-custom-message-service.ts for why this exists and
+  // which triggerSource values it handles.
+  if ('triggerSource' in event && typeof event.triggerSource === 'string' && event.triggerSource.startsWith('CustomMessage_')) {
+    return applyCustomMessage(event)
   }
 
   return bufferedHandler(event as LambdaEvent, lambdaContext)
