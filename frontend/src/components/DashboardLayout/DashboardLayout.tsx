@@ -3,6 +3,8 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   Bell,
   Bot,
+  Calendar,
+  Clock,
   FileText,
   LayoutDashboard,
   LogOut,
@@ -24,6 +26,8 @@ const NAV_LINKS: { to: string; label: string; icon: LucideIcon; end: boolean }[]
   { to: '/dashboard/voice-agents', label: 'Voice Agents', icon: Mic, end: false },
   { to: '/dashboard/forms', label: 'Forms', icon: FileText, end: false },
   { to: '/dashboard/leads', label: 'Leads', icon: Users, end: false },
+  { to: '/dashboard/appointments', label: 'Appointments', icon: Calendar, end: false },
+  { to: '/dashboard/scheduler', label: 'Scheduler', icon: Clock, end: false },
   { to: '/dashboard/whatsapp', label: 'WhatsApp', icon: MessageSquare, end: false },
   { to: '/dashboard/meta-ads', label: 'Meta Ads', icon: Megaphone, end: false },
   { to: '/dashboard/billing', label: 'Billing', icon: Receipt, end: false },

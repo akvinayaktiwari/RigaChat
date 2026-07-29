@@ -1,5 +1,6 @@
 import type {
   ApiResponse,
+  AppointmentRequest,
   BotConfig,
   ClientRecord,
   ConfirmKBUploadInput,
@@ -23,6 +24,9 @@ import type {
   MetaLead,
   PaymentRecord,
   ResyncResult,
+  ScheduleCadence,
+  ScheduledAction,
+  ScheduledActionType,
   SetupBotResult,
   StartIndexingResult,
   SubscriptionSummary,
@@ -502,4 +506,32 @@ export function getVoiceKBUploadUrl(data: GetVoiceKBUploadUrlInput): Promise<Api
 
 export function confirmVoiceKBUpload(data: ConfirmVoiceKBUploadInput): Promise<ApiResponse<VoiceKnowledgeBaseEntry>> {
   return apiClient<VoiceKnowledgeBaseEntry>(`/api/voice-agents/${data.agentId}/kb/confirm-upload`, 'POST', data)
+}
+
+export function getScheduledActions(): Promise<ApiResponse<ScheduledAction[]>> {
+  return apiClient<ScheduledAction[]>('/api/scheduler')
+}
+
+export interface CreateScheduledActionInput {
+  actionType: ScheduledActionType
+  cadence: ScheduleCadence
+}
+
+export function createScheduledAction(data: CreateScheduledActionInput): Promise<ApiResponse<ScheduledAction>> {
+  return apiClient<ScheduledAction>('/api/scheduler', 'POST', data)
+}
+
+export function updateScheduledActionCadence(
+  scheduleId: string,
+  cadence: ScheduleCadence
+): Promise<ApiResponse<ScheduledAction>> {
+  return apiClient<ScheduledAction>(`/api/scheduler/${scheduleId}`, 'PATCH', { cadence })
+}
+
+export function deleteScheduledAction(scheduleId: string): Promise<ApiResponse<{ message: string }>> {
+  return apiClient<{ message: string }>(`/api/scheduler/${scheduleId}`, 'DELETE')
+}
+
+export function getAppointmentRequests(botId: string): Promise<ApiResponse<AppointmentRequest[]>> {
+  return apiClient<AppointmentRequest[]>(`/api/appointments/${botId}`)
 }

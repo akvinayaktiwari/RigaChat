@@ -461,3 +461,30 @@ export interface PaymentRecord {
   createdAt: string
   invoiceUrl?: string | null
 }
+
+export type ScheduledActionType = 'weekly_report' | 'lead_reminder'
+
+export type ScheduleCadence = { type: 'interval_days'; intervalDays: number } | { type: 'one_off'; at: string }
+
+export interface ScheduledAction {
+  scheduleId: string
+  clientId: string
+  actionType: ScheduledActionType
+  cadence: ScheduleCadence
+  enabled: boolean
+  leadId?: string
+  botId?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AppointmentRequest {
+  requestId: string
+  botId: string
+  clientId: string
+  leadId: string
+  requestedAt: string
+  notes?: string
+  status: 'requested'
+  createdAt: string
+}
