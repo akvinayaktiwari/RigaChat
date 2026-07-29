@@ -6,6 +6,15 @@ import { zohoProvider } from '../providers/zoho-provider.js'
 import { metaProvider } from '../providers/meta-provider.js'
 import { connectZohoCRM, disconnectCRM, getCRMStatus } from '../services/crm-service.js'
 import {
+  connectCalCom,
+  disconnectCalCom,
+  getCalComEventTypes,
+  getCalComStatus,
+  getOAuthUrl as getCalComOAuthUrl,
+  setCalComDefaultEventType,
+} from '../services/cal-com-service.js'
+import type { CalComEventType } from '../lib/cal-com.js'
+import {
   connectGupshup,
   connectMetaWhatsApp,
   disconnectMetaWhatsApp,
@@ -22,6 +31,7 @@ import {
 } from '../services/meta-lead-service.js'
 import type {
   ApiResponse,
+  CalComConnection,
   CRMConnection,
   MetaConnection,
   MetaDirectWhatsAppConnection,
@@ -39,6 +49,7 @@ export const integrationRoutes = new Hono<AuthEnv>()
 
 const STATE_COOKIE = 'zoho_oauth_state'
 const META_STATE_COOKIE = 'meta_oauth_state'
+const CAL_COM_STATE_COOKIE = 'cal_com_oauth_state'
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173'
 
 function errorMessage(error: unknown): string {
@@ -276,6 +287,104 @@ integrationRoutes.get('/meta/leads', requireAuth, async (c) => {
   try {
     const leads = await getMetaLeadsForClient(clientId)
     return c.json<ApiResponse<MetaLead[]>>({ success: true, data: leads }, 200)
+  } catch (error) {
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+// Same shape as /zoho/connect and /meta/connect above: requireAuthFromQuery
+// (JWT as query param, since this is a browser GET redirect, not a fetch()
+// with an Authorization header), state cookie for CSRF, clientId embedded in
+// state so the callback knows who's completing the flow.
+integrationRoutes.get('/cal-com/connect', requireAuthFromQuery, (c) => {
+  const clientId = c.get('user').sub
+  const random = Math.random().toString(36).substring(2)
+  const state = `${clientId}:${random}`
+
+  setCookie(c, CAL_COM_STATE_COOKIE, state, {
+    httpOnly: true,
+    maxAge: 600,
+    path: '/',
+    sameSite: 'Lax',
+    secure: process.env.NODE_ENV === 'production',
+  })
+
+  return c.redirect(getCalComOAuthUrl(state))
+})
+
+integrationRoutes.get('/cal-com/callback', async (c) => {
+  const code = c.req.query('code')
+  const state = c.req.query('state')
+  const storedState = getCookie(c, CAL_COM_STATE_COOKIE)
+
+  setCookie(c, CAL_COM_STATE_COOKIE, '', { path: '/', maxAge: 0 })
+
+  if (!code || !state || !storedState || state !== storedState) {
+    return c.redirect(`${FRONTEND_URL}/dashboard/settings?cal_com=error&reason=invalid_state`)
+  }
+
+  const clientId = state.split(':')[0]
+
+  try {
+    await connectCalCom(clientId, code)
+    return c.redirect(`${FRONTEND_URL}/dashboard/settings?cal_com=connected`)
+  } catch (error) {
+    console.error('Cal.com connect error:', errorMessage(error))
+    return c.redirect(`${FRONTEND_URL}/dashboard/settings?cal_com=error&reason=auth_failed`)
+  }
+})
+
+integrationRoutes.delete('/cal-com/disconnect', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+
+  try {
+    await disconnectCalCom(clientId)
+    return c.json<ApiResponse<{ message: string }>>({ success: true, data: { message: 'Cal.com disconnected' } }, 200)
+  } catch (error) {
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+integrationRoutes.get('/cal-com/status', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+
+  try {
+    const status = await getCalComStatus(clientId)
+    return c.json<ApiResponse<Omit<CalComConnection, 'accessTokenEncrypted' | 'refreshTokenEncrypted'> | null>>(
+      { success: true, data: status },
+      200
+    )
+  } catch (error) {
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+integrationRoutes.get('/cal-com/event-types', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+
+  try {
+    const eventTypes = await getCalComEventTypes(clientId)
+    return c.json<ApiResponse<CalComEventType[]>>({ success: true, data: eventTypes }, 200)
+  } catch (error) {
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+interface SetDefaultEventTypeBody {
+  eventTypeId?: number
+}
+
+integrationRoutes.post('/cal-com/default-event-type', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const body = await c.req.json<SetDefaultEventTypeBody>()
+
+  if (typeof body.eventTypeId !== 'number') {
+    return c.json<ApiResponse<null>>({ success: false, error: 'eventTypeId is required' }, 400)
+  }
+
+  try {
+    await setCalComDefaultEventType(clientId, body.eventTypeId)
+    return c.json<ApiResponse<{ message: string }>>({ success: true, data: { message: 'Default event type set' } }, 200)
   } catch (error) {
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }

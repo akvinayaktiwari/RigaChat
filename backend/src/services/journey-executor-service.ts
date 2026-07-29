@@ -87,8 +87,16 @@ async function handleToolCall(event: JourneyExecutorEvent): Promise<Record<strin
   const shared = { botId: event.botId, clientId: event.clientId, leadId: event.leadId }
 
   switch (event.toolName) {
-    case 'booking':
-      return { ...(await bookAppointment({ ...shared, requestedAt: requireStringField(event.toolInput, 'requestedAt') })) }
+    case 'booking': {
+      const timeZone = event.toolInput?.timeZone
+      return {
+        ...(await bookAppointment({
+          ...shared,
+          requestedAt: requireStringField(event.toolInput, 'requestedAt'),
+          ...(typeof timeZone === 'string' ? { timeZone } : {}),
+        })),
+      }
+    }
     case 'reminder':
       return { ...(await scheduleReminder({ ...shared, remindAt: requireStringField(event.toolInput, 'remindAt') })) }
     case 'quotation':

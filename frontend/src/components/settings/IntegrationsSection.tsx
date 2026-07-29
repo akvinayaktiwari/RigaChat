@@ -1,4 +1,5 @@
 import { Loader2, Share2 } from 'lucide-react'
+import type { CalComEventType } from '../../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -6,6 +7,12 @@ interface IntegrationsSectionProps {
   zohoStatus: 'connected' | 'disconnected' | 'loading'
   onConnectZoho: () => void
   onDisconnectZoho: () => void
+  calComStatus: 'connected' | 'disconnected' | 'loading'
+  onConnectCalCom: () => void
+  onDisconnectCalCom: () => void
+  calComEventTypes: CalComEventType[]
+  calComDefaultEventTypeId: number | null
+  onSelectCalComEventType: (eventTypeId: number) => void
 }
 
 interface CardDef {
@@ -23,7 +30,17 @@ const STATUS_BADGES: Record<CardDef['status'], { label: string; classes: string 
   'coming-soon': { label: 'Coming Soon', classes: 'bg-gray-100 text-gray-500 border-gray-200' },
 }
 
-export default function IntegrationsSection({ zohoStatus, onConnectZoho, onDisconnectZoho }: IntegrationsSectionProps) {
+export default function IntegrationsSection({
+  zohoStatus,
+  onConnectZoho,
+  onDisconnectZoho,
+  calComStatus,
+  onConnectCalCom,
+  onDisconnectCalCom,
+  calComEventTypes,
+  calComDefaultEventTypeId,
+  onSelectCalComEventType,
+}: IntegrationsSectionProps) {
   const cards: CardDef[] = [
     {
       id: 'zoho',
@@ -31,6 +48,13 @@ export default function IntegrationsSection({ zohoStatus, onConnectZoho, onDisco
       description: 'Sync leads automatically',
       status: zohoStatus,
       onClick: () => (zohoStatus === 'connected' ? onDisconnectZoho() : onConnectZoho()),
+    },
+    {
+      id: 'cal-com',
+      name: 'Cal.com',
+      description: 'Let your agents book real site visits',
+      status: calComStatus,
+      onClick: () => (calComStatus === 'connected' ? onDisconnectCalCom() : onConnectCalCom()),
     },
     { id: 'hubspot', name: 'HubSpot', description: 'Sync leads automatically', status: 'coming-soon' },
     { id: 'salesforce', name: 'Salesforce', description: 'Sync leads automatically', status: 'coming-soon' },
@@ -58,39 +82,70 @@ export default function IntegrationsSection({ zohoStatus, onConnectZoho, onDisco
           const badge = STATUS_BADGES[card.status]
 
           return (
-            <div key={card.id} className="flex items-center justify-between p-4 rounded-xl border border-gray-100 bg-gray-50/50">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-gray-500 font-semibold text-sm shrink-0">
-                  {card.name.charAt(0)}
+            <div key={card.id}>
+              <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 bg-gray-50/50">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-gray-500 font-semibold text-sm shrink-0">
+                    {card.name.charAt(0)}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm">{card.name}</p>
+                    <span className={`inline-flex mt-0.5 border text-[10px] font-semibold px-2 py-0.5 rounded-full ${badge.classes}`}>
+                      {isLoading ? 'Loading…' : badge.label}
+                    </span>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="font-semibold text-gray-900 text-sm">{card.name}</p>
-                  <span className={`inline-flex mt-0.5 border text-[10px] font-semibold px-2 py-0.5 rounded-full ${badge.classes}`}>
-                    {isLoading ? 'Loading…' : badge.label}
-                  </span>
-                </div>
+
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-gray-400 shrink-0" />
+                ) : isComingSoon ? (
+                  <span className="text-xs text-gray-400 shrink-0">Coming Soon</span>
+                ) : isConnected ? (
+                  <button
+                    type="button"
+                    onClick={card.onClick}
+                    className="text-red-600 font-medium px-3 py-2 rounded-xl text-sm hover:bg-red-50 transition-colors shrink-0"
+                  >
+                    Disconnect
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={card.onClick}
+                    className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-3 py-2 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity shrink-0"
+                  >
+                    Connect
+                  </button>
+                )}
               </div>
 
-              {isLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin text-gray-400 shrink-0" />
-              ) : isComingSoon ? (
-                <span className="text-xs text-gray-400 shrink-0">Coming Soon</span>
-              ) : isConnected ? (
-                <button
-                  type="button"
-                  onClick={card.onClick}
-                  className="text-red-600 font-medium px-3 py-2 rounded-xl text-sm hover:bg-red-50 transition-colors shrink-0"
-                >
-                  Disconnect
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={card.onClick}
-                  className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-3 py-2 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity shrink-0"
-                >
-                  Connect
-                </button>
+              {card.id === 'cal-com' && isConnected && (
+                <div className="mt-2 p-4 rounded-xl border border-gray-100 bg-white">
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                    Booking event type
+                  </label>
+                  {calComEventTypes.length === 0 ? (
+                    <p className="text-sm text-gray-500">No event types found on your Cal.com account yet.</p>
+                  ) : (
+                    <select
+                      value={calComDefaultEventTypeId ?? ''}
+                      onChange={(e) => onSelectCalComEventType(Number(e.target.value))}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    >
+                      <option value="" disabled>
+                        Choose which event type agents book…
+                      </option>
+                      {calComEventTypes.map((et) => (
+                        <option key={et.id} value={et.id}>
+                          {et.title} ({et.lengthInMinutes}min)
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <p className="text-xs text-gray-400 mt-2">
+                    Your booking agent creates real, confirmed slots against this event type.
+                  </p>
+                </div>
               )}
             </div>
           )

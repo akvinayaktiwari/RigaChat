@@ -6,9 +6,14 @@ import type { AppointmentRequest } from '../types/index.js'
 const TABLE_NAME = getTableName('appointment_requests')
 
 export async function createAppointmentRequest(
-  data: Omit<AppointmentRequest, 'requestId' | 'status' | 'createdAt'>
+  data: Omit<AppointmentRequest, 'requestId' | 'status' | 'createdAt'> & { status?: AppointmentRequest['status'] }
 ): Promise<AppointmentRequest> {
-  const record: AppointmentRequest = { ...data, requestId: uuidv4(), status: 'requested', createdAt: new Date().toISOString() }
+  const record: AppointmentRequest = {
+    ...data,
+    requestId: uuidv4(),
+    status: data.status ?? 'requested',
+    createdAt: new Date().toISOString(),
+  }
 
   try {
     await dynamoClient.send(

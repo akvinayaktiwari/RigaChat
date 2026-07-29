@@ -10,14 +10,19 @@ import EditProfileModal from '../components/settings/EditProfileModal'
 import DeleteConfirmModal from '../components/settings/DeleteConfirmModal'
 import UpgradeModal from '../components/billing/UpgradeModal'
 import {
+  connectCalCom,
   connectZoho,
+  disconnectCalCom,
   disconnectCRM,
+  getCalComEventTypes,
+  getCalComStatus,
   getIntegrationStatus,
   getMe,
   getMySubscription,
+  setCalComDefaultEventType,
   updateProfile,
 } from '../services/api'
-import type { ClientRecord, Preferences, SubscriptionSummary } from '../types/index'
+import type { CalComEventType, ClientRecord, Preferences, SubscriptionSummary } from '../types/index'
 import type { BillableTier } from '../lib/pricingTiers'
 
 // Suggests the next tier up from the account's current plan; agency has no
@@ -55,6 +60,9 @@ export default function Settings() {
   const [subscription, setSubscription] = useState<SubscriptionSummary | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [zohoStatus, setZohoStatus] = useState<'connected' | 'disconnected' | 'loading'>('loading')
+  const [calComStatus, setCalComStatus] = useState<'connected' | 'disconnected' | 'loading'>('loading')
+  const [calComEventTypes, setCalComEventTypes] = useState<CalComEventType[]>([])
+  const [calComDefaultEventTypeId, setCalComDefaultEventTypeId] = useState<number | null>(null)
   const [preferences, setPreferences] = useState<Preferences>(loadPreferences)
   const [showEditProfile, setShowEditProfile] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
@@ -86,6 +94,20 @@ export default function Settings() {
         setZohoStatus('disconnected')
       }
 
+      try {
+        const calComRes = await getCalComStatus()
+        const connected = calComRes.success && calComRes.data?.connected
+        setCalComStatus(connected ? 'connected' : 'disconnected')
+        setCalComDefaultEventTypeId(calComRes.data?.defaultEventTypeId ?? null)
+
+        if (connected) {
+          const eventTypesRes = await getCalComEventTypes()
+          setCalComEventTypes(eventTypesRes.data ?? [])
+        }
+      } catch {
+        setCalComStatus('disconnected')
+      }
+
       setIsLoading(false)
     }
     load()
@@ -97,6 +119,15 @@ export default function Settings() {
       window.history.replaceState({}, '', '/dashboard/settings')
     } else if (zohoParam === 'error') {
       toast.show('Failed to connect Zoho CRM. Please try again.', 'error')
+      window.history.replaceState({}, '', '/dashboard/settings')
+    }
+
+    const calComParam = params.get('cal_com')
+    if (calComParam === 'connected') {
+      toast.show('Cal.com connected — choose a booking event type below', 'success')
+      window.history.replaceState({}, '', '/dashboard/settings')
+    } else if (calComParam === 'error') {
+      toast.show('Failed to connect Cal.com. Please try again.', 'error')
       window.history.replaceState({}, '', '/dashboard/settings')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -135,6 +166,43 @@ export default function Settings() {
       }
     } catch {
       toast.show('Failed to disconnect Zoho CRM', 'error')
+    }
+  }
+
+  function handleConnectCalCom() {
+    connectCalCom()
+  }
+
+  async function handleDisconnectCalCom() {
+    try {
+      const res = await disconnectCalCom()
+      if (res.success) {
+        setCalComStatus('disconnected')
+        setCalComEventTypes([])
+        setCalComDefaultEventTypeId(null)
+        toast.show('Cal.com disconnected', 'success')
+      } else {
+        toast.show(res.error ?? 'Failed to disconnect Cal.com', 'error')
+      }
+    } catch {
+      toast.show('Failed to disconnect Cal.com', 'error')
+    }
+  }
+
+  async function handleSelectCalComEventType(eventTypeId: number) {
+    const previous = calComDefaultEventTypeId
+    setCalComDefaultEventTypeId(eventTypeId)
+    try {
+      const res = await setCalComDefaultEventType(eventTypeId)
+      if (res.success) {
+        toast.show('Booking event type updated', 'success')
+      } else {
+        setCalComDefaultEventTypeId(previous)
+        toast.show(res.error ?? 'Failed to update booking event type', 'error')
+      }
+    } catch {
+      setCalComDefaultEventTypeId(previous)
+      toast.show('Failed to update booking event type', 'error')
     }
   }
 
@@ -179,6 +247,12 @@ export default function Settings() {
             zohoStatus={zohoStatus}
             onConnectZoho={handleConnectZoho}
             onDisconnectZoho={handleDisconnectZoho}
+            calComStatus={calComStatus}
+            onConnectCalCom={handleConnectCalCom}
+            onDisconnectCalCom={handleDisconnectCalCom}
+            calComEventTypes={calComEventTypes}
+            calComDefaultEventTypeId={calComDefaultEventTypeId}
+            onSelectCalComEventType={handleSelectCalComEventType}
           />
         </div>
 

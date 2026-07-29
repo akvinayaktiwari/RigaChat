@@ -2,6 +2,8 @@ import type {
   ApiResponse,
   AppointmentRequest,
   BotConfig,
+  CalComConnection,
+  CalComEventType,
   ClientRecord,
   ConfirmKBUploadInput,
   ConfirmVoiceKBUploadInput,
@@ -380,6 +382,32 @@ export function disconnectCRM(): Promise<ApiResponse<{ success: boolean }>> {
 export function connectZoho(): void {
   if (!authToken) return
   window.location.href = `${BASE_URL}/api/integrations/zoho/connect?token=${encodeURIComponent(authToken)}`
+}
+
+// Cal.com Integration API
+
+export function getCalComStatus(): Promise<ApiResponse<CalComConnection | null>> {
+  return apiClient<CalComConnection | null>('/api/integrations/cal-com/status')
+}
+
+// Same reasoning as connectZoho above -- GET /cal-com/connect is a top-level
+// browser redirect (Cal.com's own consent screen), not a fetch call, so the
+// auth token can't travel as an Authorization header.
+export function connectCalCom(): void {
+  if (!authToken) return
+  window.location.href = `${BASE_URL}/api/integrations/cal-com/connect?token=${encodeURIComponent(authToken)}`
+}
+
+export function disconnectCalCom(): Promise<ApiResponse<{ message: string }>> {
+  return apiClient<{ message: string }>('/api/integrations/cal-com/disconnect', 'DELETE')
+}
+
+export function getCalComEventTypes(): Promise<ApiResponse<CalComEventType[]>> {
+  return apiClient<CalComEventType[]>('/api/integrations/cal-com/event-types')
+}
+
+export function setCalComDefaultEventType(eventTypeId: number): Promise<ApiResponse<{ message: string }>> {
+  return apiClient<{ message: string }>('/api/integrations/cal-com/default-event-type', 'POST', { eventTypeId })
 }
 
 // WhatsApp Integration API

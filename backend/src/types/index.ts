@@ -258,8 +258,30 @@ export interface ClientRecord {
   metaDirectWhatsAppConnection?: MetaDirectWhatsAppConnection
   activeWhatsappProvider?: WhatsAppActiveProvider
   metaConnection?: MetaConnection
+  calComConnection?: CalComConnection
   createdAt: string
   updatedAt: string
+}
+
+// Tokens KMS-encrypted (lib/kms.ts), matching WhatsApp/Meta's connection
+// pattern -- not CRMConnection's (Zoho) unencrypted accessToken/refreshToken,
+// a pre-existing weaker pattern this deliberately doesn't propagate into new
+// code. defaultEventTypeId is required before booking-mcp-server.ts's
+// bookAppointment() can create a real booking (Cal.com's POST /v2/bookings
+// needs an eventTypeId) -- connected without one means "OAuth done, not yet
+// configured," a real intermediate state, not an error.
+export interface CalComConnection {
+  provider: 'cal_com'
+  connected: boolean
+  accessTokenEncrypted: string
+  refreshTokenEncrypted: string
+  // Cal.com access tokens expire in 30 minutes (short-lived compared to
+  // Zoho/Meta) -- refreshed proactively by cal-com-service.ts's
+  // getValidAccessToken() before any API call, not reactively on a 401.
+  tokenExpiresAt: string
+  calComUserId?: string
+  defaultEventTypeId?: number
+  connectedAt: string
 }
 
 export interface CacheQueryResult {
@@ -826,10 +848,14 @@ export interface WaitAndRecheckResult {
 
 // --- MCP Toolbox ---
 // Real record backing the booking MCP tool (backend/src/mcp/booking-mcp-server.ts).
-// Deliberately just a request record, not a real calendar/appointment
-// system -- no calendar integration exists in this codebase. Genuinely
-// useful without one: a client can see that a lead requested a specific
-// time, even before any real scheduling logic exists to confirm it.
+// 'requested' is the fallback for a client with no Cal.com connection (or no
+// default event type set yet) -- a real request with no calendar behind it,
+// same as this record's original (pre-Cal.com) design. 'confirmed' means
+// booking-mcp-server.ts successfully created a real Cal.com booking
+// (calComBookingUid is set). 'failed' means a connected client's booking
+// attempt errored (notes carries the error) -- surfaced to the client rather
+// than silently falling back to 'requested', since that would hide a real
+// booking failure as if it were merely unconfirmed.
 export interface AppointmentRequest {
   requestId: string
   botId: string
@@ -837,6 +863,7 @@ export interface AppointmentRequest {
   leadId: string
   requestedAt: string
   notes?: string
-  status: 'requested'
+  status: 'requested' | 'confirmed' | 'failed'
+  calComBookingUid?: string
   createdAt: string
 }

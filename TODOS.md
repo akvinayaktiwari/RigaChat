@@ -268,15 +268,15 @@
 
 ### Implement a real wait_and_recheck satisfied-check
 
-**What:** `journey-executor-service.ts`'s `handleWaitAndRecheckCheck()` hardcodes `satisfied: false` unconditionally — checking whether a lead has actually replied, or their real `lead_score` state, needs data that doesn't exist on any record yet (`Lead` has no `replied` or `lead_score` field). `appointment_booked` now has a real `AppointmentRequest` record to check (booking landed 2026-07-29), but that record's `status` is always `'requested'` today — there's no confirmation step yet, so even `appointment_booked` can't be checked meaningfully until booking has a real status transition.
+**What:** `journey-executor-service.ts`'s `handleWaitAndRecheckCheck()` hardcodes `satisfied: false` unconditionally — checking whether a lead has actually replied, or their real `lead_score` state, needs data that doesn't exist on any record yet (`Lead` has no `replied` or `lead_score` field). `appointment_booked` is now checkable for real: the Cal.com integration (2026-07-29) gives `AppointmentRequest.status` a genuine `'confirmed'`/`'failed'` transition instead of always `'requested'` — `handleWaitAndRecheckCheck()` still needs to actually query for a `'confirmed'` `AppointmentRequest` on the lead and hasn't been wired up to do so yet, but the blocking data-model gap is closed.
 
 **Why:** Right now every `wait_and_recheck` step in a compiled Journey will always run to `maxIterations` and hit `onExhausted`, never `onSatisfied` — the primitive compiles and executes correctly, but can't reflect real lead state yet.
 
-**Context:** Needs a real design decision on where `replied`/`lead_score` state lives (new fields on `Lead`? A separate `LeadJourneyState` record?) and who writes it (the chat pipeline marking `replied` when an inbound message arrives during a Journey execution? A human explicitly scoring a lead, per the original design's Premise on manual vs. AI scoring?). For `appointment_booked` specifically: needs `AppointmentRequest.status` to gain a real transition beyond `'requested'` (who confirms it, and how).
+**Context:** Needs a real design decision on where `replied`/`lead_score` state lives (new fields on `Lead`? A separate `LeadJourneyState` record?) and who writes it (the chat pipeline marking `replied` when an inbound message arrives during a Journey execution? A human explicitly scoring a lead, per the original design's Premise on manual vs. AI scoring?). `appointment_booked` no longer needs a design decision — just wiring `handleWaitAndRecheckCheck()` to look up the lead's `AppointmentRequest`(s) and check for `status === 'confirmed'`.
 
-**Effort:** M
+**Effort:** S (appointment_booked wiring) / M (replied, lead_score — still need the design decision above)
 **Priority:** P2
-**Depends on:** send_message channel integration (above), for the `replied` check specifically; a real status transition on `AppointmentRequest` (no dedicated TODO yet -- small enough to fold into whoever picks this up), for `appointment_booked`
+**Depends on:** send_message channel integration (above), for the `replied` check specifically. `appointment_booked` has no remaining dependency.
 
 ### Migrate the global weekly-report EventBridge rule to per-client ScheduledActions
 
@@ -301,5 +301,17 @@
 **Effort:** L (migrating existing connected clients, removing Gupshup code paths, updating docs/env vars)
 **Priority:** P3
 **Depends on:** Meta Direct PR #1 + PR #2 shipped and proven in production.
+
+### Cal.com OAuth client is registered but pending Cal.com's approval
+
+**What:** The Cal.com integration (`lib/cal-com.ts`, `services/cal-com-service.ts`, `routes/integration-routes.ts`'s `/cal-com/*` routes, the Settings page's Cal.com card) is fully built and tested, but `CAL_COM_CLIENT_ID`/`CAL_COM_CLIENT_SECRET`/`CAL_COM_REDIRECT_URI` in `backend/.env` are still local-dev placeholders. The real OAuth client was registered at `app.cal.com/settings/developer/oauth` and starts in a "pending" state — Cal.com admin approval is required before real `/cal-com/connect` flows will work end-to-end, and that turnaround is outside this repo's control.
+
+**Why:** Same shape as the Meta WhatsApp Business App Review and Razorpay Subscriptions approval gates already tracked in this codebase's history — code-complete, but blocked on a third party's manual review before it's usable in production.
+
+**Context:** Built in parallel with registration per the user's explicit sequencing choice ("you register now, I build in parallel"). Once Cal.com approves the OAuth client, swap the three placeholder env vars for the real values (client secret via KMS-adjacent secret handling, not committed) and do one live end-to-end verification: connect → pick an event type → book via the `booking` MCP tool → confirm a real Cal.com booking lands.
+
+**Effort:** S (once approved — swap env vars + one live verification pass)
+**Priority:** P2
+**Depends on:** Cal.com's OAuth client approval (external, no ETA)
 
 ## Completed

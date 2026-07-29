@@ -6,12 +6,25 @@ import type { AppointmentRequest, BotConfig } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
+const STATUS_LABELS: Record<AppointmentRequest['status'], string> = {
+  requested: 'Requested',
+  confirmed: 'Confirmed',
+  failed: 'Failed',
+}
+
+const STATUS_BADGES: Record<AppointmentRequest['status'], string> = {
+  requested: 'bg-gray-100 text-gray-600 border-gray-200',
+  confirmed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  failed: 'bg-red-50 text-red-700 border-red-200',
+}
+
 function TableSkeleton() {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-black/5 mt-6 overflow-hidden">
       <div className="p-4 space-y-4">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="animate-pulse grid grid-cols-4 gap-4">
+          <div key={i} className="animate-pulse grid grid-cols-5 gap-4">
+            <div className="h-4 bg-gray-100 rounded" />
             <div className="h-4 bg-gray-100 rounded" />
             <div className="h-4 bg-gray-100 rounded" />
             <div className="h-4 bg-gray-100 rounded" />
@@ -110,6 +123,7 @@ export default function AppointmentsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-left text-gray-500">
+                <th className="px-5 py-3 font-medium">Status</th>
                 <th className="px-5 py-3 font-medium">Requested for</th>
                 <th className="px-5 py-3 font-medium">Chatbot</th>
                 <th className="px-5 py-3 font-medium">Lead</th>
@@ -120,6 +134,13 @@ export default function AppointmentsPage() {
             <tbody>
               {filtered.map((req) => (
                 <tr key={req.requestId} className="border-b border-gray-50 last:border-0">
+                  <td className="px-5 py-4">
+                    <span
+                      className={`inline-flex border text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_BADGES[req.status]}`}
+                    >
+                      {STATUS_LABELS[req.status]}
+                    </span>
+                  </td>
                   <td className="px-5 py-4 text-gray-900 font-medium">
                     {new Date(req.requestedAt).toLocaleString()}
                   </td>

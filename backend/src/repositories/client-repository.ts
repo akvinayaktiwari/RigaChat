@@ -148,6 +148,23 @@ export async function removeClientMetaDirectWhatsAppConnection(clientId: string)
   }
 }
 
+export async function removeClientCalComConnection(clientId: string): Promise<void> {
+  try {
+    await dynamoClient.send(
+      new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { clientId },
+        UpdateExpression: 'REMOVE calComConnection SET updatedAt = :updatedAt',
+        ExpressionAttributeValues: { ':updatedAt': new Date().toISOString() },
+      })
+    )
+  } catch (error) {
+    throw new Error(
+      `Failed to remove Cal.com connection for client ${clientId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
 export async function clearActiveWhatsappProvider(clientId: string): Promise<void> {
   try {
     await dynamoClient.send(

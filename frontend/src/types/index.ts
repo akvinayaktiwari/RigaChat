@@ -485,6 +485,23 @@ export interface AppointmentRequest {
   leadId: string
   requestedAt: string
   notes?: string
-  status: 'requested'
+  status: 'requested' | 'confirmed' | 'failed'
+  calComBookingUid?: string
   createdAt: string
+}
+
+export interface CalComConnection {
+  provider: 'cal_com'
+  connected: boolean
+  tokenExpiresAt: string
+  calComUserId?: string
+  defaultEventTypeId?: number
+  connectedAt: string
+}
+
+export interface CalComEventType {
+  id: number
+  title: string
+  slug: string
+  lengthInMinutes: number
 }
