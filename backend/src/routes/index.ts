@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { adminRoutes } from './admin-routes.js'
+import { agentRoutes } from './agent-routes.js'
 import { appointmentRoutes } from './appointment-routes.js'
 import { authRoutes } from './auth-routes.js'
 import { billingRoutes } from './billing-routes.js'
@@ -126,6 +127,7 @@ app.route('/api/admin', adminRoutes)
 app.route('/api/auth', authRoutes)
 app.route('/api/billing', billingRoutes)
 app.route('/api/bots', botRoutes)
+app.route('/api/agents', agentRoutes)
 app.route('/api/chat', chatRoutes)
 app.route('/api/leads', leadRoutes)
 app.route('/api/kb', kbRoutes)
