@@ -7,6 +7,7 @@ import {
 } from '../repositories/agent-repository.js'
 import {
   claimAgentBinding,
+  getAgentForResource,
   removeAgentBinding,
 } from '../repositories/agent-binding-lookup-repository.js'
 import { getBotById } from '../repositories/bot-repository.js'
@@ -99,6 +100,22 @@ export async function createAgent(input: CreateAgentInput): Promise<Agent> {
     }
     throw error
   }
+}
+
+// Reverse lookup used by journey/scheduler create paths to stamp the owning
+// Agent onto a new record. Returns undefined when the resource isn't bound to
+// any Agent (additive: pre-Agent journeys keep working) or when the binding's
+// client doesn't match (defensive -- the caller already owns the bot, but this
+// guards against a stale/mismatched lookup row).
+export async function resolveOwningAgentId(
+  resourceId: string,
+  clientId: string
+): Promise<string | undefined> {
+  const binding = await getAgentForResource(resourceId)
+  if (binding && binding.clientId === clientId) {
+    return binding.agentId
+  }
+  return undefined
 }
 
 export async function getAgent(agentId: string, clientId: string): Promise<Agent> {

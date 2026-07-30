@@ -7,6 +7,7 @@ import {
 } from '../repositories/journey-repository.js'
 import { compileJourneyToAsl, JourneyCompileError } from './journey-compiler-service.js'
 import { getBotConfig } from './bot-service.js'
+import { resolveOwningAgentId } from './agent-service.js'
 import type { AgentConfig, JourneyBundle, JourneyDefinition } from '../types/index.js'
 
 export class JourneyValidationError extends Error {
@@ -62,8 +63,15 @@ export async function createJourneyBundle(input: CreateJourneyBundleInput): Prom
     throw error
   }
 
+  // Stamp the owning cross-channel Agent (resolved from botId's binding) if the
+  // bot is wrapped in one. Optional/additive -- undefined is omitted so the
+  // record has no agentId attribute rather than an undefined one (the doc client
+  // does not strip undefined by default).
+  const agentId = await resolveOwningAgentId(input.botId, input.clientId)
+
   return createJourneyBundleRepo({
     botId: input.botId,
+    ...(agentId ? { agentId } : {}),
     clientId: input.clientId,
     name: input.name,
     description: input.description,

@@ -8,6 +8,7 @@ import {
   updateScheduledAction as updateScheduledActionRepo,
 } from '../repositories/scheduled-action-repository.js'
 import { sendWeeklyReport } from './whatsapp-service.js'
+import { resolveOwningAgentId } from './agent-service.js'
 import type { ScheduleCadence, ScheduledAction, ScheduledActionType } from '../types/index.js'
 
 export class ScheduleValidationError extends Error {
@@ -68,6 +69,11 @@ export async function createScheduledAction(input: CreateScheduledActionInput): 
     botId: input.botId,
   })
 
+  // Lead-scoped actions carry a botId; stamp the owning Agent when that bot is
+  // wrapped in one. Account-level actions (weekly_report) have no botId and so
+  // no agentId. Additive/optional.
+  const agentId = input.botId ? await resolveOwningAgentId(input.botId, input.clientId) : undefined
+
   try {
     return await createScheduledActionRepo({
       scheduleId,
@@ -76,6 +82,7 @@ export async function createScheduledAction(input: CreateScheduledActionInput): 
       cadence: input.cadence,
       leadId: input.leadId,
       botId: input.botId,
+      ...(agentId ? { agentId } : {}),
       enabled: true,
     })
   } catch (error) {

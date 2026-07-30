@@ -748,6 +748,11 @@ export type JourneyBundleStatus = 'draft' | 'published'
 export interface JourneyBundle {
   bundleId: string
   botId: string
+  // The owning cross-channel Agent, resolved from botId's binding at create
+  // time. Optional/additive: a bundle whose bot isn't wrapped in an Agent yet
+  // (or was created before the Agent umbrella) simply has none. botId stays the
+  // partition key -- this is the logical owner, not a re-key.
+  agentId?: string
   clientId: string
   name: string
   description?: string
@@ -849,6 +854,10 @@ export interface ScheduledAction {
   // for.
   leadId?: string
   botId?: string
+  // The owning cross-channel Agent, resolved from botId's binding at create
+  // time when a botId is present. Optional/additive; clientId stays the
+  // partition key.
+  agentId?: string
   createdAt: string
   updatedAt: string
 }

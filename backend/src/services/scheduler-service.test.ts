@@ -9,6 +9,13 @@ import { describe, expect, it, vi } from 'vitest'
 // time an unrelated service adds a new table dependency.
 vi.mock('./whatsapp-service.js', () => ({ sendWeeklyReport: vi.fn() }))
 
+// Same reasoning: scheduler-service.ts now imports agent-service.js
+// (resolveOwningAgentId, to stamp the owning Agent on lead-scoped actions),
+// which transitively pulls in the agents / agent_binding_lookup repositories
+// and their module-load-time getTableName() checks. Mock the boundary this
+// test doesn't exercise.
+vi.mock('./agent-service.js', () => ({ resolveOwningAgentId: vi.fn().mockResolvedValue(undefined) }))
+
 const { compileScheduleExpression, ScheduleValidationError } = await import('./scheduler-service.js')
 
 describe('compileScheduleExpression', () => {
