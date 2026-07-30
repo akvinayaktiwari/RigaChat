@@ -577,7 +577,7 @@ export default function JourneyBuilderPage() {
       steps,
     }
     const agent: AgentConfig = {
-      agentId: existing?.agent.agentId ?? crypto.randomUUID(),
+      personaId: existing?.agent.personaId ?? crypto.randomUUID(),
       name: agentName,
       systemPrompt,
       toneDescription: toneDescription || undefined,

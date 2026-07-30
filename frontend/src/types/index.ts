@@ -565,7 +565,9 @@ export interface AgentChannelConfig {
 }
 
 export interface AgentConfig {
-  agentId: string
+  // The journey persona's own id (client-minted). Named personaId, not agentId,
+  // to avoid colliding with the top-level cross-channel Agent entity's agentId.
+  personaId: string
   name: string
   systemPrompt: string
   toneDescription?: string
