@@ -116,6 +116,8 @@ interface KnowledgeBaseEntry {
 - appointment_requests — partition key: botId, sort key: requestId
 - gupshup_app_lookup — partition key: appName (routes the shared /webhooks/gupshup endpoint to a clientId)
 - whatsapp_inbound_activity — partition key: leadId (lastInboundMessageAt, powers the 24h WhatsApp session-window check)
+- agents — partition key: clientId, sort key: agentId (top-level cross-channel Agent identity; channel bindings resolve to a botId/voice agentId — an identity layer over the existing per-channel records, does not touch their Pinecone namespaces)
+- agent_binding_lookup — partition key: resourceId (reverse index botId/voiceAgentId → owning Agent; atomic-claim so one resource maps to at most one Agent, mirrors gupshup_app_lookup)
 
 ## Environment Variables
 OPENAI_API_KEY
@@ -133,6 +135,8 @@ DYNAMODB_TABLE_JOURNEY_EXECUTIONS
 DYNAMODB_TABLE_APPOINTMENT_REQUESTS
 DYNAMODB_TABLE_GUPSHUP_APP_LOOKUP
 DYNAMODB_TABLE_WHATSAPP_INBOUND_ACTIVITY
+DYNAMODB_TABLE_AGENTS
+DYNAMODB_TABLE_AGENT_BINDING_LOOKUP
 COGNITO_USER_POOL_ID
 COGNITO_CLIENT_ID
 FRONTEND_URL

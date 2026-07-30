@@ -28,6 +28,8 @@ type TableKey =
   | 'appointment_requests'
   | 'gupshup_app_lookup'
   | 'whatsapp_inbound_activity'
+  | 'agents'
+  | 'agent_binding_lookup'
 
 const tableEnvVarNames: Record<TableKey, string> = {
   clients: 'DYNAMODB_TABLE_CLIENTS',
@@ -50,6 +52,8 @@ const tableEnvVarNames: Record<TableKey, string> = {
   appointment_requests: 'DYNAMODB_TABLE_APPOINTMENT_REQUESTS',
   gupshup_app_lookup: 'DYNAMODB_TABLE_GUPSHUP_APP_LOOKUP',
   whatsapp_inbound_activity: 'DYNAMODB_TABLE_WHATSAPP_INBOUND_ACTIVITY',
+  agents: 'DYNAMODB_TABLE_AGENTS',
+  agent_binding_lookup: 'DYNAMODB_TABLE_AGENT_BINDING_LOOKUP',
 }
 
 export function getTableName(key: TableKey): string {

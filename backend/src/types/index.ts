@@ -676,6 +676,54 @@ export interface AgentChannelConfig {
   messageTemplateParams?: string[]
 }
 
+// -------------------------------------------------------------------------
+// Top-level cross-channel Agent entity (additive umbrella over botId /
+// voice agentId). One Agent is what a client owns; it has optional channel
+// bindings that resolve to the existing per-channel implementation records
+// (web -> a chatbot's botId, voice -> a voice agent's agentId). botId-scoped
+// Pinecone namespaces are never touched -- the Agent is an identity layer on
+// top, not a re-key. See the 2026-07-29 design + plan-eng-review.
+//
+// NOT the same thing as AgentConfig below: AgentConfig is a journey's
+// qualification persona (its id is AgentConfig.personaId). This Agent is the
+// durable, channel-spanning identity a Journey/Scheduler targets.
+// -------------------------------------------------------------------------
+
+// Which underlying channel implementation an Agent binding points at. Distinct
+// from JourneyChannel (journey *delivery* channels) -- this axis is "which
+// implementation record is wired in", including voice, which journeys don't
+// deliver to yet.
+export type AgentChannel = 'web' | 'whatsapp' | 'voice'
+
+export interface AgentChannelBinding {
+  // The implementation record this channel resolves to: a botId for 'web', a
+  // voice agentId for 'voice'. Absent for 'whatsapp', whose connection lives on
+  // the client record (no per-agent WhatsApp resource id exists today), so a
+  // whatsapp binding is a marker with no claimable resourceId.
+  resourceId?: string
+}
+
+export interface Agent {
+  agentId: string
+  clientId: string
+  name: string
+  // Optional per-channel bindings. An Agent may have one, two, or three; a
+  // channel is present only once wired in.
+  channels: Partial<Record<AgentChannel, AgentChannelBinding>>
+  createdAt: string
+  updatedAt: string
+}
+
+// Row in the agent_binding_lookup table: reverse index from a bound resource
+// (botId / voiceAgentId) to its owning Agent, written via an atomic claim so a
+// resource belongs to at most one Agent. Mirrors gupshup_app_lookup.
+export interface AgentBindingLookup {
+  resourceId: string
+  agentId: string
+  clientId: string
+  boundAt: string
+}
+
 // Channel-agnostic: tone, bounded tool palette, qualification logic. Reused
 // across whichever channels this agent is wired into.
 export interface AgentConfig {
