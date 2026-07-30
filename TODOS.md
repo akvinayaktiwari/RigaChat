@@ -314,4 +314,28 @@
 **Priority:** P2
 **Depends on:** Cal.com's OAuth client approval (external, no ETA)
 
+### KB query-time namespace aggregation for cross-channel Agents
+
+**What:** Once the unified Agent umbrella ships (new `agents` table + channel bindings, see the `plan-eng-review` on 2026-07-29), make RAG retrieval for an Agent query the *union* of its channel bindings' existing Pinecone namespaces at query time, so a client's web chatbot and voice agent can answer from the same "brain." Aggregate-at-query only — do NOT merge namespaces or re-embed. Preserves the immutable botId-scoping (rule #5); generalizes the existing one-directional `VoiceAgent.botId` link into a first-class Agent property.
+
+**Why:** This is the "one agent, one shared knowledge base across channels" half of the cross-channel vision. It was deliberately pulled out of the Agent-identity build batch (Step 0 scope reduction) because it rests on an unverified product premise: whether the client actually wants web chat and voice calls to answer *identically*, or intentionally differently (e.g. shorter voice answers). Building the retrieval change before that answer risks committing to the wrong aggregation model.
+
+**Context:** Blocked on the design doc's Assignment — confirm with the one real client whether their web chatbot and voice agent should share knowledge or diverge. If "diverge," the shared-brain premise softens and this may not be needed at all; if "identical," build the aggregate-at-query union. The Agent identity, channel bindings, and journey/scheduler `agentId` targeting all ship first (this batch) and do not depend on this item. Approach detail: at retrieval time, resolve the Agent's bindings, collect each binding's namespace, and query across them, then MMR-merge — the retrieval settings (topK 5, candidate pool 10, MMR lambda 0.7, threshold 0.7) stay as specified in CLAUDE.md's RAG standards.
+
+**Effort:** M (retrieval-layer change in rag-service + vector-repository; gated on the product answer, not the code)
+**Priority:** P2
+**Depends on:** Agent umbrella identity (this branch's build) shipped; client answer on shared-vs-divergent knowledge
+
+### Provision the Agent umbrella DynamoDB tables + run the one-client backfill
+
+**What:** The additive Agent umbrella (branch `feature/agent-journey-scheduler`) is code-complete and tested, but two things must happen at deploy before it works in production: (1) create the two new DynamoDB tables in AWS — `agents` (partition key `clientId`, sort key `agentId`) and `agent_binding_lookup` (partition key `resourceId`) — and add `DYNAMODB_TABLE_AGENTS` and `DYNAMODB_TABLE_AGENT_BINDING_LOOKUP` to every deployed Lambda's environment via the same CI/CD env-var-sync path the other tables use; (2) run `backend/scripts/backfill-agents.ts` once the tables exist, to wrap the existing client's chatbot + voice agent into one Agent.
+
+**Why:** The repositories call `getTableName('agents')` / `getTableName('agent_binding_lookup')` at module load, so once anything imports agent-repository in production (the `/api/agents` routes do), a missing table env var throws on cold start. Nothing imports them yet in a hot path, but the Agent routes are live in the bundle. The backfill is what makes the existing client's bot + voice agent actually resolve to one Agent (so journeys/scheduler start stamping `agentId`); without it, the identity layer exists but no real data is wrapped in it yet.
+
+**Context:** Same class of deploy-time infra step as the scheduler ARNs (`SCHEDULER_TARGET_LAMBDA_ARN` / `SCHEDULER_EXECUTION_ROLE_ARN`) already tracked in this file — table creation and env-var sync are not done by any code in this repo. The backfill is idempotent (skips already-bound resources) and conservative (skips any client with >1 bot or >1 voice agent rather than guessing a pairing), so it is safe to run and re-run. Run it manually from `backend/`: `TS_NODE_TRANSPILE_ONLY=true node --env-file=.env --loader ts-node/esm scripts/backfill-agents.ts`.
+
+**Effort:** S (table creation + env-var sync + one backfill run)
+**Priority:** P1
+**Depends on:** the `feature/agent-journey-scheduler` branch merged/deployed
+
 ## Completed
