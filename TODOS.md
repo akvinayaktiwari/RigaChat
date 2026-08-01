@@ -76,17 +76,17 @@
 **Priority:** P1
 **Depends on:** None
 
-### Introduce a backend test framework (vitest)
+### Backfill backend test coverage onto the pre-vitest services and repositories
 
-**What:** Zero test infrastructure exists in `backend/` today — no jest/vitest config, no test files, no `test` script in `package.json`. Every integration (Zoho, Gupshup, Razorpay, and now Meta) ships and is verified manually via `/qa`.
+**What:** The *framework* half of this item is done — `backend/vitest.config.ts` exists (with the module-import-time env var stubs services need), `package.json` has `"test": "vitest run"` and `vitest ^4.1.10`, and 13 test files / 85 tests pass today. What's left is coverage: **8 of 29 services and 2 of 25 repositories have a `.test.ts`**. Everything tested so far was written alongside new work (journeys, scheduler, agents, MCP, Cal.com, webhooks); nothing older was ever retrofitted. Untested services include the ones carrying the most external-integration risk: `crm-service.ts`, `meta-lead-service.ts`, `chat-service.ts`, `rag-service.ts`, `form-lead-service.ts`, `billing-service.ts`, `openai-service.ts`, `crawler-service.ts`.
 
-**Why:** Unlocks safe refactoring everywhere, including the CRM-sync retry-loop extraction the Meta integration branch is doing. Catches the class of bug this review found twice in one session (a Lambda-freeze bug with no visible symptom, and a webhook signature check whose failure mode is also invisible until exploited).
+**Why:** The original reasoning still holds, just narrowed — this catches the class of bug with no visible symptom (the Lambda-freeze un-awaited CRM sync, a webhook signature check whose failure mode is invisible until exploited). Those live in exactly the untested files listed above. It also unblocks safe refactoring of the Meta/CRM paths, which currently have zero regression cover.
 
-**Context:** Bigger, standalone initiative — retrofitting tests onto ~15+ existing untested files is real effort, not a quick config change. Recommend its own planning pass (possibly its own `/office-hours`) rather than deciding the scope here. vitest is the natural fit given the existing ts-node/ESM setup.
+**Context:** No longer a standalone initiative needing its own planning pass — the setup decision is made and proven, so this is now incremental and parallelizable. The practical rule is to stop treating tests as something new work brings along and start requiring one for any older file a change touches. Highest-value first pass: `crm-service.ts` and `meta-lead-service.ts`, since three separate open TODOs in this file (webhook idempotency, cross-tenant PII race, empty `field_data`) all propose changes to that pipeline and none of it is currently covered.
 
-**Effort:** L
+**Effort:** M (was L — framework setup is done)
 **Priority:** P2
-**Depends on:** None, but ideally lands before large refactors like the CRM-sync extraction or the form-lead-service.ts fix above
+**Depends on:** None
 
 ### Meta webhook idempotency doesn't cover CRM sync / WhatsApp notify atomically
 
