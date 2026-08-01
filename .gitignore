@@ -12,6 +12,9 @@ backend/*.zip
 
 frontend/node_modules/
 frontend/dist/
+# Temp SSR bundle written by scripts/prerender.mjs; removed on success,
+# left behind only if a prerender run fails partway.
+frontend/.prerender-ssr/
 frontend/.env
 frontend/.env.local
 frontend/.env.production
