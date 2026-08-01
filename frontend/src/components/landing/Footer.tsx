@@ -15,7 +15,7 @@ const LINK_COLUMNS = [
     heading: 'Company',
     links: [
       { label: 'About Us', href: '/about-us' },
-      { label: 'Blog', href: '#' },
+      { label: 'Blog', href: '/blog' },
       { label: 'Careers', href: '/careers' },
       { label: 'Contact Us', href: '/contact' },
     ],

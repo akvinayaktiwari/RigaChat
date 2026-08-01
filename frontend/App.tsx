@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { ProtectedRoute } from './src/components/ProtectedRoute/ProtectedRoute'
 import { AdminProtectedRoute } from './src/components/AdminProtectedRoute/AdminProtectedRoute'
@@ -51,6 +52,10 @@ import WhatsAppFeature from './src/pages/features/WhatsApp'
 import Crm from './src/pages/features/Crm'
 import Forms from './src/pages/features/Forms'
 import Careers from './src/pages/Careers'
+// Blog routes are lazy so post bodies (and the blog's motion/table components)
+// stay out of the main bundle every other page pays for.
+const BlogIndex = lazy(() => import('./src/pages/BlogIndex'))
+const BlogPost = lazy(() => import('./src/pages/BlogPost'))
 import AdminLoginPage from './src/pages/admin/AdminLoginPage'
 import AdminAccountsPage from './src/pages/admin/AdminAccountsPage'
 
@@ -92,6 +97,22 @@ function App() {
         <Route path="/features/crm" element={<Crm />} />
         <Route path="/features/forms" element={<Forms />} />
         <Route path="/careers" element={<Careers />} />
+        <Route
+          path="/blog"
+          element={
+            <Suspense fallback={<div className="min-h-screen bg-[#0d0d18]" />}>
+              <BlogIndex />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/blog/:slug"
+          element={
+            <Suspense fallback={<div className="min-h-screen bg-[#0d0d18]" />}>
+              <BlogPost />
+            </Suspense>
+          }
+        />
         <Route
           path="/dashboard"
           element={
