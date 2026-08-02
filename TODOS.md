@@ -338,4 +338,18 @@
 **Priority:** P1
 **Depends on:** the `feature/agent-journey-scheduler` branch merged/deployed
 
+### When merging feature/agent-journey-scheduler, the blog commit is already on main
+
+**What:** The blog section (`ee2c2ce` on this branch — `/blog`, `/blog/:slug`, the prerender step, the pilgrimage-towns post) was cherry-picked onto `main` ahead of the rest of this branch, on 2026-08-02, as `ee0e77f` + a follow-up fix `808668a`. Both are pushed to `origin/main`. So when this branch is eventually merged, its blog commit is a duplicate of work main already has — do not treat the blog as new, unmerged work, and do not re-apply it.
+
+**Why:** Most of the blog's files are byte-identical on both sides and will merge silently, but **one file will conflict and the resolution is not the obvious one**: `frontend/src/content/blog/posts/branded-budget-residences-pilgrimage-towns/meta.ts` was *added* by both sides with different content, so git sees an add/add conflict with no common base. Main's version has `{ value: '7', label: 'Towns screened' }`; this branch still has the original `'9'`. **Take main's `7`.** Resolving it the other way — or blindly accepting "ours" — silently reintroduces a wrong public-facing stat: the post's screening table only carries data for 7 towns (Ayodhya, Varanasi, Tirupati/Tirumala, Shirdi, Puri, Madurai, Ujjain), and `9` came from the source PDF's cover, which overcounts what its own table renders.
+
+**Context:** The blog was split out early because this branch is ~20 commits of unrelated Agent/Journey/Scheduler/MCP work, and the blog only touched `App.tsx`, `Footer.tsx`, `package.json`, and `.gitignore` outside its own new files — cheap to lift out, and no reason to hold marketing content behind an infra branch. Verified on a main base at the time: `tsc --noEmit` clean and `npm run build` prerenders both blog routes. Note `npm run build` now runs `scripts/prerender.mjs` after `vite build` (client-only build is `npm run build:client`) — that change is already on main, so it is not new at merge time. The cleanest merge is to rebase this branch onto the updated `main` first, which drops the duplicated blog commit and leaves only the single `meta.ts` conflict to resolve.
+
+Verified 2026-08-02 via `git merge-tree --write-tree main feature/agent-journey-scheduler`: the add/add on `meta.ts` is the only blog-related conflict. That same dry run also reported conflicts in `CLAUDE.md`, `TODOS.md`, `backend/index.ts`, and `backend/vitest.config.ts` — those are ordinary divergence between this branch and main, nothing to do with the blog, and are resolved normally. Re-run that command before merging for the current picture.
+
+**Effort:** S for the blog conflict specifically (one file, known resolution); the branch merge overall is larger
+**Priority:** P1
+**Depends on:** nothing — read this before merging `feature/agent-journey-scheduler`
+
 ## Completed
