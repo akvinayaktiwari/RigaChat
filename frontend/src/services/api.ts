@@ -25,6 +25,8 @@ import type {
   ResyncResult,
   SetupBotResult,
   StartIndexingResult,
+  SubmitContactMessageInput,
+  SubmitContactMessageResult,
   SubscriptionSummary,
   UpdateKBInput,
   UpdateVoiceAgentInput,
@@ -502,4 +504,13 @@ export function getVoiceKBUploadUrl(data: GetVoiceKBUploadUrlInput): Promise<Api
 
 export function confirmVoiceKBUpload(data: ConfirmVoiceKBUploadInput): Promise<ApiResponse<VoiceKnowledgeBaseEntry>> {
   return apiClient<VoiceKnowledgeBaseEntry>(`/api/voice-agents/${data.agentId}/kb/confirm-upload`, 'POST', data)
+}
+// Contact API
+
+// Public endpoint — no auth token needed, but apiClient attaches one if the
+// visitor happens to already be signed in, which the backend simply ignores.
+export function submitContactMessage(
+  data: SubmitContactMessageInput
+): Promise<ApiResponse<SubmitContactMessageResult>> {
+  return apiClient<SubmitContactMessageResult>('/api/contact', 'POST', data)
 }
