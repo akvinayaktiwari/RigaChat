@@ -148,6 +148,29 @@
 **Priority:** P3
 **Depends on:** Meta Direct PR #1 + PR #2 shipped and proven in production.
 
+### Provision the contact_messages table + SES sender before /api/contact goes live
+
+**What:** The marketing-site contact form (branch `feature/contact-form`) is code-complete and tested, but three manual AWS steps are needed at deploy. State below verified live against account `291685935704` / `ap-south-1` on 2026-08-04 — none of it is assumed:
+
+1. **Create the `contact_messages` table** — partition key `messageId`, GSI `recordType-createdAt-index` (`recordType` HASH, `createdAt` RANGE), definition in `backend/src/lib/dynamo-schema.ts`. Confirmed absent today. Then set `DYNAMODB_TABLE_CONTACT_MESSAGES` **directly on all three Lambdas** (`rigachat-api`, `rigachat-api-streaming`, `rigachat-crawler`).
+2. **Set `SES_FROM_EMAIL` + `CONTACT_NOTIFICATION_EMAIL`** on the same three Lambdas. Both confirmed unset. SES itself is in better shape than expected: `vyostra.com` is already a verified identity with DKIM `SUCCESS`, and sending is enabled.
+3. **Add `ses:SendEmail` to the Lambda execution roles** — `rigachat-api-role-4c9qsico` (used by both `rigachat-api` and `rigachat-crawler`) and `rigachat-api-streaming-role-625vca9z`. Neither has any SES permission today. DynamoDB needs nothing: both roles already carry `AmazonDynamoDBFullAccess`, which covers the new table automatically.
+
+**Why:** Step 1 is a cold-start hazard, not a feature gap: `contact-message-repository.ts` calls `getTableName('contact_messages')` at module load and the shared bundle imports the whole route tree, so a missing env var throws for *every* route on that Lambda, not just `/api/contact` (same failure mode as the Agent tables entry above). Steps 2-3 are not hazards — `getSesConfig()` is read lazily per send, so an unconfigured or unauthorized SES only means submissions are stored with `notified: false` and no email goes out. Nobody is alerted, but no message is lost; `getContactMessages()` in the repository reads them back.
+
+**Context:** Same class of hand-provisioned infra step as the Agent tables and scheduler ARNs already tracked here — there is no IaC in this repo (see `docs/INFRASTRUCTURE.md`).
+
+Two things that are easy to get wrong here:
+
+- **Do not add these as GitHub secrets and expect them to land.** `ci.yml`'s "Update Lambda environment variables" step merges a *hardcoded allowlist* (`WHATSAPP_*`, `REDIS_PROVIDER`, `UPSTASH_*`, `SQS_CRAWLER_QUEUE_URL`) onto whatever the function already has. No DynamoDB table name is in that list — every existing one lives directly on the Lambda and survives deploys only because of that `jq '. + {...}'` merge. A new GH secret would be silently ignored unless `ci.yml` is edited too.
+- **The SES sandbox (`ProductionAccessEnabled: false`) is not a blocker for this feature specifically.** Sandbox restricts *destinations* to verified identities, and `vyostra.com` is verified — so a `support@vyostra.com` destination works today. Production access is only needed if the notification address ever moves off a verified domain. Do not treat "get out of the sandbox" as a prerequisite for shipping this.
+
+Also worth deciding at deploy time whether the ops console should surface these messages; the repository's `getContactMessages()` exists for exactly that but has no route or UI in front of it yet.
+
+**Effort:** S
+**Priority:** P1
+**Depends on:** the `feature/contact-form` branch merged/deployed
+
 ## Completed
 
 ### Fix un-awaited CRM sync in form-lead-service.ts (Lambda-freeze risk)

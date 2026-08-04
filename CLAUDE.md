@@ -48,6 +48,7 @@ POST /api/leads             -> save lead from chat form
 GET  /api/leads             -> fetch all leads for CRM (auth required)
 POST /api/kb                -> add knowledge base entry + embed it
 GET  /api/kb                -> fetch all KB entries (auth required)
+POST /api/contact           -> marketing-site "Get in touch" form: store the message + email support (public, no auth; honeypot + per-ip/email rate limit)
 
 ## Key Interfaces
 interface MessageChannel {
@@ -96,6 +97,7 @@ interface KnowledgeBaseEntry {
 - leads — partition key: botId, sort key: createdAt
 - conversations — partition key: botId, sort key: conversationId
 - knowledge_base — partition key: botId, sort key: entryId
+- contact_messages — partition key: messageId, GSI recordType-createdAt-index (marketing-site contact form; no clientId/botId — these are messages to us, not leads for a client's bot)
 
 ## Environment Variables
 OPENAI_API_KEY
@@ -107,6 +109,9 @@ DYNAMODB_TABLE_BOTS
 DYNAMODB_TABLE_LEADS
 DYNAMODB_TABLE_CONVERSATIONS
 DYNAMODB_TABLE_KB
+DYNAMODB_TABLE_CONTACT_MESSAGES
+SES_FROM_EMAIL
+CONTACT_NOTIFICATION_EMAIL
 COGNITO_USER_POOL_ID
 COGNITO_CLIENT_ID
 FRONTEND_URL
