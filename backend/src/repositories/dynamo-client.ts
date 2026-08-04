@@ -22,6 +22,7 @@ type TableKey =
   | 'payment_history'
   | 'meta_leads'
   | 'meta_page_lookup'
+  | 'contact_messages'
 
 const tableEnvVarNames: Record<TableKey, string> = {
   clients: 'DYNAMODB_TABLE_CLIENTS',
@@ -38,6 +39,7 @@ const tableEnvVarNames: Record<TableKey, string> = {
   payment_history: 'DYNAMODB_TABLE_PAYMENT_HISTORY',
   meta_leads: 'DYNAMODB_TABLE_META_LEADS',
   meta_page_lookup: 'DYNAMODB_TABLE_META_PAGE_LOOKUP',
+  contact_messages: 'DYNAMODB_TABLE_CONTACT_MESSAGES',
 }
 
 export function getTableName(key: TableKey): string {

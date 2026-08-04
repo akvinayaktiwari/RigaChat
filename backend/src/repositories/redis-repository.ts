@@ -1,6 +1,10 @@
 import { createHash } from 'crypto'
 import { getRedisProvider } from '../providers/redis/redis-provider.factory.js'
-import { QUICK_SIGNUP_RATE_LIMIT_SECONDS, RESYNC_COOLDOWN_SECONDS } from '../config/entitlements-config.js'
+import {
+  CONTACT_RATE_LIMIT_SECONDS,
+  QUICK_SIGNUP_RATE_LIMIT_SECONDS,
+  RESYNC_COOLDOWN_SECONDS,
+} from '../config/entitlements-config.js'
 import type { Entitlements } from '../types/index.js'
 
 const EMBEDDING_TTL = 24 * 60 * 60        // 24 hours
@@ -130,4 +134,14 @@ export async function tryAcquireQuickSignupAttempt(ip: string, email: string): P
   const redis = getRedisProvider()
   const key = `quicksignup:ratelimit:${ip}:${email}`
   return await redis.setNX(key, '1', QUICK_SIGNUP_RATE_LIMIT_SECONDS)
+}
+
+// Keyed on ip+email for the same NAT reason as tryAcquireQuickSignupAttempt
+// above. Unlike the cache helpers in this file, this one does NOT swallow
+// Redis errors: the caller decides what a rate-limiter outage means, and
+// silently returning "allowed" would turn a Redis blip into an open relay.
+export async function tryAcquireContactAttempt(ip: string, email: string): Promise<boolean> {
+  const redis = getRedisProvider()
+  const key = `contact:ratelimit:${ip}:${email}`
+  return await redis.setNX(key, '1', CONTACT_RATE_LIMIT_SECONDS)
 }

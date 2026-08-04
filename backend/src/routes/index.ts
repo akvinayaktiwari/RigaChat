@@ -6,6 +6,7 @@ import { billingRoutes } from './billing-routes.js'
 import { botRoutes } from './bot-routes.js'
 import { chatRoutes } from './chat-routes.js'
 import { clientRoutes } from './client-routes.js'
+import { contactRoutes } from './contact-routes.js'
 import { formRoutes } from './form-routes.js'
 import { integrationRoutes } from './integration-routes.js'
 import { kbRoutes } from './kb-routes.js'
@@ -57,6 +58,12 @@ app.use('/api/integrations/*', dashboardCors)
 // before the user has a token — public, but still dashboard-origin only, not
 // the wildcard widget origin.
 app.use('/api/auth/*', dashboardCors)
+
+// Public (no auth) but still dashboardCors, not widgetCors: the contact form
+// lives on our own marketing site, which is served from FRONTEND_URL. It is
+// never embedded on a client's external website, so it has no reason to accept
+// a wildcard origin the way the widget endpoints do.
+app.use('/api/contact', dashboardCors)
 
 app.use('/api/chat/*', widgetCors)
 
@@ -123,6 +130,7 @@ app.route('/api/chat', chatRoutes)
 app.route('/api/leads', leadRoutes)
 app.route('/api/kb', kbRoutes)
 app.route('/api/clients', clientRoutes)
+app.route('/api/contact', contactRoutes)
 app.route('/api/forms', formRoutes)
 app.route('/api/integrations', integrationRoutes)
 app.route('/api/voice-agents', voiceRoutes)
