@@ -49,6 +49,7 @@ GET  /api/leads             -> fetch all leads for CRM (auth required)
 POST /api/kb                -> add knowledge base entry + embed it
 GET  /api/kb                -> fetch all KB entries (auth required)
 POST /api/contact           -> marketing-site "Get in touch" form: store the message + email support (public, no auth; honeypot + per-ip/email rate limit)
+GET  /api/admin/contact-messages -> staff console list of contact submissions; defaults to un-notified only, ?unnotifiedOnly=false for all (STAFF Cognito auth)
 
 ## Key Interfaces
 interface MessageChannel {
