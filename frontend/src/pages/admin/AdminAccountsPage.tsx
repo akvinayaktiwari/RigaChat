@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { LogOut, ShieldCheck } from 'lucide-react'
 import { useStaffAuth } from '../../hooks/useStaffAuth'
 import { getAdminAccounts } from '../../services/adminApi'
 import type { AdminAccountSummary, AdminFeatureState } from '../../services/adminApi'
 import { Spinner } from '../../components/Spinner/Spinner'
 import { AccountDetailPanel } from '../../components/AccountDetailPanel/AccountDetailPanel'
+import { StaffConsoleShell } from '../../components/StaffConsoleShell/StaffConsoleShell'
 
 function formatFeature(key: string, feature: AdminFeatureState): string {
   if (!feature.enabled) return `${key}: off`
@@ -39,7 +39,7 @@ function InternalBadge({ isInternal }: { isInternal: boolean }) {
 }
 
 export default function AdminAccountsPage() {
-  const { staffUser, token, signOut } = useStaffAuth()
+  const { token } = useStaffAuth()
   const [accounts, setAccounts] = useState<AdminAccountSummary[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -92,30 +92,8 @@ export default function AdminAccountsPage() {
   const selectedAccount = accounts?.find((a) => a.accountId === selectedAccountId) ?? null
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="text-violet-600" size={20} />
-          <span className="font-semibold text-gray-900">VyostraAI Staff Console</span>
-        </div>
-        <div className="flex items-center gap-4">
-          {staffUser && <span className="text-sm text-gray-500">{staffUser.email}</span>}
-          <button
-            type="button"
-            onClick={signOut}
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
-          >
-            <LogOut size={15} />
-            Sign out
-          </button>
-        </div>
-      </header>
-
-      <main className="max-w-6xl mx-auto p-6">
-        <h1 className="text-xl font-semibold text-gray-900 mb-1">Accounts</h1>
-        <p className="text-sm text-gray-500 mb-6">All subscriptions with resolved entitlements</p>
-
-        {loading && (
+    <StaffConsoleShell title="Accounts" subtitle="All subscriptions with resolved entitlements">
+      {loading && (
           <div className="flex items-center justify-center py-20">
             <Spinner size="lg" />
           </div>
@@ -171,7 +149,6 @@ export default function AdminAccountsPage() {
             </table>
           </div>
         )}
-      </main>
 
       {selectedAccount && token && (
         <AccountDetailPanel
@@ -181,6 +158,6 @@ export default function AdminAccountsPage() {
           onRefresh={reloadAccounts}
         />
       )}
-    </div>
+    </StaffConsoleShell>
   )
 }

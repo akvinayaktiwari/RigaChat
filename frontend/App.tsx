@@ -54,6 +54,7 @@ const BlogIndex = lazy(() => import('./src/pages/BlogIndex'))
 const BlogPost = lazy(() => import('./src/pages/BlogPost'))
 import AdminLoginPage from './src/pages/admin/AdminLoginPage'
 import AdminAccountsPage from './src/pages/admin/AdminAccountsPage'
+import AdminContactMessagesPage from './src/pages/admin/AdminContactMessagesPage'
 
 function App() {
   return (
@@ -66,6 +67,14 @@ function App() {
           element={
             <AdminProtectedRoute>
               <AdminAccountsPage />
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/contact-messages"
+          element={
+            <AdminProtectedRoute>
+              <AdminContactMessagesPage />
             </AdminProtectedRoute>
           }
         />
