@@ -2,9 +2,18 @@ import { v4 as uuidv4 } from 'uuid'
 import { getAllSubscriptions, getByAccountId, updatePartial } from '../repositories/subscription-repository.js'
 import { getClientById } from '../repositories/client-repository.js'
 import { getAuditHistory, writeAuditEntry } from '../repositories/audit-log-repository.js'
+import { getContactMessages } from '../repositories/contact-message-repository.js'
 import { resolveEntitlements, invalidateEntitlementsCache } from './entitlement-service.js'
 import { PLANS } from '../config/entitlements-config.js'
-import type { AuditAction, AuditEntry, Entitlements, PlanTier, Subscription, SubscriptionOverrides } from '../types/index.js'
+import type {
+  AuditAction,
+  AuditEntry,
+  ContactMessage,
+  Entitlements,
+  PlanTier,
+  Subscription,
+  SubscriptionOverrides,
+} from '../types/index.js'
 
 export class AdminValidationError extends Error {}
 
@@ -154,4 +163,20 @@ export async function setOverrides(
 // exists purely to satisfy that layering rule for an otherwise trivial read.
 export async function getAccountAuditHistory(accountId: string): Promise<AuditEntry[]> {
   return getAuditHistory(accountId)
+}
+
+// Marketing-site contact form submissions. Unlike everything else in this
+// service, these have no accountId — they are messages to us from visitors who
+// may not be customers at all, so there is nothing to join them against.
+//
+// `unnotifiedOnly` is the mode that earns this page's existence: a message with
+// notified=false means the SES notification never went out and nobody was
+// pinged, so the row is the only record anyone will ever see. Filtering here
+// (not in the repository) keeps the repository a plain query and puts the
+// product decision in the service, where the other policy lives.
+export async function listContactMessages(
+  options: { unnotifiedOnly?: boolean; limit?: number } = {}
+): Promise<ContactMessage[]> {
+  const messages = await getContactMessages(options.limit)
+  return options.unnotifiedOnly ? messages.filter((message) => !message.notified) : messages
 }

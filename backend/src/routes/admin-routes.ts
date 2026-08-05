@@ -6,10 +6,18 @@ import {
   extendTrial,
   getAccountAuditHistory,
   listAccountsWithEntitlements,
+  listContactMessages,
   setOverrides,
   toggleInternal,
 } from '../services/admin-service.js'
-import type { ApiResponse, AuditEntry, PlanTier, Subscription, SubscriptionOverrides } from '../types/index.js'
+import type {
+  ApiResponse,
+  AuditEntry,
+  ContactMessage,
+  PlanTier,
+  Subscription,
+  SubscriptionOverrides,
+} from '../types/index.js'
 
 export const adminRoutes = new Hono()
 
@@ -40,6 +48,22 @@ adminRoutes.get('/accounts/:accountId/audit-log', async (c) => {
   } catch (error) {
     console.error('Admin audit history error:', error)
     return c.json<ApiResponse<null>>({ success: false, error: 'Failed to load audit history' }, 500)
+  }
+})
+
+// Staff-protected by the router-level use('*', requireStaffAuth) above, like
+// every other route here — no per-route auth needed. Defaults to the
+// un-notified view (?unnotifiedOnly=false for the full archive), since a
+// message nobody was emailed about is the only kind that actually needs
+// someone to open this page.
+adminRoutes.get('/contact-messages', async (c) => {
+  const unnotifiedOnly = c.req.query('unnotifiedOnly') !== 'false'
+  try {
+    const messages = await listContactMessages({ unnotifiedOnly })
+    return c.json<ApiResponse<ContactMessage[]>>({ success: true, data: messages }, 200)
+  } catch (error) {
+    console.error('Admin contact messages error:', error)
+    return c.json<ApiResponse<null>>({ success: false, error: 'Failed to load contact messages' }, 500)
   }
 })
 
