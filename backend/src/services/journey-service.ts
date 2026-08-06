@@ -59,15 +59,18 @@ function validateToolboxCoverage(journey: JourneyDefinition, agent: AgentConfig)
   }
 }
 
-interface CreateJourneyBundleInput {
+export interface CreateJourneyBundleInput {
   botId: string
   clientId: string
   name: string
   description?: string
-  isPrebuiltTemplate: boolean
-  sourceTemplateId?: string
   journey: Omit<JourneyDefinition, 'botId' | 'clientId'>
   agent: AgentConfig
+  // Set ONLY by createJourneyBundleFromTemplate() below, never from a client
+  // request body -- it records provenance, so letting a caller assert it would
+  // let any client claim their hand-written bundle came from a platform
+  // template. journey-routes.ts deliberately does not forward it.
+  sourceTemplateId?: string
 }
 
 // Compiles (structure + toolbox validation) before persisting so a broken
@@ -102,7 +105,13 @@ export async function createJourneyBundle(input: CreateJourneyBundleInput): Prom
     clientId: input.clientId,
     name: input.name,
     description: input.description,
-    isPrebuiltTemplate: input.isPrebuiltTemplate,
+    // Always false, never client-settable. Prebuilt agent templates are
+    // code-defined seeds in lib/journey-templates/ (only committable by us,
+    // and compiler-validated in CI) -- no stored bundle is ever a platform
+    // template, so this flag can only be false on a persisted record. It was
+    // previously read straight off the request body under client Cognito auth,
+    // which let any authenticated client mint a bundle that claimed to be one.
+    isPrebuiltTemplate: false,
     sourceTemplateId: input.sourceTemplateId,
     journey,
     agent: input.agent,

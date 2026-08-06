@@ -579,11 +579,13 @@ export function getJourneyBundle(botId: string, bundleId: string): Promise<ApiRe
   return apiClient<JourneyBundle>(`/api/journeys/${botId}/${bundleId}`)
 }
 
+// No isPrebuiltTemplate: the server owns that flag and always stores false for
+// a client-created bundle. Prebuilt agents are code-defined seeds we author;
+// sending the field here would imply a client can set it, which it cannot.
 export interface CreateJourneyBundleInput {
   botId: string
   name: string
   description?: string
-  isPrebuiltTemplate: boolean
   journey: Omit<JourneyDefinition, 'botId' | 'clientId'>
   agent: AgentConfig
 }

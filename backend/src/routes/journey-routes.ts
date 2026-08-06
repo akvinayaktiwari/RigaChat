@@ -19,12 +19,14 @@ interface AuthEnv {
 
 export const journeyRoutes = new Hono<AuthEnv>()
 
+// isPrebuiltTemplate and sourceTemplateId are deliberately absent: both are
+// provenance the server owns. Prebuilt agents are code-defined seeds
+// (lib/journey-templates/), so a client-created bundle is never a template,
+// and sourceTemplateId is stamped only by the clone route below.
 interface CreateJourneyBundleBody {
   botId?: string
   name?: string
   description?: string
-  isPrebuiltTemplate?: boolean
-  sourceTemplateId?: string
   journey?: Omit<JourneyDefinition, 'botId' | 'clientId'>
   agent?: AgentConfig
 }
@@ -49,11 +51,8 @@ journeyRoutes.post('/', requireAuth, async (c) => {
   const clientId = c.get('user').sub
   const body = await c.req.json<CreateJourneyBundleBody>()
 
-  if (!body.botId || !body.name || typeof body.isPrebuiltTemplate !== 'boolean' || !body.journey || !body.agent) {
-    return c.json<ApiResponse<null>>(
-      { success: false, error: 'botId, name, isPrebuiltTemplate, journey, and agent are required' },
-      400
-    )
+  if (!body.botId || !body.name || !body.journey || !body.agent) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'botId, name, journey, and agent are required' }, 400)
   }
 
   try {
@@ -62,8 +61,6 @@ journeyRoutes.post('/', requireAuth, async (c) => {
       clientId,
       name: body.name,
       description: body.description,
-      isPrebuiltTemplate: body.isPrebuiltTemplate,
-      sourceTemplateId: body.sourceTemplateId,
       journey: body.journey,
       agent: body.agent,
     })

@@ -615,7 +615,6 @@ export default function JourneyBuilderPage() {
           botId,
           name,
           description: description || undefined,
-          isPrebuiltTemplate: false,
           journey,
           agent,
         })
