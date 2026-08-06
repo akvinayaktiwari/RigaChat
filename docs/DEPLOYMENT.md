@@ -129,17 +129,48 @@ aws iam get-role --role-name RigaChatJourneyStateMachineRole \
 
 ### 3. Env vars landed on all three Lambdas
 
+Check by exact name, never by regex. A `test("JOURNEY|SCHEDUL|AGENT|...")` filter
+looks convenient and is actively misleading here: it matches the unrelated
+pre-existing `DYNAMODB_TABLE_VOICE_AGENTS` while missing
+`DYNAMODB_TABLE_APPOINTMENT_REQUESTS` entirely (no `AGENT` substring in
+"APPOINTMENT"). The two errors cancel to a reassuring "13 keys" while a real var
+is absent. Caught on the first live run of this checklist, 2026-08-06.
+
 ```bash
+EXPECTED=(DYNAMODB_TABLE_JOURNEYS DYNAMODB_TABLE_JOURNEY_EXECUTIONS \
+  DYNAMODB_TABLE_JOURNEY_TRIGGER_CLAIMS DYNAMODB_TABLE_SCHEDULED_ACTIONS \
+  DYNAMODB_TABLE_APPOINTMENT_REQUESTS DYNAMODB_TABLE_AGENTS \
+  DYNAMODB_TABLE_AGENT_BINDING_LOOKUP DYNAMODB_TABLE_GUPSHUP_APP_LOOKUP \
+  DYNAMODB_TABLE_WHATSAPP_INBOUND_ACTIVITY SCHEDULER_TARGET_LAMBDA_ARN \
+  JOURNEY_EXECUTOR_LAMBDA_ARN SCHEDULER_EXECUTION_ROLE_ARN \
+  JOURNEY_STATE_MACHINE_ROLE_ARN)
+
 for fn in rigachat-api rigachat-api-streaming rigachat-crawler; do
-  echo "== $fn"
-  aws lambda get-function-configuration --function-name "$fn" --region ap-south-1 \
-    --query 'Environment.Variables' --output json \
-    | jq 'with_entries(select(.key|test("JOURNEY|SCHEDUL|AGENT|GUPSHUP|WHATSAPP_INBOUND"))) | keys'
+  VARS=$(aws lambda get-function-configuration --function-name "$fn" \
+    --region ap-south-1 --query 'Environment.Variables' --output json)
+  MISSING=0
+  for k in "${EXPECTED[@]}"; do
+    if [ "$(echo "$VARS" | jq -r --arg k "$k" '.[$k] // "MISSING"')" = "MISSING" ]; then
+      echo "  $fn MISSING $k"; MISSING=$((MISSING+1))
+    fi
+  done
+  printf '%-28s %d/%d present\n' "$fn" $(( ${#EXPECTED[@]} - MISSING )) ${#EXPECTED[@]}
 done
 ```
 
-Expect 13 keys on each. **Do not add these as GitHub secrets** — `ci.yml`'s
-env-var step merges a hardcoded allowlist and would silently ignore them.
+Every line must read `13/13 present`. **Do not add these as GitHub secrets** —
+`ci.yml`'s env-var step merges a hardcoded allowlist and would silently ignore
+them.
+
+Also confirm both policies landed on both Lambda roles:
+
+```bash
+for ROLE in rigachat-api-role-4c9qsico rigachat-api-streaming-role-625vca9z; do
+  echo "== $ROLE"
+  aws iam list-role-policies --role-name "$ROLE" --output json | jq -r '.PolicyNames[]'
+done
+# both must include JourneySchedulerPolicy and JourneyStateMachinePolicy
+```
 
 ### 4. End-to-end: publish a journey and watch a real state machine appear
 

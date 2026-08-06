@@ -227,5 +227,5 @@ echo "  aws dynamodb list-tables --region ${REGION} --output json | jq -r '.Tabl
 echo "  aws lambda get-function-configuration --function-name rigachat-api --region ${REGION} \\"
 echo "    --query 'Environment.Variables' --output json | jq 'with_entries(select(.key|test(\"JOURNEY|SCHEDUL|AGENT|GUPSHUP|WHATSAPP_INBOUND\")))'"
 echo
-echo "NOTE: this provisions infra only. The branch is still 22 commits behind main"
-echo "and must be rebased before it can be deployed."
+echo "NOTE: this provisions infra only. Walk the post-provisioning checklist in"
+echo "docs/DEPLOYMENT.md next -- check env vars by exact name, not by regex."
