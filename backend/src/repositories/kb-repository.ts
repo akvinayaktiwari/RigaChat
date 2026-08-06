@@ -3,7 +3,7 @@ import { DeleteCommand, GetCommand, PutCommand, QueryCommand, UpdateCommand } fr
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import type { KnowledgeBaseEntry } from '../types/index.js'
 
-const TABLE_NAME = getTableName('kb')
+const TABLE_NAME = (): string => getTableName('kb')
 
 export async function createKBEntry(
   data: Omit<KnowledgeBaseEntry, 'entryId' | 'createdAt' | 'updatedAt'>
@@ -14,7 +14,7 @@ export async function createKBEntry(
   try {
     await dynamoClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Item: record,
       })
     )
@@ -30,7 +30,7 @@ export async function getKBEntriesByBotId(botId: string): Promise<KnowledgeBaseE
   try {
     const result = await dynamoClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         KeyConditionExpression: 'botId = :botId',
         ExpressionAttributeValues: { ':botId': botId },
       })
@@ -47,7 +47,7 @@ export async function getKBEntryById(botId: string, entryId: string): Promise<Kn
   try {
     const result = await dynamoClient.send(
       new GetCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { botId, entryId },
       })
     )
@@ -80,7 +80,7 @@ export async function updateKBEntry(
   try {
     const result = await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { botId, entryId },
         UpdateExpression: `SET ${updateExpressionParts.join(', ')}`,
         ExpressionAttributeNames: expressionAttributeNames,
@@ -100,7 +100,7 @@ export async function deleteKBEntry(botId: string, entryId: string): Promise<voi
   try {
     await dynamoClient.send(
       new DeleteCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { botId, entryId },
       })
     )
@@ -126,7 +126,7 @@ export async function createKBFileEntry(
   try {
     await dynamoClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Item: record,
       })
     )
@@ -147,7 +147,7 @@ export async function claimKBFileIndexingJob(botId: string, entryId: string, job
   try {
     await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { botId, entryId },
         UpdateExpression: 'SET indexingStatus = :processing',
         ConditionExpression: 'indexingJobId = :jobId AND indexingStatus = :queued',
@@ -186,7 +186,7 @@ export async function updateKBIndexingStatus(
   try {
     await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { botId, entryId },
         UpdateExpression: `SET ${updateExpressionParts.join(', ')}`,
         ExpressionAttributeNames: expressionAttributeNames,

@@ -2,7 +2,7 @@ import { DeleteCommand, GetCommand, PutCommand, QueryCommand, UpdateCommand } fr
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import type { BotConfig, BotStatus, IndexingJob } from '../types/index.js'
 
-const TABLE_NAME = getTableName('bots')
+const TABLE_NAME = (): string => getTableName('bots')
 
 export async function createBot(data: Omit<BotConfig, 'createdAt' | 'updatedAt'>): Promise<BotConfig> {
   const now = new Date().toISOString()
@@ -11,7 +11,7 @@ export async function createBot(data: Omit<BotConfig, 'createdAt' | 'updatedAt'>
   try {
     await dynamoClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Item: record,
       })
     )
@@ -27,7 +27,7 @@ export async function getBotById(botId: string, clientId: string): Promise<BotCo
   try {
     const result = await dynamoClient.send(
       new GetCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { clientId, botId },
       })
     )
@@ -43,7 +43,7 @@ export async function getBotsByClientId(clientId: string): Promise<BotConfig[]> 
   try {
     const result = await dynamoClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         KeyConditionExpression: 'clientId = :clientId',
         ExpressionAttributeValues: { ':clientId': clientId },
       })
@@ -60,7 +60,7 @@ export async function countBotsForClient(clientId: string): Promise<number> {
   try {
     const result = await dynamoClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         KeyConditionExpression: 'clientId = :clientId',
         ExpressionAttributeValues: { ':clientId': clientId },
         Select: 'COUNT',
@@ -98,7 +98,7 @@ export async function updateBot(
   try {
     const result = await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { clientId, botId },
         UpdateExpression: `SET ${updateExpressionParts.join(', ')}`,
         ExpressionAttributeNames: expressionAttributeNames,
@@ -118,7 +118,7 @@ export async function deleteBot(botId: string, clientId: string): Promise<void> 
   try {
     await dynamoClient.send(
       new DeleteCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { clientId, botId },
       })
     )
@@ -158,7 +158,7 @@ export async function claimCrawlerJob(botId: string, clientId: string, jobId: st
   try {
     await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { clientId, botId },
         UpdateExpression: 'SET indexingJob.#status = :processing, indexingJob.startedAt = :now',
         ConditionExpression: 'indexingJob.jobId = :jobId AND indexingJob.#status = :queued',
@@ -204,7 +204,7 @@ export async function updateBotCrawlStatus(
   try {
     await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { clientId, botId },
         UpdateExpression: updateExpression,
         ExpressionAttributeNames: expressionAttributeNames,
@@ -222,7 +222,7 @@ export async function getPublicBotConfig(botId: string): Promise<BotConfig | nul
   try {
     const result = await dynamoClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         IndexName: 'botId-index',
         KeyConditionExpression: 'botId = :botId',
         ExpressionAttributeValues: { ':botId': botId },

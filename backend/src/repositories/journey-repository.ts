@@ -3,7 +3,7 @@ import { DeleteCommand, GetCommand, PutCommand, QueryCommand, UpdateCommand } fr
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import type { JourneyBundle } from '../types/index.js'
 
-const TABLE_NAME = getTableName('journeys')
+const TABLE_NAME = (): string => getTableName('journeys')
 
 export async function createJourneyBundle(
   data: Omit<JourneyBundle, 'bundleId' | 'createdAt' | 'updatedAt'>
@@ -14,7 +14,7 @@ export async function createJourneyBundle(
   try {
     await dynamoClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Item: record,
       })
     )
@@ -30,7 +30,7 @@ export async function getJourneyBundlesByBotId(botId: string): Promise<JourneyBu
   try {
     const result = await dynamoClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         KeyConditionExpression: 'botId = :botId',
         ExpressionAttributeValues: { ':botId': botId },
       })
@@ -47,7 +47,7 @@ export async function getJourneyBundleById(botId: string, bundleId: string): Pro
   try {
     const result = await dynamoClient.send(
       new GetCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { botId, bundleId },
       })
     )
@@ -90,7 +90,7 @@ export async function updateJourneyBundle(
   try {
     const result = await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { botId, bundleId },
         UpdateExpression: `SET ${updateExpressionParts.join(', ')}`,
         ExpressionAttributeNames: expressionAttributeNames,
@@ -108,7 +108,7 @@ export async function deleteJourneyBundle(botId: string, bundleId: string): Prom
   try {
     await dynamoClient.send(
       new DeleteCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { botId, bundleId },
       })
     )

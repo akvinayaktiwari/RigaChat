@@ -3,7 +3,7 @@ import { DeleteCommand, GetCommand, PutCommand, QueryCommand, UpdateCommand } fr
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import type { FormConfig } from '../types/index.js'
 
-const TABLE_NAME = getTableName('forms')
+const TABLE_NAME = (): string => getTableName('forms')
 
 export async function createForm(
   data: Omit<FormConfig, 'formId' | 'createdAt' | 'updatedAt'>
@@ -14,7 +14,7 @@ export async function createForm(
   try {
     await dynamoClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Item: record,
       })
     )
@@ -30,7 +30,7 @@ export async function getFormById(formId: string, clientId: string): Promise<For
   try {
     const result = await dynamoClient.send(
       new GetCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { clientId, formId },
       })
     )
@@ -46,7 +46,7 @@ export async function getPublicFormConfig(formId: string): Promise<FormConfig | 
   try {
     const result = await dynamoClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         IndexName: 'formId-index',
         KeyConditionExpression: 'formId = :formId',
         ExpressionAttributeValues: { ':formId': formId },
@@ -66,7 +66,7 @@ export async function getFormsByClientId(clientId: string): Promise<FormConfig[]
   try {
     const result = await dynamoClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         KeyConditionExpression: 'clientId = :clientId',
         ExpressionAttributeValues: { ':clientId': clientId },
       })
@@ -100,7 +100,7 @@ export async function updateForm(
   try {
     const result = await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { clientId, formId },
         UpdateExpression: `SET ${updateExpressionParts.join(', ')}`,
         ExpressionAttributeNames: expressionAttributeNames,
@@ -120,7 +120,7 @@ export async function deleteForm(formId: string, clientId: string): Promise<void
   try {
     await dynamoClient.send(
       new DeleteCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { clientId, formId },
       })
     )

@@ -2,13 +2,13 @@ import { PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import type { AuditEntry } from '../types/index.js'
 
-const TABLE_NAME = getTableName('audit_log')
+const TABLE_NAME = (): string => getTableName('audit_log')
 
 export async function writeAuditEntry(entry: AuditEntry): Promise<void> {
   try {
     await dynamoClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Item: entry,
       })
     )
@@ -23,7 +23,7 @@ export async function getAuditHistory(accountId: string): Promise<AuditEntry[]> 
   try {
     const result = await dynamoClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         KeyConditionExpression: 'accountId = :accountId',
         ExpressionAttributeValues: { ':accountId': accountId },
         ScanIndexForward: false,

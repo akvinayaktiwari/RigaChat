@@ -2,7 +2,7 @@ import { DeleteCommand, GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import type { AgentBindingLookup } from '../types/index.js'
 
-const TABLE_NAME = getTableName('agent_binding_lookup')
+const TABLE_NAME = (): string => getTableName('agent_binding_lookup')
 
 export class AgentBindingConflictError extends Error {
   constructor(resourceId: string) {
@@ -35,7 +35,7 @@ export async function claimAgentBinding(
   try {
     await dynamoClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Item: record,
         ConditionExpression: 'attribute_not_exists(resourceId) OR agentId = :agentId',
         ExpressionAttributeValues: { ':agentId': agentId },
@@ -55,7 +55,7 @@ export async function getAgentForResource(resourceId: string): Promise<AgentBind
   try {
     const result = await dynamoClient.send(
       new GetCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { resourceId },
       })
     )
@@ -71,7 +71,7 @@ export async function removeAgentBinding(resourceId: string): Promise<void> {
   try {
     await dynamoClient.send(
       new DeleteCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { resourceId },
       })
     )

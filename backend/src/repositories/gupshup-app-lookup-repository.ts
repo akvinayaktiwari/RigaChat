@@ -1,7 +1,7 @@
 import { DeleteCommand, GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 
-const TABLE_NAME = getTableName('gupshup_app_lookup')
+const TABLE_NAME = (): string => getTableName('gupshup_app_lookup')
 
 export class GupshupAppConflictError extends Error {
   constructor(appName: string) {
@@ -28,7 +28,7 @@ export async function setGupshupAppClientMapping(appName: string, clientId: stri
   try {
     await dynamoClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Item: { appName, clientId, connectedAt: new Date().toISOString() },
         ConditionExpression: 'attribute_not_exists(appName) OR clientId = :clientId',
         ExpressionAttributeValues: { ':clientId': clientId },
@@ -48,7 +48,7 @@ export async function getClientIdForGupshupApp(appName: string): Promise<string 
   try {
     const result = await dynamoClient.send(
       new GetCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { appName },
       })
     )
@@ -64,7 +64,7 @@ export async function removeGupshupAppClientMapping(appName: string): Promise<vo
   try {
     await dynamoClient.send(
       new DeleteCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { appName },
       })
     )

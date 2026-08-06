@@ -4,7 +4,7 @@ import { dynamoClient, getTableName } from './dynamo-client.js'
 import { updatePartialFields } from '../lib/dynamo-update.js'
 import type { FormLead } from '../types/index.js'
 
-const TABLE_NAME = getTableName('form_leads')
+const TABLE_NAME = (): string => getTableName('form_leads')
 
 export async function createFormLead(data: Omit<FormLead, 'leadId' | 'createdAt'>): Promise<FormLead> {
   const record: FormLead = { ...data, leadId: uuidv4(), createdAt: new Date().toISOString() }
@@ -12,7 +12,7 @@ export async function createFormLead(data: Omit<FormLead, 'leadId' | 'createdAt'
   try {
     await dynamoClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Item: record,
       })
     )
@@ -28,7 +28,7 @@ export async function getFormLeadsByFormId(formId: string, limit = 50): Promise<
   try {
     const result = await dynamoClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         KeyConditionExpression: 'formId = :formId',
         ExpressionAttributeValues: { ':formId': formId },
         ScanIndexForward: false,
@@ -47,7 +47,7 @@ export async function getFormLeadsByClientId(clientId: string): Promise<FormLead
   try {
     const result = await dynamoClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         IndexName: 'clientId-index',
         KeyConditionExpression: 'clientId = :clientId',
         ExpressionAttributeValues: { ':clientId': clientId },
@@ -66,7 +66,7 @@ export async function getFormLeadById(formId: string, leadId: string): Promise<F
   try {
     const result = await dynamoClient.send(
       new GetCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { formId, leadId },
       })
     )
@@ -92,7 +92,7 @@ export async function updateFormLeadSyncStatus(
   status: FormLeadSyncStatus
 ): Promise<void> {
   try {
-    await updatePartialFields(TABLE_NAME, { formId, leadId }, status as Record<string, unknown>)
+    await updatePartialFields(TABLE_NAME(), { formId, leadId }, status as Record<string, unknown>)
   } catch (error) {
     throw new Error(
       `Failed to update sync status for form lead ${leadId}: ${error instanceof Error ? error.message : String(error)}`

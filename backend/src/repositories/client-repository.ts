@@ -2,7 +2,7 @@ import { GetCommand, PutCommand, QueryCommand, ScanCommand, UpdateCommand } from
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import type { ClientRecord } from '../types/index.js'
 
-const TABLE_NAME = getTableName('clients')
+const TABLE_NAME = (): string => getTableName('clients')
 
 export async function createClient(
   data: Omit<ClientRecord, 'createdAt' | 'updatedAt'>
@@ -13,7 +13,7 @@ export async function createClient(
   try {
     await dynamoClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Item: record,
       })
     )
@@ -29,7 +29,7 @@ export async function getClientById(clientId: string): Promise<ClientRecord | nu
   try {
     const result = await dynamoClient.send(
       new GetCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { clientId },
       })
     )
@@ -45,7 +45,7 @@ export async function getClientByEmail(email: string): Promise<ClientRecord | nu
   try {
     const result = await dynamoClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         IndexName: 'email-index',
         KeyConditionExpression: 'email = :email',
         ExpressionAttributeValues: { ':email': email },
@@ -81,7 +81,7 @@ export async function updateClient(
   try {
     const result = await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { clientId },
         UpdateExpression: `SET ${updateExpressionParts.join(', ')}`,
         ExpressionAttributeNames: expressionAttributeNames,
@@ -101,7 +101,7 @@ export async function removeClientCRMConnection(clientId: string): Promise<void>
   try {
     await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { clientId },
         UpdateExpression: 'REMOVE crmConnection SET updatedAt = :updatedAt',
         ExpressionAttributeValues: { ':updatedAt': new Date().toISOString() },
@@ -118,7 +118,7 @@ export async function removeClientWhatsAppConnection(clientId: string): Promise<
   try {
     await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { clientId },
         UpdateExpression: 'REMOVE whatsappConnection SET updatedAt = :updatedAt',
         ExpressionAttributeValues: { ':updatedAt': new Date().toISOString() },
@@ -135,7 +135,7 @@ export async function removeClientMetaDirectWhatsAppConnection(clientId: string)
   try {
     await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { clientId },
         UpdateExpression: 'REMOVE metaDirectWhatsAppConnection SET updatedAt = :updatedAt',
         ExpressionAttributeValues: { ':updatedAt': new Date().toISOString() },
@@ -152,7 +152,7 @@ export async function removeClientCalComConnection(clientId: string): Promise<vo
   try {
     await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { clientId },
         UpdateExpression: 'REMOVE calComConnection SET updatedAt = :updatedAt',
         ExpressionAttributeValues: { ':updatedAt': new Date().toISOString() },
@@ -169,7 +169,7 @@ export async function clearActiveWhatsappProvider(clientId: string): Promise<voi
   try {
     await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { clientId },
         UpdateExpression: 'REMOVE activeWhatsappProvider SET updatedAt = :updatedAt',
         ExpressionAttributeValues: { ':updatedAt': new Date().toISOString() },
@@ -186,7 +186,7 @@ export async function removeClientMetaConnection(clientId: string): Promise<void
   try {
     await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { clientId },
         UpdateExpression: 'REMOVE metaConnection SET updatedAt = :updatedAt',
         ExpressionAttributeValues: { ':updatedAt': new Date().toISOString() },
@@ -207,7 +207,7 @@ export async function getAllClients(): Promise<ClientRecord[]> {
     do {
       const result = await dynamoClient.send(
         new ScanCommand({
-          TableName: TABLE_NAME,
+          TableName: TABLE_NAME(),
           ExclusiveStartKey: exclusiveStartKey,
         })
       )
@@ -231,7 +231,7 @@ export async function getConnectedWhatsAppClients(): Promise<ClientRecord[]> {
     do {
       const result = await dynamoClient.send(
         new ScanCommand({
-          TableName: TABLE_NAME,
+          TableName: TABLE_NAME(),
           // OR'd across both connection shapes so a client connected ONLY via
           // Meta Direct (no Gupshup connection at all) still gets picked up -
           // this scan used to check whatsappConnection alone, which silently

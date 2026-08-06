@@ -7,19 +7,19 @@ import {
 
 const client = new SchedulerClient({ region: process.env.AWS_REGION })
 
-const targetLambdaArn = process.env.SCHEDULER_TARGET_LAMBDA_ARN
-const executionRoleArn = process.env.SCHEDULER_EXECUTION_ROLE_ARN
-
-if (!targetLambdaArn) {
-  throw new Error(
-    'Missing required environment variable SCHEDULER_TARGET_LAMBDA_ARN. Set it in your .env file before starting the server.'
-  )
-}
-
-if (!executionRoleArn) {
-  throw new Error(
-    'Missing required environment variable SCHEDULER_EXECUTION_ROLE_ARN. Set it in your .env file before starting the server.'
-  )
+// Resolved per call, NOT at module load. This file used to throw on import if
+// either var was unset, and because backend/index.ts pulls the whole route tree
+// into one Lambda that also serves /api/chat for every client's live widget, a
+// single missing scheduler var took down every route on cold start -- the
+// scheduler feature failing is correct, a company-wide outage is not.
+function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) {
+    throw new Error(
+      `Missing required environment variable ${name}. Set it in your .env file before starting the server.`
+    )
+  }
+  return value
 }
 
 // EventBridge Scheduler always invokes backend/index.ts's main (buffered)
@@ -31,8 +31,8 @@ if (!executionRoleArn) {
 // deployment decision, not something this module does.
 function buildTarget(input: Record<string, unknown>): { Arn: string; RoleArn: string; Input: string } {
   return {
-    Arn: targetLambdaArn as string,
-    RoleArn: executionRoleArn as string,
+    Arn: requireEnv('SCHEDULER_TARGET_LAMBDA_ARN'),
+    RoleArn: requireEnv('SCHEDULER_EXECUTION_ROLE_ARN'),
     Input: JSON.stringify({ source: 'aws.events', 'detail-type': 'scheduled-action', detail: input }),
   }
 }

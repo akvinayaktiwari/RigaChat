@@ -1,7 +1,7 @@
 import { UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 
-const TABLE_NAME = getTableName('journey_executions')
+const TABLE_NAME = (): string => getTableName('journey_executions')
 
 // Atomic: DynamoDB's ADD on a not-yet-existing item creates it with the
 // operand as the starting value, so the first call for a given
@@ -12,7 +12,7 @@ export async function incrementWaitAndRecheckIteration(leadId: string, stepId: s
   try {
     const result = await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { leadId, stepId },
         UpdateExpression: 'ADD iterationCount :one SET updatedAt = :now',
         ExpressionAttributeValues: { ':one': 1, ':now': new Date().toISOString() },

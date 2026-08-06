@@ -2,7 +2,7 @@ import { GetCommand, PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import type { ConversationMessage, ConversationRecord } from '../types/index.js'
 
-const TABLE_NAME = getTableName('conversations')
+const TABLE_NAME = (): string => getTableName('conversations')
 
 export async function createConversation(
   data: Omit<ConversationRecord, 'createdAt' | 'updatedAt'>
@@ -13,7 +13,7 @@ export async function createConversation(
   try {
     await dynamoClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Item: record,
       })
     )
@@ -32,7 +32,7 @@ export async function getConversation(
   try {
     const result = await dynamoClient.send(
       new GetCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { botId, conversationId },
       })
     )
@@ -54,7 +54,7 @@ export async function appendMessage(
   try {
     const result = await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { botId, conversationId },
         UpdateExpression:
           'SET messages = list_append(if_not_exists(messages, :emptyList), :newMessage), updatedAt = :updatedAt',
@@ -80,7 +80,7 @@ export async function markLeadCaptured(botId: string, conversationId: string): P
   try {
     await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { botId, conversationId },
         UpdateExpression: 'SET leadCaptured = :leadCaptured, updatedAt = :updatedAt',
         ExpressionAttributeValues: { ':leadCaptured': true, ':updatedAt': now },

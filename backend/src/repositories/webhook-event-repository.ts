@@ -2,14 +2,14 @@ import { GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import type { WebhookEvent } from '../types/index.js'
 
-const TABLE_NAME = getTableName('webhook_events')
+const TABLE_NAME = (): string => getTableName('webhook_events')
 const TTL_SECONDS = 90 * 24 * 60 * 60
 
 export async function hasProcessed(eventId: string): Promise<boolean> {
   try {
     const result = await dynamoClient.send(
       new GetCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { eventId },
       })
     )
@@ -34,7 +34,7 @@ export async function markProcessed(eventId: string, provider: string, eventType
   try {
     await dynamoClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Item: record,
       })
     )

@@ -4,8 +4,8 @@ import { dynamoClient, getTableName } from './dynamo-client.js'
 import { updatePartialFields } from '../lib/dynamo-update.js'
 import type { MetaLead } from '../types/index.js'
 
-const LEADS_TABLE_NAME = getTableName('meta_leads')
-const PAGE_LOOKUP_TABLE_NAME = getTableName('meta_page_lookup')
+const LEADS_TABLE_NAME = (): string => getTableName('meta_leads')
+const PAGE_LOOKUP_TABLE_NAME = (): string => getTableName('meta_page_lookup')
 
 export async function createMetaLead(data: Omit<MetaLead, 'leadId' | 'createdAt'>): Promise<MetaLead> {
   const record: MetaLead = { ...data, leadId: uuidv4(), createdAt: new Date().toISOString() }
@@ -13,7 +13,7 @@ export async function createMetaLead(data: Omit<MetaLead, 'leadId' | 'createdAt'
   try {
     await dynamoClient.send(
       new PutCommand({
-        TableName: LEADS_TABLE_NAME,
+        TableName: LEADS_TABLE_NAME(),
         Item: record,
       })
     )
@@ -32,7 +32,7 @@ export async function getMetaLeadById(pageId: string, leadId: string): Promise<M
   try {
     const result = await dynamoClient.send(
       new GetCommand({
-        TableName: LEADS_TABLE_NAME,
+        TableName: LEADS_TABLE_NAME(),
         Key: { pageId, leadId },
       })
     )
@@ -51,7 +51,7 @@ export async function getMetaLeadsByClientId(clientId: string, limit = 50): Prom
     // which doesn't sort chronologically. This GSI does.
     const result = await dynamoClient.send(
       new QueryCommand({
-        TableName: LEADS_TABLE_NAME,
+        TableName: LEADS_TABLE_NAME(),
         IndexName: 'clientId-createdAt-index',
         KeyConditionExpression: 'clientId = :clientId',
         ExpressionAttributeValues: { ':clientId': clientId },
@@ -81,7 +81,7 @@ export async function updateMetaLeadSyncStatus(
   status: MetaLeadSyncStatus
 ): Promise<void> {
   try {
-    await updatePartialFields(LEADS_TABLE_NAME, { clientId, leadId }, status as Record<string, unknown>)
+    await updatePartialFields(LEADS_TABLE_NAME(), { clientId, leadId }, status as Record<string, unknown>)
   } catch (error) {
     throw new Error(
       `Failed to update sync status for Meta lead (client ${clientId}, ${leadId}): ${error instanceof Error ? error.message : String(error)}`
@@ -114,7 +114,7 @@ export async function setPageClientMapping(pageId: string, clientId: string): Pr
   try {
     await dynamoClient.send(
       new PutCommand({
-        TableName: PAGE_LOOKUP_TABLE_NAME,
+        TableName: PAGE_LOOKUP_TABLE_NAME(),
         Item: { pageId, clientId, connectedAt: new Date().toISOString() },
         ConditionExpression: 'attribute_not_exists(pageId) OR clientId = :clientId',
         ExpressionAttributeValues: { ':clientId': clientId },
@@ -134,7 +134,7 @@ export async function getClientIdForPage(pageId: string): Promise<string | null>
   try {
     const result = await dynamoClient.send(
       new GetCommand({
-        TableName: PAGE_LOOKUP_TABLE_NAME,
+        TableName: PAGE_LOOKUP_TABLE_NAME(),
         Key: { pageId },
       })
     )
@@ -150,7 +150,7 @@ export async function removePageClientMapping(pageId: string): Promise<void> {
   try {
     await dynamoClient.send(
       new DeleteCommand({
-        TableName: PAGE_LOOKUP_TABLE_NAME,
+        TableName: PAGE_LOOKUP_TABLE_NAME(),
         Key: { pageId },
       })
     )

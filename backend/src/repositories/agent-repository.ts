@@ -6,7 +6,7 @@ import type { Agent } from '../types/index.js'
 // (partition clientId, sort agentId) so ownership queries look identical to
 // bot-repository.ts. This is an identity layer over the existing per-channel
 // records (botId / voice agentId); it does NOT touch their Pinecone namespaces.
-const TABLE_NAME = getTableName('agents')
+const TABLE_NAME = (): string => getTableName('agents')
 
 export async function createAgent(data: Omit<Agent, 'createdAt' | 'updatedAt'>): Promise<Agent> {
   const now = new Date().toISOString()
@@ -15,7 +15,7 @@ export async function createAgent(data: Omit<Agent, 'createdAt' | 'updatedAt'>):
   try {
     await dynamoClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Item: record,
       })
     )
@@ -31,7 +31,7 @@ export async function getAgentById(agentId: string, clientId: string): Promise<A
   try {
     const result = await dynamoClient.send(
       new GetCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { clientId, agentId },
       })
     )
@@ -47,7 +47,7 @@ export async function getAgentsByClientId(clientId: string): Promise<Agent[]> {
   try {
     const result = await dynamoClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         KeyConditionExpression: 'clientId = :clientId',
         ExpressionAttributeValues: { ':clientId': clientId },
       })
@@ -81,7 +81,7 @@ export async function updateAgent(
   try {
     const result = await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { clientId, agentId },
         UpdateExpression: `SET ${updateExpressionParts.join(', ')}`,
         ExpressionAttributeNames: expressionAttributeNames,
@@ -101,7 +101,7 @@ export async function deleteAgent(agentId: string, clientId: string): Promise<vo
   try {
     await dynamoClient.send(
       new DeleteCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { clientId, agentId },
       })
     )

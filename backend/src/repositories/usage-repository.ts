@@ -1,7 +1,7 @@
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 
-const TABLE_NAME = getTableName('usage')
+const TABLE_NAME = (): string => getTableName('usage')
 
 type UsageMetric = 'chatConversations' | 'voiceMinutes'
 
@@ -18,7 +18,7 @@ export async function getUsage(accountId: string, periodKey: string, metric: Usa
   try {
     const result = await dynamoClient.send(
       new GetCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { accountId, periodKey },
       })
     )
@@ -42,7 +42,7 @@ export async function incrementUsage(
   try {
     const result = await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { accountId, periodKey },
         UpdateExpression: 'ADD #metric :amt SET updatedAt = :now, createdAt = if_not_exists(createdAt, :now)',
         ExpressionAttributeNames: { '#metric': metric },
@@ -75,7 +75,7 @@ export async function incrementIfUnderLimit(
   try {
     const result = await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { accountId, periodKey },
         UpdateExpression: 'ADD #metric :amt SET updatedAt = :now, createdAt = if_not_exists(createdAt, :now)',
         ConditionExpression: 'attribute_not_exists(#metric) OR #metric <= :threshold',
@@ -103,7 +103,7 @@ export async function getAllUsageForPeriod(
   try {
     const result = await dynamoClient.send(
       new GetCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { accountId, periodKey },
       })
     )

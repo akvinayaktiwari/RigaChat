@@ -21,12 +21,18 @@ import type {
 export const MIN_WAIT_DAYS = 1
 export const MAX_WAIT_AND_RECHECK_ITERATIONS = 30
 
-const journeyExecutorLambdaArn = process.env.JOURNEY_EXECUTOR_LAMBDA_ARN
-
-if (!journeyExecutorLambdaArn) {
-  throw new Error(
-    'Missing required environment variable JOURNEY_EXECUTOR_LAMBDA_ARN. Set it in your .env file before starting the server.'
-  )
+// Resolved per compile, NOT at module load. This file used to throw on import
+// if the var was unset, and backend/index.ts imports the whole route tree into
+// a single Lambda that also serves the public widget -- so one missing journey
+// var 500'd every route on cold start rather than just breaking publishing.
+function journeyExecutorLambdaArn(): string {
+  const value = process.env.JOURNEY_EXECUTOR_LAMBDA_ARN
+  if (!value) {
+    throw new Error(
+      'Missing required environment variable JOURNEY_EXECUTOR_LAMBDA_ARN. Set it in your .env file before starting the server.'
+    )
+  }
+  return value
 }
 
 export class JourneyCompileError extends Error {
@@ -43,6 +49,7 @@ export class JourneyCompileError extends Error {
 // know which bot/bundle/lead/channel it's acting on. Referenced via
 // JSONPath ('.$' suffix) so each Task receives whatever the execution's own
 // input carried, not a static value baked in at compile time.
+//
 // leadSource + leadParentId are what make a non-chat lead readable at all:
 // leads / form_leads / meta_leads each have a different parent key
 // (botId / formId / pageId) and only the first is a botId, so the executor
@@ -170,7 +177,7 @@ function compileWaitAndRecheckStep(
   // the executor knows the threshold to enforce.
   states[recheckStateName] = {
     Type: 'Task',
-    Resource: journeyExecutorLambdaArn as string,
+    Resource: journeyExecutorLambdaArn(),
     Parameters: {
       operation: 'wait_and_recheck_check',
       stepId: step.stepId,
@@ -212,7 +219,7 @@ export function compileJourneyToAsl(journey: JourneyDefinition): AslStateMachine
       case 'send_message':
         states[step.stepId] = {
           Type: 'Task',
-          Resource: journeyExecutorLambdaArn as string,
+          Resource: journeyExecutorLambdaArn(),
           Parameters: {
             operation: 'send_message',
             stepId: step.stepId,
@@ -247,7 +254,7 @@ export function compileJourneyToAsl(journey: JourneyDefinition): AslStateMachine
       case 'tool_call':
         states[step.stepId] = {
           Type: 'Task',
-          Resource: journeyExecutorLambdaArn as string,
+          Resource: journeyExecutorLambdaArn(),
           Parameters: {
             operation: 'tool_call',
             toolName: step.toolName,
@@ -262,7 +269,7 @@ export function compileJourneyToAsl(journey: JourneyDefinition): AslStateMachine
       case 'human_handoff':
         states[step.stepId] = {
           Type: 'Task',
-          Resource: journeyExecutorLambdaArn as string,
+          Resource: journeyExecutorLambdaArn(),
           Parameters: {
             operation: 'human_handoff',
             stepId: step.stepId,

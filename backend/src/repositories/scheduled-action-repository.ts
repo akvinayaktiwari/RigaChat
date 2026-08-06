@@ -2,7 +2,7 @@ import { DeleteCommand, GetCommand, PutCommand, QueryCommand, UpdateCommand } fr
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import type { ScheduledAction } from '../types/index.js'
 
-const TABLE_NAME = getTableName('scheduled_actions')
+const TABLE_NAME = (): string => getTableName('scheduled_actions')
 
 // scheduleId is NOT minted here (unlike most other create*() repository
 // functions) -- it must exist before this is called, because
@@ -19,7 +19,7 @@ export async function createScheduledAction(
   try {
     await dynamoClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Item: record,
       })
     )
@@ -35,7 +35,7 @@ export async function getScheduledActionsByClientId(clientId: string): Promise<S
   try {
     const result = await dynamoClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         KeyConditionExpression: 'clientId = :clientId',
         ExpressionAttributeValues: { ':clientId': clientId },
       })
@@ -52,7 +52,7 @@ export async function getScheduledActionById(clientId: string, scheduleId: strin
   try {
     const result = await dynamoClient.send(
       new GetCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { clientId, scheduleId },
       })
     )
@@ -85,7 +85,7 @@ export async function updateScheduledAction(
   try {
     const result = await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { clientId, scheduleId },
         UpdateExpression: `SET ${updateExpressionParts.join(', ')}`,
         ExpressionAttributeNames: expressionAttributeNames,
@@ -105,7 +105,7 @@ export async function deleteScheduledAction(clientId: string, scheduleId: string
   try {
     await dynamoClient.send(
       new DeleteCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { clientId, scheduleId },
       })
     )

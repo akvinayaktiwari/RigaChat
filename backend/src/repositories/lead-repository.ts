@@ -3,7 +3,7 @@ import { GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import type { Lead } from '../types/index.js'
 
-const TABLE_NAME = getTableName('leads')
+const TABLE_NAME = (): string => getTableName('leads')
 
 export async function createLead(data: Omit<Lead, 'leadId' | 'createdAt'>): Promise<Lead> {
   const record: Lead = { ...data, leadId: uuidv4(), createdAt: new Date().toISOString() }
@@ -11,7 +11,7 @@ export async function createLead(data: Omit<Lead, 'leadId' | 'createdAt'>): Prom
   try {
     await dynamoClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Item: record,
       })
     )
@@ -27,7 +27,7 @@ export async function getLeadsByBotId(botId: string, limit = 50): Promise<Lead[]
   try {
     const result = await dynamoClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         KeyConditionExpression: 'botId = :botId',
         ExpressionAttributeValues: { ':botId': botId },
         ScanIndexForward: false,
@@ -46,7 +46,7 @@ export async function getLeadById(botId: string, leadId: string): Promise<Lead |
   try {
     const result = await dynamoClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         IndexName: 'leadId-index',
         KeyConditionExpression: 'leadId = :leadId',
         FilterExpression: 'botId = :botId',
@@ -66,7 +66,7 @@ export async function getLeadsByClientId(clientId: string): Promise<Lead[]> {
   try {
     const result = await dynamoClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         IndexName: 'clientId-index',
         KeyConditionExpression: 'clientId = :clientId',
         ExpressionAttributeValues: { ':clientId': clientId },

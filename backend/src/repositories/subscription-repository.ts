@@ -2,7 +2,7 @@ import { GetCommand, PutCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import type { Subscription } from '../types/index.js'
 
-const TABLE_NAME = getTableName('subscriptions')
+const TABLE_NAME = (): string => getTableName('subscriptions')
 
 export async function getAllSubscriptions(): Promise<Subscription[]> {
   try {
@@ -12,7 +12,7 @@ export async function getAllSubscriptions(): Promise<Subscription[]> {
     do {
       const result = await dynamoClient.send(
         new ScanCommand({
-          TableName: TABLE_NAME,
+          TableName: TABLE_NAME(),
           ExclusiveStartKey: exclusiveStartKey,
         })
       )
@@ -32,7 +32,7 @@ export async function getByAccountId(accountId: string): Promise<Subscription | 
   try {
     const result = await dynamoClient.send(
       new GetCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { accountId },
       })
     )
@@ -51,7 +51,7 @@ export async function create(data: Omit<Subscription, 'createdAt' | 'updatedAt'>
   try {
     await dynamoClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Item: record,
       })
     )
@@ -83,7 +83,7 @@ export async function updatePartial(
   try {
     const result = await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { accountId },
         UpdateExpression: `SET ${updateExpressionParts.join(', ')}`,
         ExpressionAttributeNames: expressionAttributeNames,

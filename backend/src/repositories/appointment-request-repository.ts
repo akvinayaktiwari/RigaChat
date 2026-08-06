@@ -3,7 +3,7 @@ import { PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import type { AppointmentRequest } from '../types/index.js'
 
-const TABLE_NAME = getTableName('appointment_requests')
+const TABLE_NAME = (): string => getTableName('appointment_requests')
 
 export async function createAppointmentRequest(
   data: Omit<AppointmentRequest, 'requestId' | 'status' | 'createdAt'> & { status?: AppointmentRequest['status'] }
@@ -18,7 +18,7 @@ export async function createAppointmentRequest(
   try {
     await dynamoClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Item: record,
       })
     )
@@ -34,7 +34,7 @@ export async function getAppointmentRequestsByBotId(botId: string): Promise<Appo
   try {
     const result = await dynamoClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         KeyConditionExpression: 'botId = :botId',
         ExpressionAttributeValues: { ':botId': botId },
       })

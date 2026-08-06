@@ -1,7 +1,7 @@
 import { GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 
-const TABLE_NAME = getTableName('whatsapp_inbound_activity')
+const TABLE_NAME = (): string => getTableName('whatsapp_inbound_activity')
 
 // One row per lead, always overwritten with the latest timestamp -- no
 // history of every inbound message is kept here (that's what the
@@ -13,7 +13,7 @@ export async function recordInboundMessage(leadId: string): Promise<void> {
   try {
     await dynamoClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Item: { leadId, lastInboundMessageAt: new Date().toISOString() },
       })
     )
@@ -28,7 +28,7 @@ export async function getLastInboundMessageAt(leadId: string): Promise<string | 
   try {
     const result = await dynamoClient.send(
       new GetCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { leadId },
       })
     )

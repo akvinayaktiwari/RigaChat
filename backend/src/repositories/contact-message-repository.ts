@@ -3,7 +3,7 @@ import { PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import type { ContactMessage } from '../types/index.js'
 
-const TABLE_NAME = getTableName('contact_messages')
+const TABLE_NAME = (): string => getTableName('contact_messages')
 
 export async function createContactMessage(
   data: Omit<ContactMessage, 'messageId' | 'recordType' | 'createdAt'>
@@ -18,7 +18,7 @@ export async function createContactMessage(
   try {
     await dynamoClient.send(
       new PutCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Item: record,
       })
     )
@@ -34,7 +34,7 @@ export async function markContactMessageNotified(messageId: string): Promise<voi
   try {
     await dynamoClient.send(
       new UpdateCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         Key: { messageId },
         UpdateExpression: 'SET notified = :notified',
         ExpressionAttributeValues: { ':notified': true },
@@ -51,7 +51,7 @@ export async function getContactMessages(limit = 50): Promise<ContactMessage[]> 
   try {
     const result = await dynamoClient.send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: TABLE_NAME(),
         IndexName: 'recordType-createdAt-index',
         KeyConditionExpression: 'recordType = :recordType',
         ExpressionAttributeValues: { ':recordType': 'contact_message' },
