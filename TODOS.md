@@ -290,7 +290,23 @@
 **Priority:** P2
 **Depends on:** Agent umbrella identity (this branch's build) shipped; client answer on shared-vs-divergent knowledge
 
-### Provision the Agent umbrella DynamoDB tables + run the one-client backfill
+### Provision the agent/journey infra — run scripts/provision-agent-journey.sh
+
+**What:** `scripts/provision-agent-journey.sh` does the whole thing in one run: creates all 8 DynamoDB tables, creates the EventBridge Scheduler execution role, grants the Lambda roles scheduler access, and sets all 11 env vars on all three Lambdas. It is idempotent (skips anything that already exists). Verified against account 291685935704 / ap-south-1 on 2026-08-06 — at that point **none** of it existed.
+
+Run it, then `backend/scripts/backfill-agents.ts` (see the old note below).
+
+**The scope is bigger than the tables**, which is easy to miss: `lib/eventbridge-scheduler.ts` and `services/journey-compiler-service.ts` both **throw at import time** when their ARNs are unset, exactly like a missing table env var. So three ARNs matter as much as the 8 tables:
+- `SCHEDULER_TARGET_LAMBDA_ARN` and `JOURNEY_EXECUTOR_LAMBDA_ARN` — both are `rigachat-api`'s own ARN; one bundle serves HTTP, scheduled jobs, and the journey executor (see `backend/index.ts`'s event branching).
+- `SCHEDULER_EXECUTION_ROLE_ARN` — **had to be created.** No role in the account was trusted by `scheduler.amazonaws.com`, and there were zero schedules. The app also needs `scheduler:Create/Update/DeleteSchedule` plus a scoped `iam:PassRole` for it.
+
+Key schemas were read out of each repository's `Key:{}` / `KeyConditionExpression`, not from docs. **None of the 8 tables uses a GSI** — all primary-key access.
+
+Do NOT add these as GitHub secrets: `ci.yml`'s env-var step merges a hardcoded allowlist and would silently ignore them (same trap documented in the contact-form entry).
+
+---
+
+Original note, still accurate for the backfill half:
 
 **What:** The additive Agent umbrella (branch `feature/agent-journey-scheduler`) is code-complete and tested, but two things must happen at deploy before it works in production: (1) create the two new DynamoDB tables in AWS — `agents` (partition key `clientId`, sort key `agentId`) and `agent_binding_lookup` (partition key `resourceId`) — and add `DYNAMODB_TABLE_AGENTS` and `DYNAMODB_TABLE_AGENT_BINDING_LOOKUP` to every deployed Lambda's environment via the same CI/CD env-var-sync path the other tables use; (2) run `backend/scripts/backfill-agents.ts` once the tables exist, to wrap the existing client's chatbot + voice agent into one Agent.
 
