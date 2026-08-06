@@ -16,14 +16,6 @@ import { createBrochureMcpServer } from '../mcp/brochure-mcp-server.js'
 // not via routing, the same way Pinecone queries are already scoped by
 // botId today.
 
-const mcpSharedSecret = process.env.MCP_INTERNAL_SHARED_SECRET
-
-if (!mcpSharedSecret) {
-  throw new Error(
-    'Missing required environment variable MCP_INTERNAL_SHARED_SECRET. Set it in your .env file before starting the server.'
-  )
-}
-
 export const mcpRoutes = new Hono()
 
 // INTERIM protection, not the real MCP auth model: a shared bearer secret
@@ -35,7 +27,21 @@ export const mcpRoutes = new Hono()
 // per-client/per-agent auth model for MCP access is an open question in
 // the approved design (Open Question #2) and explicitly deferred -- see
 // TODOS.md.
+// The secret is read per request, not at module load. It used to be a
+// module-level const with a throw, which meant an unset MCP secret took the
+// ENTIRE route tree down on cold start -- /api/chat included -- rather than
+// disabling the four /mcp/* endpoints nothing calls over HTTP yet.
+//
+// Fails CLOSED: when unset, every /mcp/* request is rejected 401. That is
+// strictly safer than the old behaviour, which was to refuse to boot at all
+// and thereby take the product offline to protect an unused endpoint.
 mcpRoutes.use('*', async (c, next) => {
+  const mcpSharedSecret = process.env.MCP_INTERNAL_SHARED_SECRET
+  if (!mcpSharedSecret) {
+    console.error('[mcp] MCP_INTERNAL_SHARED_SECRET is not set; rejecting all /mcp/* requests')
+    return c.text('Unauthorized', 401)
+  }
+
   const authHeader = c.req.header('Authorization')
   if (authHeader !== `Bearer ${mcpSharedSecret}`) {
     return c.text('Unauthorized', 401)

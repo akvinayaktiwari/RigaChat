@@ -29,9 +29,19 @@ function requireEnv(name: string): string {
   return value
 }
 
-const CAL_COM_CLIENT_ID = requireEnv('CAL_COM_CLIENT_ID')
-const CAL_COM_CLIENT_SECRET = requireEnv('CAL_COM_CLIENT_SECRET')
-const CAL_COM_REDIRECT_URI = requireEnv('CAL_COM_REDIRECT_URI')
+// Resolved per call, NOT at module load. These were module-level consts, which
+// meant importing this file threw when Cal.com was unconfigured -- and the
+// import chain is routes/index -> integration-routes -> cal-com-service -> here,
+// inside a single Lambda that also serves /api/chat. So an unconfigured
+// OPTIONAL integration 500'd every route in the product on cold start.
+//
+// Caught pre-deploy on 2026-08-06 by importing the compiled route tree with
+// production's actual environment: CAL_COM_* is unset in prod (the OAuth client
+// is still pending Cal.com's approval), so the deploy would have taken the whole
+// API down. Now only the /cal-com/* routes fail, and only when actually called.
+const CAL_COM_CLIENT_ID = (): string => requireEnv('CAL_COM_CLIENT_ID')
+const CAL_COM_CLIENT_SECRET = (): string => requireEnv('CAL_COM_CLIENT_SECRET')
+const CAL_COM_REDIRECT_URI = (): string => requireEnv('CAL_COM_REDIRECT_URI')
 
 export interface CalComTokens {
   accessToken: string
@@ -49,8 +59,8 @@ interface CalComTokenResponse {
 
 export function getOAuthUrl(state: string): string {
   const params = new URLSearchParams({
-    client_id: CAL_COM_CLIENT_ID,
-    redirect_uri: CAL_COM_REDIRECT_URI,
+    client_id: CAL_COM_CLIENT_ID(),
+    redirect_uri: CAL_COM_REDIRECT_URI(),
     response_type: 'code',
     // BOOKING_WRITE to create bookings, EVENT_TYPE_READ so a client can pick
     // which of their event types the booking tool books against (see
@@ -64,9 +74,9 @@ export function getOAuthUrl(state: string): string {
 export async function exchangeCodeForTokens(code: string): Promise<CalComTokens> {
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
-    client_id: CAL_COM_CLIENT_ID,
-    client_secret: CAL_COM_CLIENT_SECRET,
-    redirect_uri: CAL_COM_REDIRECT_URI,
+    client_id: CAL_COM_CLIENT_ID(),
+    client_secret: CAL_COM_CLIENT_SECRET(),
+    redirect_uri: CAL_COM_REDIRECT_URI(),
     code,
   })
 
@@ -96,8 +106,8 @@ export async function exchangeCodeForTokens(code: string): Promise<CalComTokens>
 export async function refreshAccessToken(refreshToken: string): Promise<CalComTokens> {
   const body = new URLSearchParams({
     grant_type: 'refresh_token',
-    client_id: CAL_COM_CLIENT_ID,
-    client_secret: CAL_COM_CLIENT_SECRET,
+    client_id: CAL_COM_CLIENT_ID(),
+    client_secret: CAL_COM_CLIENT_SECRET(),
     refresh_token: refreshToken,
   })
 

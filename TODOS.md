@@ -389,3 +389,17 @@ Deleted the local `formatRelativeDate` copies in `FormLeadsPage.tsx`, `Knowledge
 **Effort:** S
 **Priority:** P3
 **Depends on:** None
+
+### Third-party clients still throw at module load (Pinecone, OpenAI, Razorpay, Zoho)
+
+**What:** `lib/pinecone.ts`, `lib/openai.ts`, `lib/razorpay.ts` and `providers/zoho-provider.ts` still read their credentials at module scope and throw on import if unset. The table-name/ARN class was converted to call-time resolution on 2026-08-06; these four were not.
+
+**Why:** Same blast radius as the bug that nearly took production down during the 2026-08-06 deploy: `backend/index.ts` imports the whole route tree into one Lambda that also serves `/api/chat` on every client's live site, so one missing credential 500s every route on cold start rather than disabling one feature. These four are only safe today because all four are currently set in production — the protection is luck, not design.
+
+**Context:** Deliberately excluded from the pre-deploy fix, which was scoped to what actually blocked the deploy (`CAL_COM_*` and `MCP_INTERNAL_SHARED_SECRET`, both unset in prod). Unlike those, these three export module-level *client instances* (`pineconeClient`, `openaiClient`, `razorpayClient`) consumed across many services, so converting them means touching every call site — a refactor of the RAG/chat/billing paths, which is not something to do minutes before a deploy with no coverage on those paths.
+
+Approach when picked up: memoize a lazy accessor (`getOpenAiClient()`) and migrate call sites, or keep the export and construct on first property access. Verify with the same harness that caught the original: compile the route tree and import it with the credential deleted from the environment.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None
