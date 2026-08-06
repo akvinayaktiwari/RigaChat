@@ -198,3 +198,60 @@ describe('compileJourneyToAsl', () => {
     expect(asl.States.poll).toBeUndefined()
   })
 })
+
+// REGRESSION, verified against real Step Functions before it was fixed. A Task
+// without ResultPath has its result REPLACE the state output, so the next
+// state's Parameters resolve against the Lambda's return value instead of the
+// execution context:
+//
+//   States.Runtime: The JSONPath '$.botId' specified for the field 'botId.$'
+//   could not be found in the input '{"sent":false,"reason":"no_phone"}'
+//
+// Re-declaring CONTEXT_PASSTHROUGH_PARAMETERS on every Task is useless without
+// this, and the two are only correct together. The shipped real-estate template
+// died on its second state.
+describe('compileJourneyToAsl — every Task must preserve execution context', () => {
+  it('sets a non-root ResultPath on every Task state it emits', () => {
+    const journey = baseJourney([
+      { stepId: 'greet', type: 'send_message', name: 'Greet', messageHint: 'hi', next: 'book' },
+      { stepId: 'book', type: 'tool_call', name: 'Book', toolName: 'booking', next: 'recheck' },
+      {
+        stepId: 'recheck',
+        type: 'wait_and_recheck',
+        name: 'Recheck',
+        waitDays: 1,
+        maxIterations: 2,
+        recheckField: 'appointment_booked',
+        onSatisfied: 'handoff',
+        onExhausted: 'handoff',
+      },
+      { stepId: 'handoff', type: 'human_handoff', name: 'Handoff' },
+    ])
+
+    const asl = compileJourneyToAsl(journey)
+    const tasks = Object.entries(asl.States).filter(([, state]) => state.Type === 'Task')
+
+    expect(tasks.length).toBeGreaterThan(0)
+    for (const [name, state] of tasks) {
+      const resultPath = (state as { ResultPath?: string }).ResultPath
+      expect(resultPath, `Task state "${name}" has no ResultPath and would destroy execution context`).toBeDefined()
+      expect(resultPath, `Task state "${name}" writes its result to the root, replacing the context`).not.toBe('$')
+    }
+  })
+
+  it('keeps the context readable by the state after a send_message', () => {
+    const journey = baseJourney([
+      { stepId: 'greet', type: 'send_message', name: 'Greet', messageHint: 'hi', next: 'handoff' },
+      { stepId: 'handoff', type: 'human_handoff', name: 'Handoff' },
+    ])
+
+    const asl = compileJourneyToAsl(journey)
+
+    // greet merges its result under a scratch key, so $.botId still resolves
+    // for handoff's own Parameters.
+    expect((asl.States.greet as { ResultPath?: string }).ResultPath).toBe('$.lastResult')
+    expect((asl.States.handoff as { Parameters?: Record<string, unknown> }).Parameters).toMatchObject({
+      'botId.$': '$.botId',
+    })
+  })
+})

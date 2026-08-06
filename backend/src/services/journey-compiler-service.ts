@@ -67,6 +67,30 @@ const CONTEXT_PASSTHROUGH_PARAMETERS = {
   'journeyVersion.$': '$.journeyVersion',
 }
 
+// The other half of the passthrough, and re-declaring Parameters is useless
+// without it. A Task's ResultPath defaults to '$', which means its result
+// REPLACES the state's output -- so the next state receives the Lambda's return
+// value instead of the execution context, and its `'botId.$': '$.botId'`
+// resolves against nothing.
+//
+// Verified against real Step Functions on 2026-08-06, before any of this was
+// wired up in anger:
+//
+//   States.Runtime: The JSONPath '$.botId' specified for the field 'botId.$'
+//   could not be found in the input '{"sent":false,"reason":"no_phone"}'
+//
+// Only the wait_and_recheck recheck Task set a ResultPath (it needed one so its
+// Choice state could read the result), which is why the gap survived: the one
+// place it mattered for a different reason was correct, and every other Task
+// silently destroyed the context for whatever followed it. The shipped
+// real-estate template dies on its second state without this.
+//
+// Pointing at a scratch key rather than '$' merges the result INTO the raw
+// input, so context survives and the result is still inspectable in execution
+// history. Reused across steps on purpose: no step reads a previous step's
+// result, so retaining only the latest keeps the state payload bounded.
+const TASK_RESULT_PATH = '$.lastResult'
+
 // Every step reference (next/onTrue/onFalse/onSatisfied/onExhausted) must
 // point to a LATER array index than the referring step. This is what makes
 // a JourneyDefinition a DAG by construction -- no general graph-cycle
@@ -226,6 +250,7 @@ export function compileJourneyToAsl(journey: JourneyDefinition): AslStateMachine
             messageHint: step.messageHint,
             ...CONTEXT_PASSTHROUGH_PARAMETERS,
           },
+          ResultPath: TASK_RESULT_PATH,
           ...(step.next ? { Next: resolve(step.next) } : { End: true }),
           Retry: [{ ErrorEquals: ['States.TaskFailed'], MaxAttempts: 3, IntervalSeconds: 30, BackoffRate: 2 }],
         } satisfies AslTaskState
@@ -261,6 +286,7 @@ export function compileJourneyToAsl(journey: JourneyDefinition): AslStateMachine
             toolInput: step.toolInput,
             ...CONTEXT_PASSTHROUGH_PARAMETERS,
           },
+          ResultPath: TASK_RESULT_PATH,
           ...(step.next ? { Next: resolve(step.next) } : { End: true }),
           Retry: [{ ErrorEquals: ['States.TaskFailed'], MaxAttempts: 3, IntervalSeconds: 30, BackoffRate: 2 }],
         } satisfies AslTaskState
@@ -276,6 +302,7 @@ export function compileJourneyToAsl(journey: JourneyDefinition): AslStateMachine
             reason: step.reason,
             ...CONTEXT_PASSTHROUGH_PARAMETERS,
           },
+          ResultPath: TASK_RESULT_PATH,
           End: true,
         } satisfies AslTaskState
         break
