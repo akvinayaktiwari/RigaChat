@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { McpCapability } from '../types/index.js'
 
 const incrementWaitAndRecheckIteration = vi.fn()
 const bookAppointment = vi.fn()
@@ -203,9 +204,20 @@ describe('executeJourneyStep', () => {
       expect(bookAppointment).not.toHaveBeenCalled()
     })
 
-    it('rejects an unknown toolName', async () => {
+    // The cast is deliberate, not a workaround. McpCapability now makes this
+    // unrepresentable for our own callers, but a JourneyExecutorEvent arrives
+    // from Step Functions -- an external boundary the type system does not
+    // police. A state machine compiled before a capability was renamed, or a
+    // hand-invoked execution, can still deliver a name that no longer exists,
+    // so the runtime default branch has to keep working. Deleting this test
+    // because "the type prevents it" would be exactly wrong.
+    it('rejects an unknown toolName arriving from Step Functions', async () => {
       await expect(
-        executeJourneyStep({ ...baseContext, operation: 'tool_call', toolName: 'not_a_real_tool' })
+        executeJourneyStep({
+          ...baseContext,
+          operation: 'tool_call',
+          toolName: 'not_a_real_tool' as McpCapability,
+        })
       ).rejects.toThrow(/unknown toolName/)
     })
   })

@@ -627,10 +627,11 @@ export interface ConditionStep extends JourneyStepBase {
 
 export interface ToolCallStep extends JourneyStepBase {
   type: 'tool_call'
-  // Must be present in the owning JourneyBundle's AgentConfig.mcpToolbox --
-  // validated by journey-service.ts before persisting, not by the type
-  // system (the toolbox is per-bundle, not known at this type's definition).
-  toolName: string
+  // Constrained to the platform-wide capability palette by the type, and to
+  // this bundle's own subset of it by journey-service.ts's
+  // validateToolboxCoverage() -- the type can't express the second check
+  // because the toolbox is per-bundle, not known at this type's definition.
+  toolName: McpCapability
   toolInput?: Record<string, unknown>
   next?: string
 }
@@ -724,6 +725,20 @@ export interface AgentBindingLookup {
   boundAt: string
 }
 
+// The bounded MCP capability palette. Engineering-controlled: clients pick
+// FROM this set, they never extend it (the approved design's "bounded
+// toolbox, NOT full autonomy"). A union rather than `string` so a bad
+// capability name fails at compile time in the template seeds, and at the
+// route boundary for untrusted client input -- previously `string[]` let
+// `mcpToolbox: ['banana']` plus a step calling `banana` pass every check,
+// publish cleanly, and only fail mid-journey on a live lead at
+// journey-executor-service.ts's dispatch default.
+//
+// lib/mcp-capabilities.ts derives the runtime array from this union via an
+// exhaustiveness-checked Record, so adding a member here without adding it
+// there is a compile error. Keep that the only runtime list.
+export type McpCapability = 'booking' | 'reminder' | 'quotation' | 'brochure'
+
 // Channel-agnostic: tone, bounded tool palette, qualification logic. Reused
 // across whichever channels this agent is wired into.
 export interface AgentConfig {
@@ -734,7 +749,7 @@ export interface AgentConfig {
   systemPrompt: string
   toneDescription?: string
   // Bounded MCP tool palette per the approved design -- NOT full autonomy.
-  mcpToolbox: string[]
+  mcpToolbox: McpCapability[]
   channelConfig: Partial<Record<JourneyChannel, AgentChannelConfig>>
 }
 
@@ -893,7 +908,11 @@ export interface JourneyExecutorEvent {
   channel: JourneyChannel
   stepId?: string
   messageHint?: string
-  toolName?: string
+  // Typed, but this event arrives from Step Functions rather than from our own
+  // call site, so journey-executor-service.ts still keeps a runtime default
+  // branch -- the type describes what a correctly compiled Journey sends, not
+  // what the runtime is guaranteed to receive.
+  toolName?: McpCapability
   toolInput?: Record<string, unknown>
   recheckField?: 'replied' | 'lead_score' | 'appointment_booked'
   maxIterations?: number

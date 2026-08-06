@@ -3,7 +3,14 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
 import { createJourneyBundle, getJourneyBundle, publishJourneyBundle, updateJourneyBundle } from '../services/api'
 import { useToast } from '../components/Toast/Toast'
-import type { AgentConfig, JourneyBundle, JourneyDefinition, JourneyStep, JourneyTriggerType } from '../types/index'
+import type {
+  AgentConfig,
+  JourneyBundle,
+  JourneyDefinition,
+  JourneyStep,
+  JourneyTriggerType,
+  McpCapability,
+} from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -15,14 +22,25 @@ const inputClasses =
   'w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all'
 const labelClasses = 'block text-sm font-medium text-gray-700 mb-1.5'
 
-const TOOLBOX_OPTIONS: { toolName: string; label: string; description: string }[] = [
-  { toolName: 'booking', label: 'Book appointment', description: 'Creates a real Cal.com booking once connected in Settings' },
-  { toolName: 'reminder', label: 'Schedule reminder', description: 'Creates a follow-up Scheduler entry for this lead' },
-  { toolName: 'quotation', label: 'Get quotation', description: 'Stub — no pricing-rule model exists yet' },
-  { toolName: 'brochure', label: 'Send brochure', description: 'Stub — no document library exists yet' },
-]
+// Keyed by McpCapability rather than a free array so adding a capability to
+// the union without describing it here is a compile error -- the picker can
+// never silently omit a tool the backend accepts, and can never offer one it
+// rejects.
+const TOOLBOX_CATALOG: Record<McpCapability, { label: string; description: string }> = {
+  booking: { label: 'Book appointment', description: 'Creates a real Cal.com booking once connected in Settings' },
+  reminder: { label: 'Schedule reminder', description: 'Creates a follow-up Scheduler entry for this lead' },
+  quotation: { label: 'Get quotation', description: 'Stub — no pricing-rule model exists yet' },
+  brochure: { label: 'Send brochure', description: 'Stub — no document library exists yet' },
+}
 
-const TOOL_LABELS: Record<string, string> = Object.fromEntries(TOOLBOX_OPTIONS.map((t) => [t.toolName, t.label]))
+const TOOLBOX_OPTIONS = (Object.keys(TOOLBOX_CATALOG) as McpCapability[]).map((toolName) => ({
+  toolName,
+  ...TOOLBOX_CATALOG[toolName],
+}))
+
+const TOOL_LABELS: Record<McpCapability, string> = Object.fromEntries(
+  TOOLBOX_OPTIONS.map((t) => [t.toolName, t.label])
+) as Record<McpCapability, string>
 
 const TRIGGER_LABELS: Record<JourneyTriggerType, string> = {
   lead_captured: 'When a lead is captured',
@@ -161,7 +179,7 @@ interface StepEditorProps {
   step: JourneyStep
   index: number
   steps: JourneyStep[]
-  mcpToolbox: string[]
+  mcpToolbox: McpCapability[]
   onChange: (patch: StepPatch) => void
   onRemove: () => void
   onMoveUp: () => void
@@ -393,7 +411,13 @@ function StepEditor({
               ) : (
                 <select
                   value={step.toolName}
-                  onChange={(e) => onChange({ toolName: e.target.value, toolInput: undefined })}
+                  // Every option value below is either '' (the disabled
+                  // placeholder) or a member of mcpToolbox, which is
+                  // McpCapability[] -- so the narrow is exhaustive by
+                  // construction, not an assumption about user input.
+                  onChange={(e) =>
+                    onChange({ toolName: e.target.value as McpCapability | '', toolInput: undefined })
+                  }
                   className={inputClasses}
                 >
                   <option value="" disabled>
@@ -401,7 +425,7 @@ function StepEditor({
                   </option>
                   {mcpToolbox.map((tool) => (
                     <option key={tool} value={tool}>
-                      {TOOL_LABELS[tool] ?? tool}
+                      {TOOL_LABELS[tool]}
                     </option>
                   ))}
                 </select>
@@ -491,7 +515,7 @@ export default function JourneyBuilderPage() {
   const [agentName, setAgentName] = useState('')
   const [systemPrompt, setSystemPrompt] = useState('')
   const [toneDescription, setToneDescription] = useState('')
-  const [mcpToolbox, setMcpToolbox] = useState<string[]>([])
+  const [mcpToolbox, setMcpToolbox] = useState<McpCapability[]>([])
 
   useEffect(() => {
     if (isNew || !bundleId) return
@@ -542,7 +566,7 @@ export default function JourneyBuilderPage() {
     })
   }
 
-  function toggleTool(toolName: string) {
+  function toggleTool(toolName: McpCapability) {
     setMcpToolbox((prev) => (prev.includes(toolName) ? prev.filter((t) => t !== toolName) : [...prev, toolName]))
   }
 

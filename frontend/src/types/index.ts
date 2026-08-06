@@ -529,9 +529,19 @@ export interface ConditionStep extends JourneyStepBase {
   onFalse: string
 }
 
+// Mirrors the backend's McpCapability union (backend/src/types/index.ts). The
+// backend rejects anything outside this set with a 400, so keeping the two in
+// sync is what stops the builder from constructing a payload that can only
+// fail on save.
+export type McpCapability = 'booking' | 'reminder' | 'quotation' | 'brochure'
+
 export interface ToolCallStep extends JourneyStepBase {
   type: 'tool_call'
-  toolName: string
+  // `''` is the builder's "no tool chosen yet" draft state and is deliberately
+  // part of the type rather than cast away -- a freshly added tool_call step
+  // genuinely has no tool. validateSteps() blocks saving while it's empty, so
+  // `''` can never reach the API.
+  toolName: McpCapability | ''
   toolInput?: Record<string, unknown>
   next?: string
 }
@@ -571,7 +581,7 @@ export interface AgentConfig {
   name: string
   systemPrompt: string
   toneDescription?: string
-  mcpToolbox: string[]
+  mcpToolbox: McpCapability[]
   channelConfig: Partial<Record<JourneyChannel, AgentChannelConfig>>
 }
 

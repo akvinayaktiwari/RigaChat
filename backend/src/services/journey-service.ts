@@ -8,12 +8,38 @@ import {
 import { compileJourneyToAsl, JourneyCompileError } from './journey-compiler-service.js'
 import { getBotConfig } from './bot-service.js'
 import { resolveOwningAgentId } from './agent-service.js'
+import { findInvalidCapabilities, MCP_CAPABILITIES } from '../lib/mcp-capabilities.js'
 import type { AgentConfig, JourneyBundle, JourneyDefinition } from '../types/index.js'
 
 export class JourneyValidationError extends Error {
   constructor(message: string) {
     super(message)
     this.name = 'JourneyValidationError'
+  }
+}
+
+// The palette check the type system cannot do for untrusted input: a request
+// body is `unknown` at runtime whatever the route's interface claims, so a
+// client can still POST `mcpToolbox: ['banana']`. Catching it here (400 via
+// JourneyValidationError) means the client finds out while they are still
+// editing, instead of the bad name surviving publish and throwing days later
+// in journey-executor-service.ts's dispatch, mid-journey, on a real lead.
+//
+// Runs before validateToolboxCoverage, which is what makes that function's
+// membership check transitively sufficient for step toolNames: a step whose
+// toolName isn't a real capability cannot be in a palette-valid toolbox.
+function validateToolboxPalette(agent: AgentConfig): void {
+  if (!Array.isArray(agent.mcpToolbox)) {
+    throw new JourneyValidationError('mcpToolbox must be an array of MCP capability names')
+  }
+
+  const invalid = findInvalidCapabilities(agent.mcpToolbox)
+  if (invalid.length > 0) {
+    throw new JourneyValidationError(
+      `Unknown MCP ${invalid.length === 1 ? 'capability' : 'capabilities'} ${invalid
+        .map((name) => `"${name}"`)
+        .join(', ')} in mcpToolbox. Available: ${MCP_CAPABILITIES.join(', ')}`
+    )
   }
 }
 
@@ -52,6 +78,7 @@ export async function createJourneyBundle(input: CreateJourneyBundleInput): Prom
   await getBotConfig(input.botId, input.clientId)
 
   const journey: JourneyDefinition = { ...input.journey, botId: input.botId, clientId: input.clientId }
+  validateToolboxPalette(input.agent)
   validateToolboxCoverage(journey, input.agent)
 
   try {
@@ -128,6 +155,7 @@ export async function updateJourneyBundle(
   // editing just the agent's toolbox down could orphan an existing
   // tool_call step just as easily as editing the journey could.
   if (updates.journey || updates.agent) {
+    validateToolboxPalette(nextAgent)
     validateToolboxCoverage(nextJourney, nextAgent)
     try {
       compileJourneyToAsl(nextJourney)
