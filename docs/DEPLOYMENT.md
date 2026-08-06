@@ -81,3 +81,110 @@ regardless of whether `ci.yml`'s type-check/build job (which also runs on
 every push) passed or failed, unless GitHub branch protection rules require
 it, which isn't determinable from the repo itself. Worth confirming in
 GitHub's repo settings if this matters to you.
+
+## Post-provisioning verification: the agent/journey infra
+
+`scripts/provision-agent-journey.sh` creates 9 DynamoDB tables, 2 IAM roles, 2
+Lambda role policies, and 13 env vars across 3 Lambdas. It is idempotent.
+
+Run it once, then walk this checklist. **The unit tests cannot cover any of it**:
+they mock the AWS SDK, so they prove the branch logic and say nothing about
+whether a role is trusted by the right principal or an ARN points at anything
+real. That class of failure — the one that had `RigaChatSchedulerExecutionRole`
+not existing at all — is only visible against the live account.
+
+```bash
+./scripts/provision-agent-journey.sh
+```
+
+### 1. All 9 tables exist and are ACTIVE
+
+```bash
+for t in journeys journey_executions journey_trigger_claims scheduled_actions \
+         appointment_requests agents agent_binding_lookup gupshup_app_lookup \
+         whatsapp_inbound_activity; do
+  printf '%-32s %s\n' "$t" \
+    "$(aws dynamodb describe-table --table-name "$t" --region ap-south-1 \
+        --query 'Table.TableStatus' --output text 2>/dev/null || echo MISSING)"
+done
+```
+
+Every line must read `ACTIVE`.
+
+### 2. Both roles are trusted by the RIGHT principal
+
+This is the check that matters most, and the one easiest to get wrong: the two
+roles are near-identical apart from their trust principal, and swapping them
+fails at runtime with an unhelpful `AccessDenied`.
+
+```bash
+aws iam get-role --role-name RigaChatSchedulerExecutionRole \
+  --query 'Role.AssumeRolePolicyDocument.Statement[0].Principal.Service' --output text
+# must print: scheduler.amazonaws.com
+
+aws iam get-role --role-name RigaChatJourneyStateMachineRole \
+  --query 'Role.AssumeRolePolicyDocument.Statement[0].Principal.Service' --output text
+# must print: states.amazonaws.com
+```
+
+### 3. Env vars landed on all three Lambdas
+
+```bash
+for fn in rigachat-api rigachat-api-streaming rigachat-crawler; do
+  echo "== $fn"
+  aws lambda get-function-configuration --function-name "$fn" --region ap-south-1 \
+    --query 'Environment.Variables' --output json \
+    | jq 'with_entries(select(.key|test("JOURNEY|SCHEDUL|AGENT|GUPSHUP|WHATSAPP_INBOUND"))) | keys'
+done
+```
+
+Expect 13 keys on each. **Do not add these as GitHub secrets** — `ci.yml`'s
+env-var step merges a hardcoded allowlist and would silently ignore them.
+
+### 4. End-to-end: publish a journey and watch a real state machine appear
+
+The only check that exercises `iam:PassRole`, the trust policy and the ARN
+together. Everything above can pass while this still fails.
+
+1. In the dashboard, clone the real-estate template onto a bot
+   (`POST /api/journeys/from-template/real-estate-lead-qualification-v1`).
+2. Publish it.
+3. Confirm a state machine now exists and has a published version:
+
+```bash
+aws stepfunctions list-state-machines --region ap-south-1 \
+  --query "stateMachines[?starts_with(name, 'vyostra-')].[name,stateMachineArn]" --output table
+
+aws stepfunctions list-state-machine-versions --region ap-south-1 \
+  --state-machine-arn <arn from above> --query 'stateMachineVersions[].stateMachineVersionArn'
+```
+
+4. Confirm the bundle recorded the **version** arn, not just the state machine
+   arn — ignition starts executions against the version, and a bundle with
+   `compiledStateMachineVersionArn` unset will never ignite:
+
+```bash
+aws dynamodb scan --table-name journeys --region ap-south-1 \
+  --query 'Items[].{name:name.S,version:publishedVersion.N,versionArn:compiledStateMachineVersionArn.S}' \
+  --output table
+```
+
+5. Confirm the trigger claim was taken:
+
+```bash
+aws dynamodb scan --table-name journey_trigger_claims --region ap-south-1 --output table
+```
+
+### 5. Then run the Agent backfill
+
+Only after the tables exist:
+
+```bash
+cd backend
+TS_NODE_TRANSPILE_ONLY=true node --env-file=.env --loader ts-node/esm scripts/backfill-agents.ts
+```
+
+It is idempotent and conservative — it skips any client with more than one bot
+or voice agent rather than guessing a pairing. A lead whose client has no Agent,
+or more than one, resolves to `no_agent` / `ambiguous_agent` at ignition and is
+recorded rather than silently dropped, so a partial backfill degrades visibly.

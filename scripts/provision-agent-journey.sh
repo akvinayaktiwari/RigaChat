@@ -2,9 +2,13 @@
 # Provisioning for feature/agent-journey-scheduler (Journey / Scheduler / Agent / MCP).
 # Derived from the branch's own code, not from docs:
 #   - key schemas from each repository's Key:{} / KeyConditionExpression
-#   - no GSIs: every one of the 8 tables is primary-key access only
-#   - the 3 ARNs come from modules that THROW at import time when unset
-#     (lib/eventbridge-scheduler.ts, services/journey-compiler-service.ts)
+#   - no GSIs: every one of the 9 tables is primary-key access only
+#   - the 4 ARNs come from lib/eventbridge-scheduler.ts, lib/step-functions.ts
+#     and services/journey-compiler-service.ts
+#
+# Env vars are now resolved at CALL time rather than at module load, so a
+# missing one breaks only its own feature instead of 500-ing every route. That
+# makes this script safe to run before or after a deploy, in either order.
 #
 # Verified against account 291685935704 / ap-south-1 on 2026-08-06.
 set -euo pipefail
@@ -14,6 +18,11 @@ ACCOUNT="291685935704"
 LAMBDA_ARN="arn:aws:lambda:${REGION}:${ACCOUNT}:function:rigachat-api"
 SCHED_ROLE="RigaChatSchedulerExecutionRole"
 SCHED_ROLE_ARN="arn:aws:iam::${ACCOUNT}:role/${SCHED_ROLE}"
+# Step Functions assumes this to invoke the journey executor Lambda. Separate
+# from SCHED_ROLE because the trust policy names a different principal
+# (states.amazonaws.com vs scheduler.amazonaws.com) -- one role cannot serve both.
+SFN_ROLE="RigaChatJourneyStateMachineRole"
+SFN_ROLE_ARN="arn:aws:iam::${ACCOUNT}:role/${SFN_ROLE}"
 
 LAMBDAS=(rigachat-api rigachat-api-streaming rigachat-crawler)
 LAMBDA_ROLES=(rigachat-api-role-4c9qsico rigachat-api-streaming-role-625vca9z)
@@ -28,6 +37,9 @@ TABLES=(
   "gupshup_app_lookup:appName:-"
   "whatsapp_inbound_activity:leadId:-"
   "agent_binding_lookup:resourceId:-"
+  # Exactly one published bundle owns an (Agent, trigger). Also the ignition
+  # index: "which journey runs for this lead" is a point read on this table.
+  "journey_trigger_claims:claimKey:-"
 )
 
 echo "==> 1/4 Creating ${#TABLES[@]} DynamoDB tables"
@@ -90,9 +102,39 @@ aws iam put-role-policy --role-name "$SCHED_ROLE" \
   }'
 echo "    attached InvokeRigaChatApi"
 
-# The app itself creates/updates/deletes schedules, and must be allowed to hand
-# the scheduler role to EventBridge (iam:PassRole) when it does.
-echo "==> 3/4 Granting the Lambda roles scheduler access"
+# Step Functions assumes this role to invoke the journey executor Lambda from a
+# compiled Task state. Same shape as the scheduler role above, different trust
+# principal.
+if aws iam get-role --role-name "$SFN_ROLE" >/dev/null 2>&1; then
+  echo "    $SFN_ROLE already exists, skipping"
+else
+  echo "    creating $SFN_ROLE"
+  aws iam create-role --role-name "$SFN_ROLE" \
+    --assume-role-policy-document '{
+      "Version": "2012-10-17",
+      "Statement": [{
+        "Effect": "Allow",
+        "Principal": {"Service": "states.amazonaws.com"},
+        "Action": "sts:AssumeRole"
+      }]
+    }' --output json >/dev/null
+fi
+
+aws iam put-role-policy --role-name "$SFN_ROLE" \
+  --policy-name InvokeRigaChatApi \
+  --policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [{
+      "Effect": "Allow",
+      "Action": "lambda:InvokeFunction",
+      "Resource": "'"${LAMBDA_ARN}"'"
+    }]
+  }'
+echo "    attached InvokeRigaChatApi to $SFN_ROLE"
+
+# The app itself creates/updates/deletes schedules and state machines, and must
+# be allowed to hand each service its own role (iam:PassRole) when it does.
+echo "==> 3/4 Granting the Lambda roles scheduler + Step Functions access"
 for ROLE in "${LAMBDA_ROLES[@]}"; do
   aws iam put-role-policy --role-name "$ROLE" \
     --policy-name JourneySchedulerPolicy \
@@ -112,12 +154,44 @@ for ROLE in "${LAMBDA_ROLES[@]}"; do
         }
       ]
     }'
+  # publishJourneyBundle creates/updates a state machine and publishes an
+  # immutable version; igniteJourneysForLead starts executions against it.
+  # DescribeStateMachine is not used by the app but makes manual debugging in
+  # the console possible without another policy edit.
+  aws iam put-role-policy --role-name "$ROLE" \
+    --policy-name JourneyStateMachinePolicy \
+    --policy-document '{
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Action": [
+            "states:CreateStateMachine",
+            "states:UpdateStateMachine",
+            "states:DeleteStateMachine",
+            "states:DescribeStateMachine",
+            "states:PublishStateMachineVersion",
+            "states:ListStateMachineVersions",
+            "states:StartExecution",
+            "states:DescribeExecution",
+            "states:TagResource"
+          ],
+          "Resource": "*"
+        },
+        {
+          "Effect": "Allow",
+          "Action": "iam:PassRole",
+          "Resource": "'"${SFN_ROLE_ARN}"'",
+          "Condition": {"StringEquals": {"iam:PassedToService": "states.amazonaws.com"}}
+        }
+      ]
+    }'
   echo "    $ROLE"
 done
 
 # Merges onto existing Environment.Variables — update-function-configuration
 # replaces the whole map, so a naive call would wipe every other var.
-echo "==> 4/4 Setting 11 env vars on ${#LAMBDAS[@]} Lambdas"
+echo "==> 4/4 Setting 13 env vars on ${#LAMBDAS[@]} Lambdas"
 for FN in "${LAMBDAS[@]}"; do
   echo "    ${FN}"
   MERGED=$(aws lambda get-function-configuration \
@@ -125,9 +199,11 @@ for FN in "${LAMBDAS[@]}"; do
     --query 'Environment.Variables' --output json | jq \
     --arg lambda_arn "$LAMBDA_ARN" \
     --arg sched_role "$SCHED_ROLE_ARN" \
+    --arg sfn_role "$SFN_ROLE_ARN" \
     '. + {
       DYNAMODB_TABLE_JOURNEYS: "journeys",
       DYNAMODB_TABLE_JOURNEY_EXECUTIONS: "journey_executions",
+      DYNAMODB_TABLE_JOURNEY_TRIGGER_CLAIMS: "journey_trigger_claims",
       DYNAMODB_TABLE_SCHEDULED_ACTIONS: "scheduled_actions",
       DYNAMODB_TABLE_APPOINTMENT_REQUESTS: "appointment_requests",
       DYNAMODB_TABLE_AGENTS: "agents",
@@ -136,7 +212,8 @@ for FN in "${LAMBDAS[@]}"; do
       DYNAMODB_TABLE_WHATSAPP_INBOUND_ACTIVITY: "whatsapp_inbound_activity",
       SCHEDULER_TARGET_LAMBDA_ARN: $lambda_arn,
       JOURNEY_EXECUTOR_LAMBDA_ARN: $lambda_arn,
-      SCHEDULER_EXECUTION_ROLE_ARN: $sched_role
+      SCHEDULER_EXECUTION_ROLE_ARN: $sched_role,
+      JOURNEY_STATE_MACHINE_ROLE_ARN: $sfn_role
     }')
   aws lambda update-function-configuration \
     --function-name "$FN" --region "$REGION" \
