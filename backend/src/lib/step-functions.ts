@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto'
 import {
   CreateStateMachineCommand,
   DeleteStateMachineCommand,
+  SendTaskFailureCommand,
+  SendTaskSuccessCommand,
   SFNClient,
   StartExecutionCommand,
   UpdateStateMachineCommand,
@@ -219,6 +221,60 @@ export async function startExecution(
   } catch (error) {
     if (error instanceof Error && error.name === 'ExecutionAlreadyExists') {
       return { started: false, reason: 'already_started' }
+    }
+    throw error
+  }
+}
+
+export type ResumeResult =
+  | { resumed: true }
+  // Every one of these is an expected end state, not an error: the execution
+  // already moved on. A lead replying twice, or replying just after the 24h
+  // window closed, is ordinary behaviour and must not surface as a failure.
+  | { resumed: false; reason: 'token_expired' | 'token_unknown' }
+
+// Hands the lead's reply back to the paused execution. The token is the entire
+// authorisation to resume, which is why callers must use one WE stored against
+// that lead rather than anything supplied by the request being handled.
+export async function resumeAwaitingExecution(
+  taskToken: string,
+  output: Record<string, unknown>
+): Promise<ResumeResult> {
+  try {
+    await client.send(new SendTaskSuccessCommand({ taskToken, output: JSON.stringify(output) }))
+    return { resumed: true }
+  } catch (error) {
+    if (error instanceof Error) {
+      // The 24h window closed and Step Functions already routed the execution
+      // down onNoReply.
+      if (error.name === 'TaskTimedOut') return { resumed: false, reason: 'token_expired' }
+      // Token already consumed, or belongs to an execution that has since been
+      // stopped or deleted.
+      if (error.name === 'TaskDoesNotExist' || error.name === 'InvalidToken') {
+        return { resumed: false, reason: 'token_unknown' }
+      }
+    }
+    throw error
+  }
+}
+
+// Used to abandon a paused execution deliberately -- an opt-out, or a client
+// deleting the journey out from under a lead. Same tolerance for an execution
+// that has already moved on.
+export async function failAwaitingExecution(
+  taskToken: string,
+  errorName: string,
+  cause: string
+): Promise<ResumeResult> {
+  try {
+    await client.send(new SendTaskFailureCommand({ taskToken, error: errorName, cause }))
+    return { resumed: true }
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.name === 'TaskTimedOut') return { resumed: false, reason: 'token_expired' }
+      if (error.name === 'TaskDoesNotExist' || error.name === 'InvalidToken') {
+        return { resumed: false, reason: 'token_unknown' }
+      }
     }
     throw error
   }

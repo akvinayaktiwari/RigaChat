@@ -551,6 +551,16 @@ export interface HumanHandoffStep extends JourneyStepBase {
   reason?: string
 }
 
+// Mirrors the backend AwaitReplyStep. The step that makes a journey wait on the
+// lead rather than a clock: the execution pauses until they reply, or until the
+// 24h WhatsApp window closes and it takes onNoReply.
+export interface AwaitReplyStep extends JourneyStepBase {
+  type: 'await_reply'
+  promptHint?: string
+  next: string
+  onNoReply: string
+}
+
 export type JourneyStep =
   | SendMessageStep
   | WaitStep
@@ -558,6 +568,7 @@ export type JourneyStep =
   | ConditionStep
   | ToolCallStep
   | HumanHandoffStep
+  | AwaitReplyStep
 
 export interface JourneyDefinition {
   journeyId: string

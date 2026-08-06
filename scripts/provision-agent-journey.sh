@@ -2,7 +2,7 @@
 # Provisioning for feature/agent-journey-scheduler (Journey / Scheduler / Agent / MCP).
 # Derived from the branch's own code, not from docs:
 #   - key schemas from each repository's Key:{} / KeyConditionExpression
-#   - no GSIs: every one of the 9 tables is primary-key access only
+#   - no GSIs: every one of the 10 tables is primary-key access only
 #   - the 4 ARNs come from lib/eventbridge-scheduler.ts, lib/step-functions.ts
 #     and services/journey-compiler-service.ts
 #
@@ -40,6 +40,11 @@ TABLES=(
   # Exactly one published bundle owns an (Agent, trigger). Also the ignition
   # index: "which journey runs for this lead" is a point read on this table.
   "journey_trigger_claims:claimKey:-"
+  # Step Functions callback tokens for executions parked on an await_reply step,
+  # keyed by lead so the inbound WhatsApp handler can find them. TTL is enabled
+  # on expiresAt below -- a timed-out execution has no callback to tell us to
+  # delete its row, so nothing else would ever clean these up.
+  "journey_pending_replies:leadId:-"
 )
 
 echo "==> 1/4 Creating ${#TABLES[@]} DynamoDB tables"
@@ -69,6 +74,19 @@ for spec in "${TABLES[@]}"; do
   aws dynamodb wait table-exists --table-name "$NAME" --region "$REGION"
 done
 echo "    done"
+
+# Only journey_pending_replies has a TTL. Its rows point at Step Functions
+# callback tokens, and an execution that times out never calls back, so without
+# this the table would accumulate dead tokens forever.
+TTL_STATUS=$(aws dynamodb describe-time-to-live --table-name journey_pending_replies --region "$REGION" \
+  --query 'TimeToLiveDescription.TimeToLiveStatus' --output text 2>/dev/null || echo NONE)
+if [ "$TTL_STATUS" = "ENABLED" ] || [ "$TTL_STATUS" = "ENABLING" ]; then
+  echo "    TTL already $TTL_STATUS on journey_pending_replies, skipping"
+else
+  echo "    enabling TTL on journey_pending_replies (expiresAt)"
+  aws dynamodb update-time-to-live --table-name journey_pending_replies --region "$REGION" \
+    --time-to-live-specification "Enabled=true,AttributeName=expiresAt" --output json >/dev/null
+fi
 
 # EventBridge Scheduler assumes this role to invoke the Lambda. It does not
 # exist in the account yet (verified: zero roles trusted by scheduler.amazonaws.com,
@@ -174,7 +192,11 @@ for ROLE in "${LAMBDA_ROLES[@]}"; do
             "states:ListStateMachineVersions",
             "states:StartExecution",
             "states:DescribeExecution",
-            "states:TagResource"
+            "states:StopExecution",
+            "states:TagResource",
+            "states:SendTaskSuccess",
+            "states:SendTaskFailure",
+            "states:SendTaskHeartbeat"
           ],
           "Resource": "*"
         },
@@ -191,7 +213,7 @@ done
 
 # Merges onto existing Environment.Variables — update-function-configuration
 # replaces the whole map, so a naive call would wipe every other var.
-echo "==> 4/4 Setting 13 env vars on ${#LAMBDAS[@]} Lambdas"
+echo "==> 4/4 Setting 14 env vars on ${#LAMBDAS[@]} Lambdas"
 for FN in "${LAMBDAS[@]}"; do
   echo "    ${FN}"
   MERGED=$(aws lambda get-function-configuration \
@@ -204,6 +226,7 @@ for FN in "${LAMBDAS[@]}"; do
       DYNAMODB_TABLE_JOURNEYS: "journeys",
       DYNAMODB_TABLE_JOURNEY_EXECUTIONS: "journey_executions",
       DYNAMODB_TABLE_JOURNEY_TRIGGER_CLAIMS: "journey_trigger_claims",
+      DYNAMODB_TABLE_JOURNEY_PENDING_REPLIES: "journey_pending_replies",
       DYNAMODB_TABLE_SCHEDULED_ACTIONS: "scheduled_actions",
       DYNAMODB_TABLE_APPOINTMENT_REQUESTS: "appointment_requests",
       DYNAMODB_TABLE_AGENTS: "agents",

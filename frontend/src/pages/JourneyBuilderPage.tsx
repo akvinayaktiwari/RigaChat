@@ -52,6 +52,7 @@ const STEP_TYPE_OPTIONS: { type: JourneyStep['type']; label: string }[] = [
   { type: 'send_message', label: 'Send a message' },
   { type: 'wait', label: 'Wait' },
   { type: 'wait_and_recheck', label: 'Wait & recheck' },
+  { type: 'await_reply', label: 'Wait for their reply' },
   { type: 'condition', label: 'Condition' },
   { type: 'tool_call', label: 'Call a tool' },
   { type: 'human_handoff', label: 'Human handoff' },
@@ -61,6 +62,7 @@ const STEP_TYPE_LABELS: Record<JourneyStep['type'], string> = {
   send_message: 'Send a message',
   wait: 'Wait',
   wait_and_recheck: 'Wait & recheck',
+  await_reply: 'Wait for their reply',
   condition: 'Condition',
   tool_call: 'Call a tool',
   human_handoff: 'Human handoff',
@@ -76,6 +78,8 @@ function newStep(type: JourneyStep['type'], index: number): JourneyStep {
       return { stepId, name, type, waitDays: 1 }
     case 'wait_and_recheck':
       return { stepId, name, type, waitDays: 1, maxIterations: 3, recheckField: 'replied', onSatisfied: '', onExhausted: '' }
+    case 'await_reply':
+      return { stepId, name, type, next: '', onNoReply: '' }
     case 'condition':
       return { stepId, name, type, field: 'replied', operator: 'equals', value: '', onTrue: '', onFalse: '' }
     case 'tool_call':
@@ -112,6 +116,12 @@ function validateSteps(steps: JourneyStep[]): string | null {
     if (step.type === 'condition' && (!step.onTrue || !step.onFalse)) {
       return `"${step.name}": pick both "if true" and "if false" steps`
     }
+    // Both edges are required: a journey that pauses on a reply with nowhere to
+    // go when it doesn't arrive would strand the lead until the 24h timeout and
+    // then fail the execution.
+    if (step.type === 'await_reply' && (!step.next || !step.onNoReply)) {
+      return `"${step.name}": pick both "when they reply" and "if they don't reply" steps`
+    }
     if (step.type === 'tool_call') {
       if (!step.toolName) return `"${step.name}": choose a tool`
       if (step.toolName === 'booking' && !step.toolInput?.requestedAt) {
@@ -134,6 +144,8 @@ interface StepPatch {
   recheckField?: 'replied' | 'lead_score' | 'appointment_booked'
   onSatisfied?: string
   onExhausted?: string
+  promptHint?: string
+  onNoReply?: string
   field?: 'replied' | 'lead_score' | 'appointment_booked'
   operator?: 'equals' | 'not_equals'
   value?: string
@@ -344,6 +356,43 @@ function StepEditor({
               required
               label="If tries run out, go to"
             />
+          </>
+        )}
+
+        {step.type === 'await_reply' && (
+          <>
+            <div>
+              <label className={labelClasses}>What you're expecting them to send (optional)</label>
+              <input
+                value={step.promptHint ?? ''}
+                onChange={(e) => onChange({ promptHint: e.target.value })}
+                placeholder="e.g. budget range and preferred area"
+                className={inputClasses}
+              />
+              <p className="mt-1.5 text-xs text-gray-500">
+                A note for you, not a message to them. Use a “Send a message” step before this one to actually ask.
+              </p>
+            </div>
+            <NextStepSelect
+              steps={steps}
+              currentIndex={index}
+              value={step.next}
+              onChange={(v) => onChange({ next: v })}
+              required
+              label="When they reply, go to"
+            />
+            <NextStepSelect
+              steps={steps}
+              currentIndex={index}
+              value={step.onNoReply}
+              onChange={(v) => onChange({ onNoReply: v })}
+              required
+              label="If they don't reply within 24 hours, go to"
+            />
+            <p className="text-xs text-gray-500">
+              24 hours is WhatsApp's rule, not ours: after that you can only reach them with a pre-approved
+              template, so the journey has to take a different path.
+            </p>
           </>
         )}
 

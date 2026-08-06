@@ -13,6 +13,7 @@ import { logPayment } from '../repositories/payment-history-repository.js'
 import { getClientIdForGupshupApp } from '../repositories/gupshup-app-lookup-repository.js'
 import { recordInboundMessage } from '../repositories/whatsapp-inbound-activity-repository.js'
 import { invalidateEntitlementsCache } from './entitlement-service.js'
+import { handleInboundLeadMessage } from './journey-reply-service.js'
 import { getLeadsForClient } from './lead-service.js'
 import type { PlanTier, Subscription, SubscriptionStatus } from '../types/index.js'
 
@@ -79,6 +80,16 @@ async function resolveAndRecordInboundMessage(event: GupshupIncomingMessage): Pr
     }
 
     await recordInboundMessage(matchingLead.leadId)
+
+    // The message is now more than a timestamp: if a journey is parked on this
+    // lead's await_reply step, this is what advances it, and an opt-out is what
+    // stops it. Still best-effort -- handleInboundLeadMessage never throws --
+    // so a journey-layer problem cannot turn a received message into a 500 and
+    // make Gupshup redeliver it.
+    const outcome = await handleInboundLeadMessage(matchingLead.leadId, event.payload.payload.text ?? '')
+    if (outcome.handled !== 'no_pending_journey') {
+      console.log(`[journey-reply] lead ${matchingLead.leadId}: ${JSON.stringify(outcome)}`)
+    }
   } catch (error) {
     console.error('Failed to resolve/record Gupshup incoming message:', error)
   }

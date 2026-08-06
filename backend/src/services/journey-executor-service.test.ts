@@ -1,6 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { McpCapability } from '../types/index.js'
 
+const isOptedOut = vi.fn()
+vi.mock('../repositories/whatsapp-inbound-activity-repository.js', () => ({ isOptedOut }))
+
+const claimPendingReply = vi.fn()
+vi.mock('../repositories/journey-pending-reply-repository.js', () => ({ claimPendingReply }))
+
+const getAppointmentRequestsByBotId = vi.fn()
+vi.mock('../repositories/appointment-request-repository.js', () => ({ getAppointmentRequestsByBotId }))
+
 const incrementWaitAndRecheckIteration = vi.fn()
 const bookAppointment = vi.fn()
 const scheduleReminder = vi.fn()
@@ -35,6 +44,12 @@ const baseContext = {
 }
 
 beforeEach(() => {
+  isOptedOut.mockReset()
+  isOptedOut.mockResolvedValue(false)
+  claimPendingReply.mockReset()
+  claimPendingReply.mockResolvedValue(undefined)
+  getAppointmentRequestsByBotId.mockReset()
+  getAppointmentRequestsByBotId.mockResolvedValue([])
   incrementWaitAndRecheckIteration.mockReset()
   bookAppointment.mockReset()
   scheduleReminder.mockReset()
@@ -47,7 +62,9 @@ beforeEach(() => {
 
 describe('executeJourneyStep', () => {
   describe('wait_and_recheck_check', () => {
-    it('is never satisfied yet (no real data model to check against)', async () => {
+    // replied / lead_score still have nowhere to live, and a step with no
+    // recheckField has nothing to check, so these stay false by design.
+    it('is not satisfied when there is no recheckField to evaluate', async () => {
       incrementWaitAndRecheckIteration.mockResolvedValueOnce(1)
 
       const result = await executeJourneyStep({
@@ -225,5 +242,151 @@ describe('executeJourneyStep', () => {
   it('human_handoff acknowledges the handoff', async () => {
     const result = await executeJourneyStep({ ...baseContext, operation: 'human_handoff', stepId: 'handoff' })
     expect(result).toEqual({ handedOff: true })
+  })
+})
+
+describe('send_message — opt-out is enforced before anything else', () => {
+  // A 60-90 day nurture journey keeps firing on schedule. Without this check a
+  // lead who replied STOP on day 2 keeps receiving messages until day 90, which
+  // is a Meta WhatsApp Business policy violation against OUR account.
+  it('refuses to send to a lead who opted out, without even reading the lead', async () => {
+    isOptedOut.mockResolvedValue(true)
+
+    const result = await executeJourneyStep({
+      ...baseContext,
+      operation: 'send_message',
+      channel: 'whatsapp',
+      messageHint: 'hi',
+    })
+
+    expect(result).toMatchObject({ sent: false, reason: 'opted_out' })
+    expect(getLeadById).not.toHaveBeenCalled()
+    expect(sendWhatsAppMessageToLead).not.toHaveBeenCalled()
+  })
+})
+
+describe('await_reply — parks the execution on the lead', () => {
+  // The return value is irrelevant to Step Functions here (the execution resumes
+  // only on SendTaskSuccess), so storing the token durably IS the whole job.
+  it('stores the callback token against the lead', async () => {
+    await executeJourneyStep({
+      ...baseContext,
+      operation: 'await_reply',
+      stepId: 'ask-budget',
+      taskToken: 'token-abc',
+    })
+
+    expect(claimPendingReply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        leadId: baseContext.leadId,
+        taskToken: 'token-abc',
+        stepId: 'ask-budget',
+        bundleId: baseContext.bundleId,
+      })
+    )
+  })
+
+  it('sets a TTL that outlives the execution timeout so the row is never the first thing to vanish', async () => {
+    await executeJourneyStep({
+      ...baseContext,
+      operation: 'await_reply',
+      stepId: 'ask-budget',
+      taskToken: 'token-abc',
+    })
+
+    const record = claimPendingReply.mock.calls[0]?.[0]
+    const secondsFromNow = record.expiresAt - Math.floor(Date.now() / 1000)
+    expect(secondsFromNow).toBeGreaterThan(24 * 60 * 60)
+  })
+
+  // Returning cleanly without a stored token would park the execution on a
+  // token nobody recorded: unresumable, and invisible until it times out a day
+  // later. Throwing fails the task immediately instead.
+  it('throws rather than silently parking an unresumable execution', async () => {
+    claimPendingReply.mockRejectedValue(new Error('conditional check failed'))
+
+    await expect(
+      executeJourneyStep({ ...baseContext, operation: 'await_reply', stepId: 's', taskToken: 't' })
+    ).rejects.toThrow()
+  })
+
+  it('rejects an event with no task token', async () => {
+    await expect(
+      executeJourneyStep({ ...baseContext, operation: 'await_reply', stepId: 's' })
+    ).rejects.toThrow(/missing taskToken/)
+  })
+})
+
+describe('wait_and_recheck — appointment_booked is a real check now', () => {
+  // Previously hardcoded false, so every wait_and_recheck ran to exhaustion and
+  // onSatisfied was unreachable. Cal.com giving AppointmentRequest a genuine
+  // 'confirmed' transition is what made this checkable.
+  it('is satisfied when the lead has a confirmed appointment', async () => {
+    getAppointmentRequestsByBotId.mockResolvedValue([
+      { leadId: 'lead-1', status: 'confirmed', requestId: 'r1' },
+    ])
+    incrementWaitAndRecheckIteration.mockResolvedValueOnce(1)
+
+    const result = await executeJourneyStep({
+      ...baseContext,
+      operation: 'wait_and_recheck_check',
+      stepId: 'poll',
+      recheckField: 'appointment_booked',
+      maxIterations: 3,
+    })
+
+    expect(result).toMatchObject({ satisfied: true })
+  })
+
+  it('ignores a request that is merely requested or failed', async () => {
+    getAppointmentRequestsByBotId.mockResolvedValue([
+      { leadId: 'lead-1', status: 'requested' },
+      { leadId: 'lead-1', status: 'failed' },
+    ])
+    incrementWaitAndRecheckIteration.mockResolvedValueOnce(1)
+
+    const result = await executeJourneyStep({
+      ...baseContext,
+      operation: 'wait_and_recheck_check',
+      stepId: 'poll',
+      recheckField: 'appointment_booked',
+      maxIterations: 3,
+    })
+
+    expect(result).toMatchObject({ satisfied: false })
+  })
+
+  // Cross-lead leakage would send one lead down onSatisfied because a different
+  // lead on the same bot booked.
+  it('ignores another lead’s confirmed booking on the same bot', async () => {
+    getAppointmentRequestsByBotId.mockResolvedValue([{ leadId: 'someone-else', status: 'confirmed' }])
+    incrementWaitAndRecheckIteration.mockResolvedValueOnce(1)
+
+    const result = await executeJourneyStep({
+      ...baseContext,
+      operation: 'wait_and_recheck_check',
+      stepId: 'poll',
+      recheckField: 'appointment_booked',
+      maxIterations: 3,
+    })
+
+    expect(result).toMatchObject({ satisfied: false })
+  })
+
+  // Booking on the last permitted tick must win over exhaustion, or a lead who
+  // booked gets treated as one who ignored us.
+  it('prefers satisfied over exhausted on the final iteration', async () => {
+    getAppointmentRequestsByBotId.mockResolvedValue([{ leadId: 'lead-1', status: 'confirmed' }])
+    incrementWaitAndRecheckIteration.mockResolvedValueOnce(3)
+
+    const result = await executeJourneyStep({
+      ...baseContext,
+      operation: 'wait_and_recheck_check',
+      stepId: 'poll',
+      recheckField: 'appointment_booked',
+      maxIterations: 3,
+    })
+
+    expect(result).toEqual({ satisfied: true, exhausted: false })
   })
 })

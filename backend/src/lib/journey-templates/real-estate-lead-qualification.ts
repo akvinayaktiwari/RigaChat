@@ -4,27 +4,35 @@ import type { JourneyTemplate } from '../../types/index.js'
 // nudge once if they go quiet, hand to a human rather than nagging forever.
 //
 // Step order is load-bearing, not cosmetic. journey-compiler-service.ts
-// validates that every reference (next / onSatisfied / onExhausted) points to a
-// LATER array index -- that forward-only rule is what makes a journey a DAG by
-// construction. Reordering this array without re-checking the references will
-// fail the compile, which is exactly the intent.
+// validates that every reference (next / onNoReply / onSatisfied / onExhausted)
+// points to a LATER array index -- that forward-only rule is what makes a
+// journey a DAG by construction, and await_reply is held to it too so it cannot
+// be used to smuggle in a loop. Reordering this array without re-checking the
+// references fails the compile, which is exactly the intent.
 //
-//   0 greet ───────────────► 1 wait_for_booking
-//                               ├─ satisfied ──────────────► 4 confirm_visit
-//                               └─ exhausted ─► 2 nudge
-//   2 nudge ───────────────► 3 wait_after_nudge
-//                               ├─ satisfied ──────────────► 4 confirm_visit
-//                               └─ exhausted ─────────────► 5 hand_to_agent
+//   0 greet ──────────────────► 1 await_qualification
+//   1 await_qualification ─ reply ──► 2 offer_visit
+//                          └ 24h ───► 4 nudge
+//   2 offer_visit ────────────► 3 await_visit_time
+//   3 await_visit_time ── reply ───► 5 wait_for_booking
+//                          └ 24h ───► 4 nudge
+//   4 nudge ──────────────────► 5 wait_for_booking
+//   5 wait_for_booking ─ satisfied ► 6 confirm_visit
+//                       └ exhausted ► 7 hand_to_agent
 //
-// KNOWN LIMITATION, deliberate: there is no tool_call step booking a slot,
-// because a booking needs a concrete requestedAt and this journey has no way
-// to ask the lead for one yet -- the engine cannot consume an inbound reply
-// until the await_reply primitive lands. So this template waits for a booking
-// to appear (recheckField 'appointment_booked') rather than negotiating one.
-// When await_reply ships, the qualification turn goes between steps 0 and 1
-// and a booking tool_call replaces the passive wait. mcpToolbox already
-// carries 'booking' and 'reminder' so a client can add those steps by hand in
-// the builder today.
+// The two await_reply steps are what make this a conversation rather than a
+// drip campaign: the execution parks (costing nothing) until the lead actually
+// answers, and only then moves on. Each falls back to the same nudge when the
+// 24h WhatsApp window closes without a reply.
+//
+// STILL A LIMITATION, and an honest one: send_message delivers messageHint
+// literally today rather than composing a reply from what the lead just said,
+// so the journey can branch on a reply arriving but not yet on its content. The
+// lead's words are available downstream at $.lastResult.message for whenever
+// AI-composed sends land. Booking is still a passive wait on
+// appointment_booked rather than a tool_call, because a booking needs a
+// concrete requestedAt and parsing one out of free text is that same
+// composition problem.
 export const realEstateLeadQualification: JourneyTemplate = {
   templateId: 'real-estate-lead-qualification-v1',
   name: 'Real estate lead qualification',
@@ -69,33 +77,47 @@ export const realEstateLeadQualification: JourneyTemplate = {
         // compose from it), so it is written as a real sendable message rather
         // than as an instruction to the model.
         messageHint:
-          'Hi! Thanks for your interest. To point you to the right property, could you tell me your budget range and which area you are considering? Happy to arrange a site visit whenever suits you.',
+          'Hi! Thanks for your interest. To point you to the right property, could you tell me your budget range and which area you are considering?',
+        next: 'await_qualification',
+      },
+      {
+        stepId: 'await_qualification',
+        name: 'Wait for them to tell us budget and area',
+        type: 'await_reply',
+        promptHint: 'budget range and preferred area',
+        next: 'offer_visit',
+        onNoReply: 'nudge',
+      },
+      {
+        stepId: 'offer_visit',
+        name: 'Acknowledge and offer a site visit',
+        type: 'send_message',
+        messageHint:
+          'Thanks, that helps. Would you like to see the property in person? Tell me a day that suits you and I will arrange a site visit.',
+        next: 'await_visit_time',
+      },
+      {
+        stepId: 'await_visit_time',
+        name: 'Wait for them to name a day',
+        type: 'await_reply',
+        promptHint: 'a day that suits them for a site visit',
+        next: 'wait_for_booking',
+        onNoReply: 'nudge',
+      },
+      {
+        stepId: 'nudge',
+        name: 'Nudge once when they go quiet',
+        type: 'send_message',
+        messageHint:
+          'Just checking in -- would a weekend site visit work for you? I can hold a slot and share the exact location and directions.',
         next: 'wait_for_booking',
       },
       {
         stepId: 'wait_for_booking',
-        name: 'Wait a day for them to book',
+        name: 'Wait for a booking to be confirmed',
         type: 'wait_and_recheck',
         waitDays: 1,
         maxIterations: 3,
-        recheckField: 'appointment_booked',
-        onSatisfied: 'confirm_visit',
-        onExhausted: 'nudge',
-      },
-      {
-        stepId: 'nudge',
-        name: 'Nudge once with a concrete offer',
-        type: 'send_message',
-        messageHint:
-          'Just checking in -- would a weekend site visit work for you? I can hold a slot and share the exact location and directions.',
-        next: 'wait_after_nudge',
-      },
-      {
-        stepId: 'wait_after_nudge',
-        name: 'Give them two more days after the nudge',
-        type: 'wait_and_recheck',
-        waitDays: 2,
-        maxIterations: 2,
         recheckField: 'appointment_booked',
         onSatisfied: 'confirm_visit',
         onExhausted: 'hand_to_agent',
@@ -111,7 +133,7 @@ export const realEstateLeadQualification: JourneyTemplate = {
         stepId: 'hand_to_agent',
         name: 'Hand to a human instead of following up again',
         type: 'human_handoff',
-        reason: 'Lead did not book a site visit after an initial message and one nudge.',
+        reason: 'Lead did not book a site visit after qualification, a nudge, and a wait.',
       },
     ],
   },

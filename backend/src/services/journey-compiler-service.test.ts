@@ -255,3 +255,68 @@ describe('compileJourneyToAsl — every Task must preserve execution context', (
     })
   })
 })
+
+describe('compileJourneyToAsl — await_reply', () => {
+  const journey = () =>
+    baseJourney([
+      { stepId: 'ask', type: 'await_reply', name: 'Ask', next: 'book', onNoReply: 'handoff' },
+      { stepId: 'book', type: 'tool_call', name: 'Book', toolName: 'booking', next: 'handoff' },
+      { stepId: 'handoff', type: 'human_handoff', name: 'Handoff' },
+    ])
+
+  it('compiles to the callback pattern, not a plain Lambda invoke', () => {
+    const ask = compileJourneyToAsl(journey()).States.ask as unknown as {
+      Resource: string
+      Parameters: { FunctionName: string; Payload: Record<string, unknown> }
+    }
+
+    // The execution must NOT resume when the Lambda returns -- only when
+    // someone sends the task token back.
+    expect(ask.Resource).toBe('arn:aws:states:::lambda:invoke.waitForTaskToken')
+    expect(ask.Parameters.FunctionName).toEqual(expect.any(String))
+    expect(ask.Parameters.Payload).toMatchObject({ 'taskToken.$': '$$.Task.Token', operation: 'await_reply' })
+  })
+
+  it('times out at the WhatsApp session window and routes to onNoReply', () => {
+    const ask = compileJourneyToAsl(journey()).States.ask as unknown as {
+      TimeoutSeconds: number
+      Catch: { ErrorEquals: string[]; Next: string; ResultPath?: string }[]
+    }
+
+    expect(ask.TimeoutSeconds).toBe(24 * 60 * 60)
+    expect(ask.Catch[0]).toMatchObject({ ErrorEquals: ['States.Timeout'], Next: 'handoff' })
+  })
+
+  // Same defect class as the Task ResultPath bug: without this the onNoReply
+  // branch receives the timeout error where its execution context should be.
+  it('gives the timeout Catch its own ResultPath so onNoReply keeps its context', () => {
+    const ask = compileJourneyToAsl(journey()).States.ask as unknown as {
+      Catch: { ResultPath?: string }[]
+    }
+
+    expect(ask.Catch[0].ResultPath).toBeDefined()
+    expect(ask.Catch[0].ResultPath).not.toBe('$')
+  })
+
+  it('enforces forward-only references on both edges, so it cannot smuggle a loop', () => {
+    const backward = baseJourney(
+      [
+        { stepId: 'first', type: 'send_message', name: 'First', next: 'ask' },
+        { stepId: 'ask', type: 'await_reply', name: 'Ask', next: 'first', onNoReply: 'done' },
+        { stepId: 'done', type: 'human_handoff', name: 'Done' },
+      ],
+      'first'
+    )
+
+    expect(() => compileJourneyToAsl(backward)).toThrow(JourneyCompileError)
+  })
+
+  it('rejects an onNoReply pointing at a step that does not exist', () => {
+    const broken = baseJourney([
+      { stepId: 'ask', type: 'await_reply', name: 'Ask', next: 'done', onNoReply: 'nowhere' },
+      { stepId: 'done', type: 'human_handoff', name: 'Done' },
+    ])
+
+    expect(() => compileJourneyToAsl(broken)).toThrow(/onNoReply/)
+  })
+})

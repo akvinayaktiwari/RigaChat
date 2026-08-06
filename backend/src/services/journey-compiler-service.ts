@@ -91,6 +91,13 @@ const CONTEXT_PASSTHROUGH_PARAMETERS = {
 // result, so retaining only the latest keeps the state payload bounded.
 const TASK_RESULT_PATH = '$.lastResult'
 
+// 24 hours: Meta's WhatsApp customer-service window. Deliberately not a tuned
+// product number. Past this boundary the agent may no longer send free text at
+// all -- only a pre-approved template can reach the lead -- so this is the
+// moment the journey's available actions genuinely change, and therefore the
+// only non-arbitrary place to branch. See AwaitReplyStep.onNoReply.
+export const AWAIT_REPLY_TIMEOUT_SECONDS = 24 * 60 * 60
+
 // Every step reference (next/onTrue/onFalse/onSatisfied/onExhausted) must
 // point to a LATER array index than the referring step. This is what makes
 // a JourneyDefinition a DAG by construction -- no general graph-cycle
@@ -146,6 +153,12 @@ export function validateJourneyStructure(journey: JourneyDefinition): void {
       case 'condition':
         assertForwardReference(step, step.onTrue, 'onTrue')
         assertForwardReference(step, step.onFalse, 'onFalse')
+        break
+      case 'await_reply':
+        // Both edges forward-only like every other branch, so await_reply
+        // cannot be used to smuggle a loop past the DAG guarantee.
+        assertForwardReference(step, step.next, 'next')
+        assertForwardReference(step, step.onNoReply, 'onNoReply')
         break
       case 'human_handoff':
         // Terminal by design -- no outgoing reference to validate.
@@ -304,6 +317,45 @@ export function compileJourneyToAsl(journey: JourneyDefinition): AslStateMachine
           },
           ResultPath: TASK_RESULT_PATH,
           End: true,
+        } satisfies AslTaskState
+        break
+
+      // The only step that pauses on a human rather than a clock. Note the
+      // Resource is the SDK integration ARN, not the executor Lambda -- with
+      // the callback pattern the Lambda goes in Parameters.FunctionName and
+      // the execution does NOT resume when that Lambda returns. It resumes
+      // only when someone calls SendTaskSuccess with the token, which is why
+      // the executor's job here is to durably store the token and nothing else.
+      case 'await_reply':
+        states[step.stepId] = {
+          Type: 'Task',
+          Resource: 'arn:aws:states:::lambda:invoke.waitForTaskToken',
+          Parameters: {
+            FunctionName: journeyExecutorLambdaArn(),
+            Payload: {
+              operation: 'await_reply',
+              stepId: step.stepId,
+              promptHint: step.promptHint,
+              // $$ is the CONTEXT object, not the execution input -- this is
+              // Step Functions handing us the callback token for this exact
+              // task attempt.
+              'taskToken.$': '$$.Task.Token',
+              ...CONTEXT_PASSTHROUGH_PARAMETERS,
+            },
+          },
+          TimeoutSeconds: AWAIT_REPLY_TIMEOUT_SECONDS,
+          // On timeout the caught error must NOT land on the root, or the
+          // onNoReply branch inherits an error object where its context should
+          // be -- the same defect TASK_RESULT_PATH exists to prevent.
+          Catch: [
+            {
+              ErrorEquals: ['States.Timeout'],
+              Next: resolve(step.onNoReply),
+              ResultPath: '$.noReplyError',
+            },
+          ],
+          ResultPath: TASK_RESULT_PATH,
+          Next: resolve(step.next),
         } satisfies AslTaskState
         break
     }

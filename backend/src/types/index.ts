@@ -641,6 +641,35 @@ export interface HumanHandoffStep extends JourneyStepBase {
   reason?: string
 }
 
+// The step that makes a journey a conversation rather than a drip campaign.
+// Every other step type is outbound or a timer: send, sleep, poll, branch, call
+// a tool. None of them can consume an inbound reply, so before this existed the
+// engine could talk AT a lead but never WITH one.
+//
+// Compiles to Step Functions' task-token callback pattern: the execution pauses
+// (costing nothing while idle) until the inbound WhatsApp handler resolves the
+// waiting token and calls SendTaskSuccess with what the lead actually said.
+export interface AwaitReplyStep extends JourneyStepBase {
+  type: 'await_reply'
+  // Optional steer for the message that solicits the reply. Not the message
+  // itself -- use a send_message step before this one for that.
+  promptHint?: string
+  // Where to go once the lead replies. The reply text is available downstream
+  // at $.lastResult.message.
+  next: string
+  // Where to go when they don't.
+  //
+  // The timeout is the WhatsApp 24h session window, not a tuned number, because
+  // that is the boundary where the agent's OPTIONS change: past it, free-text
+  // sending stops being permitted and only a pre-approved template can reach
+  // them. Any other duration would be arbitrary; this one is the real
+  // constraint, so the branch always has a concrete reason to exist. Once
+  // template sending is approved, onNoReply gains "send a re-engagement
+  // template", and a reply to that reopens the window -- an addition to this
+  // branch rather than a change to the policy.
+  onNoReply: string
+}
+
 export type JourneyStep =
   | SendMessageStep
   | WaitStep
@@ -648,6 +677,32 @@ export type JourneyStep =
   | ConditionStep
   | ToolCallStep
   | HumanHandoffStep
+  | AwaitReplyStep
+
+// A journey execution parked on an await_reply step, keyed by the lead so the
+// inbound message handler -- which knows only who messaged -- can find it.
+//
+// One pending reply per lead. Phase 1 permits exactly one active bundle per
+// (Agent, trigger) and only the lead_captured trigger, so a lead cannot be
+// awaiting two journeys at once; the claim is conditional rather than an
+// overwrite so that if that ever changes it surfaces as a conflict instead of
+// silently stranding the first journey until its timeout.
+export interface PendingJourneyReply {
+  leadId: string
+  // Opaque Step Functions callback token. Possession of it is what allows an
+  // execution to be resumed, which is why resumption is bound to a token we
+  // stored ourselves rather than to anything the caller supplies.
+  taskToken: string
+  bundleId: string
+  stepId: string
+  botId: string
+  clientId: string
+  createdAt: string
+  // Unix seconds, for DynamoDB TTL. Set past the Step Functions timeout so the
+  // row outlives the execution it belongs to and cleanup is automatic -- a
+  // timed-out execution has no callback to tell us to delete it.
+  expiresAt: number
+}
 
 export interface JourneyDefinition {
   journeyId: string
@@ -931,6 +986,14 @@ export interface AslTaskState {
   Next?: string
   End?: boolean
   Retry?: { ErrorEquals: string[]; MaxAttempts: number; IntervalSeconds: number; BackoffRate?: number }[]
+  // await_reply only: the ceiling on how long an execution may sit paused
+  // waiting for the lead. See AwaitReplyStep for why it is the WhatsApp session
+  // window rather than a tuned number.
+  TimeoutSeconds?: number
+  // Catch needs its own ResultPath for the same reason every Task does: without
+  // one, the caught error REPLACES the execution context and the recovery
+  // branch's own Parameters resolve against the error object.
+  Catch?: { ErrorEquals: string[]; Next: string; ResultPath?: string }[]
 }
 
 export interface AslChoiceRule {
@@ -1019,7 +1082,12 @@ export interface WaitAndRecheckIteration {
   updatedAt: string
 }
 
-export type JourneyExecutorOperation = 'send_message' | 'tool_call' | 'wait_and_recheck_check' | 'human_handoff'
+export type JourneyExecutorOperation =
+  | 'send_message'
+  | 'tool_call'
+  | 'wait_and_recheck_check'
+  | 'human_handoff'
+  | 'await_reply'
 
 // The shape every compiled Task state's Parameters produces (see
 // CONTEXT_PASSTHROUGH_PARAMETERS in journey-compiler-service.ts), and what
@@ -1042,6 +1110,11 @@ export interface JourneyExecutorEvent {
   leadParentId?: string
   // The published bundle version this execution was started against.
   journeyVersion?: number
+  // await_reply only. Step Functions' callback token for this task attempt,
+  // supplied via $$.Task.Token. Whoever holds it can resume the execution, so
+  // it is stored against the lead and never echoed back to a caller.
+  taskToken?: string
+  promptHint?: string
   stepId?: string
   messageHint?: string
   // Typed, but this event arrives from Step Functions rather than from our own

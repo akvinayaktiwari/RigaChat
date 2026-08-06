@@ -31,6 +31,7 @@ type TableKey =
   | 'agents'
   | 'agent_binding_lookup'
   | 'journey_trigger_claims'
+  | 'journey_pending_replies'
   | 'contact_messages'
 
 const tableEnvVarNames: Record<TableKey, string> = {
@@ -57,6 +58,7 @@ const tableEnvVarNames: Record<TableKey, string> = {
   agents: 'DYNAMODB_TABLE_AGENTS',
   agent_binding_lookup: 'DYNAMODB_TABLE_AGENT_BINDING_LOOKUP',
   journey_trigger_claims: 'DYNAMODB_TABLE_JOURNEY_TRIGGER_CLAIMS',
+  journey_pending_replies: 'DYNAMODB_TABLE_JOURNEY_PENDING_REPLIES',
   contact_messages: 'DYNAMODB_TABLE_CONTACT_MESSAGES',
 }
 

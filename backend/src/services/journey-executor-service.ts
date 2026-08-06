@@ -1,4 +1,8 @@
 import { incrementWaitAndRecheckIteration } from '../repositories/journey-execution-repository.js'
+import { claimPendingReply } from '../repositories/journey-pending-reply-repository.js'
+import { isOptedOut } from '../repositories/whatsapp-inbound-activity-repository.js'
+import { getAppointmentRequestsByBotId } from '../repositories/appointment-request-repository.js'
+import { AWAIT_REPLY_TIMEOUT_SECONDS } from './journey-compiler-service.js'
 import { getLeadById } from '../repositories/lead-repository.js'
 import { bookAppointment } from '../mcp/booking-mcp-server.js'
 import { scheduleReminder } from '../mcp/reminder-mcp-server.js'
@@ -39,6 +43,14 @@ async function handleSendMessage(event: JourneyExecutorEvent): Promise<Record<st
       reason: 'unsupported_channel',
       message: `send_message is not supported on channel "${event.channel}" yet -- it has no delivery mechanism for a Journey-initiated send. See TODOS.md.`,
     }
+  }
+
+  // Checked before anything else: a lead who asked to stop must not receive a
+  // message, and a 60-90 day nurture journey will otherwise keep firing on
+  // schedule long after they said so. This is the enforcement point -- opt-out
+  // is recorded on the inbound side, honoured here.
+  if (await isOptedOut(event.leadId)) {
+    return { sent: false, reason: 'opted_out', message: 'Lead has opted out of WhatsApp messages.' }
   }
 
   const lead = await getLeadById(event.botId, event.leadId)
@@ -130,17 +142,69 @@ async function handleHumanHandoff(event: JourneyExecutorEvent): Promise<{ handed
 // Wiring a real satisfied-check is tracked in TODOS.md, gated on those data
 // models existing first -- returning false unconditionally here is honest
 // about that gap rather than faking a check that can't mean anything yet.
+// Whether the thing this step is waiting FOR has actually happened.
+//
+// Only appointment_booked is real. It became checkable when the Cal.com
+// integration gave AppointmentRequest.status a genuine 'confirmed' transition
+// instead of everything sitting at 'requested' forever.
+//
+// 'replied' and 'lead_score' still return false, and deliberately so: neither
+// has anywhere to live yet. `replied` is largely superseded by await_reply,
+// which waits on a reply directly rather than polling for one, and lead_score
+// needs a scoring model nobody has specified. Returning false is honest about
+// that; inventing a check that cannot mean anything would be worse.
+async function isRecheckSatisfied(event: JourneyExecutorEvent): Promise<boolean> {
+  if (event.recheckField !== 'appointment_booked') return false
+
+  const requests = await getAppointmentRequestsByBotId(event.botId)
+  return requests.some((request) => request.leadId === event.leadId && request.status === 'confirmed')
+}
+
 async function handleWaitAndRecheckCheck(event: JourneyExecutorEvent): Promise<WaitAndRecheckResult> {
   if (!event.stepId || event.maxIterations === undefined) {
     throw new Error('wait_and_recheck_check event missing stepId or maxIterations')
   }
 
+  // Satisfaction is checked BEFORE the counter is consumed, so a lead who books
+  // on the final permitted iteration still takes onSatisfied rather than being
+  // marked exhausted on the same tick that their booking landed.
+  const satisfied = await isRecheckSatisfied(event)
   const iterationCount = await incrementWaitAndRecheckIteration(event.leadId, event.stepId)
 
   return {
-    satisfied: false,
-    exhausted: iterationCount >= event.maxIterations,
+    satisfied,
+    exhausted: !satisfied && iterationCount >= event.maxIterations,
   }
+}
+
+// Parks the execution on the lead. Unlike every other handler, this one's
+// return value never reaches the state machine: with the callback pattern the
+// execution resumes only on SendTaskSuccess, so the ONLY thing that matters
+// here is that the token is durably stored before this returns. If the write
+// fails, throwing is correct and deliberate -- a Lambda error fails the task,
+// which is far better than returning cleanly and leaving an execution parked on
+// a token nobody recorded, unresumable until it times out 24 hours later.
+async function handleAwaitReply(event: JourneyExecutorEvent): Promise<Record<string, unknown>> {
+  if (!event.taskToken || !event.stepId) {
+    throw new Error('await_reply event missing taskToken or stepId')
+  }
+
+  const now = Date.now()
+  await claimPendingReply({
+    leadId: event.leadId,
+    taskToken: event.taskToken,
+    bundleId: event.bundleId,
+    stepId: event.stepId,
+    botId: event.botId,
+    clientId: event.clientId,
+    createdAt: new Date(now).toISOString(),
+    // Outlives the execution's own timeout by an hour so the row is still
+    // around to be read (and recognised as expired) rather than vanishing
+    // first. DynamoDB TTL then reclaims it without anyone having to notice.
+    expiresAt: Math.floor(now / 1000) + AWAIT_REPLY_TIMEOUT_SECONDS + 3600,
+  })
+
+  return { awaiting: true, stepId: event.stepId }
 }
 
 export async function executeJourneyStep(event: JourneyExecutorEvent): Promise<Record<string, unknown>> {
@@ -151,6 +215,8 @@ export async function executeJourneyStep(event: JourneyExecutorEvent): Promise<R
       return handleToolCall(event)
     case 'human_handoff':
       return handleHumanHandoff(event)
+    case 'await_reply':
+      return handleAwaitReply(event)
     case 'wait_and_recheck_check':
       return { ...(await handleWaitAndRecheckCheck(event)) }
   }
