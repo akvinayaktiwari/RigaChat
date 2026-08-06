@@ -25,6 +25,25 @@ export async function createMetaLead(data: Omit<MetaLead, 'leadId' | 'createdAt'
   }
 }
 
+// Point read on the base table's real key. pageId is the partition key and
+// leadId the sort key (see the GSI comment below), so a Meta lead cannot be
+// fetched by leadId alone -- which is why LeadRef carries the pageId.
+export async function getMetaLeadById(pageId: string, leadId: string): Promise<MetaLead | null> {
+  try {
+    const result = await dynamoClient.send(
+      new GetCommand({
+        TableName: LEADS_TABLE_NAME,
+        Key: { pageId, leadId },
+      })
+    )
+    return (result.Item as MetaLead | undefined) ?? null
+  } catch (error) {
+    throw new Error(
+      `Failed to get Meta lead ${leadId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
 export async function getMetaLeadsByClientId(clientId: string, limit = 50): Promise<MetaLead[]> {
   try {
     // Queries the clientId-createdAt-index GSI, not the base table --

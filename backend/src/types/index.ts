@@ -786,6 +786,85 @@ export interface JourneyBundle {
   updatedAt: string
 }
 
+// -------------------------------------------------------------------------
+// Lead identity for the journey layer.
+//
+// Three lead tables exist with three different parent keys, and none of the
+// non-chat ones carry a botId:
+//
+//   leads       partition botId    sort createdAt   (+ leadId-index GSI)
+//   form_leads  partition formId   sort leadId
+//   meta_leads  partition pageId   sort leadId
+//
+// The journey machinery is botId-addressed throughout (JourneyBundle, the
+// executor event, AppointmentRequest, Pinecone scoping), so before this type
+// existed a Meta lead resolved to null through every journey step: the
+// journey ran to completion and did nothing, silently.
+//
+// LeadRef is what makes a lead readable regardless of source, and it is
+// deliberately NOT interchangeable with botId. Two different ideas got
+// conflated before:
+//   - leadRef  : WHERE the lead record lives (its table and parent key)
+//   - botId    : which bot the Agent operates as -- Pinecone namespace,
+//                bot config, AppointmentRequest partition
+// A Meta lead has a pageId for the first and an Agent-derived botId for the
+// second. Collapsing them is what made "just stamp a botId on MetaLead"
+// look reasonable and would have mis-scoped RAG retrieval (rule #5).
+// -------------------------------------------------------------------------
+
+export type LeadSource = 'chat' | 'form' | 'meta'
+
+export type LeadRef =
+  | { source: 'chat'; botId: string; leadId: string }
+  | { source: 'form'; formId: string; leadId: string }
+  | { source: 'meta'; pageId: string; leadId: string }
+
+// Normalized read view across the three tables. Only the fields the journey
+// layer actually acts on -- delivery needs phone, Cal.com needs name/email,
+// the qualification prompt uses the property fields. Deliberately not a union
+// of the three record types: callers should not branch on source to read a
+// phone number.
+export interface JourneyLead {
+  leadId: string
+  clientId: string
+  source: LeadSource
+  name?: string
+  phone?: string
+  email?: string
+  propertyInterest?: string
+  budgetRange?: string
+  sourceUrl?: string
+}
+
+// Everything a journey execution needs to act on a lead, resolved once at
+// ignition and then carried through the execution rather than re-derived per
+// step.
+export interface LeadAgentContext {
+  leadRef: LeadRef
+  leadId: string
+  clientId: string
+  agentId: string
+  // The Agent's web-channel binding. Pinecone scoping, bot config lookups and
+  // AppointmentRequest partitioning all use this -- never leadRef's parent key.
+  botId: string
+}
+
+// Why a lead could not be attached to an Agent. Every value is a real,
+// expected state rather than an error: a client who hasn't created an Agent
+// yet, or has two and hasn't said which handles this source, is misconfigured,
+// not broken. Ignition records the reason on the lead so the miss is visible
+// instead of silent -- an unfollowed-up lead is the exact failure this product
+// exists to prevent.
+export type LeadResolutionFailureReason =
+  | 'lead_not_found'
+  | 'no_agent'
+  | 'ambiguous_agent'
+  | 'agent_has_no_web_binding'
+
+export type LeadResolution =
+  | { resolved: true; context: LeadAgentContext }
+  | { resolved: false; reason: LeadResolutionFailureReason }
+
 // A prebuilt agent, authored by us and shipped in the repo (see
 // lib/journey-templates/). Deliberately NOT a stored JourneyBundle: templates
 // live in code so "admin-authored only" is enforced by who can commit and
