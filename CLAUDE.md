@@ -122,6 +122,7 @@ interface KnowledgeBaseEntry {
 - whatsapp_inbound_activity — partition key: leadId (lastInboundMessageAt, powers the 24h WhatsApp session-window check)
 - agents — partition key: clientId, sort key: agentId (top-level cross-channel Agent identity; channel bindings resolve to a botId/voice agentId — an identity layer over the existing per-channel records, does not touch their Pinecone namespaces)
 - agent_binding_lookup — partition key: resourceId (reverse index botId/voiceAgentId → owning Agent; atomic-claim so one resource maps to at most one Agent, mirrors gupshup_app_lookup)
+- journey_trigger_claims — partition key: claimKey (`agent:<agentId>#<trigger>` or `bot:<botId>#<trigger>`; atomic-claim so exactly ONE published bundle owns a trigger — prevents duplicate outreach. Doubles as the ignition index: "which journey runs for this lead" is a point read)
 - contact_messages — partition key: messageId, GSI recordType-createdAt-index (marketing-site contact form; no clientId/botId — these are messages to us, not leads for a client's bot)
 
 ## Environment Variables
@@ -142,12 +143,14 @@ DYNAMODB_TABLE_GUPSHUP_APP_LOOKUP
 DYNAMODB_TABLE_WHATSAPP_INBOUND_ACTIVITY
 DYNAMODB_TABLE_AGENTS
 DYNAMODB_TABLE_AGENT_BINDING_LOOKUP
+DYNAMODB_TABLE_JOURNEY_TRIGGER_CLAIMS
 COGNITO_USER_POOL_ID
 COGNITO_CLIENT_ID
 FRONTEND_URL
 JOURNEY_EXECUTOR_LAMBDA_ARN
 SCHEDULER_TARGET_LAMBDA_ARN
 SCHEDULER_EXECUTION_ROLE_ARN
+JOURNEY_STATE_MACHINE_ROLE_ARN
 MCP_INTERNAL_SHARED_SECRET
 GUPSHUP_WEBHOOK_TOKEN
 CAL_COM_CLIENT_ID

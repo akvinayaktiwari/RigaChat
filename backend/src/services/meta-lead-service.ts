@@ -2,6 +2,7 @@ import { metaProvider } from '../providers/meta-provider.js'
 import type { MetaFieldDatum } from '../providers/meta-provider.js'
 import { getProvider, syncLeadToCRMWithRetry } from './crm-service.js'
 import { sendLeadNotification } from './whatsapp-service.js'
+import { igniteJourneysForLead } from './journey-ignition-service.js'
 import { decrypt, encrypt } from '../lib/kms.js'
 import { getClientById, removeClientMetaConnection, updateClient } from '../repositories/client-repository.js'
 import {
@@ -289,6 +290,23 @@ async function processSingleLeadgenEvent(pageId: string, leadgenId: string): Pro
     customFields: JSON.stringify(mapped.customFields),
     sourceUrl,
   })
+
+  // Hand the lead to its Agent. First in the post-save sequence because it is
+  // the only step that is time-sensitive to the lead themselves -- CRM sync and
+  // the notification below are for the client, and a buyer who filled a form
+  // thirty seconds ago is the whole reason this product exists.
+  //
+  // igniteJourneysForLead never throws (see its own comment): a journey-layer
+  // failure must not lose a lead that is already durably saved. It returns a
+  // structured outcome instead, logged here and persisted onto the lead by the
+  // follow-up that adds ignition status to the record.
+  const ignition = await igniteJourneysForLead({
+    leadRef: { source: 'meta', pageId, leadId: metaLead.leadId },
+    clientId,
+  })
+  if (ignition.status !== 'started') {
+    console.log(`[ignition] meta lead ${metaLead.leadId}: ${ignition.status}`, ignition)
+  }
 
   // Fire this after the lead is durably saved -- a CRM sync or WhatsApp
   // notification failure must never lose the lead record itself.

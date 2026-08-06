@@ -60,7 +60,19 @@ export async function getJourneyBundleById(botId: string, bundleId: string): Pro
 export async function updateJourneyBundle(
   botId: string,
   bundleId: string,
-  updates: Partial<Pick<JourneyBundle, 'name' | 'description' | 'journey' | 'agent' | 'status' | 'compiledStateMachineArn'>>
+  updates: Partial<
+    Pick<
+      JourneyBundle,
+      | 'name'
+      | 'description'
+      | 'journey'
+      | 'agent'
+      | 'status'
+      | 'compiledStateMachineArn'
+      | 'compiledStateMachineVersionArn'
+      | 'publishedVersion'
+    >
+  >
 ): Promise<JourneyBundle> {
   const now = new Date().toISOString()
   const fields: Record<string, unknown> = { ...updates, updatedAt: now }

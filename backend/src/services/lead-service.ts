@@ -6,6 +6,7 @@ import {
 } from '../repositories/lead-repository.js'
 import { markLeadCaptured } from '../repositories/conversation-repository.js'
 import { sendLeadNotification } from './whatsapp-service.js'
+import { igniteJourneysForLead } from './journey-ignition-service.js'
 import { getBotConfig } from './bot-service.js'
 import type { BotConfig, Lead } from '../types/index.js'
 
@@ -66,6 +67,18 @@ export async function captureLead(bot: BotConfig, input: CreateLeadInput): Promi
     })
 
     await markLeadCaptured(input.botId, input.conversationId)
+
+    // Hand the lead to its Agent. Safe inside this try/catch because
+    // igniteJourneysForLead never throws -- if it could, a journey-layer
+    // failure would surface as "Failed to capture lead" and the widget would
+    // tell a real visitor their details were not saved, when they were.
+    const ignition = await igniteJourneysForLead({
+      leadRef: { source: 'chat', botId: input.botId, leadId: lead.leadId },
+      clientId: input.clientId,
+    })
+    if (ignition.status !== 'started') {
+      console.log(`[ignition] chat lead ${lead.leadId}: ${ignition.status}`, ignition)
+    }
 
     const contactLines = [
       lead.name ? `Name: ${lead.name}` : null,

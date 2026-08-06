@@ -30,6 +30,7 @@ type TableKey =
   | 'whatsapp_inbound_activity'
   | 'agents'
   | 'agent_binding_lookup'
+  | 'journey_trigger_claims'
   | 'contact_messages'
 
 const tableEnvVarNames: Record<TableKey, string> = {
@@ -55,6 +56,7 @@ const tableEnvVarNames: Record<TableKey, string> = {
   whatsapp_inbound_activity: 'DYNAMODB_TABLE_WHATSAPP_INBOUND_ACTIVITY',
   agents: 'DYNAMODB_TABLE_AGENTS',
   agent_binding_lookup: 'DYNAMODB_TABLE_AGENT_BINDING_LOOKUP',
+  journey_trigger_claims: 'DYNAMODB_TABLE_JOURNEY_TRIGGER_CLAIMS',
   contact_messages: 'DYNAMODB_TABLE_CONTACT_MESSAGES',
 }
 

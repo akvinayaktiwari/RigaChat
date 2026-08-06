@@ -10,6 +10,12 @@ import { getBotConfig } from './bot-service.js'
 import { resolveOwningAgentId } from './agent-service.js'
 import { findInvalidCapabilities, MCP_CAPABILITIES } from '../lib/mcp-capabilities.js'
 import { findJourneyTemplate, listJourneyTemplates } from '../lib/journey-templates/index.js'
+import { createOrUpdateStateMachine, deleteStateMachine, stateMachineNameFor } from '../lib/step-functions.js'
+import {
+  claimJourneyTrigger,
+  releaseJourneyTrigger,
+  triggerClaimKey,
+} from '../repositories/journey-trigger-claim-repository.js'
 import type { AgentConfig, JourneyBundle, JourneyDefinition, JourneyTemplate } from '../types/index.js'
 
 export class JourneyValidationError extends Error {
@@ -223,6 +229,21 @@ export async function updateJourneyBundle(
     }
   }
 
+  // Editing a published bundle drops it back to draft, and a draft is not
+  // handling its trigger any more -- so it must not keep holding the claim.
+  // Leaving it held would block the client from publishing any other journey on
+  // that trigger while this one sits half-edited. In-flight executions are
+  // unaffected: they keep running the version they started on, so releasing
+  // here only governs which bundle NEW leads ignite into.
+  if (existing.status === 'published') {
+    await releaseJourneyTrigger(
+      triggerClaimKey({ agentId: existing.agentId, botId }, existing.journey.triggerType),
+      bundleId
+    ).catch((error) => {
+      console.error(`[journey] failed to release trigger claim while editing bundle ${bundleId}:`, error)
+    })
+  }
+
   return updateJourneyBundleRepo(botId, bundleId, {
     ...(updates.name !== undefined ? { name: updates.name } : {}),
     ...(updates.description !== undefined ? { description: updates.description } : {}),
@@ -235,23 +256,57 @@ export async function updateJourneyBundle(
   })
 }
 
+// Releases the trigger claim and tears down the state machine before dropping
+// the record, so deleting a bundle doesn't leave its trigger permanently held
+// by a bundle that no longer exists -- which would block the client from ever
+// publishing another journey on it.
+//
+// Both cleanups are best-effort and deliberately do not block the delete: if
+// AWS is unavailable, the client's delete should still succeed rather than
+// failing on a resource they cannot see. Step Functions marks a deleted machine
+// DELETING and lets in-flight executions finish, so leads mid-journey are not
+// stranded by this.
 export async function deleteJourneyBundle(botId: string, bundleId: string, clientId: string): Promise<void> {
-  await getOwnedJourneyBundle(botId, bundleId, clientId)
+  const existing = await getOwnedJourneyBundle(botId, bundleId, clientId)
+
+  await releaseJourneyTrigger(
+    triggerClaimKey({ agentId: existing.agentId, botId }, existing.journey.triggerType),
+    bundleId
+  ).catch((error) => {
+    console.error(`[journey] failed to release trigger claim for bundle ${bundleId}:`, error)
+  })
+
+  if (existing.compiledStateMachineArn) {
+    await deleteStateMachine(existing.compiledStateMachineArn).catch((error) => {
+      console.error(`[journey] failed to delete state machine for bundle ${bundleId}:`, error)
+    })
+  }
+
   await deleteJourneyBundleRepo(botId, bundleId)
 }
 
-// Compiles and stores the resulting ASL's shape as published -- deliberately
-// does NOT call AWS to create or update a real Step Functions state machine.
-// Provisioning real infrastructure (CreateStateMachine, the IAM execution
-// role, wiring journeyExecutorLambdaArn to a real deployed Lambda) is its
-// own deployment decision, out of scope for this pass per the approved
-// "data model + compiler only" scope. compiledStateMachineArn stays unset
-// until that follow-up work lands.
+// Compiles, claims the trigger, provisions a real Step Functions state machine,
+// and records the immutable version executions will target.
+//
+// The ordering is the important part, and each step is placed so that failing
+// it leaves nothing behind:
+//
+//   1. compile        -- a broken journey must never reach AWS, so no orphan
+//                        state machine can be created by an invalid bundle
+//   2. claim trigger  -- before provisioning, so losing the race to another
+//                        bundle doesn't leave a machine nobody will ever start
+//   3. create/update  -- publishes an immutable version in the same call
+//   4. persist        -- the arns and the new version number
+//
+// Step 3 is the only one that can strand state (crash before step 4), and
+// lib/step-functions.ts recovers from exactly that on the next attempt via the
+// deterministic name.
 export async function publishJourneyBundle(botId: string, bundleId: string, clientId: string): Promise<JourneyBundle> {
   const existing = await getOwnedJourneyBundle(botId, bundleId, clientId)
 
+  let asl
   try {
-    compileJourneyToAsl(existing.journey)
+    asl = compileJourneyToAsl(existing.journey)
   } catch (error) {
     if (error instanceof JourneyCompileError) {
       throw new JourneyValidationError(error.message)
@@ -259,5 +314,21 @@ export async function publishJourneyBundle(botId: string, bundleId: string, clie
     throw error
   }
 
-  return updateJourneyBundleRepo(botId, bundleId, { status: 'published' })
+  await claimJourneyTrigger(
+    triggerClaimKey({ agentId: existing.agentId, botId }, existing.journey.triggerType),
+    { bundleId, botId, clientId }
+  )
+
+  const published = await createOrUpdateStateMachine(
+    stateMachineNameFor(clientId, bundleId),
+    JSON.stringify(asl),
+    existing.compiledStateMachineArn
+  )
+
+  return updateJourneyBundleRepo(botId, bundleId, {
+    status: 'published',
+    compiledStateMachineArn: published.stateMachineArn,
+    compiledStateMachineVersionArn: published.versionArn,
+    publishedVersion: (existing.publishedVersion ?? 0) + 1,
+  })
 }

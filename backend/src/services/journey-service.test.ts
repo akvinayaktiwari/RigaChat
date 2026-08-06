@@ -17,6 +17,30 @@ vi.mock('../repositories/journey-repository.js', () => ({
 const getBotConfig = vi.fn()
 vi.mock('./bot-service.js', () => ({ getBotConfig }))
 
+const createOrUpdateStateMachine = vi.fn()
+const deleteStateMachine = vi.fn()
+vi.mock('../lib/step-functions.js', () => ({
+  createOrUpdateStateMachine,
+  deleteStateMachine,
+  stateMachineNameFor: (clientId: string, bundleId: string) => `vyostra-${clientId}-${bundleId}`,
+}))
+
+const claimJourneyTrigger = vi.fn()
+const releaseJourneyTrigger = vi.fn()
+class JourneyTriggerConflictError extends Error {
+  constructor(readonly heldByBundleId: string) {
+    super(`Another published journey already handles this trigger (bundle ${heldByBundleId})`)
+    this.name = 'JourneyTriggerConflictError'
+  }
+}
+vi.mock('../repositories/journey-trigger-claim-repository.js', () => ({
+  claimJourneyTrigger,
+  releaseJourneyTrigger,
+  triggerClaimKey: (scope: { agentId?: string; botId: string }, trigger: string) =>
+    scope.agentId ? `agent:${scope.agentId}#${trigger}` : `bot:${scope.botId}#${trigger}`,
+  JourneyTriggerConflictError,
+}))
+
 const resolveOwningAgentId = vi.fn()
 vi.mock('./agent-service.js', () => ({ resolveOwningAgentId }))
 
@@ -27,8 +51,10 @@ vi.mock('./agent-service.js', () => ({ resolveOwningAgentId }))
 const {
   createJourneyBundle,
   createJourneyBundleFromTemplate,
+  deleteJourneyBundle,
   JourneyTemplateNotFoundError,
   JourneyValidationError,
+  publishJourneyBundle,
   updateJourneyBundle,
 } = await import('./journey-service.js')
 type CreateJourneyBundleInput = Parameters<typeof createJourneyBundle>[0]
@@ -59,7 +85,25 @@ beforeEach(() => {
     createdAt: 'now',
     updatedAt: 'now',
   }))
+  claimJourneyTrigger.mockResolvedValue(undefined)
+  releaseJourneyTrigger.mockResolvedValue(undefined)
+  deleteStateMachine.mockResolvedValue(undefined)
+  createOrUpdateStateMachine.mockResolvedValue({
+    stateMachineArn: 'arn:aws:states:ap-south-1:1:stateMachine:sm',
+    versionArn: 'arn:aws:states:ap-south-1:1:stateMachine:sm:1',
+  })
+  updateJourneyBundleRepo.mockImplementation(async (_b: string, _id: string, patch: unknown) => patch)
 })
+
+const publishedBundle = {
+  bundleId: 'bundle-1',
+  botId: 'bot-1',
+  clientId: 'client-1',
+  agentId: 'agent-1',
+  journey: { ...journey, botId: 'bot-1', clientId: 'client-1' },
+  agent,
+  status: 'published' as const,
+}
 
 describe('createJourneyBundle — isPrebuiltTemplate is server-controlled', () => {
   // REGRESSION (plan-eng-review Issue 4). journey-routes.ts previously passed
@@ -230,6 +274,126 @@ describe('createJourneyBundleFromTemplate — cloning a prebuilt agent', () => {
 
     await createJourneyBundleFromTemplate({ templateId, botId: 'bot-1', clientId: 'client-1', name: '   ' })
     expect(createJourneyBundleRepo.mock.calls[0]?.[0]).toMatchObject({ name: 'Real estate lead qualification' })
+  })
+})
+
+describe('publishJourneyBundle — ordering is what keeps AWS clean', () => {
+  it('creates the state machine and records both arns plus version 1', async () => {
+    getJourneyBundleById.mockResolvedValue({ ...publishedBundle, status: 'draft' })
+
+    await publishJourneyBundle('bot-1', 'bundle-1', 'client-1')
+
+    expect(createOrUpdateStateMachine).toHaveBeenCalledWith(
+      'vyostra-client-1-bundle-1',
+      expect.any(String),
+      undefined
+    )
+    expect(updateJourneyBundleRepo).toHaveBeenCalledWith('bot-1', 'bundle-1', {
+      status: 'published',
+      compiledStateMachineArn: 'arn:aws:states:ap-south-1:1:stateMachine:sm',
+      compiledStateMachineVersionArn: 'arn:aws:states:ap-south-1:1:stateMachine:sm:1',
+      publishedVersion: 1,
+    })
+  })
+
+  it('updates in place on republish and bumps the version', async () => {
+    getJourneyBundleById.mockResolvedValue({
+      ...publishedBundle,
+      status: 'draft',
+      compiledStateMachineArn: 'arn:existing',
+      publishedVersion: 3,
+    })
+
+    await publishJourneyBundle('bot-1', 'bundle-1', 'client-1')
+
+    expect(createOrUpdateStateMachine).toHaveBeenCalledWith('vyostra-client-1-bundle-1', expect.any(String), 'arn:existing')
+    expect(updateJourneyBundleRepo.mock.calls[0]?.[2]).toMatchObject({ publishedVersion: 4 })
+  })
+
+  // A broken journey must never reach AWS: an orphaned state machine for a
+  // bundle that cannot compile is unreachable garbage nobody will clean up.
+  it('rejects a bad journey before claiming a trigger or calling AWS', async () => {
+    getJourneyBundleById.mockResolvedValue({
+      ...publishedBundle,
+      status: 'draft',
+      journey: { ...publishedBundle.journey, startStepId: 'does-not-exist' },
+    })
+
+    await expect(publishJourneyBundle('bot-1', 'bundle-1', 'client-1')).rejects.toThrow(JourneyValidationError)
+    expect(claimJourneyTrigger).not.toHaveBeenCalled()
+    expect(createOrUpdateStateMachine).not.toHaveBeenCalled()
+  })
+
+  // Claim before provision: losing the race must not leave a state machine
+  // behind that nothing will ever start an execution on.
+  it('does not provision anything when another bundle already holds the trigger', async () => {
+    getJourneyBundleById.mockResolvedValue({ ...publishedBundle, status: 'draft' })
+    claimJourneyTrigger.mockRejectedValue(new JourneyTriggerConflictError('other-bundle'))
+
+    await expect(publishJourneyBundle('bot-1', 'bundle-1', 'client-1')).rejects.toThrow(JourneyTriggerConflictError)
+    expect(createOrUpdateStateMachine).not.toHaveBeenCalled()
+    expect(updateJourneyBundleRepo).not.toHaveBeenCalled()
+  })
+
+  it('scopes the claim by Agent when the bot is wrapped in one', async () => {
+    getJourneyBundleById.mockResolvedValue({ ...publishedBundle, status: 'draft' })
+
+    await publishJourneyBundle('bot-1', 'bundle-1', 'client-1')
+
+    expect(claimJourneyTrigger).toHaveBeenCalledWith('agent:agent-1#lead_captured', {
+      bundleId: 'bundle-1',
+      botId: 'bot-1',
+      clientId: 'client-1',
+    })
+  })
+
+  it('falls back to bot scope for a bot with no Agent', async () => {
+    getJourneyBundleById.mockResolvedValue({ ...publishedBundle, agentId: undefined, status: 'draft' })
+
+    await publishJourneyBundle('bot-1', 'bundle-1', 'client-1')
+
+    expect(claimJourneyTrigger).toHaveBeenCalledWith('bot:bot-1#lead_captured', expect.any(Object))
+  })
+})
+
+describe('deleteJourneyBundle — cleans up what publish created', () => {
+  it('releases the trigger and tears down the state machine', async () => {
+    getJourneyBundleById.mockResolvedValue({ ...publishedBundle, compiledStateMachineArn: 'arn:existing' })
+
+    await deleteJourneyBundle('bot-1', 'bundle-1', 'client-1')
+
+    expect(releaseJourneyTrigger).toHaveBeenCalledWith('agent:agent-1#lead_captured', 'bundle-1')
+    expect(deleteStateMachine).toHaveBeenCalledWith('arn:existing')
+    expect(deleteJourneyBundleRepo).toHaveBeenCalledWith('bot-1', 'bundle-1')
+  })
+
+  // The client cannot see or fix an AWS outage; their delete should still work.
+  it('still deletes the record when AWS cleanup fails', async () => {
+    getJourneyBundleById.mockResolvedValue({ ...publishedBundle, compiledStateMachineArn: 'arn:existing' })
+    deleteStateMachine.mockRejectedValue(new Error('AWS is having a day'))
+    releaseJourneyTrigger.mockRejectedValue(new Error('AWS is having a day'))
+
+    await expect(deleteJourneyBundle('bot-1', 'bundle-1', 'client-1')).resolves.toBeUndefined()
+    expect(deleteJourneyBundleRepo).toHaveBeenCalled()
+  })
+})
+
+describe('updateJourneyBundle — editing a published bundle frees its trigger', () => {
+  it('releases the claim so another journey can take the trigger', async () => {
+    getJourneyBundleById.mockResolvedValue(publishedBundle)
+
+    await updateJourneyBundle('bot-1', 'bundle-1', 'client-1', { name: 'Renamed' })
+
+    expect(releaseJourneyTrigger).toHaveBeenCalledWith('agent:agent-1#lead_captured', 'bundle-1')
+    expect(updateJourneyBundleRepo.mock.calls[0]?.[2]).toMatchObject({ status: 'draft' })
+  })
+
+  it('does not touch the claim when the bundle was already a draft', async () => {
+    getJourneyBundleById.mockResolvedValue({ ...publishedBundle, status: 'draft' })
+
+    await updateJourneyBundle('bot-1', 'bundle-1', 'client-1', { name: 'Renamed' })
+
+    expect(releaseJourneyTrigger).not.toHaveBeenCalled()
   })
 })
 

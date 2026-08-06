@@ -753,6 +753,22 @@ export interface AgentConfig {
   channelConfig: Partial<Record<JourneyChannel, AgentChannelConfig>>
 }
 
+// Row in journey_trigger_claims: which bundle currently owns a given trigger
+// for a given Agent. Exactly one bundle may hold a trigger, claimed atomically
+// at publish -- without it, two published bundles on 'lead_captured' would BOTH
+// ignite, and a real buyer would get two copies of every message from two
+// copies of the agent, possibly booking two site visits.
+export interface JourneyTriggerClaim {
+  // `agent:<agentId>#<triggerType>`, or `bot:<botId>#<triggerType>` for a bot
+  // not yet wrapped in an Agent. Prefixed so the two id namespaces can never be
+  // confused for one another.
+  claimKey: string
+  bundleId: string
+  botId: string
+  clientId: string
+  claimedAt: string
+}
+
 export type JourneyBundleStatus = 'draft' | 'published'
 
 // Fused Journey + Agent + toolbox, per the 2026-07-29 architecture session's
@@ -779,9 +795,21 @@ export interface JourneyBundle {
   journey: JourneyDefinition
   agent: AgentConfig
   status: JourneyBundleStatus
-  // Set once status transitions to 'published' and journey-compiler-service
-  // successfully compiles+deploys the state machine. Absent for drafts.
+  // The mutable state machine, created on first publish and updated on every
+  // republish. Absent until a bundle has been published at least once.
   compiledStateMachineArn?: string
+  // The IMMUTABLE published version, and what ignition must start executions
+  // against. Starting against compiledStateMachineArn instead would make the
+  // version below a lie: state machine updates are eventually consistent, so an
+  // execution begun moments after a republish can still run the previous
+  // definition while our record labels it as the new one.
+  compiledStateMachineVersionArn?: string
+  // Increments on every successful publish. Threaded into the execution input
+  // so the lead timeline can say "this lead is running v3, you are editing v4"
+  // -- without it, correct Step Functions behaviour (in-flight executions keep
+  // the definition they started with) is indistinguishable to a client from
+  // their edit being ignored for weeks.
+  publishedVersion?: number
   createdAt: string
   updatedAt: string
 }
@@ -1005,6 +1033,15 @@ export interface JourneyExecutorEvent {
   clientId: string
   leadId: string
   channel: JourneyChannel
+  // Which table the lead lives in, and its parent key there. Needed because
+  // botId only locates a chat lead -- a Meta lead is keyed by pageId and a form
+  // lead by formId. Optional so an execution started before these were added to
+  // the passthrough still deserializes; callers fall back to treating the lead
+  // as a chat lead under botId.
+  leadSource?: LeadSource
+  leadParentId?: string
+  // The published bundle version this execution was started against.
+  journeyVersion?: number
   stepId?: string
   messageHint?: string
   // Typed, but this event arrives from Step Functions rather than from our own

@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { requireAuth } from '../lib/cognito.js'
+import { JourneyTriggerConflictError } from '../repositories/journey-trigger-claim-repository.js'
 import {
   createJourneyBundle,
   createJourneyBundleFromTemplate,
@@ -206,10 +207,14 @@ journeyRoutes.delete('/:botId/:bundleId', requireAuth, async (c) => {
   }
 })
 
-// Compiles and marks the bundle published -- does NOT create or update a
-// real AWS Step Functions state machine. See journey-service.ts's
-// publishJourneyBundle() for why: provisioning live infrastructure is a
-// separate, explicit deployment decision, not something this route implies.
+// Compiles, claims the trigger, and provisions a real Step Functions state
+// machine, recording the immutable version that executions are started against.
+//
+// 409 is the interesting response: another published bundle already handles
+// this trigger. That is not a server error and not a validation error -- it is
+// a decision only the client can make ("this would replace your current
+// lead-captured journey"), so it gets its own status rather than being folded
+// into a 400.
 journeyRoutes.post('/:botId/:bundleId/publish', requireAuth, async (c) => {
   const clientId = c.get('user').sub
   const botId = c.req.param('botId')
@@ -221,6 +226,9 @@ journeyRoutes.post('/:botId/:bundleId/publish', requireAuth, async (c) => {
   } catch (error) {
     if (error instanceof Error && error.message === 'Journey bundle not found') {
       return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
+    }
+    if (error instanceof JourneyTriggerConflictError) {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 409)
     }
     if (error instanceof JourneyValidationError) {
       return c.json<ApiResponse<null>>({ success: false, error: error.message }, 400)

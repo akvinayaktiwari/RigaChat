@@ -43,12 +43,21 @@ export class JourneyCompileError extends Error {
 // know which bot/bundle/lead/channel it's acting on. Referenced via
 // JSONPath ('.$' suffix) so each Task receives whatever the execution's own
 // input carried, not a static value baked in at compile time.
+// leadSource + leadParentId are what make a non-chat lead readable at all:
+// leads / form_leads / meta_leads each have a different parent key
+// (botId / formId / pageId) and only the first is a botId, so the executor
+// cannot fetch a Meta lead from botId alone. journeyVersion rides along so a
+// lead's timeline can report which published definition it is actually
+// running -- see lead-resolution-service.ts and the LeadRef comment in types.
 const CONTEXT_PASSTHROUGH_PARAMETERS = {
   'botId.$': '$.botId',
   'bundleId.$': '$.bundleId',
   'clientId.$': '$.clientId',
   'leadId.$': '$.leadId',
   'channel.$': '$.channel',
+  'leadSource.$': '$.leadSource',
+  'leadParentId.$': '$.leadParentId',
+  'journeyVersion.$': '$.journeyVersion',
 }
 
 // Every step reference (next/onTrue/onFalse/onSatisfied/onExhausted) must
