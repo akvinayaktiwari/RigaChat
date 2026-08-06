@@ -596,6 +596,18 @@ export interface AgentConfig {
   channelConfig: Partial<Record<JourneyChannel, AgentChannelConfig>>
 }
 
+// A prebuilt agent we author and ship in the codebase. Not a JourneyBundle:
+// templates are the same for every client and nobody can edit them from the
+// product. Cloning one produces a bundle the client owns.
+export interface JourneyTemplate {
+  templateId: string
+  name: string
+  description: string
+  vertical: 'real_estate'
+  journey: Omit<JourneyDefinition, 'botId' | 'clientId'>
+  agent: AgentConfig
+}
+
 export type JourneyBundleStatus = 'draft' | 'published'
 
 export interface JourneyBundle {

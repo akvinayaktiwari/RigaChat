@@ -17,6 +17,7 @@ import type {
   FormConfig,
   FormLead,
   AgentConfig,
+  JourneyTemplate,
   IndexingJob,
   JourneyBundle,
   JourneyDefinition,
@@ -577,6 +578,21 @@ export function getJourneyBundles(botId: string): Promise<ApiResponse<JourneyBun
 
 export function getJourneyBundle(botId: string, bundleId: string): Promise<ApiResponse<JourneyBundle>> {
   return apiClient<JourneyBundle>(`/api/journeys/${botId}/${bundleId}`)
+}
+
+// The prebuilt agent library. Read-only and identical for every client --
+// templates are code we author, not per-client rows, so there is nothing to
+// scope and nothing a client can edit here. Cloning one produces an ordinary
+// bundle they own outright.
+export function getJourneyTemplates(): Promise<ApiResponse<JourneyTemplate[]>> {
+  return apiClient<JourneyTemplate[]>('/api/journeys/templates')
+}
+
+export function createJourneyBundleFromTemplate(
+  templateId: string,
+  data: { botId: string; name?: string }
+): Promise<ApiResponse<JourneyBundle>> {
+  return apiClient<JourneyBundle>(`/api/journeys/from-template/${templateId}`, 'POST', data)
 }
 
 // No isPrebuiltTemplate: the server owns that flag and always stores false for
