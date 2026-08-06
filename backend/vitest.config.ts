@@ -23,6 +23,7 @@ export default defineConfig({
       DYNAMODB_TABLE_WEBHOOK_EVENTS: 'test-webhook-events-table',
       DYNAMODB_TABLE_GUPSHUP_APP_LOOKUP: 'test-gupshup-app-lookup-table',
       DYNAMODB_TABLE_WHATSAPP_INBOUND_ACTIVITY: 'test-whatsapp-inbound-activity-table',
+      EMAIL_LOGO_URL: 'https://example.com/logo.png',
     },
   },
 })

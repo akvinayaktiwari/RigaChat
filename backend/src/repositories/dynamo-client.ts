@@ -30,6 +30,7 @@ type TableKey =
   | 'whatsapp_inbound_activity'
   | 'agents'
   | 'agent_binding_lookup'
+  | 'contact_messages'
 
 const tableEnvVarNames: Record<TableKey, string> = {
   clients: 'DYNAMODB_TABLE_CLIENTS',
@@ -54,6 +55,7 @@ const tableEnvVarNames: Record<TableKey, string> = {
   whatsapp_inbound_activity: 'DYNAMODB_TABLE_WHATSAPP_INBOUND_ACTIVITY',
   agents: 'DYNAMODB_TABLE_AGENTS',
   agent_binding_lookup: 'DYNAMODB_TABLE_AGENT_BINDING_LOOKUP',
+  contact_messages: 'DYNAMODB_TABLE_CONTACT_MESSAGES',
 }
 
 export function getTableName(key: TableKey): string {

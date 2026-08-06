@@ -34,6 +34,8 @@ import type {
   ScheduledActionType,
   SetupBotResult,
   StartIndexingResult,
+  SubmitContactMessageInput,
+  SubmitContactMessageResult,
   SubscriptionSummary,
   UpdateKBInput,
   UpdateVoiceAgentInput,
@@ -611,4 +613,14 @@ export function deleteJourneyBundle(botId: string, bundleId: string): Promise<Ap
 
 export function publishJourneyBundle(botId: string, bundleId: string): Promise<ApiResponse<JourneyBundle>> {
   return apiClient<JourneyBundle>(`/api/journeys/${botId}/${bundleId}/publish`, 'POST')
+}
+
+// Contact API
+
+// Public endpoint — no auth token needed, but apiClient attaches one if the
+// visitor happens to already be signed in, which the backend simply ignores.
+export function submitContactMessage(
+  data: SubmitContactMessageInput
+): Promise<ApiResponse<SubmitContactMessageResult>> {
+  return apiClient<SubmitContactMessageResult>('/api/contact', 'POST', data)
 }

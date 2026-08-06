@@ -608,3 +608,18 @@ export interface CalComEventType {
   slug: string
   lengthInMinutes: number
 }
+// Marketing-site "Get in touch" form (POST /api/contact, public, no auth).
+export interface SubmitContactMessageInput {
+  name: string
+  email: string
+  subject: string
+  message: string
+  // Honeypot — hidden from real users, so a filled value means a bot. Always
+  // sent (empty for humans) so its absence can't be used to bypass the check.
+  company: string
+}
+
+export interface SubmitContactMessageResult {
+  messageId: string
+  createdAt: string
+}

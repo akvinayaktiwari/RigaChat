@@ -47,8 +47,12 @@ export async function captureFormLead(input: CreateFormLeadInput): Promise<FormL
     sourceUrl: input.sourceUrl,
   })
 
-  // Fire-and-forget: CRM sync never blocks or fails lead capture.
-  syncFormLeadToCRM(createdLead, input.formId, input.clientId).catch((err) => {
+  // Never fails lead capture (errors are swallowed below) — but must be
+  // awaited for the same reason the WhatsApp notification below is: AWS Lambda
+  // freezes the execution environment as soon as the handler's response
+  // promise resolves, so an un-awaited call here would be aborted mid-flight
+  // before the CRM sync's external requests ever completed.
+  await syncFormLeadToCRM(createdLead, input.formId, input.clientId).catch((err) => {
     console.error('CRM sync error:', err)
   })
 

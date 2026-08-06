@@ -62,6 +62,8 @@ POST /mcp/booking    -> MCP server, book_appointment tool (real: persists an App
 POST /mcp/reminder   -> MCP server, schedule_reminder tool (real: creates a lead_reminder ScheduledAction). Interim shared-secret auth, not Cognito.
 POST /mcp/quotation  -> MCP server, get_quotation tool (STUB -- no pricing-rule data model exists yet). Interim shared-secret auth, not Cognito.
 POST /mcp/brochure   -> MCP server, send_brochure tool (STUB -- no document/asset management exists yet). Interim shared-secret auth, not Cognito.
+POST /api/contact           -> marketing-site "Get in touch" form: store the message + email support (public, no auth; honeypot + per-ip/email rate limit)
+GET  /api/admin/contact-messages -> staff console list of contact submissions; defaults to un-notified only, ?unnotifiedOnly=false for all (STAFF Cognito auth)
 
 ## Key Interfaces
 interface MessageChannel {
@@ -118,6 +120,7 @@ interface KnowledgeBaseEntry {
 - whatsapp_inbound_activity — partition key: leadId (lastInboundMessageAt, powers the 24h WhatsApp session-window check)
 - agents — partition key: clientId, sort key: agentId (top-level cross-channel Agent identity; channel bindings resolve to a botId/voice agentId — an identity layer over the existing per-channel records, does not touch their Pinecone namespaces)
 - agent_binding_lookup — partition key: resourceId (reverse index botId/voiceAgentId → owning Agent; atomic-claim so one resource maps to at most one Agent, mirrors gupshup_app_lookup)
+- contact_messages — partition key: messageId, GSI recordType-createdAt-index (marketing-site contact form; no clientId/botId — these are messages to us, not leads for a client's bot)
 
 ## Environment Variables
 OPENAI_API_KEY
@@ -148,6 +151,13 @@ GUPSHUP_WEBHOOK_TOKEN
 CAL_COM_CLIENT_ID
 CAL_COM_CLIENT_SECRET
 CAL_COM_REDIRECT_URI
+DYNAMODB_TABLE_CONTACT_MESSAGES
+SES_FROM_EMAIL
+CONTACT_NOTIFICATION_EMAIL
+COGNITO_USER_POOL_ID
+COGNITO_CLIENT_ID
+FRONTEND_URL
+EMAIL_LOGO_URL
 
 ## Build and Run Commands
 Backend:

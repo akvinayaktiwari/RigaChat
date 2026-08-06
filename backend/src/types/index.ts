@@ -926,3 +926,44 @@ export interface AppointmentRequest {
   calComBookingUid?: string
   createdAt: string
 }
+
+// --- Marketing-site contact form ---
+// Submitted by an anonymous visitor on the public /contact page, so there is
+// no clientId or botId on this record — it is a message to VyostraAI itself,
+// not a lead for one of our clients' bots. Kept in its own table for that
+// reason rather than reusing `leads`.
+export interface ContactMessage {
+  messageId: string
+  name: string
+  email: string
+  subject: string
+  message: string
+  // Constant discriminator, only ever 'contact_message'. Exists solely as the
+  // partition key of the recordType-createdAt-index GSI so the ops console can
+  // list submissions newest-first without a table Scan. Safe as a single hot
+  // partition here: this is one landing page's contact form, not bot traffic.
+  recordType: 'contact_message'
+  // Best-effort provenance for abuse triage; 'unknown' when the runtime does
+  // not expose a remote address (same fallback as auth-routes' getClientIp).
+  sourceIp: string
+  // false when the notification email could not be sent (or SES is not
+  // configured) — the message is still stored, so nothing is lost, but this
+  // flags rows a human never got pinged about.
+  notified: boolean
+  createdAt: string
+}
+
+export interface SubmitContactMessageInput {
+  name: string
+  email: string
+  subject: string
+  message: string
+  // Honeypot: a field hidden from real users via CSS. Bots that fill every
+  // input submit a non-empty value here, which the service silently drops.
+  company?: string
+}
+
+export interface SubmitContactMessageResult {
+  messageId: string
+  createdAt: string
+}

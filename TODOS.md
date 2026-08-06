@@ -2,18 +2,6 @@
 
 ## Frontend
 
-### Add aria-live region to Toast component
-
-**What:** `frontend/src/components/Toast/Toast.tsx` has no `aria-live` region — confirmed via grep, zero matches for `aria-live` or `role=` in the file. Every toast notification in the app (success, error, info) is silent to screen-reader users.
-
-**Why:** Surfaced during `/plan-design-review` of the WhatsApp Meta Direct card, where the Embedded Signup connect/error flow depends on toast feedback being announced (same pattern the existing Gupshup connect flow already uses) — but this is app-wide, not specific to that feature. Every existing toast call site is affected today.
-
-**Context:** Small fix — add `aria-live="polite"` (or `"assertive"` for errors) to the toast container. Should land as its own change, not bundled silently into an unrelated feature PR.
-
-**Effort:** S
-**Priority:** P2
-**Depends on:** None
-
 ### Add error handling to data-load effects app-wide
 
 **What:** 15 pages (including `DashboardHome.tsx`, `LeadsPage.tsx`, `BotsPage.tsx`, `BotDetailPage.tsx`, `FormDetailPage.tsx`, `FormsPage.tsx`, `KnowledgeBasePage.tsx`, `LeadDetailPage.tsx`, `FormLeadsPage.tsx`, `NewBotPage.tsx`, `VoiceKnowledgeBasePage.tsx`, `VoiceAgentDetailPage.tsx`, `AuthCallbackPage.tsx`, `SchedulerPage.tsx`, `AppointmentsPage.tsx`) load data via a `.then((res) => setX(res.data ?? []))`-shaped effect with no check on `res.success` and no `.catch()`. Two distinct failure symptoms, same root cause: a genuinely rejected promise (network error) leaves `loading` stuck `true` forever (infinite skeleton); an HTTP error response that still resolves normally (e.g. a 500 with a well-formed `{success:false, error:...}` body) has its failure silently swallowed by `res.data ?? []`, showing a *misleading empty state* ("No schedules yet") instead of either an error or the truth.
@@ -24,18 +12,6 @@
 
 **Effort:** M
 **Priority:** P2
-**Depends on:** None
-
-### Point the remaining formatRelativeDate copies at the shared lib
-
-**What:** `FormLeadsPage.tsx`, `KnowledgeBasePage.tsx`, and `VoiceKnowledgeBasePage.tsx` each still define their own local `formatRelativeDate`, identical to the one that used to live in `DashboardHome.tsx`/`LeadsPage.tsx` before the dashboard redesign branch extracted it to `frontend/src/lib/date.ts`. These 3 copies still have the original bug: a future-dated record (client/server clock drift) renders as `"-5 minutes ago"` instead of clamping to `"0 minutes ago"`.
-
-**Why:** The fix already exists and is already in the codebase (`frontend/src/lib/date.ts`) — this is a pure find-and-replace (delete the local copy, import the shared one) plus getting the same bug fix for free in 3 more places.
-
-**Context:** Low risk, mechanical. Deferred out of the dashboard-redesign PR because those 3 files were otherwise untouched by that branch and pulling them in would have been unrelated scope creep.
-
-**Effort:** S
-**Priority:** P3
 **Depends on:** None
 
 ### Build a unified leads dashboard across chat, form, and Meta sources
@@ -63,18 +39,6 @@
 **Depends on:** Meta Lead Ads backend integration landing first
 
 ## Backend
-
-### Fix un-awaited CRM sync in form-lead-service.ts (Lambda-freeze risk)
-
-**What:** `captureFormLead` in `form-lead-service.ts` calls `syncFormLeadToCRM(...).catch(...)` without `await`, directly above a comment explaining that the next line's WhatsApp notification *must* be awaited because "AWS Lambda freezes the execution environment as soon as the handler's response promise resolves" — an un-awaited call gets aborted mid-flight. That reasoning applies equally to the un-awaited CRM sync call, meaning form-lead CRM syncs may be silently dropped on Lambda today.
-
-**Why:** This is a real production risk affecting the CRM sync of every existing form lead for every live paying client, not a hypothetical — found while reviewing the Meta Lead Ads integration plan, not caused by it.
-
-**Context:** One-line fix (add `await`). Deferred to its own follow-up PR rather than bundled into the Meta branch, since it's unrelated to Meta specifically and there's no test coverage to verify the fix doesn't change timing-sensitive behavior elsewhere.
-
-**Effort:** S
-**Priority:** P1
-**Depends on:** None
 
 ### Backfill backend test coverage onto the pre-vitest services and repositories
 
@@ -351,5 +315,37 @@ Verified 2026-08-02 via `git merge-tree --write-tree main feature/agent-journey-
 **Effort:** S for the blog conflict specifically (one file, known resolution); the branch merge overall is larger
 **Priority:** P1
 **Depends on:** nothing — read this before merging `feature/agent-journey-scheduler`
+### [RESOLVED 2026-08-05] contact_messages table + SES sender provisioned
+
+**What:** All three manual AWS steps for the contact form are done and verified live against account `291685935704` / `ap-south-1`:
+
+1. **`contact_messages` table** — created, `ACTIVE`, partition key `messageId`, GSI `recordType-createdAt-index` (`recordType` HASH, `createdAt` RANGE) also `ACTIVE`. `DYNAMODB_TABLE_CONTACT_MESSAGES=contact_messages` set on all three Lambdas (`rigachat-api`, `rigachat-api-streaming`, `rigachat-crawler`).
+2. **`SES_FROM_EMAIL=noreply@vyostra.com` + `CONTACT_NOTIFICATION_EMAIL=support@vyostra.com`** set on the same three Lambdas.
+3. **`ContactFormSesSendPolicy`** (inline, `ses:SendEmail` scoped to `identity/vyostra.com` — not `*`) attached to `rigachat-api-role-4c9qsico` and `rigachat-api-streaming-role-625vca9z`. DynamoDB needed nothing: both roles already carry `AmazonDynamoDBFullAccess`.
+
+End-to-end verified the same day against real infra: a submission wrote a real row and SES reported `Send: 1, Delivery: 1, Bounce: 0, Reject: 0` — the first email this account has ever sent. Test rows were deleted afterward (table back to 0).
+
+**Two findings worth keeping, since both are easy to get wrong again:**
+
+- **Do not add these as GitHub secrets.** `ci.yml`'s "Update Lambda environment variables" step merges a *hardcoded allowlist* (`WHATSAPP_*`, `REDIS_PROVIDER`, `UPSTASH_*`, `SQS_CRAWLER_QUEUE_URL`) onto whatever the function already has. No DynamoDB table name is in that list — every existing one lives directly on the Lambda and survives deploys only because of that `jq '. + {...}'` merge. A new GH secret would be silently ignored unless `ci.yml` is edited too. This applies to the pending Agent tables as well.
+- **The SES sandbox (`ProductionAccessEnabled: false`) is not a blocker.** Sandbox restricts *destinations* to verified identities, and `vyostra.com` is verified with DKIM `SUCCESS` — so a `support@vyostra.com` destination works today. Production access is only needed if the notification address ever moves off a verified domain.
+
+**Still open:** the branch itself. `/api/contact` stays 404 in production until `feature/contact-form` merges to `main` — infra is ready, code is not deployed.
+
+**Effort:** S (done)
+**Priority:** P1
+**Depends on:** nothing further
 
 ## Completed
+
+### Fix un-awaited CRM sync in form-lead-service.ts (Lambda-freeze risk)
+
+`captureFormLead` now awaits `syncFormLeadToCRM(...)` (still error-swallowed, never fails lead capture), closing the Lambda-freeze window that could drop form-lead CRM syncs mid-flight. P1/S. Verified: build + 21 backend tests pass.
+
+### Add aria-live region to Toast component
+
+`Toast.tsx` container now has `aria-live="polite"`; error toasts escalate to `role="alert"` (assertive), success/warning use `role="status"`. Toasts are now announced to screen readers app-wide. P2/S. Verified: frontend typecheck passes.
+
+### Point the remaining formatRelativeDate copies at the shared lib
+
+Deleted the local `formatRelativeDate` copies in `FormLeadsPage.tsx`, `KnowledgeBasePage.tsx`, and `VoiceKnowledgeBasePage.tsx`; all three now import the shared `frontend/src/lib/date.ts`, which clamps future-drifted dates to "0 minutes ago". P3/S. Verified: frontend typecheck passes.

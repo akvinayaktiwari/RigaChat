@@ -48,9 +48,16 @@ export function ToastContainer() {
   if (items.length === 0) return null
 
   return (
-    <div className={styles.container}>
+    // aria-live="polite" so screen readers announce each toast as it appears
+    // without interrupting the user. Error toasts escalate to role="alert"
+    // (assertive) below since a failure warrants an immediate announcement.
+    <div className={styles.container} aria-live="polite" aria-atomic="false">
       {items.map((toast) => (
-        <div key={toast.id} className={`${styles.toast} ${styles[toast.type]}`}>
+        <div
+          key={toast.id}
+          className={`${styles.toast} ${styles[toast.type]}`}
+          role={toast.type === 'error' ? 'alert' : 'status'}
+        >
           {toast.message}
         </div>
       ))}

@@ -1,0 +1,203 @@
+<!--
+  Worked example: a marketing/product-update email built from base-shell.html.
+  Keep this as the reference other product-update emails get copied from —
+  it shows every token in base-shell.html filled in with real values,
+  including the {{BODY_HTML}} content block (the feature list + CTA), which
+  is the part that changes per email.
+
+  Suggested send-time headers (set by the SES call, not this HTML):
+    Subject:  New in VyostraAI: automated follow-up journeys for your leads
+    From:     VyostraAI <hello@vyostraai.com>   (must match footer identity)
+    List-Unsubscribe: <{{UNSUBSCRIBE_URL}}>, <mailto:unsubscribe@vyostraai.com>
+    List-Unsubscribe-Post: List-Unsubscribe=One-Click
+-->
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<meta name="supported-color-schemes" content="light dark" />
+<title>New in VyostraAI: automated follow-up journeys for your leads</title>
+<!--[if mso]>
+<noscript>
+<xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml>
+</noscript>
+<![endif]-->
+</head>
+<body style="margin:0;padding:0;background-color:#f5f3fa;">
+<div style="margin:0;padding:0;background-color:#f5f3fa;">
+  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f5f3fa;opacity:0;">
+    Journeys are live: chain messages, wait steps, and Cal.com bookings into one automated follow-up.
+  </div>
+
+  <style>
+    @media (prefers-color-scheme: dark) {
+      .vy-canvas { background-color:#15121f !important; }
+      .vy-card { background-color:#1f1a2e !important; border-color:#33294d !important; }
+      .vy-heading { color:#f2effa !important; }
+      .vy-body-text { color:#c9c2de !important; }
+      .vy-muted { color:#8f87a8 !important; }
+      .vy-divider { border-color:#33294d !important; }
+      .vy-footer-bg { background-color:#181327 !important; }
+    }
+    @media screen and (max-width:600px) {
+      .vy-container { width:100% !important; }
+      .vy-px { padding-left:20px !important; padding-right:20px !important; }
+    }
+  </style>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="vy-canvas" style="background-color:#f5f3fa;">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="vy-container" style="width:600px;max-width:600px;">
+
+          <tr>
+            <td class="vy-card" style="background-color:#ffffff;border:1px solid #e8e4f3;border-radius:12px;overflow:hidden;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr><td style="height:4px;line-height:4px;font-size:0;background-color:#7c3aed;background-image:linear-gradient(90deg,#7c3aed,#a855f7);">&nbsp;</td></tr>
+
+                <tr>
+                  <td class="vy-px" style="padding:32px 40px 24px 40px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td valign="middle" style="padding-right:10px;">
+                          <img src="{{LOGO_URL}}" width="26" height="26" alt="" style="display:block;border:0;outline:none;height:26px;width:26px;" />
+                        </td>
+                        <td valign="middle">
+                          <span class="vy-heading" style="font-family:'Plus Jakarta Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:17px;font-weight:700;color:#1e1b2e;letter-spacing:-0.01em;">VyostraAI</span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td class="vy-px" style="padding:0 40px;">
+                    <span style="display:inline-block;font-family:'Plus Jakarta Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12px;font-weight:700;letter-spacing:1.2px;color:#7c3aed;text-transform:uppercase;">
+                      PRODUCT UPDATE
+                    </span>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td class="vy-px vy-heading" style="padding:10px 40px 4px 40px;font-family:'Plus Jakarta Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:24px;line-height:1.3;font-weight:700;color:#1e1b2e;">
+                    Follow up with every lead automatically
+                  </td>
+                </tr>
+
+                <tr>
+                  <td class="vy-px vy-body-text" style="padding:16px 40px 4px 40px;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#4b4560;">
+                    Hi {{firstName}},
+                    <br /><br />
+                    We just shipped <strong style="color:#1e1b2e;">Journeys</strong> &mdash; a way to design multi-step
+                    follow-up sequences for your leads, without writing a single line of code.
+                  </td>
+                </tr>
+
+                <!-- feature list: plain rows, not numbered — these are independent
+                     capabilities, not an ordered sequence, so no 01/02/03 markers -->
+                <tr>
+                  <td class="vy-px" style="padding:20px 40px 4px 40px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td class="vy-divider" style="padding:14px 0;border-top:1px solid #e8e4f3;">
+                          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                              <td width="8" style="background-color:#7c3aed;border-radius:2px;" bgcolor="#7c3aed">&nbsp;</td>
+                              <td width="14">&nbsp;</td>
+                              <td class="vy-body-text" style="font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:#4b4560;">
+                                <strong style="color:#1e1b2e;">Multi-step sequences</strong> &mdash; chain messages, wait periods, and conditions into one flow.
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td class="vy-divider" style="padding:14px 0;border-top:1px solid #e8e4f3;">
+                          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                              <td width="8" style="background-color:#7c3aed;border-radius:2px;" bgcolor="#7c3aed">&nbsp;</td>
+                              <td width="14">&nbsp;</td>
+                              <td class="vy-body-text" style="font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:#4b4560;">
+                                <strong style="color:#1e1b2e;">Real appointment booking</strong> &mdash; connect Cal.com and let a journey book a site visit automatically.
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td class="vy-divider" style="padding:14px 0 4px 0;border-top:1px solid #e8e4f3;border-bottom:1px solid #e8e4f3;">
+                          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                              <td width="8" style="background-color:#7c3aed;border-radius:2px;" bgcolor="#7c3aed">&nbsp;</td>
+                              <td width="14">&nbsp;</td>
+                              <td class="vy-body-text" style="font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:#4b4560;padding-bottom:10px;">
+                                <strong style="color:#1e1b2e;">Runs on autopilot</strong> &mdash; once published, a journey follows up with every new lead the same way, every time.
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td class="vy-px" style="padding:24px 40px 8px 40px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td align="center" style="border-radius:8px;background-color:#7c3aed;background-image:linear-gradient(90deg,#7c3aed,#a855f7);">
+                          <a href="{{CTA_URL}}" style="display:inline-block;padding:12px 24px;font-family:'Plus Jakarta Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">
+                            Build your first journey
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td class="vy-px vy-muted" style="padding:20px 40px 32px 40px;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;color:#8b849f;">
+                    Talk soon,<br />The VyostraAI team
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr><td style="height:24px;line-height:24px;font-size:0;">&nbsp;</td></tr>
+
+          <tr>
+            <td class="vy-footer-bg" style="padding:0 8px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td class="vy-px vy-muted" style="padding:0 32px;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12px;line-height:1.7;color:#8b849f;text-align:center;">
+                    Sent to {{RECIPIENT_EMAIL}} because you have an active VyostraAI account.
+                    <br />
+                    <a href="{{UNSUBSCRIBE_URL}}" style="color:#7c3aed;text-decoration:underline;">Unsubscribe from product updates</a>
+                    &nbsp;&middot;&nbsp;
+                    <a href="{{PREFERENCES_URL}}" style="color:#7c3aed;text-decoration:underline;">Manage email preferences</a>
+                    <br />
+                    Account and billing emails are separate and are not affected by this unsubscribe.
+                  </td>
+                </tr>
+                <tr><td style="height:12px;line-height:12px;font-size:0;">&nbsp;</td></tr>
+                <tr>
+                  <td class="vy-px vy-muted" style="padding:0 32px;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:11px;line-height:1.6;color:#8b849f;text-align:center;">
+                    VyostraAI &middot; Bengaluru, Karnataka, India
+                    <br />
+                    &copy; 2026 VyostraAI. All rights reserved.
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</div>
+</body>
+</html>

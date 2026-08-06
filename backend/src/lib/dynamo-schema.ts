@@ -178,6 +178,38 @@ export const tableDefinitions: Record<string, TableDefinition> = {
     BillingMode: 'PAY_PER_REQUEST',
   },
 
+  // Marketing-site contact form submissions (public /contact page). Partition
+  // key is the generated messageId, not the submitter's email: the same person
+  // may legitimately write twice, and an email-keyed row would let the second
+  // message silently overwrite the first.
+  //
+  // The GSI's partition key is the constant `recordType` attribute so the ops
+  // console can list submissions newest-first with a Query instead of a Scan.
+  // A constant GSI partition key is normally a hot-partition mistake — it is
+  // deliberate and safe here because writes come from one landing page's
+  // contact form (single-digit per day), nowhere near the 1000 WCU/partition
+  // ceiling. Do NOT copy this shape for anything on the bot/lead traffic path.
+  contact_messages: {
+    TableName: 'DYNAMODB_TABLE_CONTACT_MESSAGES', // reads from process.env.DYNAMODB_TABLE_CONTACT_MESSAGES
+    KeySchema: [{ AttributeName: 'messageId', KeyType: 'HASH' }],
+    AttributeDefinitions: [
+      { AttributeName: 'messageId', AttributeType: 'S' },
+      { AttributeName: 'recordType', AttributeType: 'S' },
+      { AttributeName: 'createdAt', AttributeType: 'S' },
+    ],
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: 'recordType-createdAt-index',
+        KeySchema: [
+          { AttributeName: 'recordType', KeyType: 'HASH' },
+          { AttributeName: 'createdAt', KeyType: 'RANGE' },
+        ],
+        Projection: { ProjectionType: 'ALL' },
+      },
+    ],
+    BillingMode: 'PAY_PER_REQUEST',
+  },
+
   // Durable payment ledger, separate from the subscriptions table (which only
   // holds current state, not history). One row per subscription.charged event.
   payment_history: {

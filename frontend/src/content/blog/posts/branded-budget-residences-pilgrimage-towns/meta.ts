@@ -10,7 +10,7 @@ const meta: BlogPostMeta = {
   tags: ['Hospitality', 'Real Estate', 'India', 'Feasibility Study'],
   readingMinutes: 14,
   highlights: [
-    { value: '9', label: 'Towns screened' },
+    { value: '7', label: 'Towns screened' },
     { value: '2', label: 'Operating models sized' },
     { value: '₹2.0–2.5K', label: 'Target ADR / night' },
     { value: '30–45%', label: 'Modeled EBITDA range' },

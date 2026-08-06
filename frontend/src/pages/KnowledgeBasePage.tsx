@@ -29,6 +29,7 @@ import {
 } from '../services/api'
 import { uploadFileWithProgress } from '../lib/upload-file-with-progress'
 import { translateEntitlementError } from '../lib/entitlementErrors'
+import { formatRelativeDate } from '../lib/date'
 import type { KBFileType, KnowledgeBaseEntry } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -80,19 +81,6 @@ interface EntryFormState {
 }
 
 const EMPTY_FORM: EntryFormState = { title: '', content: '' }
-
-function formatRelativeDate(date: Date): string {
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  const minutes = Math.floor(diff / 60000)
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
-
-  if (minutes < 60) return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`
-  if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`
-  if (days < 7) return days === 1 ? '1 day ago' : `${days} days ago`
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
 
 const inputClasses =
   'w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 bg-white outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors'

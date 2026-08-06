@@ -50,3 +50,11 @@ export const RESYNC_COOLDOWN_SECONDS = 600
 // no counter primitive, only setNX) — so this is "1 attempt per window," not
 // a true N-attempts/window counter. Flag if a counter is actually wanted.
 export const QUICK_SIGNUP_RATE_LIMIT_SECONDS = 60
+
+// Spam guard on POST /api/contact (public, unauthenticated, and it triggers an
+// outbound email — so it is worth rate-limiting even at landing-page volume).
+// Same setNX one-attempt-per-window shape and same ip+email keying rationale
+// as QUICK_SIGNUP_RATE_LIMIT_SECONDS above. 60s: long enough to stop a script
+// hammering the endpoint, short enough that a person fixing a typo in their
+// own message and resubmitting is not blocked.
+export const CONTACT_RATE_LIMIT_SECONDS = 60

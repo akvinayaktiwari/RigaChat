@@ -171,3 +171,40 @@ export async function getAuditHistory(staffToken: string, accountId: string): Pr
 
   return parsed
 }
+
+export interface AdminContactMessage {
+  messageId: string
+  name: string
+  email: string
+  subject: string
+  message: string
+  sourceIp: string
+  // false = the SES notification never went out, so this row is the only
+  // record of the message and someone has to reply by hand.
+  notified: boolean
+  createdAt: string
+}
+
+export async function getContactMessages(
+  staffToken: string,
+  unnotifiedOnly: boolean
+): Promise<ApiResponse<AdminContactMessage[]>> {
+  const response = await fetch(
+    `${BASE_URL}/api/admin/contact-messages?unnotifiedOnly=${unnotifiedOnly}`,
+    {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${staffToken}`,
+      },
+    }
+  )
+
+  const parsed = (await response.json()) as ApiResponse<AdminContactMessage[]>
+
+  if (!response.ok && !parsed.error) {
+    throw new Error(`Admin contact messages request failed with status ${response.status}`)
+  }
+
+  return parsed
+}
