@@ -26,8 +26,11 @@ import type {
 
 export type IgnitionOutcome =
   | { status: 'started'; bundleId: string; executionArn: string; journeyVersion: number }
-  // StartExecution is idempotent by name, so a retried ignition lands here
-  // rather than messaging the lead a second time.
+  // A retried ignition lands here rather than starting a second journey. Note
+  // this is a best-effort LABEL: the no-duplicate guarantee comes from AWS
+  // (StartExecution is idempotent by execution name, and ours is deterministic),
+  // not from this branch. See NEW_EXECUTION_SKEW_TOLERANCE_MS in
+  // lib/step-functions.ts for the case that reports 'started' on a retry.
   | { status: 'already_started'; bundleId: string }
   | { status: 'no_match'; reason: NoMatchReason }
   | { status: 'failed'; reason: string }

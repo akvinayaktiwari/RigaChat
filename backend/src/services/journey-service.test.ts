@@ -91,6 +91,7 @@ beforeEach(() => {
   createOrUpdateStateMachine.mockResolvedValue({
     stateMachineArn: 'arn:aws:states:ap-south-1:1:stateMachine:sm',
     versionArn: 'arn:aws:states:ap-south-1:1:stateMachine:sm:1',
+    version: 1,
   })
   updateJourneyBundleRepo.mockImplementation(async (_b: string, _id: string, patch: unknown) => patch)
 })
@@ -296,18 +297,52 @@ describe('publishJourneyBundle — ordering is what keeps AWS clean', () => {
     })
   })
 
-  it('updates in place on republish and bumps the version', async () => {
+  it('updates in place on republish rather than creating a second machine', async () => {
     getJourneyBundleById.mockResolvedValue({
       ...publishedBundle,
       status: 'draft',
       compiledStateMachineArn: 'arn:existing',
       publishedVersion: 3,
     })
+    createOrUpdateStateMachine.mockResolvedValue({
+      stateMachineArn: 'arn:existing',
+      versionArn: 'arn:existing:4',
+      version: 4,
+    })
 
     await publishJourneyBundle('bot-1', 'bundle-1', 'client-1')
 
     expect(createOrUpdateStateMachine).toHaveBeenCalledWith('vyostra-client-1-bundle-1', expect.any(String), 'arn:existing')
     expect(updateJourneyBundleRepo.mock.calls[0]?.[2]).toMatchObject({ publishedVersion: 4 })
+  })
+
+  // REGRESSION, found by the live end-to-end run on 2026-08-06, not by any
+  // unit test. Step Functions does NOT mint a new version when the definition
+  // is unchanged, so republishing an unedited bundle legitimately returns the
+  // SAME version arn. The old code incremented a local counter regardless, so
+  // the record claimed version 2 while compiledStateMachineVersionArn still
+  // pointed at ...:1 -- exactly the "the version stamp is a label, not a
+  // guarantee" failure this design was supposed to eliminate.
+  it('does NOT bump the version when AWS returns the same one (unchanged definition)', async () => {
+    getJourneyBundleById.mockResolvedValue({
+      ...publishedBundle,
+      status: 'draft',
+      compiledStateMachineArn: 'arn:existing',
+      publishedVersion: 1,
+    })
+    createOrUpdateStateMachine.mockResolvedValue({
+      stateMachineArn: 'arn:existing',
+      versionArn: 'arn:existing:1',
+      version: 1,
+    })
+
+    await publishJourneyBundle('bot-1', 'bundle-1', 'client-1')
+
+    const patch = updateJourneyBundleRepo.mock.calls[0]?.[2]
+    expect(patch).toMatchObject({ publishedVersion: 1, compiledStateMachineVersionArn: 'arn:existing:1' })
+    // The invariant that matters: the recorded version and the arn it points at
+    // must never disagree.
+    expect(`arn:existing:${patch.publishedVersion}`).toBe(patch.compiledStateMachineVersionArn)
   })
 
   // A broken journey must never reach AWS: an orphaned state machine for a

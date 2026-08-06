@@ -263,9 +263,13 @@ export async function updateJourneyBundle(
 //
 // Both cleanups are best-effort and deliberately do not block the delete: if
 // AWS is unavailable, the client's delete should still succeed rather than
-// failing on a resource they cannot see. Step Functions marks a deleted machine
-// DELETING and lets in-flight executions finish, so leads mid-journey are not
-// stranded by this.
+// failing on a resource they cannot see.
+//
+// CAVEAT, verified live 2026-08-06: deleting the state machine can FAIL leads
+// currently running that journey (`States.Runtime: State machine ... has been
+// deleted`) rather than letting them finish. A client deleting a published
+// journey therefore silently drops anyone mid-flight. Warning them first is a
+// product decision, tracked as a TODO rather than changed here.
 export async function deleteJourneyBundle(botId: string, bundleId: string, clientId: string): Promise<void> {
   const existing = await getOwnedJourneyBundle(botId, bundleId, clientId)
 
@@ -329,6 +333,10 @@ export async function publishJourneyBundle(botId: string, bundleId: string, clie
     status: 'published',
     compiledStateMachineArn: published.stateMachineArn,
     compiledStateMachineVersionArn: published.versionArn,
-    publishedVersion: (existing.publishedVersion ?? 0) + 1,
+    // Taken from the version AWS actually published, never incremented locally.
+    // Step Functions does not mint a new version for an unchanged definition, so
+    // a counter drifts from reality the first time someone republishes without
+    // editing -- verified live on 2026-08-06 (record said 2, arn said :1).
+    publishedVersion: published.version,
   })
 }

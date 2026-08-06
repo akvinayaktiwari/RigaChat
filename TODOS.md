@@ -365,3 +365,27 @@ End-to-end verified the same day against real infra: a submission wrote a real r
 ### Point the remaining formatRelativeDate copies at the shared lib
 
 Deleted the local `formatRelativeDate` copies in `FormLeadsPage.tsx`, `KnowledgeBasePage.tsx`, and `VoiceKnowledgeBasePage.tsx`; all three now import the shared `frontend/src/lib/date.ts`, which clamps future-drifted dates to "0 minutes ago". P3/S. Verified: frontend typecheck passes.
+
+### Deleting a published journey can kill leads mid-flight
+
+**What:** `deleteJourneyBundle` tears down the Step Functions state machine. Observed live on 2026-08-06: deleting a machine with a running execution FAILED that execution outright (`States.Runtime: State machine ... has been deleted`), while a second execution on the same machine kept running and held the machine in `DELETING` until it was stopped explicitly. The code previously carried a comment claiming the opposite — that in-flight executions are allowed to finish — which the evidence contradicts. Comments corrected; behaviour unchanged.
+
+**Why:** A client deleting a journey they think is idle can silently drop every lead currently being nurtured by it, with no warning and no record of who was dropped. For a 60-90 day real-estate nurture that could be a large number of live prospects.
+
+**Context:** Needs a product decision, not a quick patch. Options: (a) count running executions before delete and make the client confirm ("12 leads are mid-journey, delete anyway?"), (b) refuse to delete while executions are running and offer archive-instead, (c) stop executions explicitly and record the drop on each lead so it is at least visible. (c) pairs naturally with the ignition-outcome field, since "dropped because the journey was deleted" is the same kind of fact as "no journey matched".
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** ignition-outcome-on-lead landing first, if option (c) is chosen
+
+### Ignition retry reporting is best-effort within ~10s
+
+**What:** `startExecution` classifies a repeat ignition as `already_started` by comparing the returned execution's `startDate` against the call time, with a 10s skew tolerance. Two ignitions closer together than that both report `started`. Verified live on 2026-08-06 with back-to-back calls ~1s apart.
+
+**Why:** Purely a reporting inaccuracy — the no-duplicate-journey guarantee is unaffected, because AWS returned the SAME `executionArn` both times and no second journey ran. But once ignition outcomes are stamped on the lead record, a fast retry would look like a fresh start.
+
+**Context:** Real retries (Lambda async retry, Meta webhook redelivery) are minutes apart and classify correctly, so this only bites under artificial or pathological conditions. Making it exact needs a dedupe row keyed by execution name — real infrastructure bought to fix a log line rather than a behaviour, which is why it was not done. Revisit only if lead records start showing implausible duplicate starts.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None

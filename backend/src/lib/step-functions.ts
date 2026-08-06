@@ -64,6 +64,23 @@ export interface PublishedStateMachine {
   // an execution started just after a publish can silently run the PREVIOUS
   // definition while our records label it as the new version.
   versionArn: string
+  // Parsed out of versionArn, never counted. Step Functions does NOT mint a new
+  // version when the definition is unchanged, so republishing an unedited
+  // bundle legitimately returns the SAME version. An incrementing counter would
+  // drift from reality on the very first no-op republish -- caught live on
+  // 2026-08-06, where a bundle recorded version 2 while pointing at ...:1.
+  version: number
+}
+
+// Version arns end in ':<n>'. Anything else means AWS returned a shape this
+// code does not understand, and guessing a version number is exactly the drift
+// this function exists to prevent.
+function versionNumberFrom(versionArn: string): number {
+  const parsed = Number(versionArn.slice(versionArn.lastIndexOf(':') + 1))
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`Could not parse a version number from state machine version arn "${versionArn}"`)
+  }
+  return parsed
 }
 
 // Creates the state machine on first publish, updates it on republish, and in
@@ -87,7 +104,11 @@ export async function createOrUpdateStateMachine(
     if (!updated.stateMachineVersionArn) {
       throw new Error(`Step Functions did not return a version arn when updating ${existingArn}`)
     }
-    return { stateMachineArn: existingArn, versionArn: updated.stateMachineVersionArn }
+    return {
+      stateMachineArn: existingArn,
+      versionArn: updated.stateMachineVersionArn,
+      version: versionNumberFrom(updated.stateMachineVersionArn),
+    }
   }
 
   try {
@@ -103,7 +124,11 @@ export async function createOrUpdateStateMachine(
     if (!created.stateMachineArn || !created.stateMachineVersionArn) {
       throw new Error(`Step Functions did not return an arn when creating state machine ${name}`)
     }
-    return { stateMachineArn: created.stateMachineArn, versionArn: created.stateMachineVersionArn }
+    return {
+      stateMachineArn: created.stateMachineArn,
+      versionArn: created.stateMachineVersionArn,
+      version: versionNumberFrom(created.stateMachineVersionArn),
+    }
   } catch (error) {
     // Recovery for the one window this operation cannot otherwise survive: a
     // crash after CreateStateMachine succeeded but before the bundle record
@@ -144,11 +169,28 @@ export type StartExecutionResult =
 // this journey," which is a successful no-op rather than an error. Without
 // this, a Lambda retry after a crash between StartExecution and the DynamoDB
 // write would message the lead twice.
+// Clock skew between this process and AWS makes an exact comparison unsafe, so
+// an execution whose startDate is within this window of our own call is treated
+// as newly started.
+//
+// KNOWN LIMITATION, and it is a reporting limitation only: two ignitions less
+// than this far apart both report `started`, because their startDates are
+// indistinguishable given skew. Verified live on 2026-08-06 with back-to-back
+// calls ~1s apart. This does NOT weaken the safety property -- AWS returned the
+// SAME executionArn both times, so no second journey ran and the lead was not
+// messaged twice. Real retries (Lambda async retry, Meta webhook redelivery)
+// are minutes apart and are classified correctly. Making this exact would need
+// a dedupe row keyed by execution name, which is real infrastructure to buy
+// accuracy on a log line, not on behaviour.
+const NEW_EXECUTION_SKEW_TOLERANCE_MS = 10_000
+
 export async function startExecution(
   versionArn: string,
   executionName: string,
   input: Record<string, unknown>
 ): Promise<StartExecutionResult> {
+  const calledAt = Date.now()
+
   try {
     const result = await client.send(
       new StartExecutionCommand({
@@ -160,6 +202,19 @@ export async function startExecution(
     if (!result.executionArn) {
       throw new Error(`Step Functions did not return an execution arn for ${executionName}`)
     }
+
+    // Two different "already running" shapes, and only one is an error.
+    // Same name + DIFFERENT input throws ExecutionAlreadyExists (caught below).
+    // Same name + SAME input -- the ordinary retry, since our input is
+    // deterministic -- succeeds and hands back the ORIGINAL execution, with its
+    // original startDate. Reporting that as a fresh start would make a retry
+    // indistinguishable from a first ignition on the lead's record. Verified
+    // live on 2026-08-06: a second ignite returned the first execution's arn.
+    const startedAt = result.startDate?.getTime()
+    if (startedAt !== undefined && startedAt < calledAt - NEW_EXECUTION_SKEW_TOLERANCE_MS) {
+      return { started: false, reason: 'already_started' }
+    }
+
     return { started: true, executionArn: result.executionArn }
   } catch (error) {
     if (error instanceof Error && error.name === 'ExecutionAlreadyExists') {
@@ -170,9 +225,18 @@ export async function startExecution(
 }
 
 // Tolerates an already-deleted machine, same reasoning as
-// eventbridge-scheduler.ts's deleteSchedule. Note that Step Functions marks a
-// machine DELETING and lets in-flight executions finish, so deleting a bundle
-// does not strand leads mid-journey.
+// eventbridge-scheduler.ts's deleteSchedule.
+//
+// DELETION IS NOT SAFE FOR RUNNING EXECUTIONS. An earlier version of this
+// comment claimed Step Functions lets in-flight executions finish; observed
+// behaviour on 2026-08-06 contradicts it. Deleting a machine with a running
+// execution failed that execution outright (`States.Runtime: State machine ...
+// has been deleted`), while a second execution on the same machine kept running
+// and held the machine in DELETING until stopped explicitly. So deletion can
+// both strand a lead mid-journey AND leave the machine lingering.
+//
+// Nothing here prevents that -- warning a client before they delete a published
+// journey is a product decision, tracked rather than silently patched.
 export async function deleteStateMachine(stateMachineArn: string): Promise<void> {
   try {
     await client.send(new DeleteStateMachineCommand({ stateMachineArn }))
