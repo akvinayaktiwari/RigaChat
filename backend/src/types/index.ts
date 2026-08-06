@@ -786,6 +786,26 @@ export interface JourneyBundle {
   updatedAt: string
 }
 
+// A prebuilt agent, authored by us and shipped in the repo (see
+// lib/journey-templates/). Deliberately NOT a stored JourneyBundle: templates
+// live in code so "admin-authored only" is enforced by who can commit and
+// deploy rather than by an auth check, and so every template's ASL is compiled
+// and validated in CI instead of failing at a client's first publish. Cloning
+// one produces an ordinary client-owned bundle carrying sourceTemplateId.
+export interface JourneyTemplate {
+  templateId: string
+  name: string
+  description: string
+  // Which vertical this was written for. Real estate is the only one today;
+  // the field exists so the picker can group templates once there are more,
+  // not as speculative generality -- the library is the product surface.
+  vertical: 'real_estate'
+  // Same shapes a client-authored bundle uses, minus the ownership fields
+  // (botId/clientId), which are stamped at clone time.
+  journey: Omit<JourneyDefinition, 'botId' | 'clientId'>
+  agent: AgentConfig
+}
+
 // Minimal typed subset of AWS Step Functions' Amazon States Language --
 // only the states this compiler actually emits (Wait, Task, Choice,
 // Succeed), not the full ASL spec.

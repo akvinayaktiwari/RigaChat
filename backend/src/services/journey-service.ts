@@ -9,7 +9,8 @@ import { compileJourneyToAsl, JourneyCompileError } from './journey-compiler-ser
 import { getBotConfig } from './bot-service.js'
 import { resolveOwningAgentId } from './agent-service.js'
 import { findInvalidCapabilities, MCP_CAPABILITIES } from '../lib/mcp-capabilities.js'
-import type { AgentConfig, JourneyBundle, JourneyDefinition } from '../types/index.js'
+import { findJourneyTemplate, listJourneyTemplates } from '../lib/journey-templates/index.js'
+import type { AgentConfig, JourneyBundle, JourneyDefinition, JourneyTemplate } from '../types/index.js'
 
 export class JourneyValidationError extends Error {
   constructor(message: string) {
@@ -116,6 +117,52 @@ export async function createJourneyBundle(input: CreateJourneyBundleInput): Prom
     journey,
     agent: input.agent,
     status: 'draft',
+  })
+}
+
+// The prebuilt agent library. Read-only and identical for every client --
+// templates are code, not per-client rows, so there is nothing to scope by
+// clientId here and nothing a client can mutate.
+export function getJourneyTemplates(): JourneyTemplate[] {
+  return listJourneyTemplates()
+}
+
+export class JourneyTemplateNotFoundError extends Error {
+  constructor(templateId: string) {
+    super(`Journey template "${templateId}" not found`)
+    this.name = 'JourneyTemplateNotFoundError'
+  }
+}
+
+// Clone a prebuilt agent into an ordinary client-owned bundle. Routed through
+// createJourneyBundle rather than writing to the repository directly, so a
+// clone inherits the same bot-ownership check, palette validation, toolbox
+// coverage check and ASL compile a hand-authored bundle gets -- a template is
+// trusted, but the bot it's being attached to still isn't.
+//
+// journeyId and personaId are re-minted: the template's own ids identify the
+// template, and reusing them would make two clones of the same template
+// indistinguishable from each other. Provenance is carried by sourceTemplateId
+// instead, which is the one field a client cannot set themselves.
+export async function createJourneyBundleFromTemplate(input: {
+  templateId: string
+  botId: string
+  clientId: string
+  name?: string
+}): Promise<JourneyBundle> {
+  const template = findJourneyTemplate(input.templateId)
+  if (!template) {
+    throw new JourneyTemplateNotFoundError(input.templateId)
+  }
+
+  return createJourneyBundle({
+    botId: input.botId,
+    clientId: input.clientId,
+    name: input.name?.trim() || template.name,
+    description: template.description,
+    sourceTemplateId: template.templateId,
+    journey: { ...template.journey, journeyId: crypto.randomUUID() },
+    agent: { ...template.agent, personaId: crypto.randomUUID() },
   })
 }
 

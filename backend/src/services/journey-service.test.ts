@@ -24,7 +24,13 @@ vi.mock('./agent-service.js', () => ({ resolveOwningAgentId }))
 // what makes these tests prove the whole create/update validation chain
 // (palette -> toolbox coverage -> step-graph structure) rather than just the
 // bookkeeping around it.
-const { createJourneyBundle, JourneyValidationError, updateJourneyBundle } = await import('./journey-service.js')
+const {
+  createJourneyBundle,
+  createJourneyBundleFromTemplate,
+  JourneyTemplateNotFoundError,
+  JourneyValidationError,
+  updateJourneyBundle,
+} = await import('./journey-service.js')
 type CreateJourneyBundleInput = Parameters<typeof createJourneyBundle>[0]
 
 const journey: Omit<JourneyDefinition, 'botId' | 'clientId'> = {
@@ -161,6 +167,69 @@ describe('createJourneyBundle — a tool_call step must be covered by the toolbo
         agent,
       })
     ).rejects.toThrow(/not in this Agent's mcpToolbox/)
+  })
+})
+
+describe('createJourneyBundleFromTemplate — cloning a prebuilt agent', () => {
+  const templateId = 'real-estate-lead-qualification-v1'
+
+  it('stamps sourceTemplateId, which the client-facing create path cannot set', async () => {
+    await createJourneyBundleFromTemplate({ templateId, botId: 'bot-1', clientId: 'client-1' })
+
+    expect(createJourneyBundleRepo.mock.calls[0]?.[0]).toMatchObject({ sourceTemplateId: templateId })
+  })
+
+  it('produces a client-owned bundle, not another template', async () => {
+    await createJourneyBundleFromTemplate({ templateId, botId: 'bot-1', clientId: 'client-1' })
+
+    expect(createJourneyBundleRepo.mock.calls[0]?.[0]).toMatchObject({
+      isPrebuiltTemplate: false,
+      clientId: 'client-1',
+      botId: 'bot-1',
+      status: 'draft',
+    })
+  })
+
+  // Two clones of one template must be distinguishable. Reusing the template's
+  // own journeyId/personaId would make them identical apart from bundleId.
+  it('re-mints journeyId and personaId instead of reusing the template’s', async () => {
+    await createJourneyBundleFromTemplate({ templateId, botId: 'bot-1', clientId: 'client-1' })
+    await createJourneyBundleFromTemplate({ templateId, botId: 'bot-1', clientId: 'client-1' })
+
+    const [first, second] = createJourneyBundleRepo.mock.calls.map((call) => call[0])
+    expect(first.journey.journeyId).not.toBe(templateId)
+    expect(first.agent.personaId).not.toBe('real-estate-qualifier-v1')
+    expect(first.journey.journeyId).not.toBe(second.journey.journeyId)
+    expect(first.agent.personaId).not.toBe(second.agent.personaId)
+  })
+
+  it('still enforces bot ownership — a template is trusted, the target bot is not', async () => {
+    getBotConfig.mockRejectedValue(new Error('Bot not found'))
+
+    await expect(
+      createJourneyBundleFromTemplate({ templateId, botId: 'someone-elses-bot', clientId: 'client-1' })
+    ).rejects.toThrow('Bot not found')
+    expect(createJourneyBundleRepo).not.toHaveBeenCalled()
+  })
+
+  it('rejects an unknown templateId without writing anything', async () => {
+    await expect(
+      createJourneyBundleFromTemplate({ templateId: 'no-such-template', botId: 'bot-1', clientId: 'client-1' })
+    ).rejects.toThrow(JourneyTemplateNotFoundError)
+    expect(createJourneyBundleRepo).not.toHaveBeenCalled()
+  })
+
+  it('honours a name override but falls back to the template name when blank', async () => {
+    await createJourneyBundleFromTemplate({ templateId, botId: 'bot-1', clientId: 'client-1', name: 'My qualifier' })
+    expect(createJourneyBundleRepo.mock.calls[0]?.[0]).toMatchObject({ name: 'My qualifier' })
+
+    vi.clearAllMocks()
+    getBotConfig.mockResolvedValue({ botId: 'bot-1', clientId: 'client-1' })
+    resolveOwningAgentId.mockResolvedValue(undefined)
+    createJourneyBundleRepo.mockImplementation(async (record: unknown) => record)
+
+    await createJourneyBundleFromTemplate({ templateId, botId: 'bot-1', clientId: 'client-1', name: '   ' })
+    expect(createJourneyBundleRepo.mock.calls[0]?.[0]).toMatchObject({ name: 'Real estate lead qualification' })
   })
 })
 
