@@ -403,3 +403,20 @@ Approach when picked up: memoize a lazy accessor (`getOpenAiClient()`) and migra
 **Effort:** M
 **Priority:** P2
 **Depends on:** None
+
+### scripts/deploy.sh has drifted and would break login if used
+
+**What:** `docs/DEPLOYMENT.md` calls `scripts/deploy.sh` "the manual equivalent" of the CI deploy. It is not. Two concrete divergences from the values CI actually uses (GitHub repo variables, read 2026-08-06):
+
+1. `VITE_COGNITO_REDIRECT_URI` defaults to `https://beepboop.drsyeta.in/auth/callback`; the real value is `https://vyostra.com/auth/callback`. A frontend built by this script sends users to the old domain after login.
+2. It never emits `VITE_STAFF_COGNITO_CLIENT_ID` or `VITE_STAFF_COGNITO_REGION` at all, and `frontend/src/hooks/useStaffAuth.ts:30` reads the former. The staff console loses its Cognito config entirely.
+
+**Why:** This is the documented fallback for exactly the situation it was reached for — GitHub Actions was in a major outage on 2026-08-06 and this was the obvious escape hatch. Using it would have shipped a broken dashboard to production in order to work around an outage. The next person under deploy pressure will reach for it too.
+
+**Context:** Backend-only manual deploy is safe and was used instead: the script's Lambda half uses only `update-function-code` and never `update-function-configuration`, so it cannot disturb env vars. It is specifically the frontend half that is stale. Fix by sourcing the same values CI does rather than hardcoding fallbacks, or by deleting the frontend half and documenting the script as backend-only. Also worth re-checking the remaining defaults (`BACKEND_URL`, `VITE_CDN_URL`, CloudFront ids) against reality at the same time — only the two above were verified.
+
+Related: CI's health check hits `/api/bots/health-check/config`, which matches no route (bot-routes exposes `/public/:botId`, not `/:id/config`). It 404s, and since the check only fails on >= 500 it passes anyway. It is a valid cold-start smoke test but proves less than its name suggests.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
