@@ -16,6 +16,7 @@ import {
 import { addLeadNote, getUnifiedLeadDetail, updateLeadState } from '../services/api'
 import { useToast } from '../components/Toast/Toast'
 import { parseLeadRef } from '../lib/lead-ref'
+import { toDialNumber, toWhatsAppNumber } from '../lib/phone'
 import {
   leadInitials,
   OUTCOME_LABELS,
@@ -215,6 +216,10 @@ export default function LeadDetailPage() {
   }
 
   const status: LeadStatus = lead.state?.status ?? 'new'
+  // Resolved once so a number that cannot make a valid wa.me link disables the
+  // button instead of opening WhatsApp's "number is invalid" page.
+  const dialNumber = toDialNumber(lead.phone)
+  const whatsAppNumber = toWhatsAppNumber(lead.phone)
   const transcriptLines = parseTranscript(lead.chatTranscript ?? '')
   const notes = lead.state?.notes ?? []
   const customFields = Object.entries(lead.customFields ?? {})
@@ -257,10 +262,10 @@ export default function LeadDetailPage() {
             {/* The two actions this page exists to make one tap away. */}
             <div className="flex gap-2 mb-5">
               <a
-                href={lead.phone ? `tel:${lead.phone}` : undefined}
-                aria-disabled={!lead.phone}
+                href={dialNumber ? `tel:${dialNumber}` : undefined}
+                aria-disabled={!dialNumber}
                 className={`flex-1 inline-flex items-center justify-center gap-2 font-semibold px-3 py-2.5 rounded-xl text-sm transition-opacity ${
-                  lead.phone
+                  dialNumber
                     ? 'bg-linear-to-r from-violet-600 to-purple-500 text-white shadow-md shadow-violet-200/50 hover:opacity-90'
                     : 'bg-gray-100 text-gray-400 pointer-events-none'
                 }`}
@@ -269,12 +274,13 @@ export default function LeadDetailPage() {
                 Call
               </a>
               <a
-                href={lead.phone ? `https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}` : undefined}
+                href={whatsAppNumber ? `https://wa.me/${whatsAppNumber}` : undefined}
                 target="_blank"
                 rel="noreferrer"
-                aria-disabled={!lead.phone}
+                aria-disabled={!whatsAppNumber}
+                title={whatsAppNumber ? undefined : 'No number we can reach on WhatsApp'}
                 className={`flex-1 inline-flex items-center justify-center gap-2 font-semibold px-3 py-2.5 rounded-xl text-sm border transition-colors ${
-                  lead.phone
+                  whatsAppNumber
                     ? 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
                     : 'bg-gray-100 text-gray-400 border-transparent pointer-events-none'
                 }`}

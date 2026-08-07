@@ -65,7 +65,12 @@ function TableSkeleton() {
   )
 }
 
-function PaginationButton({ active, children, ...rest }: { active?: boolean } & ComponentProps<'button'>) {
+function PaginationButton({
+  active,
+  children,
+  className = '',
+  ...rest
+}: { active?: boolean } & ComponentProps<'button'>) {
   return (
     <button
       type="button"
@@ -73,7 +78,7 @@ function PaginationButton({ active, children, ...rest }: { active?: boolean } & 
         active
           ? 'bg-violet-600 text-white'
           : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white'
-      }`}
+      } ${className}`}
       {...rest}
     >
       {children}
@@ -94,6 +99,66 @@ function matchesStatus(lead: UnifiedLead, filter: StatusFilter): boolean {
   const status = leadStatus(lead)
   if (filter === 'open') return status !== 'closed'
   return status === filter
+}
+
+function ContactLines({ lead }: { lead: UnifiedLead }) {
+  if (!lead.phone && !lead.email) return <span className="text-gray-300">No contact</span>
+  return (
+    <>
+      {lead.phone && (
+        <div className="flex items-center gap-1.5">
+          <Phone size={12} className="text-gray-400 shrink-0" />
+          <span className="truncate">{lead.phone}</span>
+        </div>
+      )}
+      {lead.email && (
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <Mail size={12} className="text-gray-400 shrink-0" />
+          <span className="truncate">{lead.email}</span>
+        </div>
+      )}
+    </>
+  )
+}
+
+// Shared by the table row and the mobile card so the two layouts cannot drift
+// apart -- the status control is the primary action on this screen and must
+// behave identically in both.
+function StatusSelect({
+  lead,
+  saving,
+  onChange,
+  className = '',
+}: {
+  lead: UnifiedLead
+  saving: boolean
+  onChange: (status: LeadStatus) => void
+  className?: string
+}) {
+  const status = leadStatus(lead)
+  return (
+    <select
+      value={status}
+      disabled={saving}
+      onChange={(e) => onChange(e.target.value as LeadStatus)}
+      aria-label={`Status for ${lead.name ?? 'this lead'}`}
+      className={`text-xs font-medium px-2.5 py-1.5 rounded-full border cursor-pointer outline-none disabled:opacity-50 focus:ring-2 focus:ring-violet-100 ${STATUS_BADGE_CLASSES[status]} ${className}`}
+    >
+      {STATUS_ORDER.map((option) => (
+        <option key={option} value={option}>
+          {STATUS_LABELS[option]}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+function LeadAvatar({ name }: { name: string | undefined }) {
+  return (
+    <div className="w-9 h-9 rounded-full bg-violet-100 flex items-center justify-center text-xs font-bold text-violet-700 shrink-0">
+      {leadInitials(name)}
+    </div>
+  )
 }
 
 export default function LeadsPage() {
@@ -336,74 +401,101 @@ export default function LeadsPage() {
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-black/5 shadow-sm mt-6 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
+          {/* Cards below lg. A sideways-scrolling table is fine for a
+              reference list, but this is a work queue: at 390px the Source,
+              Next step and Status columns all sat off-screen, so the urgency
+              ordering was invisible and the status control unreachable.
+              The cutover is lg, not md: measured at exactly 768px the table
+              renders but Status still clips off the right edge, so md would
+              have swapped one unusable layout for another. */}
+          <ul className="lg:hidden divide-y divide-gray-50">
+            {paginatedLeads.map((lead) => {
+              const urgency = leadUrgency(lead, now)
+              return (
+                <li
+                  key={lead.leadId}
+                  onClick={() => navigate(leadDetailPath(lead.leadRef))}
+                  className="px-4 py-4 hover:bg-violet-50/20 cursor-pointer transition-colors"
+                >
+                  <div className="flex items-start gap-3">
+                    <LeadAvatar name={lead.name} />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-gray-900 text-sm truncate">
+                        {lead.name ?? 'Unnamed lead'}
+                      </p>
+                      <div className="text-sm text-gray-500 mt-1">
+                        <ContactLines lead={lead} />
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                        <Badge className={SOURCE_BADGE_CLASSES[lead.source]}>
+                          {SOURCE_LABELS[lead.source]}
+                        </Badge>
+                        <Badge className={URGENCY_CLASSES[urgency.tone]}>{urgency.label}</Badge>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+                    <StatusSelect
+                      lead={lead}
+                      saving={savingLeadId === lead.leadId}
+                      onChange={(status) => handleStatusChange(lead, status)}
+                      className="w-full"
+                    />
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+
+          <div className="hidden lg:block overflow-x-auto">
+            <table className="w-full border-collapse table-fixed">
               <thead>
                 <tr className="bg-gray-50/80 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  <th className="text-left px-6 py-3.5 font-semibold">Name</th>
-                  <th className="text-left px-6 py-3.5 font-semibold">Contact</th>
-                  <th className="text-left px-6 py-3.5 font-semibold">Source</th>
-                  <th className="text-left px-6 py-3.5 font-semibold">Next step</th>
-                  <th className="text-left px-6 py-3.5 font-semibold">Status</th>
+                  <th className="text-left px-4 xl:px-6 py-3.5 font-semibold w-[24%]">Name</th>
+                  <th className="text-left px-4 xl:px-6 py-3.5 font-semibold w-[30%]">Contact</th>
+                  <th className="text-left px-4 xl:px-6 py-3.5 font-semibold w-[14%]">Source</th>
+                  <th className="text-left px-4 xl:px-6 py-3.5 font-semibold w-[16%]">Next step</th>
+                  <th className="text-left px-4 xl:px-6 py-3.5 font-semibold w-[16%]">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedLeads.map((lead) => {
                   const urgency = leadUrgency(lead, now)
-                  const status = leadStatus(lead)
                   return (
                     <tr
                       key={lead.leadId}
                       onClick={() => navigate(leadDetailPath(lead.leadRef))}
                       className="border-b border-gray-50 hover:bg-violet-50/20 cursor-pointer transition-colors"
                     >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-violet-100 flex items-center justify-center text-xs font-bold text-violet-700 shrink-0">
-                            {leadInitials(lead.name)}
-                          </div>
-                          <span className="font-semibold text-gray-900 text-sm">
+                      <td className="px-4 xl:px-6 py-4">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <LeadAvatar name={lead.name} />
+                          <span className="font-semibold text-gray-900 text-sm truncate">
                             {lead.name ?? 'Unnamed lead'}
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
-                        {lead.phone && (
-                          <div className="flex items-center gap-1.5">
-                            <Phone size={12} className="text-gray-400 shrink-0" />
-                            {lead.phone}
-                          </div>
-                        )}
-                        {lead.email && (
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <Mail size={12} className="text-gray-400 shrink-0" />
-                            {lead.email}
-                          </div>
-                        )}
-                        {!lead.phone && !lead.email && <span className="text-gray-300">No contact</span>}
+                      <td className="px-4 xl:px-6 py-4 text-sm text-gray-500 max-w-0">
+                        <ContactLines lead={lead} />
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 xl:px-6 py-4">
                         <Badge className={SOURCE_BADGE_CLASSES[lead.source]}>
                           {SOURCE_LABELS[lead.source]}
                         </Badge>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 xl:px-6 py-4">
                         <Badge className={URGENCY_CLASSES[urgency.tone]}>{urgency.label}</Badge>
                       </td>
-                      <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                        <select
-                          value={status}
-                          disabled={savingLeadId === lead.leadId}
-                          onChange={(e) => handleStatusChange(lead, e.target.value as LeadStatus)}
-                          aria-label={`Status for ${lead.name ?? 'this lead'}`}
-                          className={`text-xs font-medium px-2.5 py-1.5 rounded-full border cursor-pointer outline-none disabled:opacity-50 focus:ring-2 focus:ring-violet-100 ${STATUS_BADGE_CLASSES[status]}`}
-                        >
-                          {STATUS_ORDER.map((option) => (
-                            <option key={option} value={option}>
-                              {STATUS_LABELS[option]}
-                            </option>
-                          ))}
-                        </select>
+                      <td className="px-4 xl:px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                        {/* w-full + min-w-0 so the select fills its fixed
+                            column instead of forcing the table 6px wider than
+                            its container, which clipped this control at lg. */}
+                        <StatusSelect
+                          lead={lead}
+                          saving={savingLeadId === lead.leadId}
+                          onChange={(status) => handleStatusChange(lead, status)}
+                          className="w-full min-w-0"
+                        />
                       </td>
                     </tr>
                   )
@@ -412,7 +504,7 @@ export default function LeadsPage() {
             </table>
           </div>
 
-          <div className="flex items-center justify-between px-6 py-3.5 border-t border-gray-50">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-6 py-3.5 border-t border-gray-50">
             <p className="text-sm text-gray-500">
               Showing {(currentPage - 1) * PAGE_SIZE + 1} to{' '}
               {Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length} leads
@@ -421,8 +513,18 @@ export default function LeadsPage() {
               <PaginationButton onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>
                 <ChevronLeft size={14} className="mx-auto" />
               </PaginationButton>
+              {/* Numbered pages need room. Below sm they are replaced by a
+                  plain "3 / 12" so prev/next stay thumb-sized. */}
+              <span className="sm:hidden px-3 text-sm text-gray-500">
+                {currentPage} / {totalPages}
+              </span>
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <PaginationButton key={page} active={page === currentPage} onClick={() => setCurrentPage(page)}>
+                <PaginationButton
+                  key={page}
+                  active={page === currentPage}
+                  onClick={() => setCurrentPage(page)}
+                  className="hidden sm:block"
+                >
                   {page}
                 </PaginationButton>
               ))}
