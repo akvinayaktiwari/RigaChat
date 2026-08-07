@@ -19,7 +19,7 @@ export default function WidgetTestPage() {
 
         <h1 className="text-xl font-bold text-slate-800">Test Widget Embed</h1>
         <p className="text-sm text-slate-500 mt-1">
-          Paste a chatbot's Bot ID below. The next page embeds the real widget on a mock
+          Paste a agent's Bot ID below. The next page embeds the real widget on a mock
           site so you can chat with it live, exactly as a visitor would.
         </p>
 

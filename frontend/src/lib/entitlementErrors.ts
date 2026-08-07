@@ -23,7 +23,7 @@ export function translateEntitlementError(body: EntitlementErrorBody): string | 
 
   if (body.error === 'LIMIT_EXCEEDED' && body.feature === 'agents') {
     const limit = body.limit ?? 0
-    return `You've reached your plan's limit of ${limit} chatbot${limit === 1 ? '' : 's'}. Upgrade to add more.`
+    return `You've reached your plan's limit of ${limit} agent${limit === 1 ? '' : 's'}. Upgrade to add more.`
   }
 
   if (body.error === 'LIMIT_EXCEEDED' && body.feature === 'chat') {

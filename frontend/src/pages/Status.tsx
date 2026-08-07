@@ -45,7 +45,7 @@ function StatusHero() {
         </div>
         <h1 className="text-4xl md:text-5xl font-extrabold text-on-surface tracking-tight leading-tight">System Status</h1>
         <p className="mt-4 text-base md:text-lg text-on-surface-variant max-w-2xl mx-auto leading-relaxed">
-          Real-time status for VyostraAI's chatbot, dashboard, and integrations.
+          Real-time status for VyostraAI's agent, dashboard, and integrations.
         </p>
       </div>
     </section>

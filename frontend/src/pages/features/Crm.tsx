@@ -11,7 +11,7 @@ interface LeadRow {
 
 const LEAD_ROWS: LeadRow[] = [
   { name: 'Rahul Sharma', source: 'Property Bot', date: 'Today', status: 'New' },
-  { name: 'Priya Mehta', source: 'Chatbot', date: 'Yesterday', status: 'Contacted' },
+  { name: 'Priya Mehta', source: 'Agent', date: 'Yesterday', status: 'Contacted' },
   { name: 'Arjun Singh', source: 'Form', date: '2 days ago', status: 'Qualified' },
 ]
 
@@ -56,13 +56,13 @@ export default function Crm() {
       <UseCaseLayout
         badge="LEAD CRM"
         headline="Every lead, organized automatically"
-        subheadline="VyostraAI stores every lead captured by your chatbots and forms in a built-in CRM dashboard. Filter, track status, and sync to Zoho CRM in one click."
+        subheadline="VyostraAI stores every lead captured by your agents and forms in a built-in CRM dashboard. Filter, track status, and sync to Zoho CRM in one click."
         heroVisual={<CrmTableMockup />}
         howItWorksSteps={[
           {
             number: '1',
-            title: 'Chatbot Captures the Lead',
-            body: 'Every visitor who shares their contact details through your chatbot or form is automatically saved as a lead in your CRM dashboard.',
+            title: 'Agent Captures the Lead',
+            body: 'Every visitor who shares their contact details through your agent or form is automatically saved as a lead in your CRM dashboard.',
             icon: <Bot className="w-6 h-6" />,
           },
           {
@@ -82,7 +82,7 @@ export default function Crm() {
           {
             icon: <Database className="w-5 h-5" />,
             title: 'Automatic Lead Storage',
-            body: 'Every lead from every chatbot and form lands in your CRM automatically. No manual entry, no missed submissions, no spreadsheets.',
+            body: 'Every lead from every agent and form lands in your CRM automatically. No manual entry, no missed submissions, no spreadsheets.',
           },
           {
             icon: <Filter className="w-5 h-5" />,
@@ -96,7 +96,7 @@ export default function Crm() {
           },
         ]}
         integrations={[
-          { icon: <Bot className="w-4 h-4" />, title: 'AI Chatbot', href: '/features/chatbot' },
+          { icon: <Bot className="w-4 h-4" />, title: 'AI Agent', href: '/features/agent' },
           { icon: <MessageSquare className="w-4 h-4" />, title: 'WhatsApp Alerts', href: '/features/whatsapp' },
           { icon: <FileText className="w-4 h-4" />, title: 'Form Builder', href: '/features/forms' },
         ]}

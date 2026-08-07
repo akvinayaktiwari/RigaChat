@@ -4,7 +4,7 @@ import { Search, X } from 'lucide-react'
 export interface FilterChip {
   /** Unique key for the React list — also identifies which filter this chip clears. */
   key: string
-  /** Full chip label, e.g. "Chatbot: Support Bot". */
+  /** Full chip label, e.g. "Agent: Support Bot". */
   label: string
   onRemove: () => void
 }

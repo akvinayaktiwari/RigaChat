@@ -94,7 +94,7 @@ export default function SystemMapSection() {
             start to finish
           </h2>
           <p className="text-gray-500 text-lg max-w-xl mx-auto">
-            Not just a chatbot. Five stages, one platform, no Zapier in between.
+            Not just a agent. Five stages, one platform, no Zapier in between.
           </p>
         </div>
 

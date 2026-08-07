@@ -41,7 +41,7 @@ const TERMS_SECTIONS: TermsSection[] = [
     order: '2',
     title: 'Use of Service',
     icon: 'Settings2',
-    body: 'You must provide accurate information. You are responsible for your chatbot content. Do not use VyostraAI for spam or illegal activity.',
+    body: 'You must provide accurate information. You are responsible for your agent content. Do not use VyostraAI for spam or illegal activity.',
   },
   {
     id: 'section-3',
@@ -101,7 +101,7 @@ function TermsHeader({ onDownload }: { onDownload: () => void }) {
           </div>
           <h1 className="text-4xl md:text-5xl font-extrabold text-on-surface tracking-tight">Terms of Service</h1>
           <p className="mt-3 text-base text-on-surface-variant max-w-xl leading-relaxed">
-            These terms govern your use of VyostraAI. By creating an account or using our chatbot, you agree to the
+            These terms govern your use of VyostraAI. By creating an account or using our agent, you agree to the
             terms outlined below.
           </p>
         </div>

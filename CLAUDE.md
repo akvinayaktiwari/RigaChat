@@ -46,6 +46,10 @@ GET  /api/bots/:id/config   -> fetch bot config for widget (public, no auth)
 POST /api/chat              -> RAG retrieval + OpenAI stream (public, no auth)
 POST /api/leads             -> save lead from chat form
 GET  /api/leads             -> fetch all leads for CRM (auth required)
+GET  /api/leads/inbox          -> unified inbox: chat + form + Meta leads merged, each with its LeadRef and LeadState, ordered by urgency not recency (auth required)
+GET  /api/leads/detail         -> one lead, source-agnostic: normalized fields plus the transcript (chat) or the submitted answers relabelled from fieldId (form/Meta). LeadRef travels as query params (auth required)
+PATCH /api/leads/state         -> set status/outcome/ownerId/nextActionAt/leadScore on a lead (auth required; body carries the LeadRef. `replied`/`appointmentBooked` are journey-written and NOT settable here)
+POST /api/leads/notes          -> append a note to a lead (auth required; body carries the LeadRef)
 POST /api/kb                -> add knowledge base entry + embed it
 GET  /api/kb                -> fetch all KB entries (auth required)
 GET  /api/journeys/templates             -> list the prebuilt agent library (auth required; code-defined seeds, identical for every client)
@@ -124,6 +128,7 @@ interface KnowledgeBaseEntry {
 - agent_binding_lookup — partition key: resourceId (reverse index botId/voiceAgentId → owning Agent; atomic-claim so one resource maps to at most one Agent, mirrors gupshup_app_lookup)
 - journey_pending_replies — partition key: leadId (Step Functions callback tokens for executions parked on an await_reply step; TTL on expiresAt, because a timed-out execution never calls back to clean itself up)
 - journey_trigger_claims — partition key: claimKey (`agent:<agentId>#<trigger>` or `bot:<botId>#<trigger>`; atomic-claim so exactly ONE published bundle owns a trigger — prevents duplicate outreach. Doubles as the ignition index: "which journey runs for this lead" is a point read)
+- lead_state — partition key: leadId, GSI clientId-updatedAt-index (per-lead CRM working state: status/owner/nextActionAt/notes/leadScore. Its own table because the three lead tables have three different partition keys — same reason whatsapp_inbound_activity and journey_pending_replies are leadId-keyed side tables. Also where JourneyStep.recheckField's `replied`/`leadScore`/`appointmentBooked` finally live)
 - contact_messages — partition key: messageId, GSI recordType-createdAt-index (marketing-site contact form; no clientId/botId — these are messages to us, not leads for a client's bot)
 
 ## Environment Variables
@@ -159,6 +164,7 @@ CAL_COM_CLIENT_ID
 CAL_COM_CLIENT_SECRET
 CAL_COM_REDIRECT_URI
 DYNAMODB_TABLE_CONTACT_MESSAGES
+DYNAMODB_TABLE_LEAD_STATE
 SES_FROM_EMAIL
 CONTACT_NOTIFICATION_EMAIL
 COGNITO_USER_POOL_ID

@@ -2,9 +2,9 @@ import { z } from 'zod'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { createAppointmentRequest } from '../repositories/appointment-request-repository.js'
-import { getLeadById } from '../repositories/lead-repository.js'
+import { readJourneyLead, toLeadRef } from '../services/lead-resolution-service.js'
 import { bookViaCalCom } from '../services/cal-com-service.js'
-import type { AppointmentRequest } from '../types/index.js'
+import type { AppointmentRequest, LeadSource } from '../types/index.js'
 
 const DEFAULT_TIME_ZONE = 'Asia/Kolkata'
 
@@ -12,6 +12,10 @@ export interface BookAppointmentInput {
   botId: string
   clientId: string
   leadId: string
+  // Where the lead actually lives. Absent means "chat lead under botId", which
+  // is what this used to assume unconditionally -- see toLeadRef.
+  leadSource?: LeadSource
+  leadParentId?: string
   requestedAt: string
   notes?: string
   timeZone?: string
@@ -36,7 +40,10 @@ export async function bookAppointment(input: BookAppointmentInput): Promise<Appo
     throw new Error(`"${input.requestedAt}" is not a valid ISO 8601 datetime`)
   }
 
-  const lead = await getLeadById(input.botId, input.leadId)
+  // Same fix as journey-executor-service: getLeadById reads the chat leads
+  // table only, so a form or Meta lead came back null and was booked as
+  // "Lead" with no attendee email -- which Cal.com can reject outright.
+  const lead = await readJourneyLead(toLeadRef(input))
 
   let result: Awaited<ReturnType<typeof bookViaCalCom>>
   try {

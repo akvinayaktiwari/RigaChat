@@ -57,6 +57,83 @@ export interface Lead {
   createdAt: string
 }
 
+// ---------------------------------------------------------------------------
+// Lead state + the unified inbox
+//
+// Mirrors backend/src/types/index.ts. A LeadRef names BOTH the table and the
+// parent key, which is the only way to read a lead back without knowing its
+// source up front -- the three lead tables have three different partition keys.
+// ---------------------------------------------------------------------------
+
+export type LeadSource = 'chat' | 'form' | 'meta'
+
+export type LeadRef =
+  | { source: 'chat'; botId: string; leadId: string }
+  | { source: 'form'; formId: string; leadId: string }
+  | { source: 'meta'; pageId: string; leadId: string }
+
+export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'closed'
+
+export type LeadOutcome = 'won' | 'lost' | 'unreachable'
+
+export interface LeadNote {
+  noteId: string
+  body: string
+  authorId: string
+  createdAt: string
+}
+
+export interface LeadState {
+  leadId: string
+  clientId: string
+  status: LeadStatus
+  outcome?: LeadOutcome
+  ownerId?: string
+  nextActionAt?: string
+  lastTouchedAt?: string
+  leadScore?: number
+  replied?: boolean
+  appointmentBooked?: boolean
+  notes: LeadNote[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface UnifiedLead {
+  leadId: string
+  clientId: string
+  source: LeadSource
+  name?: string
+  phone?: string
+  email?: string
+  propertyInterest?: string
+  budgetRange?: string
+  sourceUrl?: string
+  leadRef: LeadRef
+  createdAt: string
+  // null means nobody has touched this lead yet -- there is no state row, which
+  // the UI reads as 'new' rather than writing one on capture just to say so.
+  state: LeadState | null
+}
+
+// One lead, opened. Mirrors backend UnifiedLeadDetail: everything the list row
+// carries, plus the raw material a human reads before deciding what to say —
+// the conversation for a chat lead, the submitted answers for form/Meta.
+export interface UnifiedLeadDetail extends UnifiedLead {
+  chatTranscript?: string
+  customFields?: Record<string, string>
+}
+
+// Only the fields an operator may set. replied/appointmentBooked are written by
+// the journey executor and are deliberately absent here.
+export interface LeadStatePatch {
+  status?: LeadStatus
+  outcome?: LeadOutcome | null
+  ownerId?: string | null
+  nextActionAt?: string | null
+  leadScore?: number | null
+}
+
 export type KBFileType = 'pdf' | 'docx' | 'text'
 
 // indexingStatus is undefined for text-only entries (added via the plain

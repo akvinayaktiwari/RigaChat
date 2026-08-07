@@ -919,6 +919,78 @@ export interface JourneyLead {
   sourceUrl?: string
 }
 
+// ---------------------------------------------------------------------------
+// Lead state (CRM)
+//
+// The three lead tables have three different partition keys (leads/botId,
+// form_leads/formId, meta_leads/pageId), so per-lead working state cannot be
+// added as attributes on the records themselves without a different write path
+// per source. It lives in its own leadId-keyed table instead -- the same shape
+// whatsapp_inbound_activity and journey_pending_replies already use for
+// exactly this reason.
+//
+// This is also what JourneyStep.recheckField ('replied' | 'lead_score' |
+// 'appointment_booked') has been branching on: those facts had nowhere to live
+// before this table, so a recheck could never observe them.
+// ---------------------------------------------------------------------------
+
+// Four statuses on purpose. A longer pipeline is a different product with a
+// different buyer. `closed` carries an outcome.
+export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'closed'
+
+export type LeadOutcome = 'won' | 'lost' | 'unreachable'
+
+export interface LeadNote {
+  noteId: string
+  body: string
+  // Cognito sub of whoever wrote it. Kept even for single-operator accounts so
+  // team assignment later does not need a backfill.
+  authorId: string
+  createdAt: string
+}
+
+export interface LeadState {
+  leadId: string
+  clientId: string
+  status: LeadStatus
+  // Only meaningful when status is 'closed'; cleared when a lead is reopened.
+  outcome?: LeadOutcome
+  ownerId?: string
+  // Drives the queue ordering. Overdue first, which is the whole point of the
+  // inbox being a queue rather than a recency-sorted table.
+  nextActionAt?: string
+  lastTouchedAt?: string
+  // 0-100. Written by the qualification prompt, read by JourneyStep recheck.
+  leadScore?: number
+  replied?: boolean
+  appointmentBooked?: boolean
+  notes: LeadNote[]
+  createdAt: string
+  updatedAt: string
+}
+
+// What the unified inbox returns: the normalized cross-source lead fields
+// (JourneyLead) plus where the record lives, when it arrived, and its working
+// state. State is optional because a lead that has never been touched has no
+// lead_state row yet -- absence means 'new', and we do not write a row on
+// capture just to say so.
+export interface UnifiedLead extends JourneyLead {
+  leadRef: LeadRef
+  createdAt: string
+  state: LeadState | null
+}
+
+// One lead, opened. Everything UnifiedLead carries plus the raw material a
+// human needs to decide what to say next: the conversation for a chat lead, the
+// submitted answers for a form or Meta lead. Kept separate from UnifiedLead so
+// the inbox list does not ship every transcript it will never render.
+export interface UnifiedLeadDetail extends UnifiedLead {
+  chatTranscript?: string
+  // Already parsed. The three sources store this differently (a JSON string on
+  // FormLead and MetaLead, nothing at all on Lead) and the UI should not care.
+  customFields?: Record<string, string>
+}
+
 // Everything a journey execution needs to act on a lead, resolved once at
 // ignition and then carried through the execution rather than re-derived per
 // step.

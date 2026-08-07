@@ -19,7 +19,7 @@ interface FounderInfo {
 }
 
 const STATS: StatItem[] = [
-  { value: '24/7', label: 'AI Chatbot Uptime', icon: 'Zap' },
+  { value: '24/7', label: 'AI Agent Uptime', icon: 'Zap' },
   { value: '4s', label: 'Average Lead Alert Time', icon: 'CheckCircle2' },
   { value: '2', label: 'Live Integrations', icon: 'TrendingUp' },
   { value: '100%', label: 'Data Encrypted at Rest', icon: 'MessageCircle' },
@@ -90,7 +90,7 @@ function StoryBlockOneText() {
       </h2>
       <p className="text-base md:text-lg text-on-surface-variant leading-relaxed">
         We built VyostraAI because we saw too many businesses losing leads to slow response times, missed form
-        submissions, and disconnected tools. VyostraAI fixes that with an AI chatbot, WhatsApp automation, and CRM
+        submissions, and disconnected tools. VyostraAI fixes that with an AI agent, WhatsApp automation, and CRM
         sync — all in one platform.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
@@ -101,7 +101,7 @@ function StoryBlockOneText() {
           <div>
             <h4 className="font-bold text-on-surface text-sm mb-1">Always On</h4>
             <p className="text-xs text-on-surface-variant leading-relaxed">
-              AI chatbot captures leads 24/7, even on holidays.
+              AI agent captures leads 24/7, even on holidays.
             </p>
           </div>
         </div>

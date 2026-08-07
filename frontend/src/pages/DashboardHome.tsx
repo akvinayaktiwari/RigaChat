@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, Bot, CheckCircle, Download, Plus, TrendingUp, Users } from 'lucide-react'
-import { getAllLeads, getMyBots } from '../services/api'
+import { ArrowRight, Bot, CheckCircle, Download, Plus, TrendingUp, TriangleAlert, Users } from 'lucide-react'
+import { getLeadInbox, getMyBots } from '../services/api'
 import { useAuth } from '../hooks/useAuth'
 import Sparkline from '../components/charts/Sparkline'
 import TrendChart from '../components/charts/TrendChart'
-import { exportLeadsCsv } from '../lib/csv'
+import { exportInboxCsv } from '../lib/csv'
+import { leadDetailPath } from '../lib/lead-ref'
+import { SOURCE_BADGE_CLASSES, SOURCE_LABELS, STATUS_BADGE_CLASSES, STATUS_LABELS, leadStatus } from '../lib/lead-display'
 import { formatRelativeDate } from '../lib/date'
-import type { BotConfig, BotStatus, Lead } from '../types/index'
+import type { BotConfig, BotStatus, UnifiedLead } from '../types/index'
 
 const RECENT_LEADS_COUNT = 5
 const GLANCE_BOTS_COUNT = 5
@@ -58,7 +60,7 @@ function localDateKey(date: Date): string {
 }
 
 /** Real day-by-day lead counts for the last `days` calendar days (today inclusive), oldest first. Days with no leads are honestly 0, never omitted or fabricated. */
-function bucketLeadsByDay(leads: Lead[], days: number): DailyBucket[] {
+function bucketLeadsByDay(leads: UnifiedLead[], days: number): DailyBucket[] {
   const now = new Date()
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
@@ -239,17 +241,26 @@ export default function DashboardHome() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [bots, setBots] = useState<BotConfig[]>([])
-  const [leads, setLeads] = useState<Lead[]>([])
+  const [leads, setLeads] = useState<UnifiedLead[]>([])
   const [loading, setLoading] = useState(true)
+  // Every stat on this page is derived from `leads`. If the inbox call fails,
+  // `?? []` renders "Total Leads 0" and a flat chart as though they were
+  // measured — a worse lie here than on the Leads page, because these numbers
+  // look like findings. The banner marks them as unavailable instead.
+  const [leadsUnavailable, setLeadsUnavailable] = useState(false)
 
   useEffect(() => {
     let cancelled = false
 
     async function load() {
-      const [botsRes, leadsRes] = await Promise.all([getMyBots(), getAllLeads()])
+      const [botsRes, leadsRes] = await Promise.allSettled([getMyBots(), getLeadInbox()])
       if (cancelled) return
-      setBots(botsRes.data ?? [])
-      setLeads(leadsRes.data ?? [])
+
+      setBots(botsRes.status === 'fulfilled' ? (botsRes.value.data ?? []) : [])
+
+      const leadsOk = leadsRes.status === 'fulfilled' && leadsRes.value.success
+      setLeads(leadsOk ? (leadsRes.value.data ?? []) : [])
+      setLeadsUnavailable(!leadsOk)
       setLoading(false)
     }
 
@@ -268,10 +279,6 @@ export default function DashboardHome() {
   const firstNamePart = rawName.split(' ')[0].split('@')[0]
   const firstName = firstNamePart.charAt(0).toUpperCase() + firstNamePart.slice(1)
   const greeting = getGreeting(new Date().getHours())
-
-  function botName(botId: string): string {
-    return bots.find((bot) => bot.botId === botId)?.name ?? 'Unknown'
-  }
 
   const activeBots = bots.filter(isActiveBot)
 
@@ -320,7 +327,7 @@ export default function DashboardHome() {
   const thisWeekSparkline = thisWeekBuckets.map((bucket) => bucket.count)
 
   function handleExportLeadsCsv() {
-    exportLeadsCsv('vyostra-leads.csv', leads, botName)
+    exportInboxCsv('vyostra-leads.csv', leads)
   }
 
   return (
@@ -333,7 +340,7 @@ export default function DashboardHome() {
           >
             {greeting}, {firstName} 👋
           </h1>
-          <p className="text-sm text-gray-500 mt-1">Here&apos;s what&apos;s happening with your chatbots today</p>
+          <p className="text-sm text-gray-500 mt-1">Here&apos;s what&apos;s happening with your agents today</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -354,6 +361,23 @@ export default function DashboardHome() {
           </button>
         </div>
       </div>
+
+      {leadsUnavailable && !loading && (
+        <div className="mb-6 flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          <TriangleAlert size={18} className="text-red-500 shrink-0 mt-0.5" />
+          <p className="text-sm text-red-700">
+            Lead data couldn&apos;t be loaded, so every lead figure below is showing zero rather than a
+            measured number.{' '}
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="underline font-medium hover:text-red-900"
+            >
+              Reload
+            </button>
+          </p>
+        </div>
+      )}
 
       {loading ? (
         <StatsSkeleton />
@@ -408,7 +432,7 @@ export default function DashboardHome() {
             Welcome to VyostraAI
           </h2>
           <p className="text-sm text-gray-500 text-center max-w-xs mb-6">
-            Set up your first chatbot to start capturing leads from your website
+            Set up your first agent to start capturing leads from your website
           </p>
           <button
             type="button"
@@ -456,11 +480,8 @@ export default function DashboardHome() {
                     <tr className="bg-gray-50/80 text-xs font-semibold uppercase tracking-wider text-gray-500">
                       <th className="text-left px-6 py-3.5 font-semibold">Name</th>
                       <th className="text-left px-6 py-3.5 font-semibold">Email</th>
-                      <th className="text-left px-6 py-3.5 font-semibold">Bot</th>
+                      <th className="text-left px-6 py-3.5 font-semibold">Source</th>
                       <th className="text-left px-6 py-3.5 font-semibold">Date</th>
-                      {/* Real per-lead status tracking (Contacted/Converted) doesn't
-                          exist in our data model yet — every captured lead is
-                          honestly "New" until that's added as its own feature. */}
                       <th className="text-left px-6 py-3.5 font-semibold">Status</th>
                     </tr>
                   </thead>
@@ -469,15 +490,23 @@ export default function DashboardHome() {
                       <tr
                         key={lead.leadId}
                         className="border-b border-gray-50 hover:bg-violet-50/20 cursor-pointer transition-colors duration-100"
-                        onClick={() => navigate(`/dashboard/leads/${lead.leadId}?botId=${lead.botId}`)}
+                        onClick={() => navigate(leadDetailPath(lead.leadRef))}
                       >
                         <td className="px-6 py-4 text-sm font-medium text-gray-900">{lead.name}</td>
                         <td className="px-6 py-4 text-sm text-gray-500">{lead.email}</td>
-                        <td className="px-6 py-4 text-sm text-gray-700">{botName(lead.botId)}</td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-full border ${SOURCE_BADGE_CLASSES[lead.source]}`}
+                          >
+                            {SOURCE_LABELS[lead.source]}
+                          </span>
+                        </td>
                         <td className="px-6 py-4 text-sm text-gray-400">{formatRelativeDate(new Date(lead.createdAt))}</td>
                         <td className="px-6 py-4">
-                          <span className="inline-flex bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold px-2.5 py-1 rounded-full">
-                            New
+                          <span
+                            className={`inline-flex text-xs font-semibold px-2.5 py-1 rounded-full border ${STATUS_BADGE_CLASSES[leadStatus(lead)]}`}
+                          >
+                            {STATUS_LABELS[leadStatus(lead)]}
                           </span>
                         </td>
                       </tr>

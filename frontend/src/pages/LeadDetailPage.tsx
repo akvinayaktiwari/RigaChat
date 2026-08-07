@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   Bot as BotIcon,
   Calendar,
+  CalendarClock,
   ChevronLeft,
   DollarSign,
   Globe,
@@ -10,9 +11,24 @@ import {
   Mail,
   MessageSquare,
   Phone,
+  StickyNote,
 } from 'lucide-react'
-import { getLeadById, getMyBots } from '../services/api'
-import type { Lead } from '../types/index'
+import { addLeadNote, getUnifiedLeadDetail, updateLeadState } from '../services/api'
+import { useToast } from '../components/Toast/Toast'
+import { describeApiError } from '../lib/api-error'
+import { parseLeadRef } from '../lib/lead-ref'
+import { toDialNumber, toWhatsAppNumber } from '../lib/phone'
+import {
+  leadInitials,
+  OUTCOME_LABELS,
+  OUTCOME_ORDER,
+  SOURCE_BADGE_CLASSES,
+  SOURCE_LABELS,
+  STATUS_BADGE_CLASSES,
+  STATUS_LABELS,
+  STATUS_ORDER,
+} from '../lib/lead-display'
+import type { LeadOutcome, LeadStatePatch, LeadStatus, UnifiedLeadDetail } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -37,17 +53,8 @@ function parseTranscript(transcript: string): TranscriptLine[] {
     })
 }
 
-function getInitials(name: string | undefined): string {
-  if (!name) return '?'
-  return name
-    .split(' ')
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
-}
-
 function formatFullDate(dateString: string): string {
+  if (!dateString) return 'Unknown'
   return new Date(dateString).toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -56,6 +63,22 @@ function formatFullDate(dateString: string): string {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+// <input type="datetime-local"> wants local wall-clock with no zone, while the
+// API stores ISO-8601 UTC. Converting through the epoch keeps the displayed
+// time the one the operator actually picked.
+function toLocalInputValue(iso: string | undefined): string {
+  if (!iso) return ''
+  const date = new Date(iso)
+  const offsetMs = date.getTimezoneOffset() * 60 * 1000
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16)
+}
+
+function fromLocalInputValue(value: string): string | null {
+  if (!value) return null
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString()
 }
 
 function InfoRow({ icon: Icon, label, value }: { icon: typeof Mail; label: string; value: string }) {
@@ -99,49 +122,90 @@ function LoadingSkeleton() {
   )
 }
 
+const SELECT_CLASSES =
+  'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-white cursor-pointer outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors disabled:opacity-50'
+
 export default function LeadDetailPage() {
   const { leadId } = useParams<{ leadId: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const botId = searchParams.get('botId') ?? ''
+  const toast = useToast()
+  const leadRef = parseLeadRef(leadId, searchParams)
 
-  const [lead, setLead] = useState<Lead | null>(null)
-  const [botName, setBotName] = useState('')
+  const [lead, setLead] = useState<UnifiedLeadDetail | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [noteDraft, setNoteDraft] = useState('')
 
   useEffect(() => {
-    if (!leadId || !botId) {
-      setError(true)
+    if (!leadRef) {
+      setError('That link is missing the information needed to open this lead.')
       setLoading(false)
       return
     }
 
-    Promise.all([getLeadById(botId, leadId), getMyBots()])
-      .then(([leadRes, botsRes]) => {
-        if (leadRes.success && leadRes.data) {
-          setLead(leadRes.data)
-        } else {
-          setError(true)
-        }
-        const bots = botsRes.data ?? []
-        setBotName(bots.find((b) => b.botId === botId)?.name ?? 'Unknown Bot')
+    let cancelled = false
+    getUnifiedLeadDetail(leadRef)
+      .then((res) => {
+        if (cancelled) return
+        if (res.success && res.data) setLead(res.data)
+        // A 500 and a genuine 404 both landed here as "Lead not found" before,
+        // which sent you looking for a deleted lead when the table was simply
+        // unreachable. describeApiError keeps that distinction in the console
+        // while showing the customer something they can act on.
+        else setError(describeApiError('leads/detail', res.error, 'We couldn’t open this lead.'))
         setLoading(false)
       })
       .catch(() => {
-        setError(true)
+        if (cancelled) return
+        setError('Could not reach the server')
         setLoading(false)
       })
-  }, [botId, leadId])
+    return () => {
+      cancelled = true
+    }
+    // leadRef is rebuilt each render from the URL; keying on its parts avoids
+    // an infinite refetch loop while still refetching when the URL changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leadId, searchParams])
 
-  if (loading) {
-    return <LoadingSkeleton />
+  async function applyPatch(patch: LeadStatePatch) {
+    if (!leadRef) return
+    setSaving(true)
+    const res = await updateLeadState(leadRef, patch)
+    setSaving(false)
+
+    if (!res.success || !res.data) {
+      toast.show(describeApiError('leads/state', res.error, 'Couldn’t save that change.'), 'error')
+      return
+    }
+    const updated = res.data
+    setLead((prev) => (prev ? { ...prev, state: updated } : prev))
   }
+
+  async function handleAddNote() {
+    if (!leadRef || !noteDraft.trim()) return
+    setSaving(true)
+    const res = await addLeadNote(leadRef, noteDraft.trim())
+    setSaving(false)
+
+    if (!res.success || !res.data) {
+      toast.show(describeApiError('leads/notes', res.error, 'Couldn’t save that note.'), 'error')
+      return
+    }
+    const updated = res.data
+    setLead((prev) => (prev ? { ...prev, state: updated } : prev))
+    setNoteDraft('')
+  }
+
+  if (loading) return <LoadingSkeleton />
 
   if (error || !lead) {
     return (
       <div className="flex flex-col items-center text-center py-16">
-        <p className="text-gray-900 font-medium">Lead not found</p>
+        <p className="text-gray-900 font-medium">Couldn&apos;t open this lead</p>
+        <p className="text-sm text-gray-500 mt-2 max-w-md">{error}</p>
         <button
           type="button"
           onClick={() => navigate('/dashboard/leads')}
@@ -153,7 +217,14 @@ export default function LeadDetailPage() {
     )
   }
 
-  const transcriptLines = parseTranscript(lead.chatTranscript)
+  const status: LeadStatus = lead.state?.status ?? 'new'
+  // Resolved once so a number that cannot make a valid wa.me link disables the
+  // button instead of opening WhatsApp's "number is invalid" page.
+  const dialNumber = toDialNumber(lead.phone)
+  const whatsAppNumber = toWhatsAppNumber(lead.phone)
+  const transcriptLines = parseTranscript(lead.chatTranscript ?? '')
+  const notes = lead.state?.notes ?? []
+  const customFields = Object.entries(lead.customFields ?? {})
 
   return (
     <div>
@@ -167,66 +238,240 @@ export default function LeadDetailPage() {
       </button>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1 bg-white rounded-2xl border border-black/5 p-6 shadow-sm">
-          <div className="w-16 h-16 rounded-full bg-linear-to-br from-violet-600 to-purple-500 flex items-center justify-center mx-auto mb-4">
-            <span className="text-xl font-bold text-white" style={JAKARTA_FONT}>
-              {getInitials(lead.name)}
-            </span>
-          </div>
-          <h1 className="text-xl font-bold text-gray-900 text-center mb-1" style={JAKARTA_FONT}>
-            {lead.name}
-          </h1>
-          <p className="text-sm text-gray-500 text-center mb-6">{botName}</p>
-
-          <div>
-            <InfoRow icon={Phone} label="Phone" value={lead.phone ?? 'Not provided'} />
-            <InfoRow icon={Mail} label="Email" value={lead.email ?? 'Not provided'} />
-            <InfoRow icon={Globe} label="Source URL" value={lead.sourceUrl} />
-            <InfoRow icon={Calendar} label="Date" value={formatFullDate(lead.createdAt)} />
-            <InfoRow icon={BotIcon} label="Bot name" value={botName} />
-          </div>
-
-          {(lead.propertyInterest || lead.budgetRange) && (
-            <div className="mt-2">
-              <p className="text-sm font-medium text-gray-500 mt-4 mb-2">Additional Info</p>
-              {lead.propertyInterest && <InfoRow icon={Home} label="Property Interest" value={lead.propertyInterest} />}
-              {lead.budgetRange && <InfoRow icon={DollarSign} label="Budget Range" value={lead.budgetRange} />}
+        <div className="lg:col-span-1 space-y-6">
+          <div className="bg-white rounded-2xl border border-black/5 p-6 shadow-sm">
+            <div className="w-16 h-16 rounded-full bg-linear-to-br from-violet-600 to-purple-500 flex items-center justify-center mx-auto mb-4">
+              <span className="text-xl font-bold text-white" style={JAKARTA_FONT}>
+                {leadInitials(lead.name)}
+              </span>
             </div>
-          )}
-        </div>
-
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-black/5 p-6 shadow-sm">
-          <h2 className="font-bold text-lg text-gray-900 mb-5" style={JAKARTA_FONT}>
-            Conversation
-          </h2>
-
-          {transcriptLines.length === 0 ? (
-            <div className="flex flex-col items-center text-center py-8">
-              <MessageSquare size={32} className="text-gray-300 mb-2" />
-              <p className="text-gray-400 text-sm">No conversation transcript available</p>
+            <h1 className="text-xl font-bold text-gray-900 text-center mb-2" style={JAKARTA_FONT}>
+              {lead.name ?? 'Unnamed lead'}
+            </h1>
+            <div className="flex justify-center gap-2 mb-5">
+              <span
+                className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-full border ${SOURCE_BADGE_CLASSES[lead.source]}`}
+              >
+                {SOURCE_LABELS[lead.source]}
+              </span>
+              <span
+                className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-full border ${STATUS_BADGE_CLASSES[status]}`}
+              >
+                {STATUS_LABELS[status]}
+              </span>
             </div>
-          ) : (
-            <div className="demo-chat-scrollbar flex flex-col gap-3 max-h-125 overflow-y-auto pr-2">
-              {transcriptLines.map((line, i) =>
-                line.role === 'user' ? (
-                  <div key={i} className="flex justify-end">
-                    <div className="bg-linear-to-br from-violet-600 to-purple-500 text-white rounded-2xl rounded-br-sm px-4 py-3 text-sm max-w-[80%] leading-relaxed">
-                      {line.text}
-                    </div>
-                  </div>
-                ) : (
-                  <div key={i} className="flex gap-3 items-end">
-                    <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-                      <BotIcon className="w-3.5 h-3.5 text-gray-400" />
-                    </div>
-                    <div className="bg-gray-100 rounded-2xl rounded-bl-sm px-4 py-3 text-sm text-gray-700 max-w-[80%] leading-relaxed">
-                      {line.text}
-                    </div>
-                  </div>
-                )
+
+            {/* The two actions this page exists to make one tap away. */}
+            <div className="flex gap-2 mb-5">
+              <a
+                href={dialNumber ? `tel:${dialNumber}` : undefined}
+                aria-disabled={!dialNumber}
+                className={`flex-1 inline-flex items-center justify-center gap-2 font-semibold px-3 py-2.5 rounded-xl text-sm transition-opacity ${
+                  dialNumber
+                    ? 'bg-linear-to-r from-violet-600 to-purple-500 text-white shadow-md shadow-violet-200/50 hover:opacity-90'
+                    : 'bg-gray-100 text-gray-400 pointer-events-none'
+                }`}
+              >
+                <Phone size={14} />
+                Call
+              </a>
+              <a
+                href={whatsAppNumber ? `https://wa.me/${whatsAppNumber}` : undefined}
+                target="_blank"
+                rel="noreferrer"
+                aria-disabled={!whatsAppNumber}
+                title={whatsAppNumber ? undefined : 'No number we can reach on WhatsApp'}
+                className={`flex-1 inline-flex items-center justify-center gap-2 font-semibold px-3 py-2.5 rounded-xl text-sm border transition-colors ${
+                  whatsAppNumber
+                    ? 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                    : 'bg-gray-100 text-gray-400 border-transparent pointer-events-none'
+                }`}
+              >
+                <MessageSquare size={14} />
+                WhatsApp
+              </a>
+            </div>
+
+            <div>
+              <InfoRow icon={Phone} label="Phone" value={lead.phone ?? 'Not provided'} />
+              <InfoRow icon={Mail} label="Email" value={lead.email ?? 'Not provided'} />
+              <InfoRow icon={Globe} label="Source URL" value={lead.sourceUrl ?? 'Not provided'} />
+              <InfoRow icon={Calendar} label="Captured" value={formatFullDate(lead.createdAt)} />
+              {lead.state?.lastTouchedAt && (
+                <InfoRow
+                  icon={CalendarClock}
+                  label="Last touched"
+                  value={formatFullDate(lead.state.lastTouchedAt)}
+                />
               )}
             </div>
-          )}
+
+            {(lead.propertyInterest || lead.budgetRange) && (
+              <div className="mt-2">
+                <p className="text-sm font-medium text-gray-500 mt-4 mb-2">Additional Info</p>
+                {lead.propertyInterest && (
+                  <InfoRow icon={Home} label="Property Interest" value={lead.propertyInterest} />
+                )}
+                {lead.budgetRange && <InfoRow icon={DollarSign} label="Budget Range" value={lead.budgetRange} />}
+              </div>
+            )}
+
+            {customFields.length > 0 && (
+              <div className="mt-4">
+                <p className="text-sm font-medium text-gray-500 mb-2">Submitted answers</p>
+                <dl className="space-y-2">
+                  {customFields.map(([key, value]) => (
+                    <div key={key} className="text-sm">
+                      <dt className="text-xs text-gray-400">{key}</dt>
+                      <dd className="text-gray-700 font-medium break-words">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-2xl border border-black/5 p-6 shadow-sm">
+            <h2 className="font-bold text-base text-gray-900 mb-4" style={JAKARTA_FONT}>
+              Where this stands
+            </h2>
+
+            <label className="text-xs text-gray-400 block mb-1.5" htmlFor="lead-status">
+              Status
+            </label>
+            <select
+              id="lead-status"
+              value={status}
+              disabled={saving}
+              onChange={(e) => applyPatch({ status: e.target.value as LeadStatus })}
+              className={SELECT_CLASSES}
+            >
+              {STATUS_ORDER.map((option) => (
+                <option key={option} value={option}>
+                  {STATUS_LABELS[option]}
+                </option>
+              ))}
+            </select>
+
+            {status === 'closed' && (
+              <>
+                <label className="text-xs text-gray-400 block mb-1.5 mt-4" htmlFor="lead-outcome">
+                  Outcome
+                </label>
+                <select
+                  id="lead-outcome"
+                  value={lead.state?.outcome ?? ''}
+                  disabled={saving}
+                  onChange={(e) =>
+                    applyPatch({ outcome: e.target.value ? (e.target.value as LeadOutcome) : null })
+                  }
+                  className={SELECT_CLASSES}
+                >
+                  <option value="">Not recorded</option>
+                  {OUTCOME_ORDER.map((option) => (
+                    <option key={option} value={option}>
+                      {OUTCOME_LABELS[option]}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+
+            <label className="text-xs text-gray-400 block mb-1.5 mt-4" htmlFor="lead-next-action">
+              Next action
+            </label>
+            <input
+              id="lead-next-action"
+              type="datetime-local"
+              value={toLocalInputValue(lead.state?.nextActionAt)}
+              disabled={saving}
+              onChange={(e) => applyPatch({ nextActionAt: fromLocalInputValue(e.target.value) })}
+              className={SELECT_CLASSES}
+            />
+            <p className="text-xs text-gray-400 mt-2">
+              Leads with an overdue next action are pinned to the top of your inbox.
+            </p>
+          </div>
+        </div>
+
+        <div className="lg:col-span-2 space-y-6">
+          <div className="bg-white rounded-2xl border border-black/5 p-6 shadow-sm">
+            <h2 className="font-bold text-lg text-gray-900 mb-4" style={JAKARTA_FONT}>
+              Notes
+            </h2>
+
+            <textarea
+              value={noteDraft}
+              onChange={(e) => setNoteDraft(e.target.value)}
+              placeholder="What happened on the call?"
+              rows={3}
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-700 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors resize-y"
+            />
+            <div className="flex justify-end mt-2">
+              <button
+                type="button"
+                onClick={handleAddNote}
+                disabled={saving || !noteDraft.trim()}
+                className="bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Add note
+              </button>
+            </div>
+
+            {notes.length === 0 ? (
+              <div className="flex flex-col items-center text-center py-8">
+                <StickyNote size={28} className="text-gray-300 mb-2" />
+                <p className="text-gray-400 text-sm">No notes yet</p>
+              </div>
+            ) : (
+              <ul className="mt-5 space-y-3">
+                {[...notes].reverse().map((note) => (
+                  <li key={note.noteId} className="border border-gray-100 rounded-xl px-4 py-3">
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.body}</p>
+                    <p className="text-xs text-gray-400 mt-1.5">{formatFullDate(note.createdAt)}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="bg-white rounded-2xl border border-black/5 p-6 shadow-sm">
+            <h2 className="font-bold text-lg text-gray-900 mb-5" style={JAKARTA_FONT}>
+              Conversation
+            </h2>
+
+            {transcriptLines.length === 0 ? (
+              <div className="flex flex-col items-center text-center py-8">
+                <MessageSquare size={32} className="text-gray-300 mb-2" />
+                <p className="text-gray-400 text-sm">
+                  {lead.source === 'chat'
+                    ? 'No conversation transcript available'
+                    : `${SOURCE_LABELS[lead.source]} leads arrive as a submission, not a conversation`}
+                </p>
+              </div>
+            ) : (
+              <div className="demo-chat-scrollbar flex flex-col gap-3 max-h-125 overflow-y-auto pr-2">
+                {transcriptLines.map((line, i) =>
+                  line.role === 'user' ? (
+                    <div key={i} className="flex justify-end">
+                      <div className="bg-linear-to-br from-violet-600 to-purple-500 text-white rounded-2xl rounded-br-sm px-4 py-3 text-sm max-w-[80%] leading-relaxed">
+                        {line.text}
+                      </div>
+                    </div>
+                  ) : (
+                    <div key={i} className="flex gap-3 items-end">
+                      <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                        <BotIcon className="w-3.5 h-3.5 text-gray-400" />
+                      </div>
+                      <div className="bg-gray-100 rounded-2xl rounded-bl-sm px-4 py-3 text-sm text-gray-700 max-w-[80%] leading-relaxed">
+                        {line.text}
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

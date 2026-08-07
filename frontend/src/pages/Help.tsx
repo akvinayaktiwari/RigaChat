@@ -36,7 +36,7 @@ const HELP_CATEGORIES: HelpCategory[] = [
     id: 'getting-started',
     label: 'Getting Started',
     icon: 'Rocket',
-    description: 'Set up your chatbot and start capturing leads in under 5 minutes.',
+    description: 'Set up your agent and start capturing leads in under 5 minutes.',
   },
   {
     id: 'whatsapp',
@@ -68,9 +68,9 @@ const HELP_ARTICLES: HelpArticle[] = [
   {
     id: 'art-1',
     categoryId: 'getting-started',
-    question: 'How do I create my first chatbot?',
+    question: 'How do I create my first agent?',
     answer:
-      'Go to Chatbots in the sidebar and click Create New Bot. Enter your website URL and VyostraAI trains your AI chatbot automatically. It takes under 5 minutes.',
+      'Go to Agents in the sidebar and click Create New Bot. Enter your website URL and VyostraAI trains your AI agent automatically. It takes under 5 minutes.',
   },
   {
     id: 'art-2',
@@ -84,7 +84,7 @@ const HELP_ARTICLES: HelpArticle[] = [
     categoryId: 'getting-started',
     question: 'What is the knowledge base?',
     answer:
-      'The knowledge base is the information your chatbot uses to answer questions. VyostraAI builds it automatically from your website URL. You can also add custom entries manually.',
+      'The knowledge base is the information your agent uses to answer questions. VyostraAI builds it automatically from your website URL. You can also add custom entries manually.',
   },
   {
     id: 'art-4',
@@ -130,7 +130,7 @@ const HELP_ARTICLES: HelpArticle[] = [
     id: 'art-10',
     categoryId: 'leads',
     question: 'How do I create a lead capture form?',
-    answer: 'Go to Forms in the sidebar, click Create Form, add your fields, and copy the embed code. Forms work independently of chatbots.',
+    answer: 'Go to Forms in the sidebar, click Create Form, add your fields, and copy the embed code. Forms work independently of agents.',
   },
   {
     id: 'art-11',

@@ -194,7 +194,7 @@ export default function BotsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="font-extrabold text-2xl text-gray-900" style={JAKARTA_FONT}>
-          Chatbots
+          Agents
         </h1>
         {!capReady ? (
           <div className="w-10 h-10 flex items-center justify-center">
@@ -229,10 +229,10 @@ export default function BotsPage() {
               <Lock className="w-7 h-7 text-amber-500" />
             </div>
             <h2 className="text-xl font-bold text-gray-900 mb-2" style={JAKARTA_FONT}>
-              Chatbot limit reached
+              Agent limit reached
             </h2>
             <p className="text-sm text-gray-500 text-center max-w-xs mb-6">
-              You&apos;ve reached your plan&apos;s limit of {agentsLimit} chatbot{agentsLimit === 1 ? '' : 's'}.
+              You&apos;ve reached your plan&apos;s limit of {agentsLimit} agent{agentsLimit === 1 ? '' : 's'}.
               Upgrade to add more.
             </p>
             <a
@@ -249,10 +249,10 @@ export default function BotsPage() {
               <BotIcon className="w-7 h-7 text-violet-400" />
             </div>
             <h2 className="text-xl font-bold text-gray-900 mb-2" style={JAKARTA_FONT}>
-              No Chatbots Yet
+              No Agents Yet
             </h2>
             <p className="text-sm text-gray-500 text-center max-w-xs mb-6">
-              Create your first AI chatbot and start capturing leads from your website
+              Create your first AI agent and start capturing leads from your website
             </p>
             <button
               type="button"
@@ -419,7 +419,7 @@ export default function BotsPage() {
             </button>
 
             <h2 className="font-bold text-xl text-gray-900 mb-4" style={JAKARTA_FONT}>
-              Embed Your Chatbot
+              Embed Your Agent
             </h2>
             <p className="text-sm text-gray-500 -mt-3 mb-4">
               Paste this code before the closing &lt;/body&gt; tag on your website
@@ -429,7 +429,7 @@ export default function BotsPage() {
               <li>Copy the embed code below</li>
               <li>Open your website&apos;s HTML file</li>
               <li>Paste before the &lt;/body&gt; tag</li>
-              <li>Your chatbot will appear automatically</li>
+              <li>Your agent will appear automatically</li>
             </ol>
 
             <pre className="bg-gray-900 text-green-400 font-mono text-xs rounded-xl p-4 overflow-x-auto">
@@ -465,7 +465,7 @@ export default function BotsPage() {
               Delete {botToDelete.name}?
             </h2>
             <p className="text-sm text-gray-500 mt-2">
-              This will permanently delete the chatbot and all associated data.
+              This will permanently delete the agent and all associated data.
             </p>
             <div className="flex items-center justify-end gap-3 mt-6">
               <button

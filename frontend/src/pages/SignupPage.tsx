@@ -118,7 +118,7 @@ export default function SignupPage() {
     <div className="min-h-screen flex flex-col lg:flex-row">
       <div className="w-full lg:w-1/2">
         <AuthHeroPanel
-          tagline="AI chatbots with native CRM"
+          tagline="AI agents with native CRM"
           features={FEATURE_PILLS}
           footnote="Trusted by 500+ businesses in India"
         />

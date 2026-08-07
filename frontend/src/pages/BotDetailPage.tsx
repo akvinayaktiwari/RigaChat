@@ -256,7 +256,7 @@ export default function BotDetailPage() {
           onClick={() => navigate('/dashboard/bots')}
           className={`mt-4 px-4 py-2.5 text-sm ${primaryButtonClasses}`}
         >
-          Back to Chatbots
+          Back to Agents
         </button>
       </div>
     )
@@ -423,7 +423,7 @@ export default function BotDetailPage() {
                   className={inputClasses}
                 />
                 <p className="mt-1.5 text-xs text-gray-400">
-                  Detected automatically during setup. Visitors can contact this address directly from the chatbot.
+                  Detected automatically during setup. Visitors can contact this address directly from the agent.
                 </p>
                 {bot.supportEmail && !isValidEmail(bot.supportEmail.trim()) && (
                   <p className="mt-1.5 text-xs text-red-500">Please enter a valid email address.</p>
@@ -585,7 +585,7 @@ export default function BotDetailPage() {
                 <Trash2 size={16} className="text-red-500" />
                 <span className="font-medium text-gray-700">Delete Bot</span>
               </div>
-              <p className="text-gray-500 text-sm mb-3">Permanently delete this chatbot and all associated data</p>
+              <p className="text-gray-500 text-sm mb-3">Permanently delete this agent and all associated data</p>
 
               <button
                 type="button"
@@ -639,7 +639,7 @@ export default function BotDetailPage() {
               Delete {bot.name}?
             </h2>
             <p className="text-sm text-gray-500 mt-2">
-              This will permanently delete the chatbot, all leads, and knowledge base entries.
+              This will permanently delete the agent, all leads, and knowledge base entries.
             </p>
             <div className="flex items-center justify-end gap-3 mt-6">
               <button

@@ -12,6 +12,7 @@ export default defineConfig({
       COGNITO_USER_POOL_ID: 'test-pool-id',
       COGNITO_CLIENT_ID: 'test-client-id',
       DYNAMODB_TABLE_CLIENTS: 'test-clients-table',
+      DYNAMODB_TABLE_LEAD_STATE: 'test-lead-state-table',
       DYNAMODB_TABLE_SUBSCRIPTIONS: 'test-subscriptions-table',
       DYNAMODB_TABLE_JOURNEYS: 'test-journeys-table',
       JOURNEY_EXECUTOR_LAMBDA_ARN: 'arn:aws:lambda:ap-south-1:000000000000:function:test-journey-executor',

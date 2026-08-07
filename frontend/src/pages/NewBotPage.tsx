@@ -70,7 +70,7 @@ const FLOW_OPTIONS: {
     icon: Globe,
     title: 'Train from website',
     description:
-      'Enter your website URL. Our crawler automatically reads your pages and trains your chatbot on your content.',
+      'Enter your website URL. Our crawler automatically reads your pages and trains your agent on your content.',
     badge: 'Recommended',
     badgeClasses: 'bg-violet-100 text-violet-700',
   },
@@ -208,7 +208,7 @@ export default function NewBotPage() {
         setAgentsLimit(limit)
         setAtCap(limit !== null && count >= limit)
       } catch (err) {
-        console.error('Failed to check chatbot entitlement:', err)
+        console.error('Failed to check agent entitlement:', err)
       } finally {
         setCheckingAccess(false)
       }
@@ -225,7 +225,7 @@ export default function NewBotPage() {
 
     if (step === 1) {
       if (formData.name.trim().length < 2) {
-        nextErrors.name = 'Chatbot name must be at least 2 characters'
+        nextErrors.name = 'Agent name must be at least 2 characters'
       }
       if (flowType === 'website') {
         const url = formData.websiteUrl.trim()
@@ -280,7 +280,7 @@ export default function NewBotPage() {
       })
 
       if (!res.success || !res.data) {
-        setLaunchError(translateEntitlementError(res) ?? res.error ?? 'Failed to create chatbot')
+        setLaunchError(translateEntitlementError(res) ?? res.error ?? 'Failed to create agent')
         setLaunchStep('form')
         return
       }
@@ -352,14 +352,14 @@ export default function NewBotPage() {
           <button
             type="button"
             onClick={() => navigate('/dashboard/bots')}
-            title="Back to Chatbots"
+            title="Back to Agents"
             className="text-gray-500 hover:text-gray-800 transition-colors"
           >
             <ArrowLeft size={20} />
           </button>
           <div>
             <h1 className="font-extrabold text-2xl text-gray-900" style={JAKARTA_FONT}>
-              Create New Chatbot
+              Create New Agent
             </h1>
           </div>
         </div>
@@ -369,10 +369,10 @@ export default function NewBotPage() {
             <Lock className="w-7 h-7 text-amber-500" />
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2" style={JAKARTA_FONT}>
-            Chatbot limit reached
+            Agent limit reached
           </h2>
           <p className="text-sm text-gray-500 max-w-sm mb-6">
-            You&apos;ve reached your plan&apos;s limit of {agentsLimit} chatbot{agentsLimit === 1 ? '' : 's'}.
+            You&apos;ve reached your plan&apos;s limit of {agentsLimit} agent{agentsLimit === 1 ? '' : 's'}.
             Upgrade to add more.
           </p>
           <a
@@ -393,16 +393,16 @@ export default function NewBotPage() {
         <button
           type="button"
           onClick={() => navigate('/dashboard/bots')}
-          title="Back to Chatbots"
+          title="Back to Agents"
           className="text-gray-500 hover:text-gray-800 transition-colors"
         >
           <ArrowLeft size={20} />
         </button>
         <div>
           <h1 className="font-extrabold text-2xl text-gray-900" style={JAKARTA_FONT}>
-            Create New Chatbot
+            Create New Agent
           </h1>
-          <p className="text-sm text-gray-500">Set up your AI chatbot in minutes</p>
+          <p className="text-sm text-gray-500">Set up your AI agent in minutes</p>
         </div>
       </div>
 
@@ -419,7 +419,7 @@ export default function NewBotPage() {
             {currentStep === 1 && (
               <div className="space-y-5">
                 <div>
-                  <label className={labelClasses}>Chatbot Name</label>
+                  <label className={labelClasses}>Agent Name</label>
                   <input
                     type="text"
                     value={formData.name}
@@ -585,7 +585,7 @@ export default function NewBotPage() {
                     }
                     className={`${inputClasses} max-w-[120px]`}
                   />
-                  <p className={hintClasses}>Chatbot will ask for contact details after this many exchanges</p>
+                  <p className={hintClasses}>Agent will ask for contact details after this many exchanges</p>
                 </div>
               </div>
             )}
@@ -596,7 +596,7 @@ export default function NewBotPage() {
                   Configure Lead Form Fields
                 </h2>
                 <p className="text-sm text-gray-500 mt-1 mb-5">
-                  These fields will be shown to visitors when your chatbot captures a lead
+                  These fields will be shown to visitors when your agent captures a lead
                 </p>
 
                 <div className="space-y-3">
@@ -664,7 +664,7 @@ export default function NewBotPage() {
 
                 <div className="bg-gray-50 rounded-2xl p-6 space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">Chatbot Name</span>
+                    <span className="text-sm text-gray-500">Agent Name</span>
                     <span className="text-sm font-bold text-gray-900">{formData.name}</span>
                   </div>
                   <div className="h-px bg-gray-100" />
@@ -713,7 +713,7 @@ export default function NewBotPage() {
                   onClick={handleLaunch}
                   className={`w-full mt-6 py-4 text-lg ${primaryButtonClasses}`}
                 >
-                  Launch Chatbot 🚀
+                  Launch Agent 🚀
                 </button>
 
                 {launchError && (

@@ -25,21 +25,21 @@ export const PRICING_TIERS: PricingTier[] = [
     name: 'Starter',
     pricing: { in: 1999, intl: 49 },
     description: 'For a single site getting started with AI chat.',
-    features: ['1 chatbot', '500 conversations/month', '50 CRM leads', 'Website knowledge base training'],
+    features: ['1 agent', '500 conversations/month', '50 CRM leads', 'Website knowledge base training'],
   },
   {
     tier: 'growth',
     name: 'Growth',
     pricing: { in: 5499, intl: 129 },
     description: 'For growing teams running multiple bots.',
-    features: ['3 chatbots', '2,000 conversations/month', 'Unlimited CRM leads', 'Website knowledge base training'],
+    features: ['3 agents', '2,000 conversations/month', 'Unlimited CRM leads', 'Website knowledge base training'],
   },
   {
     tier: 'agency',
     name: 'Agency',
     pricing: { in: 14999, intl: 349 },
-    description: 'For agencies managing chatbots at scale.',
-    features: ['Unlimited chatbots', 'Unlimited conversations', 'Unlimited CRM leads', 'Website knowledge base training'],
+    description: 'For agencies managing agents at scale.',
+    features: ['Unlimited agents', 'Unlimited conversations', 'Unlimited CRM leads', 'Website knowledge base training'],
   },
 ]
 

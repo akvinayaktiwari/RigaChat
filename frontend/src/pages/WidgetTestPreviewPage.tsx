@@ -53,7 +53,7 @@ export default function WidgetTestPreviewPage() {
       <div className="px-10 py-16 text-center">
         <h1 className="text-3xl font-bold text-slate-800">Find your next home with Acme</h1>
         <p className="text-slate-500 mt-3 max-w-md mx-auto">
-          This is a mock client website, used only to verify that a chatbot embed actually
+          This is a mock client website, used only to verify that a agent embed actually
           works when dropped onto a real page. The chat bubble should appear in the corner
           — open it and talk to the bot with real AI-generated answers.
         </p>

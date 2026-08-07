@@ -1,4 +1,5 @@
-import type { Lead } from '../types/index'
+import { OUTCOME_LABELS, SOURCE_LABELS, STATUS_LABELS } from './lead-display'
+import type { Lead, UnifiedLead } from '../types/index'
 
 // Leading =, +, -, or @ makes some spreadsheet apps (Excel, Sheets) treat a
 // cell as a formula. lead.name/email/phone come from the public,
@@ -55,4 +56,27 @@ function buildLeadsCsvRows(leads: Lead[], getBotName: (botId: string) => string)
 /** Builds and downloads a leads CSV in the shared Name/Email/Phone/Bot/Date/Status shape. */
 export function exportLeadsCsv(filename: string, leads: Lead[], getBotName: (botId: string) => string): void {
   downloadCsv(filename, buildCsv(LEADS_CSV_HEADERS, buildLeadsCsvRows(leads, getBotName)))
+}
+
+const INBOX_CSV_HEADERS = ['Name', 'Email', 'Phone', 'Source', 'Captured', 'Status', 'Outcome', 'Next action']
+
+// Unlike buildLeadsCsvRows above, Status here is real: it comes from the
+// lead_state row rather than being hardcoded to "New". A lead with no state
+// row has genuinely never been touched, so it still reports as New.
+function buildInboxCsvRows(leads: UnifiedLead[]): string[][] {
+  return leads.map((lead) => [
+    lead.name ?? '',
+    lead.email ?? '',
+    lead.phone ?? '',
+    SOURCE_LABELS[lead.source],
+    new Date(lead.createdAt).toLocaleDateString(),
+    STATUS_LABELS[lead.state?.status ?? 'new'],
+    lead.state?.outcome ? OUTCOME_LABELS[lead.state.outcome] : '',
+    lead.state?.nextActionAt ? new Date(lead.state.nextActionAt).toLocaleDateString() : '',
+  ])
+}
+
+/** Builds and downloads a CSV of the unified inbox, in whatever order it was given. */
+export function exportInboxCsv(filename: string, leads: UnifiedLead[]): void {
+  downloadCsv(filename, buildCsv(INBOX_CSV_HEADERS, buildInboxCsvRows(leads)))
 }

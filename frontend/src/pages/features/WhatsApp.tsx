@@ -39,7 +39,7 @@ export default function WhatsAppFeaturePage() {
       <UseCaseLayout
         badge="WHATSAPP AUTOMATION"
         headline="Never miss a lead — get notified instantly"
-        subheadline="VyostraAI sends a WhatsApp message to your number the moment a lead is captured — from your chatbot or your forms. No app switching. No delays."
+        subheadline="VyostraAI sends a WhatsApp message to your number the moment a lead is captured — from your agent or your forms. No app switching. No delays."
         heroVisual={<WhatsAppNotificationMockup />}
         howItWorksSteps={[
           {
@@ -51,7 +51,7 @@ export default function WhatsAppFeaturePage() {
           {
             number: '2',
             title: 'Enable Lead Notifications',
-            body: 'Turn on the Lead Notifications toggle. From that moment, every new lead captured by any of your chatbots or forms triggers an instant WhatsApp message to your number.',
+            body: 'Turn on the Lead Notifications toggle. From that moment, every new lead captured by any of your agents or forms triggers an instant WhatsApp message to your number.',
             icon: <ToggleRight className="w-6 h-6" />,
           },
           {
@@ -75,11 +75,11 @@ export default function WhatsAppFeaturePage() {
           {
             icon: <BarChart2 className="w-5 h-5" />,
             title: 'Weekly Performance Reports',
-            body: 'Every Monday morning, a consolidated report arrives on your WhatsApp — leads by bot, total conversations, and your best performing chatbot of the week.',
+            body: 'Every Monday morning, a consolidated report arrives on your WhatsApp — leads by bot, total conversations, and your best performing agent of the week.',
           },
         ]}
         integrations={[
-          { icon: <Bot className="w-4 h-4" />, title: 'AI Chatbot', href: '/features/chatbot' },
+          { icon: <Bot className="w-4 h-4" />, title: 'AI Agent', href: '/features/agent' },
           { icon: <Users className="w-4 h-4" />, title: 'Lead CRM', href: '/features/crm' },
           { icon: <RefreshCw className="w-4 h-4" />, title: 'Zoho Sync', href: '/features/crm' },
         ]}

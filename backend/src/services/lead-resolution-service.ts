@@ -1,9 +1,20 @@
 import { getLeadById } from '../repositories/lead-repository.js'
 import { getFormLeadById } from '../repositories/form-lead-repository.js'
+import { getPublicFormConfig } from '../repositories/form-repository.js'
 import { getMetaLeadById } from '../repositories/meta-lead-repository.js'
 import { getAgentForResource } from '../repositories/agent-binding-lookup-repository.js'
 import { getAgents } from './agent-service.js'
-import type { Agent, JourneyLead, LeadRef, LeadResolution } from '../types/index.js'
+import type {
+  Agent,
+  FormField,
+  FormLead,
+  JourneyLead,
+  Lead,
+  LeadRef,
+  LeadResolution,
+  LeadSource,
+  MetaLead,
+} from '../types/index.js'
 
 // -------------------------------------------------------------------------
 // Makes a lead from ANY source addressable by the journey layer.
@@ -47,53 +58,133 @@ function parseCustomFields(raw: string): Record<string, unknown> {
   }
 }
 
+// Pure record -> JourneyLead mappings, one per source.
+//
+// Split out of readJourneyLead so a caller that ALREADY holds records (the
+// unified inbox, which lists whole tables at once) normalizes them without a
+// second per-lead read. readJourneyLead below is now just "fetch, then
+// normalize" -- there is still exactly one definition of what a form lead's
+// phone number is.
+export function normalizeChatLead(lead: Lead): JourneyLead {
+  return {
+    leadId: lead.leadId,
+    clientId: lead.clientId,
+    source: 'chat',
+    name: lead.name,
+    phone: lead.phone,
+    email: lead.email,
+    propertyInterest: lead.propertyInterest,
+    budgetRange: lead.budgetRange,
+    sourceUrl: lead.sourceUrl,
+  }
+}
+
+export function normalizeMetaLead(lead: MetaLead): JourneyLead {
+  return {
+    leadId: lead.leadId,
+    clientId: lead.clientId,
+    source: 'meta',
+    name: lead.name,
+    phone: lead.phone,
+    email: lead.email,
+    propertyInterest: lead.propertyInterest,
+    budgetRange: lead.budgetRange,
+    sourceUrl: lead.sourceUrl,
+  }
+}
+
+// The form builder writes customFields keyed by fieldId (a UUID), while the
+// LABELS live on the FormConfig. pickField below matches on the key, so a
+// UUID-keyed submission resolved to no name, no phone and no email -- and
+// because readJourneyLead feeds the journey layer, a journey on a form lead
+// found no phone number and delivered nothing, silently. Passing the form's
+// own field definitions is what makes those rows readable.
+//
+// `type` is checked before `label` on purpose: a field declared type 'phone'
+// IS the phone number, whatever it happens to be called. That removes the
+// "a form whose phone field is called 'reach me on' will not be picked up"
+// limitation this file used to have to admit to.
+function resolveByFieldDefs(
+  values: Record<string, unknown>,
+  formFields: FormField[]
+): Record<string, string> {
+  const resolved: Record<string, string> = {}
+
+  for (const field of formFields) {
+    const value = values[field.fieldId]
+    if (typeof value !== 'string' || value.length === 0) continue
+    resolved[field.label.toLowerCase()] = value
+    if (field.type === 'email' || field.type === 'phone') {
+      resolved[field.type] = value
+    }
+  }
+
+  return resolved
+}
+
+// formFields is optional so callers that legitimately lack it (and the older
+// rows that were already keyed by readable label) still work: resolution falls
+// back to the original key matching rather than returning nothing.
+export function normalizeFormLead(lead: FormLead, formFields?: FormField[]): JourneyLead {
+  const raw = parseCustomFields(lead.customFields)
+  const fields = formFields ? { ...raw, ...resolveByFieldDefs(raw, formFields) } : raw
+
+  return {
+    leadId: lead.leadId,
+    clientId: lead.clientId,
+    source: 'form',
+    name: pickField(fields, ['name']),
+    phone: pickField(fields, ['phone', 'mobile', 'contact', 'whatsapp']),
+    email: pickField(fields, ['email', 'e-mail']),
+    propertyInterest: pickField(fields, ['property', 'interest', 'project']),
+    budgetRange: pickField(fields, ['budget', 'price']),
+    sourceUrl: lead.sourceUrl,
+  }
+}
+
+// Rebuilds a LeadRef from the flat fields carried on a JourneyExecutorEvent (or
+// a booking input). Those fields are optional because executions started before
+// d024f8a exist in flight, so an absent leadSource falls back to treating the
+// lead as a chat lead under botId -- the documented passthrough behaviour.
+//
+// This exists because two consumers were still calling
+// getLeadById(botId, leadId) directly, which reads the CHAT leads table only. A
+// form lead lives in form_leads under formId and a Meta lead in meta_leads
+// under pageId, so that lookup returned null for both and the caller reported
+// "no phone number" for a lead whose phone was on file the whole time.
+export function toLeadRef(parts: {
+  leadId: string
+  botId: string
+  leadSource?: LeadSource
+  leadParentId?: string
+}): LeadRef {
+  if (parts.leadSource === 'form' && parts.leadParentId) {
+    return { source: 'form', formId: parts.leadParentId, leadId: parts.leadId }
+  }
+  if (parts.leadSource === 'meta' && parts.leadParentId) {
+    return { source: 'meta', pageId: parts.leadParentId, leadId: parts.leadId }
+  }
+  return { source: 'chat', botId: parts.botId, leadId: parts.leadId }
+}
+
 export async function readJourneyLead(leadRef: LeadRef): Promise<JourneyLead | null> {
   switch (leadRef.source) {
     case 'chat': {
       const lead = await getLeadById(leadRef.botId, leadRef.leadId)
-      if (!lead) return null
-      return {
-        leadId: lead.leadId,
-        clientId: lead.clientId,
-        source: 'chat',
-        name: lead.name,
-        phone: lead.phone,
-        email: lead.email,
-        propertyInterest: lead.propertyInterest,
-        budgetRange: lead.budgetRange,
-        sourceUrl: lead.sourceUrl,
-      }
+      return lead ? normalizeChatLead(lead) : null
     }
     case 'meta': {
       const lead = await getMetaLeadById(leadRef.pageId, leadRef.leadId)
-      if (!lead) return null
-      return {
-        leadId: lead.leadId,
-        clientId: lead.clientId,
-        source: 'meta',
-        name: lead.name,
-        phone: lead.phone,
-        email: lead.email,
-        propertyInterest: lead.propertyInterest,
-        budgetRange: lead.budgetRange,
-        sourceUrl: lead.sourceUrl,
-      }
+      return lead ? normalizeMetaLead(lead) : null
     }
     case 'form': {
       const lead = await getFormLeadById(leadRef.formId, leadRef.leadId)
       if (!lead) return null
-      const fields = parseCustomFields(lead.customFields)
-      return {
-        leadId: lead.leadId,
-        clientId: lead.clientId,
-        source: 'form',
-        name: pickField(fields, ['name']),
-        phone: pickField(fields, ['phone', 'mobile', 'contact', 'whatsapp']),
-        email: pickField(fields, ['email', 'e-mail']),
-        propertyInterest: pickField(fields, ['property', 'interest', 'project']),
-        budgetRange: pickField(fields, ['budget', 'price']),
-        sourceUrl: lead.sourceUrl,
-      }
+      // Without this the lead's UUID-keyed answers stay unreadable, which is
+      // exactly the delivery bug described above -- the journey layer calls
+      // this path to find a phone number.
+      const form = await getPublicFormConfig(leadRef.formId)
+      return normalizeFormLead(lead, form?.fields)
     }
   }
 }
