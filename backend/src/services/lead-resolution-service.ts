@@ -1,10 +1,12 @@
 import { getLeadById } from '../repositories/lead-repository.js'
 import { getFormLeadById } from '../repositories/form-lead-repository.js'
+import { getPublicFormConfig } from '../repositories/form-repository.js'
 import { getMetaLeadById } from '../repositories/meta-lead-repository.js'
 import { getAgentForResource } from '../repositories/agent-binding-lookup-repository.js'
 import { getAgents } from './agent-service.js'
 import type {
   Agent,
+  FormField,
   FormLead,
   JourneyLead,
   Lead,
@@ -90,8 +92,42 @@ export function normalizeMetaLead(lead: MetaLead): JourneyLead {
   }
 }
 
-export function normalizeFormLead(lead: FormLead): JourneyLead {
-  const fields = parseCustomFields(lead.customFields)
+// The form builder writes customFields keyed by fieldId (a UUID), while the
+// LABELS live on the FormConfig. pickField below matches on the key, so a
+// UUID-keyed submission resolved to no name, no phone and no email -- and
+// because readJourneyLead feeds the journey layer, a journey on a form lead
+// found no phone number and delivered nothing, silently. Passing the form's
+// own field definitions is what makes those rows readable.
+//
+// `type` is checked before `label` on purpose: a field declared type 'phone'
+// IS the phone number, whatever it happens to be called. That removes the
+// "a form whose phone field is called 'reach me on' will not be picked up"
+// limitation this file used to have to admit to.
+function resolveByFieldDefs(
+  values: Record<string, unknown>,
+  formFields: FormField[]
+): Record<string, string> {
+  const resolved: Record<string, string> = {}
+
+  for (const field of formFields) {
+    const value = values[field.fieldId]
+    if (typeof value !== 'string' || value.length === 0) continue
+    resolved[field.label.toLowerCase()] = value
+    if (field.type === 'email' || field.type === 'phone') {
+      resolved[field.type] = value
+    }
+  }
+
+  return resolved
+}
+
+// formFields is optional so callers that legitimately lack it (and the older
+// rows that were already keyed by readable label) still work: resolution falls
+// back to the original key matching rather than returning nothing.
+export function normalizeFormLead(lead: FormLead, formFields?: FormField[]): JourneyLead {
+  const raw = parseCustomFields(lead.customFields)
+  const fields = formFields ? { ...raw, ...resolveByFieldDefs(raw, formFields) } : raw
+
   return {
     leadId: lead.leadId,
     clientId: lead.clientId,
@@ -117,7 +153,12 @@ export async function readJourneyLead(leadRef: LeadRef): Promise<JourneyLead | n
     }
     case 'form': {
       const lead = await getFormLeadById(leadRef.formId, leadRef.leadId)
-      return lead ? normalizeFormLead(lead) : null
+      if (!lead) return null
+      // Without this the lead's UUID-keyed answers stay unreadable, which is
+      // exactly the delivery bug described above -- the journey layer calls
+      // this path to find a phone number.
+      const form = await getPublicFormConfig(leadRef.formId)
+      return normalizeFormLead(lead, form?.fields)
     }
   }
 }

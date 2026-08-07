@@ -1,5 +1,6 @@
 import { getLeadById, getLeadsByClientId } from '../repositories/lead-repository.js'
 import { getFormLeadById, getFormLeadsByClientId } from '../repositories/form-lead-repository.js'
+import { getFormsByClientId, getPublicFormConfig } from '../repositories/form-repository.js'
 import { getMetaLeadById, getMetaLeadsByClientId } from '../repositories/meta-lead-repository.js'
 import {
   appendLeadNote,
@@ -14,7 +15,7 @@ import {
   normalizeMetaLead,
   readJourneyLead,
 } from './lead-resolution-service.js'
-import type { LeadRef, LeadState, UnifiedLead, UnifiedLeadDetail } from '../types/index.js'
+import type { FormField, LeadRef, LeadState, UnifiedLead, UnifiedLeadDetail } from '../types/index.js'
 
 // One inbox across chat, form and Meta leads.
 //
@@ -27,15 +28,20 @@ import type { LeadRef, LeadState, UnifiedLead, UnifiedLeadDetail } from '../type
 const META_INBOX_LIMIT = 500
 
 export async function getUnifiedInbox(clientId: string): Promise<UnifiedLead[]> {
-  const [chatLeads, formLeads, metaLeads, states] = await Promise.all([
+  // The client's forms come along because a form lead's answers are keyed by
+  // fieldId -- without the field definitions every form row renders as
+  // "Unnamed lead / No contact". One query for all of them, not one per lead.
+  const [chatLeads, formLeads, metaLeads, states, forms] = await Promise.all([
     getLeadsByClientId(clientId),
     getFormLeadsByClientId(clientId),
     getMetaLeadsByClientId(clientId, META_INBOX_LIMIT),
     getLeadStatesForClient(clientId),
+    getFormsByClientId(clientId),
   ])
 
   const stateByLeadId = new Map(states.map((state) => [state.leadId, state]))
   const read = (leadId: string): LeadState | null => stateByLeadId.get(leadId) ?? null
+  const fieldsByFormId = new Map<string, FormField[]>(forms.map((form) => [form.formId, form.fields]))
 
   const unified: UnifiedLead[] = [
     ...chatLeads.map((lead) => ({
@@ -45,7 +51,7 @@ export async function getUnifiedInbox(clientId: string): Promise<UnifiedLead[]> 
       state: read(lead.leadId),
     })),
     ...formLeads.map((lead) => ({
-      ...normalizeFormLead(lead),
+      ...normalizeFormLead(lead, fieldsByFormId.get(lead.formId)),
       leadRef: { source: 'form', formId: lead.formId, leadId: lead.leadId } as LeadRef,
       createdAt: lead.createdAt,
       state: read(lead.leadId),
@@ -119,6 +125,21 @@ function parseCustomFields(raw: string): Record<string, string> {
   }
 }
 
+// customFields keys are fieldIds. Swap each for its form label so the workspace
+// shows "Budget: 3 BHK" instead of "6baea1e9-9d03-...: 3 BHK". Unmatched keys
+// are kept as-is: an answer whose field was since deleted from the form is
+// still an answer somebody gave.
+function labelCustomFields(
+  values: Record<string, string>,
+  formFields: FormField[] | undefined
+): Record<string, string> {
+  if (!formFields) return values
+  const labelByFieldId = new Map(formFields.map((field) => [field.fieldId, field.label]))
+  return Object.fromEntries(
+    Object.entries(values).map(([key, value]) => [labelByFieldId.get(key) ?? key, value])
+  )
+}
+
 // Everything the workspace needs out of the source record, from ONE read of it.
 // Deliberately not readJourneyLead + a second fetch for the extras: that would
 // read the same row twice per page load to assemble one object.
@@ -134,10 +155,13 @@ async function readSourceRecord(leadRef: LeadRef): Promise<SourceRecord | null> 
     case 'form': {
       const lead = await getFormLeadById(leadRef.formId, leadRef.leadId)
       if (!lead) return null
+      const form = await getPublicFormConfig(leadRef.formId)
       return {
-        ...normalizeFormLead(lead),
+        ...normalizeFormLead(lead, form?.fields),
         createdAt: lead.createdAt,
-        customFields: parseCustomFields(lead.customFields),
+        // Relabelled for display: the raw map is keyed by fieldId, which is a
+        // UUID no human wants to read next to their answer.
+        customFields: labelCustomFields(parseCustomFields(lead.customFields), form?.fields),
       }
     }
     case 'meta': {

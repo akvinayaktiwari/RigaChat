@@ -7,6 +7,9 @@ vi.mock('../repositories/lead-repository.js', () => ({ getLeadById }))
 const getFormLeadById = vi.fn()
 vi.mock('../repositories/form-lead-repository.js', () => ({ getFormLeadById }))
 
+const getPublicFormConfig = vi.fn()
+vi.mock('../repositories/form-repository.js', () => ({ getPublicFormConfig }))
+
 const getMetaLeadById = vi.fn()
 vi.mock('../repositories/meta-lead-repository.js', () => ({ getMetaLeadById }))
 
@@ -28,6 +31,7 @@ const agentWithWeb: Agent = {
 }
 
 beforeEach(() => {
+  getPublicFormConfig.mockResolvedValue(null)
   vi.clearAllMocks()
 })
 

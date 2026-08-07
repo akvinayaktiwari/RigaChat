@@ -13,6 +13,10 @@ const getMetaLeadsByClientId = vi.fn()
 const getMetaLeadById = vi.fn()
 vi.mock('../repositories/meta-lead-repository.js', () => ({ getMetaLeadsByClientId, getMetaLeadById }))
 
+const getFormsByClientId = vi.fn()
+const getPublicFormConfig = vi.fn()
+vi.mock('../repositories/form-repository.js', () => ({ getFormsByClientId, getPublicFormConfig }))
+
 const getLeadStatesForClient = vi.fn()
 const upsertLeadState = vi.fn()
 const appendLeadNote = vi.fn()
@@ -85,6 +89,8 @@ beforeEach(() => {
   getFormLeadsByClientId.mockResolvedValue([])
   getMetaLeadsByClientId.mockResolvedValue([])
   getLeadStatesForClient.mockResolvedValue([])
+  getFormsByClientId.mockResolvedValue([])
+  getPublicFormConfig.mockResolvedValue(null)
 })
 
 afterEach(() => {
@@ -111,6 +117,68 @@ describe('getUnifiedInbox', () => {
 
   it('normalizes a form lead’s contact fields out of customFields', async () => {
     getFormLeadsByClientId.mockResolvedValue([formLead('f1', '2026-08-02T00:00:00.000Z')])
+
+    const [lead] = await getUnifiedInbox(CLIENT)
+
+    expect(lead.name).toBe('form f1')
+    expect(lead.phone).toBe('+919900000000')
+  })
+
+  it('reads a UUID-keyed form submission via the form’s own field definitions', async () => {
+    // The form builder keys customFields by fieldId, not by label. Without the
+    // field defs these rows resolve to no name/phone/email -- which also left
+    // the journey layer with no phone number to deliver to.
+    const uuidKeyed: FormLead = {
+      ...formLead('f1', '2026-08-02T00:00:00.000Z'),
+      customFields: JSON.stringify({
+        '8967c774-4ab1-4d7d-8d60-c62ff8e9db94': 'Whatsapppppp',
+        '21a12d38-a922-4b38-b490-7dd4956017ff': 'akvinayaktiwari5@gmail.com',
+        '6baea1e9-9d03-4a30-8530-6ecb3a46cedd': '3 BHK',
+      }),
+    }
+    getFormLeadsByClientId.mockResolvedValue([uuidKeyed])
+    getFormsByClientId.mockResolvedValue([
+      {
+        formId: 'form-1',
+        fields: [
+          { fieldId: '8967c774-4ab1-4d7d-8d60-c62ff8e9db94', label: 'Name', type: 'text', required: true },
+          { fieldId: '21a12d38-a922-4b38-b490-7dd4956017ff', label: 'Email', type: 'email', required: false },
+          { fieldId: '6baea1e9-9d03-4a30-8530-6ecb3a46cedd', label: 'Property', type: 'text', required: false },
+        ],
+      },
+    ])
+
+    const [lead] = await getUnifiedInbox(CLIENT)
+
+    expect(lead.name).toBe('Whatsapppppp')
+    expect(lead.email).toBe('akvinayaktiwari5@gmail.com')
+    expect(lead.propertyInterest).toBe('3 BHK')
+  })
+
+  it('resolves a phone field by its declared type, not its label', async () => {
+    // A field literally called "Reach me on" is still the phone number when the
+    // form declares type: 'phone'. Key-name matching could never see that.
+    getFormLeadsByClientId.mockResolvedValue([
+      {
+        ...formLead('f1', '2026-08-02T00:00:00.000Z'),
+        customFields: JSON.stringify({ 'abc-123': '+919900000000' }),
+      },
+    ])
+    getFormsByClientId.mockResolvedValue([
+      {
+        formId: 'form-1',
+        fields: [{ fieldId: 'abc-123', label: 'Reach me on', type: 'phone', required: true }],
+      },
+    ])
+
+    const [lead] = await getUnifiedInbox(CLIENT)
+
+    expect(lead.phone).toBe('+919900000000')
+  })
+
+  it('still reads older label-keyed submissions when no field defs are available', async () => {
+    getFormLeadsByClientId.mockResolvedValue([formLead('f1', '2026-08-02T00:00:00.000Z')])
+    getFormsByClientId.mockResolvedValue([])
 
     const [lead] = await getUnifiedInbox(CLIENT)
 

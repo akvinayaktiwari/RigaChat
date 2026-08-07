@@ -50,27 +50,27 @@ fi
 # lead's outcome and notes are the only record of why it closed.
 
 echo "==> 2/3 Checking the Lambda roles can reach ${TABLE}"
-# The existing roles carry a broad DynamoDB policy rather than per-table grants,
-# so a new table normally needs no IAM change. This verifies that assumption
-# instead of assuming it: a Resource that names tables explicitly would silently
-# deny the new one at runtime, which surfaces as a 500 on /api/leads/inbox.
+# simulate-principal-policy, not a grep over inline policies. The first version
+# of this check read only `iam list-role-policies` and reported both roles as
+# ungranted -- they carry AmazonDynamoDBFullAccess as an ATTACHED MANAGED
+# policy, which that never looked at. A false alarm here is worse than no
+# check: it sends you editing IAM that was already correct.
+TABLE_ARN="arn:aws:dynamodb:${REGION}:${ACCOUNT}:table/${TABLE}"
 for ROLE in rigachat-api-role-4c9qsico rigachat-api-streaming-role-625vca9z; do
-  RESOURCES=$(aws iam list-role-policies --role-name "$ROLE" --query 'PolicyNames[]' --output text 2>/dev/null || echo "")
-  COVERED="no"
-  for POLICY in $RESOURCES; do
-    DOC=$(aws iam get-role-policy --role-name "$ROLE" --policy-name "$POLICY" \
-      --query 'PolicyDocument' --output json 2>/dev/null || echo '{}')
-    if echo "$DOC" | grep -q 'dynamodb' && echo "$DOC" | grep -qE '"\*"|table/\*'; then
-      COVERED="yes"
-      break
-    fi
-  done
-  if [ "$COVERED" = "yes" ]; then
-    echo "    $ROLE: wildcard DynamoDB access, no change needed"
+  DENIED=$(aws iam simulate-principal-policy \
+    --policy-source-arn "arn:aws:iam::${ACCOUNT}:role/${ROLE}" \
+    --action-names dynamodb:Query dynamodb:GetItem dynamodb:UpdateItem \
+    --resource-arns "$TABLE_ARN" "${TABLE_ARN}/index/${INDEX}" \
+    --query "EvaluationResults[?EvalDecision!='allowed'].EvalActionName" \
+    --output text 2>/dev/null || echo "SIMULATE_FAILED")
+
+  if [ -z "$DENIED" ]; then
+    echo "    $ROLE: Query/GetItem/UpdateItem allowed on table + index"
+  elif [ "$DENIED" = "SIMULATE_FAILED" ]; then
+    echo "    $ROLE: could not simulate (needs iam:SimulatePrincipalPolicy) -- check by hand"
   else
-    echo "    $ROLE: NO wildcard DynamoDB grant found -- add ${TABLE} and its"
-    echo "        index (arn:aws:dynamodb:${REGION}:${ACCOUNT}:table/${TABLE},"
-    echo "        .../table/${TABLE}/index/${INDEX}) to its policy before deploying."
+    echo "    $ROLE: DENIED $DENIED -- grant these on"
+    echo "        $TABLE_ARN and ${TABLE_ARN}/index/${INDEX} before deploying."
   fi
 done
 
