@@ -82,7 +82,7 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
             }}
             className="text-sm text-gray-700 font-medium py-2 text-left"
           >
-            Watch 2-min demo
+            See it in action
           </button>
           <a
             href="/login"

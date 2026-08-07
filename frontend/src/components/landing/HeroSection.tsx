@@ -59,7 +59,7 @@ export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
               onClick={onOpenDemo}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-gray-700 font-semibold bg-white border border-gray-200 px-6 py-3.5 rounded-xl hover:bg-gray-50 transition-colors text-sm shadow-sm"
             >
-              Watch 2-min demo
+              See it in action
             </button>
           </div>
 
