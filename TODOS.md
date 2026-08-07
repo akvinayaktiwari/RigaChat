@@ -10,21 +10,35 @@
 
 **Context:** Needs a shared pattern, not a one-off fix per page — e.g. a small `useAsyncData` hook or a top-level `ErrorBoundary` plus a per-page error state, applied consistently. Fixing just 1-2 pages in isolation would leave the rest inconsistent and this exact gap would just resurface next time someone touches one of the other 13.
 
+**Progress (2026-08-08, feat/lead-state-and-unified-inbox):** 3 of 15 done — `LeadsPage.tsx`, `LeadDetailPage.tsx`, `DashboardHome.tsx`. Each now distinguishes a failed load from an empty one, and `lib/api-error.ts`'s `describeApiError` is the beginning of the shared pattern this item asks for (logs the raw server string, renders a safe message). The remaining 12 pages are untouched, so this stays OPEN — and the fix landed exactly the way this item warns against, one page at a time.
+
 **Effort:** M
 **Priority:** P2
 **Depends on:** None
 
-### Build a unified leads dashboard across chat, form, and Meta sources
+### "Agents" now collides with the Agent identity model
 
-**What:** `LeadsPage.tsx` (chat leads) and `FormLeadsPage.tsx` (form leads) are separate pages today; the Meta Lead Ads integration adds a third source with its own bare-bones list page for MVP. An agency using all three sources has to check 2-3 separate pages to see their full pipeline.
+**What:** The chatbot -> Agent rename put "Agents" directly above "Voice Agents" in the dashboard nav, while `CLAUDE.md:126` defines the `agents` table as the top-level cross-channel Agent identity whose bindings resolve to a botId AND a voice agentId. So an Agent is the PARENT of both nav items, and three distinct things now share the name (web bot, voice agent, and the identity that owns them). The Journeys page also offers a "prebuilt agent library", which is a fourth sense.
 
-**Why:** Better UX, and sets up cleanly for whatever the next lead source ends up being (Google Ads, TikTok Lead Ads, etc.) instead of accumulating one page per source indefinitely.
+**Why:** The rename itself is right — "chatbot" undersells the product and "Agent" is the category customers now shop for. But a user reading the nav cannot tell what an Agent is, and the architecture already had a precise answer.
 
-**Context:** Flagged as an Open Question in the Meta Ads design doc (`~/.gstack/projects/akvinayaktiwari-RigaChat/akvinayaktiwari-feature-meta-ads-integration-design-20260725-024416.md`) and deliberately deferred out of that branch — Meta leads land in their own table/API first, readable via a page mirroring `FormLeadsPage.tsx`, and this is the "actually make it nice" follow-up once that's landed.
+**Context:** Two ways out: give the web channel a channel-specific label ("Chat Agents" / "Voice Agents", parallel and unambiguous), or collapse the model so there is ONE Agents page listing Agents with channel badges, which is what the `agents` table was designed for and would make the nav match the data model. The second is more work and more correct.
 
 **Effort:** M
-**Priority:** P3
-**Depends on:** Meta Lead Ads backend integration landing first
+**Priority:** P2
+**Depends on:** None
+
+### Frontend has no test runner
+
+**What:** `frontend/` has no vitest/jest config and zero test files, so `lib/phone.ts` (E.164 normalization), `lib/lead-ref.ts` (URL <-> LeadRef round-tripping) and `lib/lead-display.ts` (the urgency tiers the whole lead queue is ordered by) ship untested. The backend has 273 tests; the frontend has none.
+
+**Why:** All three are pure functions doing string and date arithmetic — the single most regression-prone code in the app and the cheapest possible thing to test. `leadUrgency`'s tier logic in particular has to agree exactly with `lead-inbox-service.ts`'s server-side sort, and nothing currently enforces that.
+
+**Context:** Adding vitest to `frontend/` is roughly a 20-minute setup (`vitest.config.ts` + a `test` script + wiring it into `.github/workflows/ci.yml`'s check-frontend job). The three libs above are the obvious first targets and need no DOM or component testing to cover.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
 
 ### Add a field-mapping UI for Meta Lead Ads custom questions
 
@@ -187,6 +201,8 @@
 **What:** `lib/phone-match.ts`'s `phonesMatch()` compares the last 10 digits of two phone numbers after stripping non-digit characters, because `Lead.phone` has no canonical format — whatever a client's lead-capture form or agent recorded goes in as-is. This is what `webhook-service.ts` uses to match an inbound Gupshup message's phone number to a lead.
 
 **Why:** The heuristic is honest about its own limitation (documented in the file itself): it can produce a false match if two different real phone numbers happen to share the same last 10 digits (rare but not impossible), and a false negative for numbers with fewer than 10 significant digits.
+
+**Progress (2026-08-08, feat/lead-state-and-unified-inbox):** `frontend/src/lib/phone.ts`'s `toWhatsAppNumber()` normalizes to E.164 for the lead workspace's wa.me link — drops the domestic trunk zero, applies +91 to bare 10-digit numbers. That is DISPLAY-time only and does not touch stored data or `phonesMatch()`, so this item stays open. It does establish the normalization rules the capture-time fix can reuse.
 
 **Context:** A real fix means normalizing to E.164 (`+<countrycode><number>`) at every point a phone number enters the system — the chat lead-capture form, the CRM, wherever a client can edit a lead's phone number — not just in the matcher. That's a bigger, cross-cutting change touching every lead-intake path in the app, not a one-file fix. Worth doing once real inbound-message volume shows the heuristic actually causing mismatches, not preemptively.
 
@@ -365,6 +381,21 @@ End-to-end verified the same day against real infra: a submission wrote a real r
 **Depends on:** None
 
 ## Completed
+
+### Build a unified leads dashboard across chat, form, and Meta sources
+
+**What:** `LeadsPage.tsx` (chat leads) and `FormLeadsPage.tsx` (form leads) are separate pages today; the Meta Lead Ads integration adds a third source with its own bare-bones list page for MVP. An agency using all three sources has to check 2-3 separate pages to see their full pipeline.
+
+**Why:** Better UX, and sets up cleanly for whatever the next lead source ends up being (Google Ads, TikTok Lead Ads, etc.) instead of accumulating one page per source indefinitely.
+
+**Context:** Flagged as an Open Question in the Meta Ads design doc (`~/.gstack/projects/akvinayaktiwari-RigaChat/akvinayaktiwari-feature-meta-ads-integration-design-20260725-024416.md`) and deliberately deferred out of that branch — Meta leads land in their own table/API first, readable via a page mirroring `FormLeadsPage.tsx`, and this is the "actually make it nice" follow-up once that's landed.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** Meta Lead Ads backend integration landing first
+
+**Completed:** 2026-08-08 (feat/lead-state-and-unified-inbox)
+
 
 ### Fix un-awaited CRM sync in form-lead-service.ts (Lambda-freeze risk)
 
