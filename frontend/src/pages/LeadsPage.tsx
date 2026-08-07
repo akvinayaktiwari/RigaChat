@@ -39,7 +39,7 @@ const DATE_RANGE_OPTIONS: { value: DateRange; label: string; days: number | null
 
 const SOURCE_OPTIONS: { value: SourceFilter; label: string }[] = [
   { value: 'all', label: 'All sources' },
-  { value: 'chat', label: 'Chatbot' },
+  { value: 'chat', label: 'Agent' },
   { value: 'form', label: 'Form' },
   { value: 'meta', label: 'Meta Ads' },
 ]
@@ -306,7 +306,7 @@ export default function LeadsPage() {
           <p className="text-sm text-gray-500 mt-1">
             {overdueCount > 0
               ? `${overdueCount} ${overdueCount === 1 ? 'lead needs' : 'leads need'} a follow-up today`
-              : 'Every lead from your chatbots, forms and Meta Ads — most urgent first'}
+              : 'Every lead from your agents, forms and Meta Ads — most urgent first'}
           </p>
         </div>
         <button
@@ -391,7 +391,7 @@ export default function LeadsPage() {
           <p className="text-sm text-gray-500 mt-2">
             {chips.length > 0
               ? "Try adjusting or clearing your filters — there's nothing captured for this combination yet."
-              : 'Leads from your chatbots, forms and Meta Ads will appear here'}
+              : 'Leads from your agents, forms and Meta Ads will appear here'}
           </p>
           {chips.length > 0 && (
             <button

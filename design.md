@@ -431,9 +431,9 @@ When implementing, replace Aika/design content with:
 ```
 Brand name:       VyostraAI
 Logo icon:        MessageSquare (keep same)
-Tagline:          "AI chatbot with native CRM — built for Indian SMBs"
+Tagline:          "AI Agents with native CRM — built for Indian SMBs"
 
-Hero headline:    "Deploy AI chatbots your customers love to talk to."
+Hero headline:    "Deploy AI agents your customers love to talk to."
 Hero subtext:     "Train on your website content, capture leads automatically,
                    and sync to your CRM — all in one platform."
 
@@ -465,7 +465,7 @@ Integrations (4 cards):
   Salesforce (planned) → Phase 2
 
 CTA section:
-  Headline: "Your AI chatbot is 3 minutes away."
+  Headline: "Your AI agent is 3 minutes away."
   Subtext:  "Join 500+ businesses automating conversations
              with VyostraAI. Start free, upgrade when you scale."
 ```
@@ -737,7 +737,7 @@ New (leads):
 
 ```
 Used on: list pages with more than one real filter
-         (e.g. Leads page: chatbot, search, date range)
+         (e.g. Leads page: agent, search, date range)
 
 Container: bg-white rounded-2xl p-4
            border border-black/[0.05] shadow-sm

@@ -151,7 +151,7 @@ function EntryModal({ title, form, onChange, onCancel, onSave, saving, saveLabel
               rows={8}
               value={form.content}
               onChange={(e) => onChange({ ...form, content: e.target.value })}
-              placeholder="Enter any information you want your chatbot to know. This could be pricing details, FAQs, policies, or any other information about your business."
+              placeholder="Enter any information you want your agent to know. This could be pricing details, FAQs, policies, or any other information about your business."
               className={`${inputClasses} min-h-35 resize-y`}
             />
           </div>
@@ -457,13 +457,13 @@ export default function KnowledgeBasePage() {
   if (!botId) {
     return (
       <div className="flex flex-col items-center text-center py-16">
-        <p className="text-gray-900 font-medium">No chatbot selected</p>
+        <p className="text-gray-900 font-medium">No agent selected</p>
         <button
           type="button"
           onClick={() => navigate('/dashboard/bots')}
           className={`mt-4 px-4 py-2.5 text-sm ${primaryButtonClasses}`}
         >
-          Back to Chatbots
+          Back to Agents
         </button>
       </div>
     )
@@ -499,7 +499,7 @@ export default function KnowledgeBasePage() {
       <div className="bg-violet-50 border border-violet-100 rounded-2xl p-4 mt-4 flex items-start gap-3">
         <Info size={18} className="text-violet-500 shrink-0 mt-0.5" />
         <p className="text-violet-700 text-sm">
-          Entries added here will be used by your chatbot to answer questions not covered by your website content.
+          Entries added here will be used by your agent to answer questions not covered by your website content.
         </p>
       </div>
 
@@ -626,7 +626,7 @@ export default function KnowledgeBasePage() {
             No knowledge base entries
           </h2>
           <p className="text-sm text-gray-500 text-center max-w-xs mb-6">
-            Add your first entry to help your chatbot answer questions accurately.
+            Add your first entry to help your agent answer questions accurately.
           </p>
           <button
             type="button"

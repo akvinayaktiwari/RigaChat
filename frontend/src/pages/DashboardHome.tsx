@@ -340,7 +340,7 @@ export default function DashboardHome() {
           >
             {greeting}, {firstName} 👋
           </h1>
-          <p className="text-sm text-gray-500 mt-1">Here&apos;s what&apos;s happening with your chatbots today</p>
+          <p className="text-sm text-gray-500 mt-1">Here&apos;s what&apos;s happening with your agents today</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -432,7 +432,7 @@ export default function DashboardHome() {
             Welcome to VyostraAI
           </h2>
           <p className="text-sm text-gray-500 text-center max-w-xs mb-6">
-            Set up your first chatbot to start capturing leads from your website
+            Set up your first agent to start capturing leads from your website
           </p>
           <button
             type="button"

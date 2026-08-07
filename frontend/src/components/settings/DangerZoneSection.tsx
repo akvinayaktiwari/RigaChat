@@ -28,7 +28,7 @@ export default function DangerZoneSection({ onSignOut, onDeleteAccount }: Danger
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-red-600 max-w-md">
-          Deleting your account will permanently erase all active chatbots, leads, conversations, and knowledge base
+          Deleting your account will permanently erase all active agents, leads, conversations, and knowledge base
           entries. This action cannot be undone.
         </p>
         <button

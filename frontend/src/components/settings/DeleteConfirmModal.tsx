@@ -13,7 +13,7 @@ export default function DeleteConfirmModal({ onClose, onConfirm }: DeleteConfirm
           Delete Account?
         </h2>
         <p className="text-sm text-gray-500 mt-2">
-          This will permanently erase all your chatbots, leads, conversations, and knowledge base entries. This
+          This will permanently erase all your agents, leads, conversations, and knowledge base entries. This
           action cannot be undone.
         </p>
         <div className="flex items-center justify-end gap-3 mt-6">

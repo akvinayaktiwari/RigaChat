@@ -12,12 +12,12 @@ import {
 import { MetaIcon, WhatsAppIcon } from '../components/landing/BrandIcons'
 import type { ConnectWhatsAppInput, MetaDirectWhatsAppConnection, WhatsAppConnection } from '../types/index'
 
-type TabId = 'lead-notifications' | 'weekly-reports' | 'chatbot'
+type TabId = 'lead-notifications' | 'weekly-reports' | 'agent'
 
 const TABS: { id: TabId; label: string; icon: typeof Bell }[] = [
   { id: 'lead-notifications', label: 'Lead Notifications', icon: Bell },
   { id: 'weekly-reports', label: 'Weekly Reports', icon: Calendar },
-  { id: 'chatbot', label: 'WhatsApp Chatbot', icon: MessageCircle },
+  { id: 'agent', label: 'WhatsApp Agent', icon: MessageCircle },
 ]
 
 const EMPTY_FORM: ConnectWhatsAppInput = {
@@ -585,14 +585,14 @@ export default function WhatsApp() {
             </div>
           )}
 
-          {activeTab === 'chatbot' && (
+          {activeTab === 'agent' && (
             <div className="flex flex-col items-center justify-center text-center py-10 gap-3">
               <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
                 <Lock className="w-5 h-5" />
               </div>
-              <h4 className="text-sm font-bold text-gray-900">WhatsApp Chatbot</h4>
+              <h4 className="text-sm font-bold text-gray-900">WhatsApp Agent</h4>
               <p className="text-sm text-gray-500 max-w-md">
-                Let your AI chatbot talk to leads directly on WhatsApp, not just your website widget. This is coming
+                Let your AI agent talk to leads directly on WhatsApp, not just your website widget. This is coming
                 in a future release.
               </p>
               <span className="inline-flex items-center text-[10px] font-semibold text-gray-500 bg-gray-100 border border-gray-200 px-2.5 py-1 rounded-full uppercase tracking-wide">

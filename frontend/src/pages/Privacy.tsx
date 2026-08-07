@@ -57,7 +57,7 @@ const TOC_ITEMS: TOCItem[] = [
 
 const COLLECT_BULLETS: InfoBullet[] = [
   { label: 'Account Data', text: 'Name, email, and phone on signup.' },
-  { label: 'Lead Data', text: 'Info captured through chatbots and forms during visitor interactions.' },
+  { label: 'Lead Data', text: 'Info captured through agents and forms during visitor interactions.' },
   { label: 'Usage Analytics', text: 'Platform navigation, feature usage, and performance metrics.' },
 ]
 
@@ -67,7 +67,7 @@ const USE_BLOCKS: UseBlock[] = [
   {
     icon: 'RefreshCw',
     label: 'CRM Sync',
-    text: 'To sync captured leads with connected CRMs including Zoho CRM. Leads sourced from Meta Lead Ads are handled identically to leads captured via chatbot or forms — synced to CRM and never sold or shared.',
+    text: 'To sync captured leads with connected CRMs including Zoho CRM. Leads sourced from Meta Lead Ads are handled identically to leads captured via agent or forms — synced to CRM and never sold or shared.',
   },
   {
     icon: 'ShieldCheck',
@@ -221,7 +221,7 @@ function CollectSection() {
     <section id="section-1" className="scroll-mt-28 border-b border-outline-variant/20 pb-12">
       <SectionHeading order="1" title="Information We Collect" />
       <p className="text-base text-on-surface-variant leading-relaxed mb-6">
-        We gather multiple types of information to ensure the best possible chatbot experience and service performance.
+        We gather multiple types of information to ensure the best possible agent experience and service performance.
       </p>
       <div className="p-6 md:p-8 bg-white border border-outline-variant/30 rounded-2xl shadow-xs space-y-6">
         {COLLECT_BULLETS.map((bullet) => (

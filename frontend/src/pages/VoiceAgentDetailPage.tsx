@@ -354,7 +354,7 @@ export default function VoiceAgentDetailPage() {
               </div>
 
               <div>
-                <label className={labelClasses}>Link to existing chatbot (optional)</label>
+                <label className={labelClasses}>Link to existing agent (optional)</label>
                 <select
                   value={formData.botId}
                   onChange={(e) => update('botId', e.target.value)}
@@ -368,7 +368,7 @@ export default function VoiceAgentDetailPage() {
                   ))}
                 </select>
                 <p className={hintClasses}>
-                  Also search this chatbot's knowledge base when answering voice calls, in addition to this agent's
+                  Also search this agent's knowledge base when answering voice calls, in addition to this agent's
                   own indexed content.
                 </p>
               </div>

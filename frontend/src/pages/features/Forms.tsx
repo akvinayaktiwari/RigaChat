@@ -66,11 +66,11 @@ export default function Forms() {
           {
             icon: <Bell className="w-5 h-5" />,
             title: 'Instant WhatsApp Alerts',
-            body: 'Every form submission triggers a WhatsApp notification to your number with the lead details — just like chatbot leads.',
+            body: 'Every form submission triggers a WhatsApp notification to your number with the lead details — just like agent leads.',
           },
         ]}
         integrations={[
-          { icon: <Bot className="w-4 h-4" />, title: 'AI Chatbot', href: '/features/chatbot' },
+          { icon: <Bot className="w-4 h-4" />, title: 'AI Agent', href: '/features/agent' },
           { icon: <MessageSquare className="w-4 h-4" />, title: 'WhatsApp Alerts', href: '/features/whatsapp' },
           { icon: <Users className="w-4 h-4" />, title: 'Lead CRM', href: '/features/crm' },
         ]}

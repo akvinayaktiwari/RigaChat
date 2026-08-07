@@ -94,7 +94,7 @@ export default function AppointmentsPage() {
             onChange={(e) => setSelectedBotId(e.target.value)}
             className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
           >
-            <option value="all">All chatbots</option>
+            <option value="all">All agents</option>
             {bots.map((bot) => (
               <option key={bot.botId} value={bot.botId}>
                 {bot.name}
@@ -125,7 +125,7 @@ export default function AppointmentsPage() {
               <tr className="border-b border-gray-100 text-left text-gray-500">
                 <th className="px-5 py-3 font-medium">Status</th>
                 <th className="px-5 py-3 font-medium">Requested for</th>
-                <th className="px-5 py-3 font-medium">Chatbot</th>
+                <th className="px-5 py-3 font-medium">Agent</th>
                 <th className="px-5 py-3 font-medium">Lead</th>
                 <th className="px-5 py-3 font-medium">Notes</th>
                 <th className="px-5 py-3 font-medium">Requested</th>

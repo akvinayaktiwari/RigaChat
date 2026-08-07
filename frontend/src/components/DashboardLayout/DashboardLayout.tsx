@@ -23,7 +23,7 @@ import VyostraLogo from '../VyostraLogo'
 
 const NAV_LINKS: { to: string; label: string; icon: LucideIcon; end: boolean }[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/dashboard/bots', label: 'Chatbots', icon: Bot, end: false },
+  { to: '/dashboard/bots', label: 'Agents', icon: Bot, end: false },
   { to: '/dashboard/voice-agents', label: 'Voice Agents', icon: Mic, end: false },
   { to: '/dashboard/forms', label: 'Forms', icon: FileText, end: false },
   { to: '/dashboard/leads', label: 'Leads', icon: Users, end: false },
@@ -38,8 +38,8 @@ const NAV_LINKS: { to: string; label: string; icon: LucideIcon; end: boolean }[]
 
 function getPageTitle(pathname: string): string {
   if (pathname === '/dashboard') return 'Dashboard'
-  if (pathname === '/dashboard/bots/new') return 'New Chatbot'
-  if (pathname === '/dashboard/bots') return 'Chatbots'
+  if (pathname === '/dashboard/bots/new') return 'New Agent'
+  if (pathname === '/dashboard/bots') return 'Agents'
   if (/^\/dashboard\/bots\/[^/]+$/.test(pathname)) return 'Bot Settings'
   if (pathname === '/dashboard/forms/new') return 'New Form'
   if (pathname === '/dashboard/forms') return 'Forms'

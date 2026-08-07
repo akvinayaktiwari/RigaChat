@@ -43,22 +43,22 @@ export default function Chatbot() {
   return (
     <>
       <Helmet>
-        <title>AI Chatbot for Lead Generation — VyostraAI</title>
+        <title>AI Agent for Lead Generation — VyostraAI</title>
         <meta
           name="description"
-          content="Capture leads 24/7 with an AI chatbot trained on your business data. No code required. Set up in under 5 minutes."
+          content="Capture leads 24/7 with an AI agent trained on your business data. No code required. Set up in under 5 minutes."
         />
       </Helmet>
       <UseCaseLayout
-        badge="AI CHATBOT"
+        badge="AI AGENT"
         headline="Your 24/7 AI sales assistant"
-        subheadline="VyostraAI's AI chatbot engages every visitor, answers their questions, and captures their contact details automatically — even when you are not there."
+        subheadline="VyostraAI's AI agent engages every visitor, answers their questions, and captures their contact details automatically — even when you are not there."
         heroVisual={<ChatWidgetMockup />}
         howItWorksSteps={[
           {
             number: '1',
             title: 'Create Your Bot',
-            body: 'Enter your website URL. VyostraAI reads your content and trains your AI chatbot automatically. No prompts, no configuration needed.',
+            body: 'Enter your website URL. VyostraAI reads your content and trains your AI agent automatically. No prompts, no configuration needed.',
             icon: <Bot className="w-6 h-6" />,
           },
           {
@@ -70,7 +70,7 @@ export default function Chatbot() {
           {
             number: '3',
             title: 'Watch Leads Come In',
-            body: 'Your chatbot qualifies visitors, captures their details, and stores every lead in your dashboard automatically. You get notified instantly.',
+            body: 'Your agent qualifies visitors, captures their details, and stores every lead in your dashboard automatically. You get notified instantly.',
             icon: <Users className="w-6 h-6" />,
           },
         ]}
@@ -83,7 +83,7 @@ export default function Chatbot() {
           {
             icon: <Clock className="w-5 h-5" />,
             title: 'Captures Leads 24/7',
-            body: 'Your chatbot never sleeps. It engages visitors at 2am on a Sunday and captures their details just as effectively as during business hours.',
+            body: 'Your agent never sleeps. It engages visitors at 2am on a Sunday and captures their details just as effectively as during business hours.',
           },
           {
             icon: <Zap className="w-5 h-5" />,
@@ -97,7 +97,7 @@ export default function Chatbot() {
           { icon: <FileText className="w-4 h-4" />, title: 'Form Builder', href: '/features/forms' },
         ]}
         ctaHeadline="Ready to capture leads on autopilot?"
-        ctaBody="Set up your AI chatbot in under 5 minutes. No code required. No credit card needed."
+        ctaBody="Set up your AI agent in under 5 minutes. No code required. No credit card needed."
       />
     </>
   )

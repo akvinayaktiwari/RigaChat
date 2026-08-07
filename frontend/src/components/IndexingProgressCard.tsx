@@ -133,7 +133,7 @@ export default function IndexingProgressCard({ job, surface, onRetry }: Indexing
 
   const state = deriveState(job)
   const readyCopy =
-    surface === 'bot' ? 'Your chatbot can now answer questions.' : 'Your voice agent is ready to take calls.'
+    surface === 'bot' ? 'Your agent can now answer questions.' : 'Your voice agent is ready to take calls.'
 
   return (
     <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">

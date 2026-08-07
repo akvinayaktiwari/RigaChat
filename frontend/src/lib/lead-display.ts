@@ -3,7 +3,7 @@ import type { LeadOutcome, LeadSource, LeadStatus, UnifiedLead } from '../types/
 const DAY_MS = 24 * 60 * 60 * 1000
 
 export const SOURCE_LABELS: Record<LeadSource, string> = {
-  chat: 'Chatbot',
+  chat: 'Agent',
   form: 'Form',
   meta: 'Meta Ads',
 }

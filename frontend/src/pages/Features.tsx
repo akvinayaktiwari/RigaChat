@@ -11,14 +11,14 @@ interface FeatureCardData {
   title: string
   body: string
   // Absent for features that are live but don't have a marketing deep-dive page
-  // yet. Only /features/chatbot, /whatsapp, /crm and /forms exist as routes --
+  // yet. Only /features/agent, /whatsapp, /crm and /forms exist as routes --
   // giving a card an href that has no route would 404, so the card renders
   // static instead of guessing at a URL.
   href?: string
 }
 
 const FEATURE_CARDS: FeatureCardData[] = [
-  { icon: <Bot className="w-6 h-6" />, title: 'AI Chatbot', body: '24/7 lead capture. Trained on your content. No code required.', href: '/features/chatbot' },
+  { icon: <Bot className="w-6 h-6" />, title: 'AI Agent', body: '24/7 lead capture. Trained on your content. No code required.', href: '/features/agent' },
   {
     icon: <MessageSquare className="w-6 h-6" />,
     title: 'WhatsApp Automation',

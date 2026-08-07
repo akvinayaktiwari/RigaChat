@@ -37,13 +37,13 @@ function LimitRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function describeFeatures(features: EntitlementFeatures): { chat: string; crm: string; chatbots: string; voice: string } {
+function describeFeatures(features: EntitlementFeatures): { chat: string; crm: string; agents: string; voice: string } {
   return {
     chat: features.chat.enabled
       ? `${formatLimit(features.chat.limits.conversations, 'conversations/month')}${features.chat.mode === 'degraded' ? ' (degraded)' : ''}`
       : 'Not included',
     crm: features.crm.enabled ? formatLimit(features.crm.limits.leads, 'leads') : 'Not included',
-    chatbots: features.agents.enabled ? formatLimit(features.agents.limits.max, 'chatbots') : 'Not included',
+    agents: features.agents.enabled ? formatLimit(features.agents.limits.max, 'agents') : 'Not included',
     voice: features.voice.enabled ? formatLimit(features.voice.limits.minutes, 'minutes/month') : 'Voice: not included',
   }
 }
@@ -107,7 +107,7 @@ export default function SubscriptionSection({ subscription, onUpgradeClick }: Su
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Limits</p>
           <LimitRow label="Chat" value={limits.chat} />
           <LimitRow label="CRM" value={limits.crm} />
-          <LimitRow label="Chatbots" value={limits.chatbots} />
+          <LimitRow label="Agents" value={limits.agents} />
           <LimitRow label="Voice" value={limits.voice} />
         </div>
 
