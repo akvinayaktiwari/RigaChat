@@ -18,17 +18,22 @@ const getPublicFormConfig = vi.fn()
 vi.mock('../repositories/form-repository.js', () => ({ getFormsByClientId, getPublicFormConfig }))
 
 const getLeadStatesForClient = vi.fn()
+const getLeadState = vi.fn()
 const upsertLeadState = vi.fn()
 const appendLeadNote = vi.fn()
 vi.mock('../repositories/lead-state-repository.js', () => ({
   getLeadStatesForClient,
+  getLeadState,
   upsertLeadState,
   appendLeadNote,
 }))
 
-const { addLeadNoteForClient, getUnifiedInbox, updateLeadStateForClient } = await import(
-  './lead-inbox-service.js'
-)
+const {
+  addLeadNoteForClient,
+  getUnifiedInbox,
+  getUnifiedLeadDetail,
+  updateLeadStateForClient,
+} = await import('./lead-inbox-service.js')
 
 const NOW = '2026-08-07T12:00:00.000Z'
 const CLIENT = 'client-1'
@@ -90,6 +95,7 @@ beforeEach(() => {
   getMetaLeadsByClientId.mockResolvedValue([])
   getLeadStatesForClient.mockResolvedValue([])
   getFormsByClientId.mockResolvedValue([])
+  getLeadState.mockResolvedValue(null)
   getPublicFormConfig.mockResolvedValue(null)
 })
 
@@ -334,5 +340,85 @@ describe('addLeadNoteForClient', () => {
       addLeadNoteForClient({ source: 'form', formId: 'form-1', leadId: 'f1' }, CLIENT, 'hi', 'u1')
     ).rejects.toThrow('Lead not found')
     expect(appendLeadNote).not.toHaveBeenCalled()
+  })
+})
+
+describe('getUnifiedLeadDetail', () => {
+  it('returns the chat transcript alongside the normalized lead', async () => {
+    getLeadById.mockResolvedValue({
+      ...chatLead('c1', '2026-08-01T00:00:00.000Z'),
+      chatTranscript: 'User: hi\nBot: hello',
+    })
+
+    const detail = await getUnifiedLeadDetail({ source: 'chat', botId: 'bot-1', leadId: 'c1' }, CLIENT)
+
+    expect(detail.chatTranscript).toBe('User: hi\nBot: hello')
+    expect(detail.leadRef).toEqual({ source: 'chat', botId: 'bot-1', leadId: 'c1' })
+    expect(detail.createdAt).toBe('2026-08-01T00:00:00.000Z')
+  })
+
+  it('relabels a form lead’s answers from fieldId to the human label', async () => {
+    getFormLeadById.mockResolvedValue({
+      ...formLead('f1', '2026-08-02T00:00:00.000Z'),
+      customFields: JSON.stringify({ 'abc-123': '3 BHK' }),
+    })
+    getPublicFormConfig.mockResolvedValue({
+      formId: 'form-1',
+      fields: [{ fieldId: 'abc-123', label: 'Property', type: 'text', required: false }],
+    })
+
+    const detail = await getUnifiedLeadDetail({ source: 'form', formId: 'form-1', leadId: 'f1' }, CLIENT)
+
+    // A UUID is not something to show a human next to their own answer.
+    expect(detail.customFields).toEqual({ Property: '3 BHK' })
+  })
+
+  it('keeps an answer whose field was since deleted from the form', async () => {
+    getFormLeadById.mockResolvedValue({
+      ...formLead('f1', '2026-08-02T00:00:00.000Z'),
+      customFields: JSON.stringify({ 'gone-456': 'still an answer' }),
+    })
+    getPublicFormConfig.mockResolvedValue({ formId: 'form-1', fields: [] })
+
+    const detail = await getUnifiedLeadDetail({ source: 'form', formId: 'form-1', leadId: 'f1' }, CLIENT)
+
+    expect(detail.customFields).toEqual({ 'gone-456': 'still an answer' })
+  })
+
+  it('does not 404 a lead just because its customFields blob is malformed', async () => {
+    getFormLeadById.mockResolvedValue({
+      ...formLead('f1', '2026-08-02T00:00:00.000Z'),
+      customFields: 'not json at all',
+    })
+
+    const detail = await getUnifiedLeadDetail({ source: 'form', formId: 'form-1', leadId: 'f1' }, CLIENT)
+
+    expect(detail.customFields).toEqual({})
+    expect(detail.leadId).toBe('f1')
+  })
+
+  it('attaches the lead_state row when one exists', async () => {
+    getLeadById.mockResolvedValue(chatLead('c1', '2026-08-01T00:00:00.000Z'))
+    getLeadState.mockResolvedValue(state('c1', { status: 'qualified' }))
+
+    const detail = await getUnifiedLeadDetail({ source: 'chat', botId: 'bot-1', leadId: 'c1' }, CLIENT)
+
+    expect(detail.state?.status).toBe('qualified')
+  })
+
+  it('refuses another client’s lead without revealing that it exists', async () => {
+    getLeadById.mockResolvedValue({ ...chatLead('c1', NOW), clientId: 'someone-else' })
+
+    await expect(
+      getUnifiedLeadDetail({ source: 'chat', botId: 'bot-1', leadId: 'c1' }, CLIENT)
+    ).rejects.toThrow('Lead not found')
+  })
+
+  it('refuses a lead that does not exist', async () => {
+    getMetaLeadById.mockResolvedValue(null)
+
+    await expect(
+      getUnifiedLeadDetail({ source: 'meta', pageId: 'page-1', leadId: 'gone' }, CLIENT)
+    ).rejects.toThrow('Lead not found')
   })
 })
