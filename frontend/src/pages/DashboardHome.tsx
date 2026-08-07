@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, Bot, CheckCircle, Download, Plus, TrendingUp, Users } from 'lucide-react'
+import { ArrowRight, Bot, CheckCircle, Download, Plus, TrendingUp, TriangleAlert, Users } from 'lucide-react'
 import { getLeadInbox, getMyBots } from '../services/api'
 import { useAuth } from '../hooks/useAuth'
 import Sparkline from '../components/charts/Sparkline'
@@ -243,15 +243,24 @@ export default function DashboardHome() {
   const [bots, setBots] = useState<BotConfig[]>([])
   const [leads, setLeads] = useState<UnifiedLead[]>([])
   const [loading, setLoading] = useState(true)
+  // Every stat on this page is derived from `leads`. If the inbox call fails,
+  // `?? []` renders "Total Leads 0" and a flat chart as though they were
+  // measured — a worse lie here than on the Leads page, because these numbers
+  // look like findings. The banner marks them as unavailable instead.
+  const [leadsUnavailable, setLeadsUnavailable] = useState(false)
 
   useEffect(() => {
     let cancelled = false
 
     async function load() {
-      const [botsRes, leadsRes] = await Promise.all([getMyBots(), getLeadInbox()])
+      const [botsRes, leadsRes] = await Promise.allSettled([getMyBots(), getLeadInbox()])
       if (cancelled) return
-      setBots(botsRes.data ?? [])
-      setLeads(leadsRes.data ?? [])
+
+      setBots(botsRes.status === 'fulfilled' ? (botsRes.value.data ?? []) : [])
+
+      const leadsOk = leadsRes.status === 'fulfilled' && leadsRes.value.success
+      setLeads(leadsOk ? (leadsRes.value.data ?? []) : [])
+      setLeadsUnavailable(!leadsOk)
       setLoading(false)
     }
 
@@ -352,6 +361,23 @@ export default function DashboardHome() {
           </button>
         </div>
       </div>
+
+      {leadsUnavailable && !loading && (
+        <div className="mb-6 flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          <TriangleAlert size={18} className="text-red-500 shrink-0 mt-0.5" />
+          <p className="text-sm text-red-700">
+            Lead data couldn&apos;t be loaded, so every lead figure below is showing zero rather than a
+            measured number.{' '}
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="underline font-medium hover:text-red-900"
+            >
+              Reload
+            </button>
+          </p>
+        </div>
+      )}
 
       {loading ? (
         <StatsSkeleton />

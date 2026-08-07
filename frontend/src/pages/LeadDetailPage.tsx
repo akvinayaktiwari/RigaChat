@@ -132,13 +132,13 @@ export default function LeadDetailPage() {
 
   const [lead, setLead] = useState<UnifiedLeadDetail | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [noteDraft, setNoteDraft] = useState('')
 
   useEffect(() => {
     if (!leadRef) {
-      setError(true)
+      setError('That link is missing the information needed to open this lead.')
       setLoading(false)
       return
     }
@@ -148,12 +148,15 @@ export default function LeadDetailPage() {
       .then((res) => {
         if (cancelled) return
         if (res.success && res.data) setLead(res.data)
-        else setError(true)
+        // A 500 and a genuine 404 both landed here as "Lead not found" before,
+        // which sent you looking for a deleted lead when the table was simply
+        // unreachable. The server's own message is more use than our guess.
+        else setError(res.error ?? 'Could not load this lead')
         setLoading(false)
       })
       .catch(() => {
         if (cancelled) return
-        setError(true)
+        setError('Could not reach the server')
         setLoading(false)
       })
     return () => {
@@ -198,7 +201,8 @@ export default function LeadDetailPage() {
   if (error || !lead) {
     return (
       <div className="flex flex-col items-center text-center py-16">
-        <p className="text-gray-900 font-medium">Lead not found</p>
+        <p className="text-gray-900 font-medium">Couldn&apos;t open this lead</p>
+        <p className="text-sm text-gray-500 mt-2 max-w-md">{error}</p>
         <button
           type="button"
           onClick={() => navigate('/dashboard/leads')}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ComponentProps } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Download, Mail, Phone, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, Mail, Phone, TriangleAlert, Users } from 'lucide-react'
 import { getLeadInbox, updateLeadState } from '../services/api'
 import FilterBar from '../components/FilterBar/FilterBar'
 import type { FilterChip } from '../components/FilterBar/FilterBar'
@@ -102,6 +102,7 @@ export default function LeadsPage() {
   const [searchParams] = useSearchParams()
   const [leads, setLeads] = useState<UnifiedLead[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [savingLeadId, setSavingLeadId] = useState<string | null>(null)
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('open')
@@ -109,19 +110,37 @@ export default function LeadsPage() {
   const [dateRange, setDateRange] = useState<DateRange>('all')
   const [currentPage, setCurrentPage] = useState(1)
 
+  // A failed load must not look like an empty inbox. `res.data ?? []` alone
+  // turns a 500 into a friendly "No leads yet", which is the worst possible
+  // lie for this screen: the operator concludes nobody enquired and closes the
+  // tab. The reload counter re-runs the effect for the Retry button.
+  const [reloadCount, setReloadCount] = useState(0)
+
   useEffect(() => {
     let cancelled = false
+    setLoading(true)
+    setLoadError(null)
+
     // Guards against setState-after-unmount if the user navigates away
     // before this resolves — same pattern DashboardHome.tsx already uses.
-    getLeadInbox().then((res) => {
-      if (cancelled) return
-      setLeads(res.data ?? [])
-      setLoading(false)
-    })
+    getLeadInbox()
+      .then((res) => {
+        if (cancelled) return
+        if (res.success) setLeads(res.data ?? [])
+        else setLoadError(res.error ?? 'Could not load your leads')
+        setLoading(false)
+      })
+      .catch(() => {
+        // apiClient throws when the request never completes at all (server
+        // down, DNS, CORS). Without this the skeleton spins forever.
+        if (cancelled) return
+        setLoadError('Could not reach the server')
+        setLoading(false)
+      })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [reloadCount])
 
   useEffect(() => {
     const sourceParam = searchParams.get('source')
@@ -279,6 +298,21 @@ export default function LeadsPage() {
 
       {loading ? (
         <TableSkeleton />
+      ) : loadError ? (
+        <div className="py-16 flex flex-col items-center text-center">
+          <TriangleAlert size={48} className="text-red-300 mb-4" />
+          <p className="font-bold text-xl text-gray-900" style={JAKARTA_FONT}>
+            Couldn’t load your leads
+          </p>
+          <p className="text-sm text-gray-500 mt-2 max-w-md">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => setReloadCount((n) => n + 1)}
+            className="mt-4 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity"
+          >
+            Try again
+          </button>
+        </div>
       ) : filtered.length === 0 ? (
         <div className="py-16 flex flex-col items-center text-center">
           <Users size={48} className="text-violet-300 mb-4" />
