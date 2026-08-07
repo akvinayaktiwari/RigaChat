@@ -3,7 +3,15 @@ import { getFormLeadById } from '../repositories/form-lead-repository.js'
 import { getMetaLeadById } from '../repositories/meta-lead-repository.js'
 import { getAgentForResource } from '../repositories/agent-binding-lookup-repository.js'
 import { getAgents } from './agent-service.js'
-import type { Agent, JourneyLead, LeadRef, LeadResolution } from '../types/index.js'
+import type {
+  Agent,
+  FormLead,
+  JourneyLead,
+  Lead,
+  LeadRef,
+  LeadResolution,
+  MetaLead,
+} from '../types/index.js'
 
 // -------------------------------------------------------------------------
 // Makes a lead from ANY source addressable by the journey layer.
@@ -47,53 +55,69 @@ function parseCustomFields(raw: string): Record<string, unknown> {
   }
 }
 
+// Pure record -> JourneyLead mappings, one per source.
+//
+// Split out of readJourneyLead so a caller that ALREADY holds records (the
+// unified inbox, which lists whole tables at once) normalizes them without a
+// second per-lead read. readJourneyLead below is now just "fetch, then
+// normalize" -- there is still exactly one definition of what a form lead's
+// phone number is.
+export function normalizeChatLead(lead: Lead): JourneyLead {
+  return {
+    leadId: lead.leadId,
+    clientId: lead.clientId,
+    source: 'chat',
+    name: lead.name,
+    phone: lead.phone,
+    email: lead.email,
+    propertyInterest: lead.propertyInterest,
+    budgetRange: lead.budgetRange,
+    sourceUrl: lead.sourceUrl,
+  }
+}
+
+export function normalizeMetaLead(lead: MetaLead): JourneyLead {
+  return {
+    leadId: lead.leadId,
+    clientId: lead.clientId,
+    source: 'meta',
+    name: lead.name,
+    phone: lead.phone,
+    email: lead.email,
+    propertyInterest: lead.propertyInterest,
+    budgetRange: lead.budgetRange,
+    sourceUrl: lead.sourceUrl,
+  }
+}
+
+export function normalizeFormLead(lead: FormLead): JourneyLead {
+  const fields = parseCustomFields(lead.customFields)
+  return {
+    leadId: lead.leadId,
+    clientId: lead.clientId,
+    source: 'form',
+    name: pickField(fields, ['name']),
+    phone: pickField(fields, ['phone', 'mobile', 'contact', 'whatsapp']),
+    email: pickField(fields, ['email', 'e-mail']),
+    propertyInterest: pickField(fields, ['property', 'interest', 'project']),
+    budgetRange: pickField(fields, ['budget', 'price']),
+    sourceUrl: lead.sourceUrl,
+  }
+}
+
 export async function readJourneyLead(leadRef: LeadRef): Promise<JourneyLead | null> {
   switch (leadRef.source) {
     case 'chat': {
       const lead = await getLeadById(leadRef.botId, leadRef.leadId)
-      if (!lead) return null
-      return {
-        leadId: lead.leadId,
-        clientId: lead.clientId,
-        source: 'chat',
-        name: lead.name,
-        phone: lead.phone,
-        email: lead.email,
-        propertyInterest: lead.propertyInterest,
-        budgetRange: lead.budgetRange,
-        sourceUrl: lead.sourceUrl,
-      }
+      return lead ? normalizeChatLead(lead) : null
     }
     case 'meta': {
       const lead = await getMetaLeadById(leadRef.pageId, leadRef.leadId)
-      if (!lead) return null
-      return {
-        leadId: lead.leadId,
-        clientId: lead.clientId,
-        source: 'meta',
-        name: lead.name,
-        phone: lead.phone,
-        email: lead.email,
-        propertyInterest: lead.propertyInterest,
-        budgetRange: lead.budgetRange,
-        sourceUrl: lead.sourceUrl,
-      }
+      return lead ? normalizeMetaLead(lead) : null
     }
     case 'form': {
       const lead = await getFormLeadById(leadRef.formId, leadRef.leadId)
-      if (!lead) return null
-      const fields = parseCustomFields(lead.customFields)
-      return {
-        leadId: lead.leadId,
-        clientId: lead.clientId,
-        source: 'form',
-        name: pickField(fields, ['name']),
-        phone: pickField(fields, ['phone', 'mobile', 'contact', 'whatsapp']),
-        email: pickField(fields, ['email', 'e-mail']),
-        propertyInterest: pickField(fields, ['property', 'interest', 'project']),
-        budgetRange: pickField(fields, ['budget', 'price']),
-        sourceUrl: lead.sourceUrl,
-      }
+      return lead ? normalizeFormLead(lead) : null
     }
   }
 }

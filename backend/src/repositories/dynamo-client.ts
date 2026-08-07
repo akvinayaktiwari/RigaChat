@@ -33,6 +33,7 @@ type TableKey =
   | 'journey_trigger_claims'
   | 'journey_pending_replies'
   | 'contact_messages'
+  | 'lead_state'
 
 const tableEnvVarNames: Record<TableKey, string> = {
   clients: 'DYNAMODB_TABLE_CLIENTS',
@@ -60,6 +61,7 @@ const tableEnvVarNames: Record<TableKey, string> = {
   journey_trigger_claims: 'DYNAMODB_TABLE_JOURNEY_TRIGGER_CLAIMS',
   journey_pending_replies: 'DYNAMODB_TABLE_JOURNEY_PENDING_REPLIES',
   contact_messages: 'DYNAMODB_TABLE_CONTACT_MESSAGES',
+  lead_state: 'DYNAMODB_TABLE_LEAD_STATE',
 }
 
 export function getTableName(key: TableKey): string {
