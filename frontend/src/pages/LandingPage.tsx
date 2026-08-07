@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react'
 import Navbar from '../components/landing/Navbar'
 import HeroSection from '../components/landing/HeroSection'
 import StatsBar from '../components/landing/StatsBar'
+import SystemMapSection from '../components/landing/SystemMapSection'
 import FeaturesSection from '../components/landing/FeaturesSection'
 import IntegrationsSection from '../components/landing/IntegrationsSection'
 import RoadmapSection from '../components/landing/RoadmapSection'
@@ -98,6 +99,7 @@ export default function LandingPage() {
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
       <HeroSection onOpenDemo={() => setIsDemoOpen(true)} />
       <StatsBar />
+      <SystemMapSection />
       <FeaturesSection />
       <IntegrationsSection />
       <RoadmapSection />
