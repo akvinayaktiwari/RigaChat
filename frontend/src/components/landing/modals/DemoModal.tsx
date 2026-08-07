@@ -117,7 +117,8 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
             <div className="flex items-center justify-between px-6 py-4 bg-on-background/80 border-b border-outline/10 text-white">
               <div className="flex items-center gap-2">
                 <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                <span className="font-bold text-sm uppercase tracking-wider text-outline-variant">BeepBoop Live Interactive Demo</span>
+                {/* CSS-uppercased, so "Vyostra" avoids the doubled-A "VYOSTRAAI". */}
+                <span className="font-bold text-sm uppercase tracking-wider text-outline-variant">Vyostra Live Interactive Demo</span>
               </div>
               <button
                 onClick={onClose}
@@ -153,7 +154,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                   <div className="bg-primary/10 border border-primary/20 p-3 rounded-lg">
                     <p className="text-[10px] font-bold text-primary uppercase tracking-wider">Metrics Improved</p>
                     <p className="text-lg font-extrabold text-white mt-1">+25% AOV</p>
-                    <p className="text-[10px] text-outline-variant mt-0.5">Captured dynamically by BeepBoop intelligence engine.</p>
+                    <p className="text-[10px] text-outline-variant mt-0.5">Captured dynamically by VyostraAI intelligence engine.</p>
                   </div>
                 </div>
               </div>
@@ -170,7 +171,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                             className="w-5 h-5 rounded-full object-cover"
                             referrerPolicy="no-referrer"
                           />
-                          <span className="text-xs font-bold text-on-surface">Rachel · BeepBoop Sales Bot</span>
+                          <span className="text-xs font-bold text-on-surface">Rachel · VyostraAI Sales Bot</span>
                         </div>
                         <span className="text-[10px] font-semibold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">ACTIVE</span>
                       </div>
@@ -221,7 +222,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                     </div>
                     <h4 className="text-lg font-bold text-white">Dynamic Revenue Recovery</h4>
                     <p className="text-xs text-outline-variant mt-2 max-w-sm">
-                      BeepBoop tracks cart abandonments and automatically engages visitors before they leave the page. It can
+                      VyostraAI tracks cart abandonments and automatically engages visitors before they leave the page. It can
                       offer discount triggers or real-time support, resulting in up to 30% recovery rate.
                     </p>
                     <button

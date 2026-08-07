@@ -34,7 +34,11 @@ const NEXT_TIER_UP: Record<SubscriptionSummary['plan'], BillableTier | undefined
   agency: undefined,
 }
 
-const PREFS_STORAGE_KEY = 'beepboop_prefs'
+const PREFS_STORAGE_KEY = 'vyostra_prefs'
+// Pre-rename key. Read as a fallback so an existing session keeps its saved
+// preferences instead of silently reverting to defaults; the next save writes
+// the new key.
+const LEGACY_PREFS_STORAGE_KEY = 'beepboop_prefs'
 
 const DEFAULT_PREFS: Preferences = {
   emailNotifications: true,
@@ -45,7 +49,7 @@ const DEFAULT_PREFS: Preferences = {
 
 function loadPreferences(): Preferences {
   try {
-    const saved = sessionStorage.getItem(PREFS_STORAGE_KEY)
+    const saved = sessionStorage.getItem(PREFS_STORAGE_KEY) ?? sessionStorage.getItem(LEGACY_PREFS_STORAGE_KEY)
     return saved ? { ...DEFAULT_PREFS, ...(JSON.parse(saved) as Partial<Preferences>) } : DEFAULT_PREFS
   } catch {
     return DEFAULT_PREFS

@@ -15,7 +15,12 @@ BACKEND_URL="${BACKEND_URL:-https://hxtvyv6kgsasppyrvyljaezeii0zxzco.lambda-url.
 VOICE_WS_URL="${VOICE_WS_URL:-}"
 VITE_COGNITO_DOMAIN="${VITE_COGNITO_DOMAIN:-ap-south-1d7y7lw8aj.auth.ap-south-1.amazoncognito.com}"
 VITE_COGNITO_CLIENT_ID="${VITE_COGNITO_CLIENT_ID:-bia5g9e6gsb3h9n191rcvkugn}"
-VITE_COGNITO_REDIRECT_URI="${VITE_COGNITO_REDIRECT_URI:-https://beepboop.drsyeta.in/auth/callback}"
+# This default was https://beepboop.drsyeta.in/auth/callback, which is NOT the
+# value CI builds with and sends users to the old domain after login. Corrected
+# to match the GitHub repo variable. NOTE: the frontend half of this script is
+# still unsafe -- it never emits VITE_STAFF_COGNITO_CLIENT_ID, so the staff
+# console loses its Cognito config. See TODOS.md before using it.
+VITE_COGNITO_REDIRECT_URI="${VITE_COGNITO_REDIRECT_URI:-https://vyostra.com/auth/callback}"
 VITE_CDN_URL="${VITE_CDN_URL:-https://d30yf1mzs1yo7h.cloudfront.net}"
 
 trap 'code=$?; rm -f frontend/.env.production; if [ $code -ne 0 ]; then echo "=============================="; echo "Deployment failed."; echo "=============================="; fi' EXIT

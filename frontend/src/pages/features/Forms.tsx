@@ -21,7 +21,7 @@ export default function Forms() {
   return (
     <>
       <Helmet>
-        <title>Smart Form Builder — BeepBoop</title>
+        <title>Smart Form Builder — VyostraAI</title>
         <meta
           name="description"
           content="Build beautiful lead capture forms in minutes. Embed anywhere. Every submission captured and notified instantly via WhatsApp."

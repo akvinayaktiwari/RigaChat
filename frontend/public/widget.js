@@ -1,12 +1,26 @@
 (function () {
   'use strict';
   var BACKEND_URL = '__BACKEND_URL__';
-  var SS_WIDGET_STATE = 'beepboop_widget_state';
-  var SS_LEAD_CAPTURED = 'beepboop_lead_captured';
-  var SS_LEAD_DATA = 'beepboop_lead_data';
-  var SS_CONV_ID = 'beepboop_conv_id';
+  var SS_WIDGET_STATE = 'vyostra_widget_state';
+  var SS_LEAD_CAPTURED = 'vyostra_lead_captured';
+  var SS_LEAD_DATA = 'vyostra_lead_data';
+  var SS_CONV_ID = 'vyostra_conv_id';
+  // Pre-rename keys. A visitor mid-conversation when the new widget ships still
+  // has state under the old names -- notably lead_captured, which is what stops
+  // the lead form being shown to someone who already submitted it. Read through
+  // to the old key so the rename does not re-prompt them.
+  var SS_LEGACY = {
+    'vyostra_widget_state': 'beepboop_widget_state',
+    'vyostra_lead_captured': 'beepboop_lead_captured',
+    'vyostra_lead_data': 'beepboop_lead_data',
+    'vyostra_conv_id': 'beepboop_conv_id'
+  };
   function ssGet(key) {
-    try { return sessionStorage.getItem(key); } catch (e) { return null; }
+    try {
+      var val = sessionStorage.getItem(key);
+      if (val === null && SS_LEGACY[key]) return sessionStorage.getItem(SS_LEGACY[key]);
+      return val;
+    } catch (e) { return null; }
   }
   function ssSet(key, val) {
     try { sessionStorage.setItem(key, val); } catch (e) { /* ignore */ }
@@ -209,7 +223,7 @@
     '<input id="ciq-input" type="text" placeholder="Type a message..." />' +
     '<button id="ciq-send" aria-label="Send message">' + SEND_ICON + '</button></div>' +
     '<div id="ciq-input-hint" class="ciq-hidden">Please fill in the details above to continue</div>' +
-    '<div id="ciq-footer">Powered by <a href="https://beepboop.drsyeta.in">VyostraAI</a></div>' +
+    '<div id="ciq-footer">Powered by <a href="https://vyostra.com">VyostraAI</a></div>' +
     '</div>';
   function init() {
     fetch(BACKEND_URL + '/api/bots/public/' + encodeURIComponent(botId))

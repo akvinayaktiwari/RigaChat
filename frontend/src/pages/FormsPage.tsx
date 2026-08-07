@@ -16,7 +16,7 @@ function getEmbedScriptSnippet(formId: string): string {
 }
 
 function getEmbedTriggerSnippet(formId: string): string {
-  return `onclick="BeepBoop.openForm('${formId}')"`
+  return `onclick="VyostraAI.openForm('${formId}')"`
 }
 
 const primaryButtonClasses =
@@ -110,7 +110,7 @@ export default function FormsPage() {
         <Info size={18} className="text-violet-500 shrink-0 mt-0.5" />
         <p className="text-violet-700 text-sm">
           Create embeddable forms to capture leads from your website. Wrap any button with{' '}
-          <code className="font-mono">BeepBoop.openForm(&apos;form-id&apos;)</code> to trigger.
+          <code className="font-mono">VyostraAI.openForm(&apos;form-id&apos;)</code> to trigger.
         </p>
       </div>
 

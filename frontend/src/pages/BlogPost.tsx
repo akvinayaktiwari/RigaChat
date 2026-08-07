@@ -39,7 +39,7 @@ function PostNotFound() {
   return (
     <div className="landing-page bg-background">
       <Helmet>
-        <title>Post not found — BeepBoop</title>
+        <title>Post not found — VyostraAI</title>
         <meta name="robots" content="noindex" />
       </Helmet>
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
@@ -82,7 +82,7 @@ export default function BlogPost() {
   return (
     <div className="landing-page bg-background">
       <Helmet>
-        <title>{`${meta.title} — BeepBoop`}</title>
+        <title>{`${meta.title} — VyostraAI`}</title>
         <meta name="description" content={meta.excerpt} />
         <link rel="canonical" href={canonical} />
         <meta property="og:type" content="article" />

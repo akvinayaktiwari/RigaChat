@@ -99,12 +99,12 @@ export default function BlogIndex() {
   return (
     <div className="landing-page bg-background">
       <Helmet>
-        <title>Blog — BeepBoop</title>
-        <meta name="description" content="Research, breakdowns and field notes from the BeepBoop team on AI, lead generation and the markets our customers build in." />
+        <title>Blog — VyostraAI</title>
+        <meta name="description" content="Research, breakdowns and field notes from the VyostraAI team on AI, lead generation and the markets our customers build in." />
         <link rel="canonical" href={`${SITE_URL}/blog`} />
         <meta property="og:type" content="website" />
-        <meta property="og:title" content="Blog — BeepBoop" />
-        <meta property="og:description" content="Research, breakdowns and field notes from the BeepBoop team." />
+        <meta property="og:title" content="Blog — VyostraAI" />
+        <meta property="og:description" content="Research, breakdowns and field notes from the VyostraAI team." />
         <meta property="og:url" content={`${SITE_URL}/blog`} />
         <meta name="twitter:card" content="summary_large_image" />
       </Helmet>
@@ -115,7 +115,7 @@ export default function BlogIndex() {
         <main className="mx-auto max-w-5xl px-6 pb-24 pt-36 lg:px-8">
           <ScrollReveal>
             <span className="inline-flex items-center rounded-full border border-violet-400/30 bg-violet-500/10 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-violet-300">
-              The BeepBoop Blog
+              The VyostraAI Blog
             </span>
             <h1 className="mt-6 text-4xl font-extrabold leading-[1.1] text-white md:text-6xl" style={JAKARTA_FONT}>
               Research from the{' '}

@@ -335,7 +335,7 @@ export async function sendWeeklyReport(clientId: string): Promise<void> {
   const totalCount = chatLeadCount + formLeadCount
 
   const message =
-    `Your weekly BeepBoop report\n\n` +
+    `Your weekly VyostraAI report\n\n` +
     `New leads this week: ${totalCount}\n` +
     `- Chat widget: ${chatLeadCount}\n` +
     `- Forms: ${formLeadCount}`

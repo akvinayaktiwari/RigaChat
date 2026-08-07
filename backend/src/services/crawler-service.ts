@@ -78,7 +78,7 @@ async function fetchHtml(url: string): Promise<string> {
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
-        'User-Agent': 'BeepBoop-Crawler/1.0 (AI chatbot indexer)',
+        'User-Agent': 'VyostraAI-Crawler/1.0 (AI chatbot indexer)',
       },
     })
     if (!response.ok) throw new Error(`Status ${response.status}`)

@@ -60,7 +60,7 @@ export default function TrialModal({ isOpen, onClose }: TrialModalProps) {
 
               <h3 className="text-2xl font-extrabold tracking-tight text-on-background">Start your free trial</h3>
               <p className="text-on-surface-variant text-sm mt-2">
-                Set up your BeepBoop workspace and start turning visitors into leads today.
+                Set up your VyostraAI workspace and start turning visitors into leads today.
               </p>
 
               <ul className="mt-6 space-y-3 text-left">
@@ -77,7 +77,7 @@ export default function TrialModal({ isOpen, onClose }: TrialModalProps) {
                 className="w-full mt-8 py-4 rounded-xl cta-accent text-white font-semibold flex items-center justify-center gap-2 hover:opacity-95 transition-all shadow-md hover:shadow-lg"
                 id="trial-modal-cta-btn"
               >
-                Go to BeepBoop <ArrowRight className="w-4 h-4" />
+                Go to VyostraAI <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </motion.div>

@@ -243,8 +243,8 @@ export class ZohoProvider implements CRMProvider {
       lastName,
       email: email || undefined,
       phone: phone || undefined,
-      leadSource: 'BeepBoop',
-      description: otherFields.length > 0 ? otherFields.join('\n') : 'Lead captured via BeepBoop form',
+      leadSource: 'VyostraAI',
+      description: otherFields.length > 0 ? otherFields.join('\n') : 'Lead captured via VyostraAI form',
       sourceUrl,
     }
   }

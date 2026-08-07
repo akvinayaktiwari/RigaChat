@@ -47,7 +47,7 @@ export default function Crm() {
   return (
     <>
       <Helmet>
-        <title>Built-in Lead CRM — BeepBoop</title>
+        <title>Built-in Lead CRM — VyostraAI</title>
         <meta
           name="description"
           content="Every lead captured, stored, and organized automatically. Filter, track, and sync to Zoho CRM in real-time."
@@ -56,7 +56,7 @@ export default function Crm() {
       <UseCaseLayout
         badge="LEAD CRM"
         headline="Every lead, organized automatically"
-        subheadline="BeepBoop stores every lead captured by your chatbots and forms in a built-in CRM dashboard. Filter, track status, and sync to Zoho CRM in one click."
+        subheadline="VyostraAI stores every lead captured by your chatbots and forms in a built-in CRM dashboard. Filter, track status, and sync to Zoho CRM in one click."
         heroVisual={<CrmTableMockup />}
         howItWorksSteps={[
           {
@@ -101,7 +101,7 @@ export default function Crm() {
           { icon: <FileText className="w-4 h-4" />, title: 'Form Builder', href: '/features/forms' },
         ]}
         ctaHeadline="See every lead in one place"
-        ctaBody="BeepBoop captures and organizes your leads automatically. Connect Zoho CRM in one click."
+        ctaBody="VyostraAI captures and organizes your leads automatically. Connect Zoho CRM in one click."
       />
     </>
   )

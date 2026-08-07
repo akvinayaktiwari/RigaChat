@@ -10,7 +10,7 @@ export function EmbedSnippet({ botId }: EmbedSnippetProps) {
   const { show } = useToast()
   const cdnUrl = import.meta.env.VITE_CDN_URL
 
-  const snippet = `<!-- BeepBoop Widget -->
+  const snippet = `<!-- VyostraAI Widget -->
 <script
   src="${cdnUrl}/widget.js"
   data-bot-id="${botId}"

@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 
 declare global {
   interface Window {
-    BeepBoop?: {
+    VyostraAI?: {
       openForm: (formId: string) => void
       closeForm: () => void
     }
@@ -29,7 +29,7 @@ export default function FormTestPreviewPage() {
   }, [formId])
 
   function handleOpenForm() {
-    if (formId) window.BeepBoop?.openForm(formId)
+    if (formId) window.VyostraAI?.openForm(formId)
   }
 
   if (!formId) {

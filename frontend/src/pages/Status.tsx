@@ -45,7 +45,7 @@ function StatusHero() {
         </div>
         <h1 className="text-4xl md:text-5xl font-extrabold text-on-surface tracking-tight leading-tight">System Status</h1>
         <p className="mt-4 text-base md:text-lg text-on-surface-variant max-w-2xl mx-auto leading-relaxed">
-          Real-time status for BeepBoop's chatbot, dashboard, and integrations.
+          Real-time status for VyostraAI's chatbot, dashboard, and integrations.
         </p>
       </div>
     </section>
@@ -61,7 +61,7 @@ function OverallStatusBanner() {
       </span>
       <div>
         <p className="text-emerald-800 font-extrabold text-base">All Systems Operational</p>
-        <p className="text-emerald-700 text-xs mt-0.5">Every BeepBoop service is running normally.</p>
+        <p className="text-emerald-700 text-xs mt-0.5">Every VyostraAI service is running normally.</p>
       </div>
     </div>
   )

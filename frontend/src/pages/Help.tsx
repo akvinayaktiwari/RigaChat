@@ -70,7 +70,7 @@ const HELP_ARTICLES: HelpArticle[] = [
     categoryId: 'getting-started',
     question: 'How do I create my first chatbot?',
     answer:
-      'Go to Chatbots in the sidebar and click Create New Bot. Enter your website URL and BeepBoop trains your AI chatbot automatically. It takes under 5 minutes.',
+      'Go to Chatbots in the sidebar and click Create New Bot. Enter your website URL and VyostraAI trains your AI chatbot automatically. It takes under 5 minutes.',
   },
   {
     id: 'art-2',
@@ -84,7 +84,7 @@ const HELP_ARTICLES: HelpArticle[] = [
     categoryId: 'getting-started',
     question: 'What is the knowledge base?',
     answer:
-      'The knowledge base is the information your chatbot uses to answer questions. BeepBoop builds it automatically from your website URL. You can also add custom entries manually.',
+      'The knowledge base is the information your chatbot uses to answer questions. VyostraAI builds it automatically from your website URL. You can also add custom entries manually.',
   },
   {
     id: 'art-4',
@@ -98,7 +98,7 @@ const HELP_ARTICLES: HelpArticle[] = [
     categoryId: 'whatsapp',
     question: 'What is Gupshup and do I need an account?',
     answer:
-      'Gupshup is a WhatsApp Business API provider. Sign up free at platform.gupshup.io, create an app, and paste your API key into BeepBoop.',
+      'Gupshup is a WhatsApp Business API provider. Sign up free at platform.gupshup.io, create an app, and paste your API key into VyostraAI.',
   },
   {
     id: 'art-6',
@@ -112,13 +112,13 @@ const HELP_ARTICLES: HelpArticle[] = [
     categoryId: 'integrations',
     question: 'How do I connect Zoho CRM?',
     answer:
-      'Go to Settings, Integrations, Zoho CRM, Connect. Authorize BeepBoop in Zoho. All new leads sync automatically after that.',
+      'Go to Settings, Integrations, Zoho CRM, Connect. Authorize VyostraAI in Zoho. All new leads sync automatically after that.',
   },
   {
     id: 'art-8',
     categoryId: 'integrations',
-    question: 'Which CRMs does BeepBoop support?',
-    answer: 'BeepBoop currently supports Zoho CRM. HubSpot and Salesforce are coming soon.',
+    question: 'Which CRMs does VyostraAI support?',
+    answer: 'VyostraAI currently supports Zoho CRM. HubSpot and Salesforce are coming soon.',
   },
   {
     id: 'art-9',
@@ -136,7 +136,7 @@ const HELP_ARTICLES: HelpArticle[] = [
     id: 'art-11',
     categoryId: 'billing',
     question: 'Is there a free trial?',
-    answer: 'Yes. BeepBoop is free to start. No credit card required.',
+    answer: 'Yes. VyostraAI is free to start. No credit card required.',
   },
   {
     id: 'art-12',
@@ -173,13 +173,15 @@ function HelpHero({ searchQuery, onSearchChange }: { searchQuery: string; onSear
       <div className="relative z-10 max-w-3xl mx-auto">
         <div className="flex items-center justify-center gap-2 mb-4">
           <LifeBuoy className="w-6 h-6 text-primary" />
-          <span className="text-sm font-bold uppercase tracking-wider text-primary">BeepBoop Support Suite</span>
+          {/* "Vyostra", not "VyostraAI" -- this label is CSS-uppercased, and
+              "VYOSTRAAI" reads as a typo because of the doubled A. */}
+          <span className="text-sm font-bold uppercase tracking-wider text-primary">Vyostra Support Suite</span>
         </div>
         <h1 className="text-4xl md:text-5xl font-extrabold text-on-surface mb-5 tracking-tight">
           Help Center &amp; Knowledge Base
         </h1>
         <p className="text-base md:text-lg text-on-surface-variant max-w-2xl mx-auto mb-8 leading-relaxed">
-          Search articles, explore features, and find answers to get the most out of BeepBoop.
+          Search articles, explore features, and find answers to get the most out of VyostraAI.
         </p>
         <div className="relative max-w-2xl mx-auto w-full group">
           <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-primary w-5 h-5" />
@@ -310,7 +312,7 @@ function SupportCta() {
       <div className="relative z-10 max-w-2xl mx-auto">
         <h2 className="text-2xl md:text-3xl font-extrabold text-white mb-4">Still need help?</h2>
         <p className="text-sm md:text-base text-white/80 max-w-xl mx-auto mb-8 leading-relaxed">
-          Our team is available to help with any questions about BeepBoop.
+          Our team is available to help with any questions about VyostraAI.
         </p>
         <div className="flex flex-wrap justify-center gap-4">
           <a

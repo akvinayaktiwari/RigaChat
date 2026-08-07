@@ -15,7 +15,7 @@ function WhatsAppNotificationMockup() {
 
       <div className="bg-[#005C4B] rounded-2xl rounded-tl-none p-4">
         <p className="text-white font-mono text-xs leading-relaxed whitespace-pre-line">
-          {'🔔 New Lead — BeepBoop\n\nName: Rahul Sharma\nPhone: +91 98765 43210\nEmail: rahul@example.com\nBot: Property Assistant\nTime: Today, 2:34 PM\n\nbeepboop.drsyeta.in/leads'}
+          {'🔔 New Lead — VyostraAI\n\nName: Rahul Sharma\nPhone: +91 98765 43210\nEmail: rahul@example.com\nBot: Property Assistant\nTime: Today, 2:34 PM\n\nvyostra.com/leads'}
         </p>
         <div className="flex items-center justify-end gap-1 mt-2">
           <span className="text-white/50 text-[10px]">2:34 PM</span>
@@ -30,7 +30,7 @@ export default function WhatsAppFeaturePage() {
   return (
     <>
       <Helmet>
-        <title>WhatsApp Lead Notifications — BeepBoop</title>
+        <title>WhatsApp Lead Notifications — VyostraAI</title>
         <meta
           name="description"
           content="Get instant WhatsApp alerts every time a new lead is captured. Weekly reports every Monday. Powered by Gupshup."
@@ -39,13 +39,13 @@ export default function WhatsAppFeaturePage() {
       <UseCaseLayout
         badge="WHATSAPP AUTOMATION"
         headline="Never miss a lead — get notified instantly"
-        subheadline="BeepBoop sends a WhatsApp message to your number the moment a lead is captured — from your chatbot or your forms. No app switching. No delays."
+        subheadline="VyostraAI sends a WhatsApp message to your number the moment a lead is captured — from your chatbot or your forms. No app switching. No delays."
         heroVisual={<WhatsAppNotificationMockup />}
         howItWorksSteps={[
           {
             number: '1',
             title: 'Connect Your Gupshup Account',
-            body: 'Enter your Gupshup API key and WhatsApp Business number in BeepBoop settings. BeepBoop encrypts your credentials with AWS KMS — never stored in plain text.',
+            body: 'Enter your Gupshup API key and WhatsApp Business number in VyostraAI settings. VyostraAI encrypts your credentials with AWS KMS — never stored in plain text.',
             icon: <Key className="w-6 h-6" />,
           },
           {
@@ -70,7 +70,7 @@ export default function WhatsAppFeaturePage() {
           {
             icon: <Lock className="w-5 h-5" />,
             title: 'Your Credentials, Your Control',
-            body: 'BeepBoop never stores your API key in plain text. It is encrypted with AWS KMS and only decrypted in memory when sending a message.',
+            body: 'VyostraAI never stores your API key in plain text. It is encrypted with AWS KMS and only decrypted in memory when sending a message.',
           },
           {
             icon: <BarChart2 className="w-5 h-5" />,

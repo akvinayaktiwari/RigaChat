@@ -93,7 +93,7 @@
   function ensureShadowRoot() {
     if (shadowRoot) return;
     host = document.createElement('div');
-    host.id = 'beepboop-form-widget-host';
+    host.id = 'vyostra-form-widget-host';
     document.body.appendChild(host);
     shadowRoot = host.attachShadow({ mode: 'open' });
     var style = document.createElement('style');
@@ -265,16 +265,23 @@
     if (backdrop) backdrop.remove();
   }
 
-  window.BeepBoop = window.BeepBoop || {};
+  window.VyostraAI = window.VyostraAI || {};
 
-  window.BeepBoop.openForm = function (formId) {
+  window.VyostraAI.openForm = function (formId) {
     currentFormId = formId;
     loadForm(formId, function (config) {
       mountModal(config);
     });
   };
 
-  window.BeepBoop.closeForm = function () {
+  window.VyostraAI.closeForm = function () {
     closeForm();
   };
+
+  // Deprecated alias for the pre-rename global. Clients paste
+  // onclick="BeepBoop.openForm('...')" directly into their own page HTML, so
+  // those handlers live on sites we do not control and cannot edit. Dropping
+  // this would break every form button embedded before the rename. Same object,
+  // not a copy, so both names stay in sync.
+  window.BeepBoop = window.VyostraAI;
 })();

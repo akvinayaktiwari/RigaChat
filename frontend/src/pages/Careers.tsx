@@ -45,7 +45,7 @@ const BENEFIT_CARDS: BenefitCard[] = [
   { icon: <Laptop className="w-5 h-5" />, title: 'Remote First', body: 'Work from home, a cafe, or anywhere with good internet.' },
   { icon: <Calendar className="w-5 h-5" />, title: 'Flexible Hours', body: 'Own your schedule. We care about output, not hours.' },
   { icon: <BookOpen className="w-5 h-5" />, title: 'Learning Budget', body: 'Annual budget for courses, books, and conferences.' },
-  { icon: <TrendingUp className="w-5 h-5" />, title: 'Equity Potential', body: 'Early team members get equity as BeepBoop grows.' },
+  { icon: <TrendingUp className="w-5 h-5" />, title: 'Equity Potential', body: 'Early team members get equity as VyostraAI grows.' },
   { icon: <Shield className="w-5 h-5" />, title: 'Health Coverage', body: 'Health insurance for you and your family.' },
   { icon: <Coffee className="w-5 h-5" />, title: 'Home Office Setup', body: 'One-time stipend to set up your remote workspace.' },
   { icon: <MessageSquare className="w-5 h-5" />, title: 'Async Communication', body: 'No unnecessary meetings. We communicate via docs and chat.' },
@@ -73,7 +73,7 @@ function CareersHero() {
           Build the future of lead generation — remotely
         </h1>
         <p className="mt-4 text-base md:text-lg text-on-surface-variant leading-relaxed max-w-2xl mx-auto">
-          BeepBoop is a fully remote team building AI products that help businesses capture and convert leads. We move fast, build lean, and care about craft.
+          VyostraAI is a fully remote team building AI products that help businesses capture and convert leads. We move fast, build lean, and care about craft.
         </p>
         <a
           href="mailto:support@vyostra.com"
@@ -170,10 +170,10 @@ function GeneralApplicationCta() {
     <section className="max-w-7xl mx-auto bg-on-surface rounded-3xl p-10 text-center text-white">
       <h2 className="text-2xl md:text-3xl font-extrabold mb-4">Don't see a role that fits?</h2>
       <p className="text-white/80 max-w-xl mx-auto mb-8 leading-relaxed">
-        We always want to hear from talented people. Send us your resume and tell us how you would contribute to BeepBoop.
+        We always want to hear from talented people. Send us your resume and tell us how you would contribute to VyostraAI.
       </p>
       <a
-        href="mailto:support@vyostra.com?subject=Resume — BeepBoop Application"
+        href="mailto:support@vyostra.com?subject=Resume — VyostraAI Application"
         className="inline-flex items-center gap-2 bg-primary text-white px-8 py-4 rounded-xl font-bold hover:opacity-95 transition-all"
       >
         <Mail className="w-4.5 h-4.5" />
@@ -189,10 +189,10 @@ export default function Careers() {
   return (
     <div className="landing-page bg-background">
       <Helmet>
-        <title>Careers at BeepBoop — Work Remotely</title>
+        <title>Careers at VyostraAI — Work Remotely</title>
         <meta
           name="description"
-          content="Join BeepBoop. Fully remote. Build AI products that help businesses grow. Send your resume to support@vyostra.com"
+          content="Join VyostraAI. Fully remote. Build AI products that help businesses grow. Send your resume to support@vyostra.com"
         />
       </Helmet>
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
