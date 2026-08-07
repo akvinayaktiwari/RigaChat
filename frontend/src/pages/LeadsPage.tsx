@@ -6,6 +6,7 @@ import { getLeadInbox, updateLeadState } from '../services/api'
 import FilterBar from '../components/FilterBar/FilterBar'
 import type { FilterChip } from '../components/FilterBar/FilterBar'
 import { useToast } from '../components/Toast/Toast'
+import { describeApiError } from '../lib/api-error'
 import { exportInboxCsv } from '../lib/csv'
 import { leadDetailPath } from '../lib/lead-ref'
 import {
@@ -192,7 +193,10 @@ export default function LeadsPage() {
       .then((res) => {
         if (cancelled) return
         if (res.success) setLeads(res.data ?? [])
-        else setLoadError(res.error ?? 'Could not load your leads')
+        else
+          setLoadError(
+            describeApiError('leads/inbox', res.error, 'We couldn’t load your leads just now.')
+          )
         setLoading(false)
       })
       .catch(() => {
@@ -228,7 +232,7 @@ export default function LeadsPage() {
     setSavingLeadId(null)
 
     if (!res.success || !res.data) {
-      toast.show(res.error ?? 'Could not update this lead', 'error')
+      toast.show(describeApiError('leads/state', res.error, 'Couldn’t update this lead.'), 'error')
       return
     }
     const updated = res.data

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { addLeadNote, getUnifiedLeadDetail, updateLeadState } from '../services/api'
 import { useToast } from '../components/Toast/Toast'
+import { describeApiError } from '../lib/api-error'
 import { parseLeadRef } from '../lib/lead-ref'
 import { toDialNumber, toWhatsAppNumber } from '../lib/phone'
 import {
@@ -151,8 +152,9 @@ export default function LeadDetailPage() {
         if (res.success && res.data) setLead(res.data)
         // A 500 and a genuine 404 both landed here as "Lead not found" before,
         // which sent you looking for a deleted lead when the table was simply
-        // unreachable. The server's own message is more use than our guess.
-        else setError(res.error ?? 'Could not load this lead')
+        // unreachable. describeApiError keeps that distinction in the console
+        // while showing the customer something they can act on.
+        else setError(describeApiError('leads/detail', res.error, 'We couldn’t open this lead.'))
         setLoading(false)
       })
       .catch(() => {
@@ -175,7 +177,7 @@ export default function LeadDetailPage() {
     setSaving(false)
 
     if (!res.success || !res.data) {
-      toast.show(res.error ?? 'Could not save this change', 'error')
+      toast.show(describeApiError('leads/state', res.error, 'Couldn’t save that change.'), 'error')
       return
     }
     const updated = res.data
@@ -189,7 +191,7 @@ export default function LeadDetailPage() {
     setSaving(false)
 
     if (!res.success || !res.data) {
-      toast.show(res.error ?? 'Could not save this note', 'error')
+      toast.show(describeApiError('leads/notes', res.error, 'Couldn’t save that note.'), 'error')
       return
     }
     const updated = res.data
