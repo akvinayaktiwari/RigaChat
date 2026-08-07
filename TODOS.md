@@ -352,6 +352,18 @@ End-to-end verified the same day against real infra: a submission wrote a real r
 **Priority:** P1
 **Depends on:** nothing further
 
+### Editing a knowledge base entry doesn't invalidate the 7-day answer cache
+
+**What:** `redis-repository.ts` caches chat answers under `ans:<botId>:<hash of exact question text>` with `ANSWER_TTL = 7 days` (line 11). Nothing in the KB write path clears it. So after a client corrects a knowledge base entry, every question already asked keeps returning the **pre-edit answer for up to a week**, even though Pinecone now holds the corrected text. `runSuggestionPrewarm()` masks this for the ~10 questions it regenerates, which is why it isn't obvious.
+
+**Why:** Editing an entry is what a client does *because* the bot said something wrong. The one action that is supposed to fix a wrong answer provably does not fix it for anyone who already asked. Found on 2026-08-07 while correcting the VyostraAI marketing bot, whose KB was denying three shipped features; the chunk half was fixable (see the `deleteChunksByEntryId` fix in `kb-service.updateKBEntry`) but the cached answers were not, and had to be deleted one known question at a time via `scripts/clear-cached-answer.ts`.
+
+**Context:** `RedisProvider` (`providers/redis/redis-provider.interface.ts`) exposes only `get`/`set`/`delete`/`setNX` — no `scan` or pattern delete — so `ans:<botId>:*` cannot be swept without extending the interface across both the Upstash and ElastiCache providers. Preferred fix is a per-bot cache generation instead: store `kbgen:<botId>`, include it in the answer key (`ans:<botId>:<gen>:<hash>`), and `INCR` it on any KB create/update/delete. That invalidates a bot's whole answer cache atomically with no scanning, and stale keys age out on their own TTL. Cost is one extra Redis GET on the cached-answer read path, which should be measured before committing to it — the alternative is adding pattern-delete to both providers. Applies equally to the voice-agent KB path, which shares this cache.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None
+
 ## Completed
 
 ### Fix un-awaited CRM sync in form-lead-service.ts (Lambda-freeze risk)

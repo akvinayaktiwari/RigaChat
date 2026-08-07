@@ -182,6 +182,14 @@ export async function updateKBEntry(
 
   try {
     const entry = await updateKBEntryRepo(botId, entryId, updates)
+    // Drop this entry's old vectors before re-embedding. indexKnowledgeBaseEntry
+    // mints a fresh chunkId per chunk, so an upsert alone cannot overwrite the
+    // previous ones -- they linger in Pinecone forever and keep getting
+    // retrieved alongside the new text. That is how an edited entry ends up
+    // making the bot answer from BOTH the old and new wording, which is the
+    // opposite of what editing an entry is for. Scoped to this entryId via its
+    // sourceUrl, so other entries in the namespace are untouched.
+    await deleteChunksByEntryId(botId, entryId)
     await indexKnowledgeBaseEntry(botId, entryId, entry.title, entry.content)
     return entry
   } catch (error) {
