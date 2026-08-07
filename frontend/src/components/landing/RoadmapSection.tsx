@@ -35,7 +35,7 @@ const PILLARS: Pillar[] = [
     iconColor: 'text-cyan-300',
     role: 'The hands that never forget.',
     description:
-      'Simple timed actions — book a slot, send a WhatsApp template, fire an email. No AI, just dependable follow-through.',
+      'Timed actions that need no AI — lead reminders and weekly reports, on a repeating interval or a one-off date.',
   },
   {
     icon: Route,
@@ -46,12 +46,12 @@ const PILLARS: Pillar[] = [
     iconColor: 'text-violet-200',
     role: 'Where it all comes together.',
     description:
-      'A visual timeline that connects your agents and schedulers. Describe the flow in plain words — then watch it run itself.',
+      'A step list that wires your agents and schedulers together — it sends, waits for the actual reply, branches on what happens, and knows when to stop.',
     elevated: true,
   },
 ]
 
-type NodeKind = 'scheduler' | 'when' | 'agent' | 'if'
+type NodeKind = 'agent' | 'await' | 'check' | 'human'
 
 interface TimelineNode {
   kind: NodeKind
@@ -60,26 +60,31 @@ interface TimelineNode {
   timing: string
 }
 
+// This mirrors the shipped real-estate template step for step
+// (backend/src/lib/journey-templates/real-estate-lead-qualification.ts). If that
+// template changes, change this too — it is the one place the marketing site
+// claims something concrete about what a journey actually does.
 const TIMELINE_NODES: TimelineNode[] = [
-  { kind: 'scheduler', label: 'Scheduler', title: 'Visit booked', timing: 'via Calendly' },
-  { kind: 'scheduler', label: 'Scheduler', title: 'Reminder sent', timing: '1 day before' },
-  { kind: 'when', label: 'When', title: 'Visit completed', timing: 'status changes' },
-  { kind: 'agent', label: 'Agent', title: 'WhatsApp follow-up', timing: 'within the hour' },
-  { kind: 'if', label: 'If', title: 'No reply', timing: 'for 3 days' },
-  { kind: 'agent', label: 'Voice agent', title: 'Nurture call', timing: 'auto-dialed' },
+  { kind: 'agent', label: 'Agent', title: 'Greets the new lead', timing: 'on WhatsApp, at once' },
+  { kind: 'await', label: 'Waits', title: 'For budget and area', timing: 'up to 24 hours' },
+  { kind: 'agent', label: 'Agent', title: 'Offers a site visit', timing: 'once they answer' },
+  { kind: 'await', label: 'Waits', title: 'For a day that suits them', timing: 'up to 24 hours' },
+  { kind: 'agent', label: 'Agent', title: 'Nudges once if quiet', timing: 'exactly once' },
+  { kind: 'check', label: 'Checks', title: 'Visit booked yet?', timing: 'daily, 3 times' },
+  { kind: 'human', label: 'Hands off', title: 'Over to your team', timing: 'instead of nagging' },
 ]
 
 const KIND_STYLES: Record<NodeKind, { border: string; labelColor: string }> = {
-  scheduler: { border: 'border-cyan-400/40', labelColor: 'text-cyan-300' },
   agent: { border: 'border-violet-400/40', labelColor: 'text-violet-300' },
-  when: { border: 'border-dashed border-white/25', labelColor: 'text-white/50' },
-  if: { border: 'border-dashed border-white/25', labelColor: 'text-white/50' },
+  await: { border: 'border-cyan-400/40', labelColor: 'text-cyan-300' },
+  check: { border: 'border-dashed border-white/25', labelColor: 'text-white/50' },
+  human: { border: 'border-emerald-400/40', labelColor: 'text-emerald-300' },
 }
 
 function TimelineNodeCard({ node }: { node: TimelineNode }) {
   const style = KIND_STYLES[node.kind]
   return (
-    <div className={`w-40 shrink-0 rounded-xl border bg-white/[0.03] p-3.5 ${style.border}`}>
+    <div className={`w-36 shrink-0 rounded-xl border bg-white/[0.03] p-3.5 ${style.border}`}>
       <p className={`mb-1.5 text-[11px] font-semibold uppercase tracking-wide ${style.labelColor}`}>{node.label}</p>
       <p className="mb-1 text-sm font-semibold text-white">{node.title}</p>
       <p className="text-xs text-white/40">{node.timing}</p>
@@ -103,25 +108,25 @@ export default function RoadmapSection() {
       <div className="relative max-w-6xl mx-auto">
         <div className="max-w-2xl mx-auto text-center mb-12 sm:mb-14">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <p className="text-sm font-semibold text-violet-400 uppercase tracking-widest">The next chapter</p>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-xs font-medium text-white/70">
-              <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse motion-reduce:animate-none" />
-              In development
+            <p className="text-sm font-semibold text-violet-400 uppercase tracking-widest">Journeys</p>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-300">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse motion-reduce:animate-none" />
+              Live now
             </span>
           </div>
           <h2
             className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight mb-4"
             style={JAKARTA_FONT}
           >
-            From single agents to{' '}
+            Your agent answers. Then it{' '}
             <span className="bg-gradient-to-r from-violet-400 to-cyan-300 bg-clip-text text-transparent">
-              self-running journeys
+              follows up on its own
             </span>
             .
           </h2>
           <p className="text-white/60 text-lg leading-relaxed">
-            Today VyostraAI answers and captures. Next, it acts on its own — three building blocks you assemble once,
-            then let run.
+            Capturing a lead is the easy half. A journey carries it forward — three building blocks you assemble once,
+            then leave running.
           </p>
         </div>
 
@@ -174,39 +179,50 @@ export default function RoadmapSection() {
                 A journey, drawn once
               </h3>
             </div>
-            <div className="flex items-center gap-4 text-xs text-white/60">
+            <div className="flex flex-wrap items-center gap-4 text-xs text-white/60">
               <span className="flex items-center gap-1.5">
                 <span className="h-2.5 w-2.5 rounded-full bg-violet-400" />
                 AI agent
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="h-2.5 w-2.5 rounded-full bg-cyan-400" />
-                Automation
+                Waits for a real reply
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                Human handoff
               </span>
             </div>
           </div>
           <p className="text-sm text-white/50 mb-6">
-            Example: a real-estate site visit, from booking to follow-up — no one lifting a finger.
+            This is the real-estate journey that ships with the product, step for step — from a new lead to a booked
+            site visit, with nobody lifting a finger.
           </p>
 
           <div className="overflow-x-auto pb-2">
-            <div className="relative flex items-center gap-3 w-max">
+            <div className="relative flex items-center gap-2 w-max">
               <div className="pointer-events-none absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-white/10" />
               <div className="roadmap-spark pointer-events-none absolute top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-violet-300 shadow-[0_0_8px_2px_rgba(196,181,253,0.8)]" />
               {TIMELINE_NODES.map((node, i) => (
-                <div key={node.title} className="relative flex items-center gap-3 shrink-0">
+                <div key={node.title} className="relative flex items-center gap-2 shrink-0">
                   <TimelineNodeCard node={node} />
                   {i < TIMELINE_NODES.length - 1 && (
-                    <div className="h-px w-6 shrink-0 bg-gradient-to-r from-violet-400/60 to-cyan-400/60" />
+                    <div className="h-px w-4 shrink-0 bg-gradient-to-r from-violet-400/60 to-cyan-400/60" />
                   )}
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-white/50 mt-6">
-            <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-            Built from templates for real estate, clinics, coaching and more — customize, don&apos;t start blank.
+          <div className="mt-6 space-y-2">
+            <div className="flex items-center gap-2 text-xs text-white/50">
+              <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+              Clone the prebuilt real-estate agent, reword it, publish. More verticals on the way.
+            </div>
+            <div className="flex items-center gap-2 text-xs text-white/50">
+              <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+              A lead replies &ldquo;STOP&rdquo; and the journey ends there — no further messages, ever.
+            </div>
           </div>
         </div>
       </div>

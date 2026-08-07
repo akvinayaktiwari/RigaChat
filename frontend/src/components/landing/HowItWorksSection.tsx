@@ -13,9 +13,9 @@ const STEPS = [
   },
   {
     step: '03',
-    title: 'Go live and capture leads',
+    title: 'Go live and let it follow up',
     description:
-      'Your AI agent answers questions 24/7, captures leads automatically, and syncs everything to your CRM dashboard in real time.',
+      'Your AI agent answers questions 24/7 and syncs every lead to your CRM in real time — then a journey takes over, following up on WhatsApp until they book or your team steps in.',
   },
 ]
 

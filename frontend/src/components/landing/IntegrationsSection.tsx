@@ -21,7 +21,7 @@ const INTEGRATIONS: Integration[] = [
     iconColor: 'text-green-600',
     iconBg: 'bg-green-100',
     bg: 'from-green-50 to-emerald-50',
-    perks: ['Lead notifications', 'Rich media support', 'WhatsApp AI agent (coming soon)'],
+    perks: ['Lead notifications', 'Rich media support', 'Two-way AI conversations'],
     status: 'live',
   },
   {

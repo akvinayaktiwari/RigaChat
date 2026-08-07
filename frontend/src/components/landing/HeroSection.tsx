@@ -28,7 +28,7 @@ export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
         <div>
           <div className="inline-flex items-center gap-2 bg-violet-50 border border-violet-100 text-violet-700 text-xs font-semibold px-3.5 py-1.5 rounded-full mb-6">
             <span className="w-1.5 h-1.5 bg-violet-500 rounded-full inline-block animate-pulse" />
-            Now with WhatsApp Business API
+            New: self-running follow-up journeys
             <ChevronRight className="w-3.5 h-3.5" />
           </div>
 
@@ -43,7 +43,8 @@ export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
           </h1>
 
           <p className="text-lg text-gray-500 leading-relaxed mb-8 max-w-lg">
-            Train on your website content, capture leads automatically, and sync to your CRM — all in one platform.
+            Train on your website content, capture leads automatically, then let your agent follow up on WhatsApp until
+            they book — all in one platform.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 mb-10">

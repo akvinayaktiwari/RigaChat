@@ -1,4 +1,4 @@
-import { Database, Zap, BarChart3, MessageSquare, Globe, Shield, Mic, type LucideIcon } from 'lucide-react'
+import { Database, Zap, BarChart3, MessageSquare, Globe, Shield, Mic, Route, type LucideIcon } from 'lucide-react'
 
 interface BentoFeature {
   icon: LucideIcon
@@ -49,9 +49,20 @@ const BENTO_FEATURES: BentoFeature[] = [
     large: false,
   },
   {
+    icon: Route,
+    title: 'Follow-up on autopilot',
+    description:
+      'Journeys keep working after the capture — message, wait for the actual reply, then branch on what they said.',
+    gradient: 'from-fuchsia-50 to-violet-50',
+    accentColor: 'text-fuchsia-600',
+    iconBg: 'bg-fuchsia-100',
+    large: false,
+  },
+  {
     icon: MessageSquare,
-    title: 'WhatsApp notifications',
-    description: 'Get instant WhatsApp alerts when a new lead is captured. Never miss a hot lead again.',
+    title: 'WhatsApp, both directions',
+    description:
+      'Instant alerts the moment a lead is captured — and a two-way AI agent that answers their replies on WhatsApp, not just yours.',
     gradient: 'from-emerald-50 via-teal-50 to-white',
     accentColor: 'text-emerald-600',
     iconBg: 'bg-emerald-100',
@@ -91,7 +102,7 @@ export default function FeaturesSection() {
             your customer conversations
           </h2>
           <p className="text-gray-500 text-lg max-w-xl mx-auto">
-            From knowledge ingestion to CRM sync — all the pieces your AI agent needs, assembled and ready.
+            From knowledge ingestion to automated follow-up — all the pieces your AI agent needs, assembled and ready.
           </p>
         </div>
 
