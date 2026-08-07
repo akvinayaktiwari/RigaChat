@@ -87,7 +87,10 @@ export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
           </div>
         </div>
 
-        <div className="flex justify-center lg:justify-end mt-8 lg:mt-0">
+        {/* id is the scroll target the walkthrough's "try the live agent" action
+            hands off to, since this chat is the real streaming agent and the
+            walkthrough is scripted. */}
+        <div id="hero-demo-chat" className="flex justify-center lg:justify-end mt-8 lg:mt-0 scroll-mt-28">
           <DemoChat />
         </div>
       </div>
