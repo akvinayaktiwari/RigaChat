@@ -25,6 +25,9 @@ import type {
   KBUploadUrlResult,
   KnowledgeBaseEntry,
   Lead,
+  LeadRef,
+  LeadState,
+  LeadStatePatch,
   MetaConnection,
   MetaDirectWhatsAppConnection,
   MetaLead,
@@ -38,6 +41,8 @@ import type {
   SubmitContactMessageInput,
   SubmitContactMessageResult,
   SubscriptionSummary,
+  UnifiedLead,
+  UnifiedLeadDetail,
   UpdateKBInput,
   UpdateVoiceAgentInput,
   VoiceAgent,
@@ -142,6 +147,36 @@ export function getAllLeads(): Promise<ApiResponse<Lead[]>> {
 
 export function getLeadById(botId: string, leadId: string): Promise<ApiResponse<Lead>> {
   return apiClient<Lead>(`/api/leads/${botId}/${leadId}`)
+}
+
+// Unified inbox: chat + form + Meta leads in one list, already ordered by
+// urgency server-side (overdue follow-ups first, then untouched oldest-first).
+// Do not re-sort by date on the client -- that ordering is the product.
+export function getLeadInbox(): Promise<ApiResponse<UnifiedLead[]>> {
+  return apiClient<UnifiedLead[]>('/api/leads/inbox')
+}
+
+// The whole LeadRef travels in the query string because this is a GET reached
+// by opening a link — see lib/lead-ref.ts for the URL shape.
+export function getUnifiedLeadDetail(leadRef: LeadRef): Promise<ApiResponse<UnifiedLeadDetail>> {
+  const params = new URLSearchParams({ source: leadRef.source, leadId: leadRef.leadId })
+  if (leadRef.source === 'chat') params.set('botId', leadRef.botId)
+  if (leadRef.source === 'form') params.set('formId', leadRef.formId)
+  if (leadRef.source === 'meta') params.set('pageId', leadRef.pageId)
+  return apiClient<UnifiedLeadDetail>(`/api/leads/detail?${params.toString()}`)
+}
+
+// The leadRef goes in the body because it names the source table AND its parent
+// key; a bare leadId is not addressable across three tables.
+export function updateLeadState(
+  leadRef: LeadRef,
+  patch: LeadStatePatch
+): Promise<ApiResponse<LeadState>> {
+  return apiClient<LeadState>('/api/leads/state', 'PATCH', { leadRef, ...patch })
+}
+
+export function addLeadNote(leadRef: LeadRef, body: string): Promise<ApiResponse<LeadState>> {
+  return apiClient<LeadState>('/api/leads/notes', 'POST', { leadRef, body })
 }
 
 // KB API

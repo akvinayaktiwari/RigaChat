@@ -980,6 +980,17 @@ export interface UnifiedLead extends JourneyLead {
   state: LeadState | null
 }
 
+// One lead, opened. Everything UnifiedLead carries plus the raw material a
+// human needs to decide what to say next: the conversation for a chat lead, the
+// submitted answers for a form or Meta lead. Kept separate from UnifiedLead so
+// the inbox list does not ship every transcript it will never render.
+export interface UnifiedLeadDetail extends UnifiedLead {
+  chatTranscript?: string
+  // Already parsed. The three sources store this differently (a JSON string on
+  // FormLead and MetaLead, nothing at all on Lead) and the UI should not care.
+  customFields?: Record<string, string>
+}
+
 // Everything a journey execution needs to act on a lead, resolved once at
 // ignition and then carried through the execution rather than re-derived per
 // step.

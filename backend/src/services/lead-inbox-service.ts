@@ -1,8 +1,9 @@
-import { getLeadsByClientId } from '../repositories/lead-repository.js'
-import { getFormLeadsByClientId } from '../repositories/form-lead-repository.js'
-import { getMetaLeadsByClientId } from '../repositories/meta-lead-repository.js'
+import { getLeadById, getLeadsByClientId } from '../repositories/lead-repository.js'
+import { getFormLeadById, getFormLeadsByClientId } from '../repositories/form-lead-repository.js'
+import { getMetaLeadById, getMetaLeadsByClientId } from '../repositories/meta-lead-repository.js'
 import {
   appendLeadNote,
+  getLeadState,
   getLeadStatesForClient,
   upsertLeadState,
   type LeadStatePatch,
@@ -13,7 +14,7 @@ import {
   normalizeMetaLead,
   readJourneyLead,
 } from './lead-resolution-service.js'
-import type { LeadRef, LeadState, UnifiedLead } from '../types/index.js'
+import type { LeadRef, LeadState, UnifiedLead, UnifiedLeadDetail } from '../types/index.js'
 
 // One inbox across chat, form and Meta leads.
 //
@@ -99,6 +100,71 @@ function compareByUrgency(a: UnifiedLead, b: UnifiedLead): number {
   const tierB = urgencyTier(b, now)
   if (tierA !== tierB) return tierA - tierB
   return compareWithinTier(a, b, tierA)
+}
+
+// A malformed customFields blob must not 404 the lead -- the same posture
+// lead-resolution-service.ts takes. The operator still gets the contact fields
+// and the notes, which is most of why they opened the page.
+function parseCustomFields(raw: string): Record<string, string> {
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed !== 'object' || parsed === null) return {}
+    return Object.fromEntries(
+      Object.entries(parsed as Record<string, unknown>).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string'
+      )
+    )
+  } catch {
+    return {}
+  }
+}
+
+// Everything the workspace needs out of the source record, from ONE read of it.
+// Deliberately not readJourneyLead + a second fetch for the extras: that would
+// read the same row twice per page load to assemble one object.
+type SourceRecord = Omit<UnifiedLeadDetail, 'leadRef' | 'state'>
+
+async function readSourceRecord(leadRef: LeadRef): Promise<SourceRecord | null> {
+  switch (leadRef.source) {
+    case 'chat': {
+      const lead = await getLeadById(leadRef.botId, leadRef.leadId)
+      if (!lead) return null
+      return { ...normalizeChatLead(lead), createdAt: lead.createdAt, chatTranscript: lead.chatTranscript }
+    }
+    case 'form': {
+      const lead = await getFormLeadById(leadRef.formId, leadRef.leadId)
+      if (!lead) return null
+      return {
+        ...normalizeFormLead(lead),
+        createdAt: lead.createdAt,
+        customFields: parseCustomFields(lead.customFields),
+      }
+    }
+    case 'meta': {
+      const lead = await getMetaLeadById(leadRef.pageId, leadRef.leadId)
+      if (!lead) return null
+      return {
+        ...normalizeMetaLead(lead),
+        createdAt: lead.createdAt,
+        customFields: parseCustomFields(lead.customFields),
+      }
+    }
+  }
+}
+
+export async function getUnifiedLeadDetail(
+  leadRef: LeadRef,
+  clientId: string
+): Promise<UnifiedLeadDetail> {
+  const [record, state] = await Promise.all([readSourceRecord(leadRef), getLeadState(leadRef.leadId)])
+
+  // 404 either way (missing vs. owned by someone else) -- don't reveal
+  // existence to a non-owner. Mirrors lead-service.ts's getLeadDetail.
+  if (!record || record.clientId !== clientId) {
+    throw new Error('Lead not found')
+  }
+
+  return { ...record, leadRef, state }
 }
 
 // Ownership is checked against the LEAD, not against the lead_state row: an

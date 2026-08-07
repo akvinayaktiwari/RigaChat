@@ -11,6 +11,7 @@ import {
 import {
   addLeadNoteForClient,
   getUnifiedInbox,
+  getUnifiedLeadDetail,
   updateLeadStateForClient,
 } from '../services/lead-inbox-service.js'
 import type { LeadStatePatch } from '../repositories/lead-state-repository.js'
@@ -22,6 +23,7 @@ import type {
   LeadState,
   LeadStatus,
   UnifiedLead,
+  UnifiedLeadDetail,
 } from '../types/index.js'
 
 interface AuthEnv {
@@ -211,6 +213,30 @@ leadRoutes.get('/inbox', requireAuth, async (c) => {
     return c.json<ApiResponse<UnifiedLead[]>>({ success: true, data: leads }, 200)
   } catch (error) {
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+leadRoutes.get('/detail', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  // Same LeadRef, arriving as query params instead of a body -- this is a GET
+  // reached by opening a link, so the whole ref has to live in the URL.
+  const leadRef = parseLeadRef({
+    source: c.req.query('source'),
+    leadId: c.req.query('leadId'),
+    botId: c.req.query('botId'),
+    formId: c.req.query('formId'),
+    pageId: c.req.query('pageId'),
+  })
+  if (!leadRef) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'A valid leadRef is required' }, 400)
+  }
+
+  try {
+    const lead = await getUnifiedLeadDetail(leadRef, clientId)
+    return c.json<ApiResponse<UnifiedLeadDetail>>({ success: true, data: lead }, 200)
+  } catch (error) {
+    const { message, status } = stateErrorResponse(error)
+    return c.json<ApiResponse<null>>({ success: false, error: message }, status)
   }
 })
 
