@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { useNavigate } from 'react-router-dom'
-import { Bot, MessageSquare, Users, FileText } from 'lucide-react'
+import { Bot, MessageSquare, Users, FileText, Mic, Route, CalendarCheck } from 'lucide-react'
 import Navbar from '../components/landing/Navbar'
 import Footer from '../components/landing/Footer'
 import DemoModal from '../components/landing/modals/DemoModal'
@@ -10,7 +10,11 @@ interface FeatureCardData {
   icon: ReactNode
   title: string
   body: string
-  href: string
+  // Absent for features that are live but don't have a marketing deep-dive page
+  // yet. Only /features/chatbot, /whatsapp, /crm and /forms exist as routes --
+  // giving a card an href that has no route would 404, so the card renders
+  // static instead of guessing at a URL.
+  href?: string
 }
 
 const FEATURE_CARDS: FeatureCardData[] = [
@@ -18,7 +22,7 @@ const FEATURE_CARDS: FeatureCardData[] = [
   {
     icon: <MessageSquare className="w-6 h-6" />,
     title: 'WhatsApp Automation',
-    body: 'Instant lead alerts and weekly reports on your WhatsApp.',
+    body: 'Instant lead alerts, weekly reports, and a two-way AI agent that answers replies.',
     href: '/features/whatsapp',
   },
   { icon: <Users className="w-6 h-6" />, title: 'Lead CRM', body: 'Every lead organized and trackable. Sync to Zoho in one click.', href: '/features/crm' },
@@ -27,6 +31,21 @@ const FEATURE_CARDS: FeatureCardData[] = [
     title: 'Form Builder',
     body: 'Beautiful forms that embed anywhere. Leads captured and notified instantly.',
     href: '/features/forms',
+  },
+  {
+    icon: <Route className="w-6 h-6" />,
+    title: 'Follow-up Journeys',
+    body: 'Your agent messages a new lead, waits for their reply, nudges once if they go quiet, and hands to your team instead of following up forever.',
+  },
+  {
+    icon: <Mic className="w-6 h-6" />,
+    title: 'AI Voice Agent',
+    body: 'Visitors talk to your agent on the page — no app, no phone call. Same knowledge base, same CRM.',
+  },
+  {
+    icon: <CalendarCheck className="w-6 h-6" />,
+    title: 'Appointments & Reminders',
+    body: 'Bookings land in your dashboard via Cal.com, with reminders on a schedule you set.',
   },
 ]
 
@@ -47,7 +66,8 @@ function FeaturesHero() {
           Everything you need to never miss a lead
         </h1>
         <p className="mt-4 text-base md:text-lg text-on-surface-variant leading-relaxed max-w-2xl mx-auto">
-          One platform. AI chatbot, WhatsApp alerts, CRM, forms, and integrations. Built for businesses that take leads seriously.
+          One platform. AI chat and voice agents, WhatsApp, CRM, forms, and follow-up journeys that keep working after
+          the lead is captured.
         </p>
         <button
           onClick={() => navigate('/signup')}
@@ -61,19 +81,42 @@ function FeaturesHero() {
   )
 }
 
-function FeatureCard({ card }: { card: FeatureCardData }) {
-  const navigate = useNavigate()
+function FeatureCardBody({ card }: { card: FeatureCardData }) {
   return (
-    <button
-      onClick={() => navigate(card.href)}
-      className="text-left bg-white border border-outline-variant/30 rounded-2xl p-6 shadow-xs hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer"
-    >
+    <>
       <div className="flex items-center justify-between mb-4">
         <div className="w-10 h-10 bg-primary/10 text-primary rounded-xl flex items-center justify-center">{card.icon}</div>
         <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full">LIVE</span>
       </div>
       <h3 className="font-bold text-on-surface text-lg mb-2">{card.title}</h3>
       <p className="text-sm text-on-surface-variant leading-relaxed">{card.body}</p>
+    </>
+  )
+}
+
+const CARD_SHELL = 'text-left bg-white border border-outline-variant/30 rounded-2xl p-6 shadow-xs'
+
+function FeatureCard({ card }: { card: FeatureCardData }) {
+  const navigate = useNavigate()
+
+  // No deep-dive page for this feature yet, so it renders as a plain panel --
+  // no hover lift and no pointer cursor, which would promise a click that
+  // goes nowhere.
+  if (!card.href) {
+    return (
+      <div className={CARD_SHELL}>
+        <FeatureCardBody card={card} />
+      </div>
+    )
+  }
+
+  const href = card.href
+  return (
+    <button
+      onClick={() => navigate(href)}
+      className={`${CARD_SHELL} hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer`}
+    >
+      <FeatureCardBody card={card} />
     </button>
   )
 }
@@ -103,7 +146,8 @@ function FeaturesCta() {
     <section className="max-w-7xl mx-auto bg-on-surface rounded-3xl p-12 text-center text-white">
       <h2 className="text-2xl md:text-3xl font-extrabold mb-4">Ready to never miss a lead again?</h2>
       <p className="text-white/80 max-w-xl mx-auto mb-8 leading-relaxed">
-        Set up your AI chatbot, WhatsApp alerts, and CRM in minutes. No credit card required.
+        Set up your AI agent, WhatsApp, and CRM in minutes — then let a journey handle the follow-up. No credit card
+        required.
       </p>
       <div className="flex flex-wrap justify-center gap-4">
         <button
@@ -129,10 +173,10 @@ export default function Features() {
   return (
     <div className="landing-page bg-background">
       <Helmet>
-        <title>Features — BeepBoop AI Lead Generation</title>
+        <title>Features — VyostraAI Lead Generation</title>
         <meta
           name="description"
-          content="AI Chatbot, WhatsApp notifications, Lead CRM, Form Builder, and Zoho integration. Everything you need to capture and convert leads."
+          content="AI chat and voice agents, two-way WhatsApp, follow-up journeys, Lead CRM, Form Builder, and Zoho integration. Everything you need to capture and convert leads."
         />
       </Helmet>
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
