@@ -47,6 +47,7 @@ POST /api/chat              -> RAG retrieval + OpenAI stream (public, no auth)
 POST /api/leads             -> save lead from chat form
 GET  /api/leads             -> fetch all leads for CRM (auth required)
 GET  /api/leads/inbox          -> unified inbox: chat + form + Meta leads merged, each with its LeadRef and LeadState, ordered by urgency not recency (auth required)
+GET  /api/leads/detail         -> one lead, source-agnostic: normalized fields plus the transcript (chat) or the submitted answers relabelled from fieldId (form/Meta). LeadRef travels as query params (auth required)
 PATCH /api/leads/state         -> set status/outcome/ownerId/nextActionAt/leadScore on a lead (auth required; body carries the LeadRef. `replied`/`appointmentBooked` are journey-written and NOT settable here)
 POST /api/leads/notes          -> append a note to a lead (auth required; body carries the LeadRef)
 POST /api/kb                -> add knowledge base entry + embed it
