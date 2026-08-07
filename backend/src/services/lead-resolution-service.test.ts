@@ -19,7 +19,9 @@ vi.mock('../repositories/agent-binding-lookup-repository.js', () => ({ getAgentF
 const getAgents = vi.fn()
 vi.mock('./agent-service.js', () => ({ getAgents }))
 
-const { readJourneyLead, resolveLeadAgentContext } = await import('./lead-resolution-service.js')
+const { readJourneyLead, resolveLeadAgentContext, toLeadRef } = await import(
+  './lead-resolution-service.js'
+)
 
 const agentWithWeb: Agent = {
   agentId: 'agent-1',
@@ -191,5 +193,42 @@ describe('resolveLeadAgentContext — sourceless leads resolve by client, and re
     await expect(
       resolveLeadAgentContext({ source: 'meta', pageId: 'page-9', leadId: 'lead-2' }, 'client-1')
     ).resolves.toEqual({ resolved: false, reason: 'agent_has_no_web_binding' })
+  })
+})
+
+describe('toLeadRef', () => {
+  it('routes a form lead to form_leads by formId', () => {
+    expect(toLeadRef({ leadId: 'l1', botId: 'b1', leadSource: 'form', leadParentId: 'f1' })).toEqual({
+      source: 'form',
+      formId: 'f1',
+      leadId: 'l1',
+    })
+  })
+
+  it('routes a Meta lead to meta_leads by pageId', () => {
+    expect(toLeadRef({ leadId: 'l1', botId: 'b1', leadSource: 'meta', leadParentId: 'p1' })).toEqual({
+      source: 'meta',
+      pageId: 'p1',
+      leadId: 'l1',
+    })
+  })
+
+  // Executions started before leadSource existed are still in flight.
+  it('falls back to a chat lead under botId when leadSource is absent', () => {
+    expect(toLeadRef({ leadId: 'l1', botId: 'b1' })).toEqual({
+      source: 'chat',
+      botId: 'b1',
+      leadId: 'l1',
+    })
+  })
+
+  // A source without its parent key cannot address a row, so guessing would
+  // read the wrong table. Falling back to chat is at least self-consistent.
+  it('falls back to chat when a source arrives without its parent key', () => {
+    expect(toLeadRef({ leadId: 'l1', botId: 'b1', leadSource: 'form' })).toEqual({
+      source: 'chat',
+      botId: 'b1',
+      leadId: 'l1',
+    })
   })
 })

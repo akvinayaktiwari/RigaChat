@@ -64,7 +64,12 @@ export async function getUnifiedInbox(clientId: string): Promise<UnifiedLead[]> 
     })),
   ]
 
-  return unified.sort(compareByUrgency)
+  // `now` is read ONCE, not inside the comparator. Array.sort calls the
+  // comparator O(n log n) times, and a comparator that reads the clock is not a
+  // stable total order: a lead whose nextActionAt straddles the current instant
+  // can compare inconsistently between two calls within the same sort.
+  const now = Date.now()
+  return unified.sort((a, b) => compareByUrgency(a, b, now))
 }
 
 // Lower tier = needs you sooner. This is the one design decision that makes the
@@ -100,8 +105,7 @@ function compareWithinTier(a: UnifiedLead, b: UnifiedLead, tier: number): number
   return Date.parse(b.createdAt) - Date.parse(a.createdAt)
 }
 
-function compareByUrgency(a: UnifiedLead, b: UnifiedLead): number {
-  const now = Date.now()
+function compareByUrgency(a: UnifiedLead, b: UnifiedLead, now: number): number {
   const tierA = urgencyTier(a, now)
   const tierB = urgencyTier(b, now)
   if (tierA !== tierB) return tierA - tierB

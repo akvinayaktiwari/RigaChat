@@ -12,6 +12,7 @@ import type {
   Lead,
   LeadRef,
   LeadResolution,
+  LeadSource,
   MetaLead,
 } from '../types/index.js'
 
@@ -139,6 +140,31 @@ export function normalizeFormLead(lead: FormLead, formFields?: FormField[]): Jou
     budgetRange: pickField(fields, ['budget', 'price']),
     sourceUrl: lead.sourceUrl,
   }
+}
+
+// Rebuilds a LeadRef from the flat fields carried on a JourneyExecutorEvent (or
+// a booking input). Those fields are optional because executions started before
+// d024f8a exist in flight, so an absent leadSource falls back to treating the
+// lead as a chat lead under botId -- the documented passthrough behaviour.
+//
+// This exists because two consumers were still calling
+// getLeadById(botId, leadId) directly, which reads the CHAT leads table only. A
+// form lead lives in form_leads under formId and a Meta lead in meta_leads
+// under pageId, so that lookup returned null for both and the caller reported
+// "no phone number" for a lead whose phone was on file the whole time.
+export function toLeadRef(parts: {
+  leadId: string
+  botId: string
+  leadSource?: LeadSource
+  leadParentId?: string
+}): LeadRef {
+  if (parts.leadSource === 'form' && parts.leadParentId) {
+    return { source: 'form', formId: parts.leadParentId, leadId: parts.leadId }
+  }
+  if (parts.leadSource === 'meta' && parts.leadParentId) {
+    return { source: 'meta', pageId: parts.leadParentId, leadId: parts.leadId }
+  }
+  return { source: 'chat', botId: parts.botId, leadId: parts.leadId }
 }
 
 export async function readJourneyLead(leadRef: LeadRef): Promise<JourneyLead | null> {

@@ -3,7 +3,7 @@ import { claimPendingReply } from '../repositories/journey-pending-reply-reposit
 import { isOptedOut } from '../repositories/whatsapp-inbound-activity-repository.js'
 import { getAppointmentRequestsByBotId } from '../repositories/appointment-request-repository.js'
 import { AWAIT_REPLY_TIMEOUT_SECONDS } from './journey-compiler-service.js'
-import { getLeadById } from '../repositories/lead-repository.js'
+import { readJourneyLead, toLeadRef } from './lead-resolution-service.js'
 import { bookAppointment } from '../mcp/booking-mcp-server.js'
 import { scheduleReminder } from '../mcp/reminder-mcp-server.js'
 import { getQuotation } from '../mcp/quotation-mcp-server.js'
@@ -53,7 +53,11 @@ async function handleSendMessage(event: JourneyExecutorEvent): Promise<Record<st
     return { sent: false, reason: 'opted_out', message: 'Lead has opted out of WhatsApp messages.' }
   }
 
-  const lead = await getLeadById(event.botId, event.leadId)
+  // NOT getLeadById(event.botId, ...): that reads the chat leads table, so a
+  // form or Meta lead resolved to null and every send reported no_phone_number
+  // for a lead whose phone was on file. The event already carries leadSource
+  // and leadParentId for exactly this.
+  const lead = await readJourneyLead(toLeadRef(event))
   if (!lead?.phone) {
     return { sent: false, reason: 'no_phone_number', message: 'Lead has no phone number on file.' }
   }
@@ -96,7 +100,16 @@ function requireStringField(toolInput: Record<string, unknown> | undefined, fiel
 // self-HTTP-call back into this same Lambda, since journey-executor-service
 // and the MCP capability logic both already run inside the one Lambda.
 async function handleToolCall(event: JourneyExecutorEvent): Promise<Record<string, unknown>> {
-  const shared = { botId: event.botId, clientId: event.clientId, leadId: event.leadId }
+  // leadSource/leadParentId ride along so a tool that needs to READ the lead
+  // (booking, for the attendee name and email) can find it outside the chat
+  // leads table. Optional on the way in, so pre-d024f8a executions still work.
+  const shared = {
+    botId: event.botId,
+    clientId: event.clientId,
+    leadId: event.leadId,
+    ...(event.leadSource ? { leadSource: event.leadSource } : {}),
+    ...(event.leadParentId ? { leadParentId: event.leadParentId } : {}),
+  }
 
   switch (event.toolName) {
     case 'booking': {

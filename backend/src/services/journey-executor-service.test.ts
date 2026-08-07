@@ -31,6 +31,15 @@ vi.mock('../mcp/reminder-mcp-server.js', () => ({ scheduleReminder }))
 vi.mock('../mcp/quotation-mcp-server.js', () => ({ getQuotation }))
 vi.mock('../mcp/brochure-mcp-server.js', () => ({ sendBrochure }))
 vi.mock('../repositories/lead-repository.js', () => ({ getLeadById }))
+
+// readJourneyLead reaches these for non-chat leads. Before the leadSource fix
+// the executor never looked here at all, which was the bug.
+const getFormLeadById = vi.fn()
+vi.mock('../repositories/form-lead-repository.js', () => ({ getFormLeadById }))
+const getPublicFormConfig = vi.fn()
+vi.mock('../repositories/form-repository.js', () => ({ getPublicFormConfig }))
+const getMetaLeadById = vi.fn()
+vi.mock('../repositories/meta-lead-repository.js', () => ({ getMetaLeadById }))
 vi.mock('./whatsapp-service.js', () => ({ hasActiveWhatsAppSession, sendWhatsAppMessageToLead }))
 
 const { executeJourneyStep } = await import('./journey-executor-service.js')
@@ -56,6 +65,10 @@ beforeEach(() => {
   getQuotation.mockReset()
   sendBrochure.mockReset()
   getLeadById.mockReset()
+  getFormLeadById.mockReset()
+  getPublicFormConfig.mockReset()
+  getMetaLeadById.mockReset()
+  getPublicFormConfig.mockResolvedValue(null)
   hasActiveWhatsAppSession.mockReset()
   sendWhatsAppMessageToLead.mockReset()
 })
@@ -131,6 +144,56 @@ describe('executeJourneyStep', () => {
 
       expect(result).toMatchObject({ sent: false, reason: 'no_phone_number' })
       expect(hasActiveWhatsAppSession).not.toHaveBeenCalled()
+    })
+
+    // Regression: the executor used to call getLeadById(event.botId, ...),
+    // which reads the CHAT leads table only. A form lead lives in form_leads
+    // under formId, so the lookup returned null and every send reported
+    // no_phone_number for a lead whose phone was on file the whole time.
+    it('finds a form lead’s phone via leadSource instead of the chat table', async () => {
+      getFormLeadById.mockResolvedValueOnce({
+        leadId: 'lead-1',
+        formId: 'form-1',
+        clientId: 'client-1',
+        source: 'form',
+        customFields: JSON.stringify({ 'fid-1': '+919900000000' }),
+        sourceUrl: 'https://example.com',
+        createdAt: '2026-08-01T00:00:00.000Z',
+      })
+      getPublicFormConfig.mockResolvedValueOnce({
+        formId: 'form-1',
+        fields: [{ fieldId: 'fid-1', label: 'Mobile', type: 'phone', required: true }],
+      })
+      hasActiveWhatsAppSession.mockResolvedValueOnce(true)
+      sendWhatsAppMessageToLead.mockResolvedValueOnce({ sent: true })
+
+      const result = await executeJourneyStep({
+        ...baseContext,
+        channel: 'whatsapp',
+        operation: 'send_message',
+        stepId: 'greet',
+        leadSource: 'form',
+        leadParentId: 'form-1',
+      })
+
+      expect(getFormLeadById).toHaveBeenCalledWith('form-1', 'lead-1')
+      expect(getLeadById).not.toHaveBeenCalled()
+      expect(result).not.toMatchObject({ reason: 'no_phone_number' })
+    })
+
+    it('still treats a lead with no leadSource as a chat lead under botId', async () => {
+      getLeadById.mockResolvedValueOnce({ leadId: 'lead-1', clientId: 'client-1', phone: '+15551234567' })
+      hasActiveWhatsAppSession.mockResolvedValueOnce(false)
+
+      await executeJourneyStep({
+        ...baseContext,
+        channel: 'whatsapp',
+        operation: 'send_message',
+        stepId: 'greet',
+      })
+
+      expect(getLeadById).toHaveBeenCalled()
+      expect(getFormLeadById).not.toHaveBeenCalled()
     })
 
     it('refuses outside an active WhatsApp session rather than risk a policy violation', async () => {
