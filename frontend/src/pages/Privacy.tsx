@@ -46,6 +46,12 @@ interface Partner {
   icon: 'Cloud' | 'Send' | 'Layers' | 'Sparkles'
 }
 
+// The registered legal entity behind VyostraAI. Defined once and reused in the
+// policy body and the contact block: Meta App Review cross-checks this string
+// against Business Verification, so it must not drift between places.
+const LEGAL_ENTITY = 'Aashirwad Trading Enterprises'
+const ENTITY_LOCATION = 'Bangalore, Karnataka, India'
+
 const TOC_ITEMS: TOCItem[] = [
   { id: 'section-1', label: 'Information We Collect', order: '01' },
   { id: 'section-2', label: 'How We Use Information', order: '02' },
@@ -135,6 +141,16 @@ function PolicyHeader({ onDownload }: { onDownload: () => void }) {
           <h1 className="text-4xl md:text-5xl font-extrabold text-on-surface tracking-tight">Privacy Policy</h1>
           <p className="mt-3 text-base text-on-surface-variant max-w-xl leading-relaxed">
             At VyostraAI, we value your privacy. This policy explains how we collect, protect, and use your data.
+          </p>
+          {/* Names the data controller. Required by GDPR/DPDP, and checked by
+              Meta App Review against the legal entity declared on the data
+              handling form -- a policy naming no controller is a routine query
+              or rejection. */}
+          <p className="mt-3 text-sm text-on-surface-variant max-w-xl leading-relaxed">
+            VyostraAI is operated by{' '}
+            <span className="font-semibold text-on-surface">{LEGAL_ENTITY}</span>, {ENTITY_LOCATION}.{' '}
+            {LEGAL_ENTITY} is the data controller responsible for personal data processed through the
+            platform.
           </p>
         </div>
         <button
@@ -367,7 +383,9 @@ function ContactSection() {
     <section id="section-6" className="scroll-mt-28">
       <SectionHeading order="6" title="Contact Us" />
       <p className="text-base text-on-surface-variant leading-relaxed mb-6">
-        If you have questions regarding your data or our policies, feel free to contact us.
+        If you have questions regarding your data or our policies, feel free to contact us. Data
+        protection enquiries and requests to access or delete your data should be addressed to{' '}
+        {LEGAL_ENTITY}, the data controller.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <div className="p-6 bg-white border border-outline-variant/30 rounded-2xl flex items-center gap-5 shadow-xs">
