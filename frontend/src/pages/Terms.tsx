@@ -4,6 +4,11 @@ import Navbar from '../components/landing/Navbar'
 import Footer from '../components/landing/Footer'
 import DemoModal from '../components/landing/modals/DemoModal'
 
+// Must match Privacy.tsx and the site footer exactly -- Meta App Review
+// cross-checks the declared legal entity against what is published.
+const LEGAL_ENTITY = 'Aashirwad Trading Enterprises'
+const ENTITY_LOCATION = 'Bangalore, Karnataka, India'
+
 interface TOCItem {
   id: string
   label: string
@@ -103,6 +108,14 @@ function TermsHeader({ onDownload }: { onDownload: () => void }) {
           <p className="mt-3 text-base text-on-surface-variant max-w-xl leading-relaxed">
             These terms govern your use of VyostraAI. By creating an account or using our agent, you agree to the
             terms outlined below.
+          </p>
+          {/* Same entity string as Privacy.tsx and the site footer. Meta App
+              Review checks the declared legal entity against what is actually
+              published, so these three must agree. */}
+          <p className="mt-3 text-sm text-on-surface-variant max-w-xl leading-relaxed">
+            VyostraAI is operated by{' '}
+            <span className="font-semibold text-on-surface">{LEGAL_ENTITY}</span>, {ENTITY_LOCATION}. These
+            terms form an agreement between you and {LEGAL_ENTITY}.
           </p>
         </div>
         <button
