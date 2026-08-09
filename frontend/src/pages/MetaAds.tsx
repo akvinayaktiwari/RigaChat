@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Check, Megaphone } from 'lucide-react'
+import { Check, Megaphone, TriangleAlert, X } from 'lucide-react'
 import { useToast } from '../components/Toast/Toast'
 import { connectMeta, disconnectMeta, getMetaLeads, getMetaStatus } from '../services/api'
 import type { MetaConnection, MetaLead } from '../types/index'
@@ -51,6 +51,11 @@ export default function MetaAds() {
   const [leads, setLeads] = useState<MetaLead[]>([])
   const [leadsLoading, setLeadsLoading] = useState(true)
   const [disconnecting, setDisconnecting] = useState(false)
+  // A connect failure is a persistent panel, not a toast. Every message here
+  // takes 3.3-6.3s to read (measured) and the toast dismisses at 3s, so the
+  // instructions were vanishing before a client could finish them. The panel
+  // also sits next to the button they need to press again.
+  const [connectError, setConnectError] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -78,13 +83,16 @@ export default function MetaAds() {
       toast.show('Meta Ads connected successfully', 'success')
       window.history.replaceState({}, '', '/dashboard/meta-ads')
     } else if (metaParam === 'error') {
-      toast.show(metaConnectMessage(params.get('reason')), 'error')
+      setConnectError(metaConnectMessage(params.get('reason')))
       window.history.replaceState({}, '', '/dashboard/meta-ads')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function handleConnect() {
+    // Clear a previous failure before leaving for Meta, so a stale message is
+    // never sitting next to a fresh attempt when they come back.
+    setConnectError(null)
     connectMeta()
   }
 
@@ -145,6 +153,30 @@ export default function MetaAds() {
             </span>
           )}
         </div>
+
+        {/* Stays until dismissed or until they retry. Placed inside the
+            connection card so the explanation and the button it refers to are
+            the same object on screen. */}
+        {connectError && (
+          <div
+            role="alert"
+            className="mb-6 flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3"
+          >
+            <TriangleAlert size={18} className="text-red-500 shrink-0 mt-0.5" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-red-800">Couldn&apos;t connect Meta Ads</p>
+              <p className="text-sm text-red-700 mt-0.5">{connectError}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setConnectError(null)}
+              aria-label="Dismiss"
+              className="text-red-400 hover:text-red-700 transition-colors shrink-0"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
 
         {status === 'loading' ? (
           <div className="h-24 bg-gray-100 rounded-xl animate-pulse" />
