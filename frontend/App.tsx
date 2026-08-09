@@ -44,6 +44,7 @@ import About from './src/pages/About'
 import Contact from './src/pages/Contact'
 import Help from './src/pages/Help'
 import Privacy from './src/pages/Privacy'
+import DataDeletionStatus from './src/pages/DataDeletionStatus'
 import Terms from './src/pages/Terms'
 import Status from './src/pages/Status'
 import Features from './src/pages/Features'
@@ -98,6 +99,10 @@ function App() {
         <Route path="/contact" element={<Contact />} />
         <Route path="/help" element={<Help />} />
         <Route path="/privacy-policy" element={<Privacy />} />
+        {/* Meta's data-deletion callback returns this URL with a confirmation
+            code. Without the route it fell through to the SPA shell and
+            rendered the landing page. */}
+        <Route path="/data-deletion-status" element={<DataDeletionStatus />} />
         <Route path="/terms-of-service" element={<Terms />} />
         <Route path="/system-status" element={<Status />} />
         <Route path="/features" element={<Features />} />
