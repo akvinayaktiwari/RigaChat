@@ -1,4 +1,10 @@
 import crypto from 'node:crypto'
+import {
+  MetaMisconfiguredError,
+  MetaNoPagesError,
+  MetaPagesLookupError,
+  MetaTokenExchangeError,
+} from '../lib/meta-connect-errors.js'
 
 const META_OAUTH_URL = 'https://www.facebook.com/v21.0/dialog/oauth'
 const GRAPH_API_BASE = 'https://graph.facebook.com/v21.0'
@@ -64,6 +70,14 @@ export class MetaProvider {
     const clientId = requireEnv('META_APP_ID')
     const redirectUri = requireEnv('META_REDIRECT_URI')
 
+    // A localhost redirect in production is the misconfiguration that costs the
+    // most to diagnose: Meta accepts the request, shows the consent screen, and
+    // only then answers "URL Blocked" -- by which point the client has left the
+    // dashboard and there is nothing in our logs. Caught before the redirect.
+    if (process.env.NODE_ENV === 'production' && /localhost|127\.0\.0\.1/.test(redirectUri)) {
+      throw new MetaMisconfiguredError('META_REDIRECT_URI still points at localhost')
+    }
+
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: redirectUri,
@@ -96,7 +110,7 @@ export class MetaProvider {
     const tokenData = (await tokenResponse.json()) as MetaTokenResponse
 
     if (!tokenData.access_token) {
-      throw new Error(`Meta token exchange failed: ${tokenData.error?.message ?? 'Unknown error'}`)
+      throw new MetaTokenExchangeError(tokenData.error?.message ?? 'Unknown error')
     }
 
     const pagesParams = new URLSearchParams({
@@ -108,12 +122,12 @@ export class MetaProvider {
     const pagesData = (await pagesResponse.json()) as MetaPagesResponse
 
     if (pagesData.error) {
-      throw new Error(`Meta Pages lookup failed: ${pagesData.error.message ?? 'Unknown error'}`)
+      throw new MetaPagesLookupError(pagesData.error.message ?? 'Unknown error')
     }
 
     const page = pagesData.data?.[0]
     if (!page) {
-      throw new Error('No Facebook Pages found for this account. Connect a Page you manage and try again.')
+      throw new MetaNoPagesError()
     }
 
     return { pageId: page.id, pageName: page.name, pageAccessToken: page.access_token }

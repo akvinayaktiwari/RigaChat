@@ -66,6 +66,22 @@
 **Priority:** P2
 **Depends on:** None
 
+### Meta app is in Development mode — no client can connect Lead Ads at all
+
+**What:** Meta app `1620710049625709` ("Vyostra AI Platform") is in Development mode with exactly one role holder, Facebook user `4512644655638994` (verified via `GET /v21.0/<app-id>/roles`, re-checked 2026-08-09 — unchanged since 2026-08-07). Any other Facebook account starting the OAuth flow gets Meta's "App not active — the app developer is aware of the issue" screen. That wording is misleading: nothing is broken and nobody is aware. It is a permissions refusal.
+
+**Why:** This is not a partial degradation. Development mode admits ONLY role holders, so the Meta Lead Ads integration is structurally closed to every customer. The code path is correct and now reports failures properly (`bc55944`) — but no client reaches it.
+
+**Context:** Cannot be fixed in code; it is Meta App Dashboard work, and only the admin account can start it. Two steps:
+1. **To unblock testing now:** add role holders at `developers.facebook.com/apps/1620710049625709/roles/`. Invites must be accepted by the invited account.
+2. **To open it to clients:** take the app Live — needs Privacy Policy URL, app icon, and category under Settings → Basic, plus a Data Deletion callback. Separately, the `leads_retrieval` scope needs **App Review** before any Page outside the app's own roles returns lead data (`meta-provider.ts:11` already documents this).
+
+Also confirm `META_REDIRECT_URI` is set to the deployed callback before going Live — it is `http://localhost:3000/...` in `backend/.env` today. The production guard added in `bc55944` catches that before the redirect rather than letting Meta answer "URL Blocked" after the client has left the dashboard.
+
+**Effort:** M (mostly waiting on Meta App Review)
+**Priority:** P0
+**Depends on:** Meta admin account 4512644655638994
+
 ### Meta webhook idempotency doesn't cover CRM sync / WhatsApp notify atomically
 
 **What:** `hasProcessed`/`markProcessed` in `webhook-event-repository.ts` are check-then-act (a plain Get, then later a plain Put), and in the Meta pipeline (`meta-lead-service.ts`'s `processSingleLeadgenEvent`), `markProcessed` isn't called until after the Graph API fetch, CRM sync, and WhatsApp send all complete. Two concurrent deliveries for the same `leadgen_id` (Meta's own docs acknowledge redelivery is possible) can both pass `hasProcessed` before either writes, causing a duplicate `meta_leads` row, a duplicate CRM push, and a duplicate WhatsApp alert to the client.

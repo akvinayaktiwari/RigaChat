@@ -1,3 +1,7 @@
+// Re-exported so existing importers keep working now that the class lives
+// with the rest of the connect failures.
+export { MetaPageAlreadyConnectedError } from '../lib/meta-connect-errors.js'
+import { MetaPageAlreadyConnectedError } from '../lib/meta-connect-errors.js'
 import { metaProvider } from '../providers/meta-provider.js'
 import type { MetaFieldDatum } from '../providers/meta-provider.js'
 import { getProvider, syncLeadToCRMWithRetry } from './crm-service.js'
@@ -88,13 +92,6 @@ function buildSyntheticFormFields(fields: Record<string, string>): FormField[] {
     if (fieldId === 'name') return { fieldId, label: 'Name', type: 'text', required: false }
     return { fieldId, label: fieldId, type: 'text', required: false }
   })
-}
-
-export class MetaPageAlreadyConnectedError extends Error {
-  constructor() {
-    super('This Facebook Page is already connected to another account.')
-    this.name = 'MetaPageAlreadyConnectedError'
-  }
 }
 
 export async function connectMetaAds(clientId: string, code: string): Promise<void> {
