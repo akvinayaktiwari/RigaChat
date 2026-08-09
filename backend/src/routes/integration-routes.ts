@@ -1,3 +1,4 @@
+import { failureReasonOf } from '../lib/meta-connect-errors.js'
 import crypto from 'node:crypto'
 import { Hono } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
@@ -27,7 +28,6 @@ import {
   disconnectMetaAds,
   getMetaLeadsForClient,
   getMetaStatus,
-  MetaPageAlreadyConnectedError,
 } from '../services/meta-lead-service.js'
 import type {
   ApiResponse,
@@ -230,7 +230,16 @@ integrationRoutes.get('/meta/connect', requireAuthFromQuery, (c) => {
     secure: process.env.NODE_ENV === 'production',
   })
 
-  return c.redirect(metaProvider.getOAuthUrl(state))
+  // getOAuthUrl throws on missing env vars and on a localhost redirect in
+  // production. This is a top-level browser navigation, so an uncaught throw
+  // renders a raw 500 page with the dashboard nowhere in sight; redirecting
+  // back with a reason keeps the client inside the app.
+  try {
+    return c.redirect(metaProvider.getOAuthUrl(state))
+  } catch (error) {
+    console.error('Meta connect setup error:', errorMessage(error))
+    return c.redirect(`${FRONTEND_URL}/dashboard/meta-ads?meta=error&reason=${failureReasonOf(error)}`)
+  }
 })
 
 integrationRoutes.get('/meta/callback', async (c) => {
@@ -239,6 +248,14 @@ integrationRoutes.get('/meta/callback', async (c) => {
   const storedState = getCookie(c, META_STATE_COOKIE)
 
   setCookie(c, META_STATE_COOKIE, '', { path: '/', maxAge: 0 })
+
+  // Meta reports a declined consent screen as query params on the redirect, not
+  // as a missing code. Checked BEFORE the state comparison so "I clicked
+  // Cancel" stops reading as "something is broken" -- previously both fell
+  // through to the same generic failure.
+  if (c.req.query('error')) {
+    return c.redirect(`${FRONTEND_URL}/dashboard/meta-ads?meta=error&reason=permission_declined`)
+  }
 
   if (!code || !state || !storedState || state !== storedState) {
     return c.redirect(`${FRONTEND_URL}/dashboard/meta-ads?meta=error&reason=invalid_state`)
@@ -250,9 +267,10 @@ integrationRoutes.get('/meta/callback', async (c) => {
     await connectMetaAds(clientId, code)
     return c.redirect(`${FRONTEND_URL}/dashboard/meta-ads?meta=connected`)
   } catch (error) {
+    // The real message still goes to the logs; the client gets a reason code
+    // the dashboard turns into something they can act on.
     console.error('Meta connect error:', errorMessage(error))
-    const reason = error instanceof MetaPageAlreadyConnectedError ? 'page_already_connected' : 'auth_failed'
-    return c.redirect(`${FRONTEND_URL}/dashboard/meta-ads?meta=error&reason=${reason}`)
+    return c.redirect(`${FRONTEND_URL}/dashboard/meta-ads?meta=error&reason=${failureReasonOf(error)}`)
   }
 })
 

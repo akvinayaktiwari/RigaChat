@@ -15,6 +15,35 @@ function parseCustomFields(raw: MetaLead['customFields']): Record<string, string
   }
 }
 
+// Mirrors backend/src/lib/meta-connect-errors.ts's MetaConnectFailureReason.
+//
+// Every one of these used to render as "Failed to connect Meta Ads. Please try
+// again." The worst case was a client with no Facebook Page: the backend
+// produced the exactly right sentence and it was discarded, so the client
+// retried an action that could never succeed. "Try again" is only honest for
+// the genuinely transient cases.
+const META_ERROR_MESSAGES: Record<string, string> = {
+  no_pages:
+    'No Facebook Page found on that account. Meta Lead Ads needs a Page you manage — create or get access to one, then connect again.',
+  page_already_connected:
+    'That Facebook Page is already connected to another account. Disconnect it there first.',
+  permission_declined:
+    'Connection cancelled. Meta needs permission to read your Page and its Lead Ads forms — approve the prompts to continue.',
+  token_exchange_failed:
+    'Meta rejected the connection. This is usually a temporary issue on their side — try again in a few minutes.',
+  pages_lookup_failed:
+    'We connected to Meta but couldn’t read your Pages. Try again shortly.',
+  misconfigured:
+    'Meta Ads isn’t configured correctly on our side. This one is on us — contact support and we’ll fix it.',
+  invalid_state:
+    'That connection link expired. Start the connection again from this page.',
+}
+
+function metaConnectMessage(reason: string | null): string {
+  if (reason && META_ERROR_MESSAGES[reason]) return META_ERROR_MESSAGES[reason]
+  return 'Couldn’t connect Meta Ads. Please try again, or contact support if it keeps happening.'
+}
+
 export default function MetaAds() {
   const toast = useToast()
 
@@ -49,12 +78,7 @@ export default function MetaAds() {
       toast.show('Meta Ads connected successfully', 'success')
       window.history.replaceState({}, '', '/dashboard/meta-ads')
     } else if (metaParam === 'error') {
-      const reason = params.get('reason')
-      const message =
-        reason === 'page_already_connected'
-          ? 'That Facebook Page is already connected to another account. Disconnect it there first.'
-          : 'Failed to connect Meta Ads. Please try again.'
-      toast.show(message, 'error')
+      toast.show(metaConnectMessage(params.get('reason')), 'error')
       window.history.replaceState({}, '', '/dashboard/meta-ads')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
