@@ -126,6 +126,8 @@ Also confirm `META_REDIRECT_URI` is set to the deployed callback before going Li
 
 **Context:** Found during the adversarial pass of this branch's `/ship`. Needs a real design decision: either store enough Meta identifiers to actually locate and purge affected records (and build the `/data-deletion-status` page), or be upfront in the callback response about the manual process, rather than returning a URL that 404s. Relevant before submitting for Meta App Review, since reviewers may test this callback.
 
+**Progress (2026-08-09):** The `/data-deletion-status` page now exists and is routed (`frontend/src/pages/DataDeletionStatus.tsx`). It takes the second option deliberately — it reports that the request was received and verified and is completed manually within 30 days, and does NOT claim the data has been deleted, because `handleMetaDataDeletionRequest` still performs no purge. The remaining and larger half of this item is unchanged: nothing correlates a Meta `user_id` to stored records, so an actual automated deletion is still impossible. This stays P1.
+
 **Effort:** M
 **Priority:** P1
 **Depends on:** None
