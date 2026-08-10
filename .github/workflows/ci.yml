@@ -216,11 +216,16 @@ jobs:
 
       - name: Health check main Lambda
         run: |
-          RESPONSE=$(curl -s -o /tmp/health.json -w "%{http_code}" "${{ secrets.BACKEND_URL }}/api/bots/health-check/config")
+          # /health, not /api/bots/health-check/config -- that path matched no
+          # route (bot-routes exposes /public/:botId) and returned 404 on every
+          # deploy. It still passed, because the check only fails on >= 500, so
+          # this "health check" proved only that something answered.
+          RESPONSE=$(curl -s -o /tmp/health.json -w "%{http_code}" "${{ secrets.BACKEND_URL }}/health")
           echo "HTTP status: $RESPONSE"
           cat /tmp/health.json
           echo
-          if [ "$RESPONSE" -ge 500 ]; then
+          # A real route, so anything but 200 is a genuine failure now.
+          if [ "$RESPONSE" -ne 200 ]; then
             echo "Lambda returned $RESPONSE — failing deploy"
             exit 1
           fi

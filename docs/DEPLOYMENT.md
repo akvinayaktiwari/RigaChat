@@ -51,10 +51,40 @@ this is unverifiable from the repo alone and worth a manual check. See
 
 A full local re-implementation of the same steps (AWS CLI install check →
 credentials check → backend build → all 3 Lambdas → frontend build → widget
-placeholder injection → S3 → CloudFront). Ships with real default infra
-identifiers baked in as fallback env values — see
-[INFRASTRUCTURE.md](./INFRASTRUCTURE.md) for the actual values. This one
-**is** in sync with the 3-Lambda reality (unlike the next one).
+placeholder injection → S3 → CloudFront). This one **is** in sync with the
+3-Lambda reality (unlike the next one).
+
+**The seven `VITE_*` build values are not hardcoded.** They are read from the
+same GitHub repo variables the workflow uses, via `gh variable list`. If `gh`
+is unavailable or unauthenticated, exported env vars are used instead, and if
+a value cannot be resolved either way the script **aborts before building**
+rather than falling back to a default.
+
+That is deliberate. Until 2026-08-10 these were hardcoded fallbacks and they
+had drifted: `VITE_COGNITO_REDIRECT_URI` still pointed at the retired
+`beepboop.drsyeta.in`, and `VITE_STAFF_COGNITO_CLIENT_ID` /
+`VITE_STAFF_COGNITO_REGION` were never emitted at all, so a frontend built by
+this script sent users to a dead domain after login and left the staff console
+with no Cognito client. The script exists for the case where CI is down — the
+one time you cannot afford it to quietly ship a broken dashboard.
+
+The dashboard's CloudFront distribution is likewise resolved at run time, by
+matching the login domain against distribution aliases, because two
+distributions serve the dashboard bucket and the old hardcoded id was the
+**retired** domain's. Invalidating that one left `vyostra.com` serving stale
+HTML while the script reported success. Infra identifiers that cannot drift
+this way (region, Lambda names, bucket names, widget distribution) are still
+defaulted in the script — see [INFRASTRUCTURE.md](./INFRASTRUCTURE.md).
+
+Prerequisites, therefore: `gh` **and** `jq` installed and `gh auth login`
+done, or all seven `VITE_*` values exported by hand.
+
+**`scripts/deploy.sh --backend-only`** skips the frontend half entirely (build,
+S3 sync, CloudFront) and needs none of those values. This is the deploy that
+was actually safe during the 2026-08-06 outage — the Lambda half uses only
+`update-function-code` and never `update-function-configuration`, so it cannot
+disturb env vars. Reach for this first when CI is down; use the full script
+only when the frontend genuinely needs to ship.
 
 ## The stale one: `backend/scripts/deploy.js` (`npm run deploy`)
 

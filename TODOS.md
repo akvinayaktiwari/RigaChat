@@ -469,19 +469,22 @@ Approach when picked up: memoize a lazy accessor (`getOpenAiClient()`) and migra
 **Priority:** P2
 **Depends on:** None
 
-### scripts/deploy.sh has drifted and would break login if used
+### [RESOLVED 2026-08-10] scripts/deploy.sh has drifted and would break login if used
 
-**What:** `docs/DEPLOYMENT.md` calls `scripts/deploy.sh` "the manual equivalent" of the CI deploy. It is not. Two concrete divergences from the values CI actually uses (GitHub repo variables, read 2026-08-06):
+**What it was:** the documented fallback for a CI outage would have shipped a broken dashboard. Verified against the real GitHub repo variables and live AWS on 2026-08-10, which turned up more than the original two divergences:
 
-1. `VITE_COGNITO_REDIRECT_URI` defaults to `https://beepboop.drsyeta.in/auth/callback`; the real value is `https://vyostra.com/auth/callback`. A frontend built by this script sends users to the old domain after login.
-2. It never emits `VITE_STAFF_COGNITO_CLIENT_ID` or `VITE_STAFF_COGNITO_REGION` at all, and `frontend/src/hooks/useStaffAuth.ts:30` reads the former. The staff console loses its Cognito config entirely.
+1. `VITE_COGNITO_REDIRECT_URI` defaulted to the retired `beepboop.drsyeta.in` — already corrected in an earlier commit.
+2. `VITE_STAFF_COGNITO_CLIENT_ID` / `VITE_STAFF_COGNITO_REGION` were never emitted, so `useStaffAuth.ts:30` built with an undefined client and the staff console could not sign anyone in.
+3. **New:** `CLOUDFRONT_DISTRIBUTION_ID` defaulted to `E24Z9D4G4FY8PH`, which is aliased to the retired domain. Two distributions serve the `rigachat-dashboard` bucket; the live one is `E2ZWB77M7V8J9X` (`vyostra.com`, `www.vyostra.com`). A manual deploy uploaded to S3 and then invalidated the wrong one — `vyostra.com` kept serving stale HTML while the script printed "Deployment complete!".
+4. **New:** `form-widget.js` was never injected or uploaded, though CI does both — a manual deploy left it stale on the CDN.
+5. **New:** the closing summary printed `https://d1gaddygcav1ob.cloudfront.net`, a hostname that no longer exists.
 
-**Why:** This is the documented fallback for exactly the situation it was reached for — GitHub Actions was in a major outage on 2026-08-06 and this was the obvious escape hatch. Using it would have shipped a broken dashboard to production in order to work around an outage. The next person under deploy pressure will reach for it too.
+**Fix:** the seven `VITE_*` values now come from the same GitHub repo variables CI reads (`gh variable list`), falling back to exported env vars, and the script **aborts** rather than using a default when neither resolves — drift is now structurally impossible instead of merely corrected. The dashboard distribution is resolved by matching the login domain against distribution aliases. `form-widget.js` is handled, and the summary prints derived URLs. All three resolution paths (gh, exported-env, abort) were exercised.
 
-**Context:** Backend-only manual deploy is safe and was used instead: the script's Lambda half uses only `update-function-code` and never `update-function-configuration`, so it cannot disturb env vars. It is specifically the frontend half that is stale. Fix by sourcing the same values CI does rather than hardcoding fallbacks, or by deleting the frontend half and documenting the script as backend-only. Also worth re-checking the remaining defaults (`BACKEND_URL`, `VITE_CDN_URL`, CloudFront ids) against reality at the same time — only the two above were verified.
+**Also fixed:** the related CI health check. It hit `/api/bots/health-check/config`, which matches no route and returned 404 on every deploy while still passing, because the check only failed on >= 500. It now hits `/health` (a real route, verified 200 in production) and fails on anything other than 200.
 
-Related: CI's health check hits `/api/bots/health-check/config`, which matches no route (bot-routes exposes `/public/:botId`, not `/:id/config`). It 404s, and since the check only fails on >= 500 it passes anyway. It is a valid cold-start smoke test but proves less than its name suggests.
+**Still open, deliberately:** `backend/scripts/deploy.js` (`npm run deploy`) remains stale and two-Lambda — tracked separately in docs/DEPLOYMENT.md, untouched here.
 
-**Effort:** S
+**Effort:** S (done)
 **Priority:** P2
 **Depends on:** None
