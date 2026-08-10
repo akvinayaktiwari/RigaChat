@@ -82,6 +82,33 @@ Also confirm `META_REDIRECT_URI` is set to the deployed callback before going Li
 **Priority:** P0
 **Depends on:** Meta admin account 4512644655638994
 
+### Meta deletion requests have no un-notified listing, and Meta retries duplicate them
+
+**What:** Two gaps in the new `meta_deletion_requests` table, both surfaced by Codex's adversarial pass on 2026-08-10:
+
+1. **No way to find abandoned requests.** When SES fails (or is unconfigured) the row is stored with `notified=false` and nobody is emailed. `contact_messages` has a `recordType-createdAt-index` GSI for exactly this recovery path; `meta_deletion_requests` has none, so finding un-notified rows needs a full table Scan. There is no retry worker, alert, or admin console view either — a request can sit unprocessed indefinitely while the status page keeps telling the person it completes within 30 days.
+2. **Meta retries create duplicate cases.** `handleMetaDataDeletionRequest` mints a fresh random code per delivery, and the `attribute_not_exists(confirmationCode)` guard only prevents code collisions, not duplicate *source* requests. Meta redelivers on timeout, so one person's request becomes N rows, N ops emails, and N status URLs — completing one leaves the others reading "pending" forever.
+
+**Why:** Both undercut the promise the status page makes. The whole point of the 2026-08-10 change was that the callback stops fabricating success; these are the two remaining ways it can still quietly fail to deliver on it.
+
+**Context:** Fix for (1) is a GSI mirroring contact_messages (`recordType-createdAt-index`) plus an admin listing, which also gives the `status: 'completed'` transition somewhere to live — nothing writes `'completed'` today, so closing a request means hand-editing DynamoDB. Fix for (2) is the same atomic-claim idempotency pattern already filed for the Meta leadgen webhook below; the natural key is the signed request's `user_id` plus a time bucket. Worth doing together, since both touch the same table.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None
+
+### Public deletion-status lookup is unauthenticated and unthrottled
+
+**What:** `GET /api/webhooks/meta/data-deletion/:code` does a DynamoDB point read for any caller-supplied code before returning 404. Codex flagged it as a cost/concurrency amplification vector on 2026-08-10.
+
+**Why:** Recorded rather than fixed, because the severity does not survive comparison with what is already exposed. `POST /api/chat` (public, calls OpenAI), `POST /api/leads` and `GET /api/bots/public/:botId` are all unauthenticated on the same Function URL, and a DynamoDB point read on a tiny table is the *cheapest* of them. Enumeration is not the risk either — the code is 128 random bits. So this is a general "public API has no rate limiting" gap that happens to have been noticed here.
+
+**Context:** The repo already has the mechanism: `redis-repository.ts`'s `tryAcquireContactAttempt` does per-ip/email limiting for the contact form. Applying the same per-ip limiter across the public route surface is the real fix, and is broader than this one endpoint.
+
+**Effort:** M (whole public surface, not just this route)
+**Priority:** P3
+**Depends on:** None
+
 ### Meta webhook idempotency doesn't cover CRM sync / WhatsApp notify atomically
 
 **What:** `hasProcessed`/`markProcessed` in `webhook-event-repository.ts` are check-then-act (a plain Get, then later a plain Put), and in the Meta pipeline (`meta-lead-service.ts`'s `processSingleLeadgenEvent`), `markProcessed` isn't called until after the Graph API fetch, CRM sync, and WhatsApp send all complete. Two concurrent deliveries for the same `leadgen_id` (Meta's own docs acknowledge redelivery is possible) can both pass `hasProcessed` before either writes, causing a duplicate `meta_leads` row, a duplicate CRM push, and a duplicate WhatsApp alert to the client.
