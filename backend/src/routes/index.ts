@@ -73,6 +73,19 @@ app.use('/api/auth/*', dashboardCors)
 // a wildcard origin the way the widget endpoints do.
 app.use('/api/contact', dashboardCors)
 
+// The deletion-status lookup is fetched from the browser: the status page is
+// served from FRONTEND_URL, so without this the response carries no
+// Access-Control-Allow-Origin and every lookup fails as a CORS error -- which
+// the page would then render as "we couldn't load your request", forever.
+// Same reasoning as /api/contact above, and the only webhook route a browser
+// ever calls.
+//
+// Verified, not assumed: Hono's `/*` also matches the BARE
+// /api/webhooks/meta/data-deletion that Meta POSTs to, so this middleware runs
+// there too. Harmless -- CORS is enforced by browsers, and Meta is
+// server-to-server, sends no Origin, and ignores the response header.
+app.use('/api/webhooks/meta/data-deletion/*', dashboardCors)
+
 app.use('/api/chat/*', widgetCors)
 
 // POST /api/leads (exact path, no auth) is the public lead-capture endpoint
