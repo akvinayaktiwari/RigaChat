@@ -42,6 +42,7 @@ echo "==> 2/3 Checking the Lambda roles can reach ${TABLE}"
 # carry AmazonDynamoDBFullAccess as an ATTACHED MANAGED policy, which a
 # list-role-policies check never sees. See provision-lead-state.sh.
 TABLE_ARN="arn:aws:dynamodb:${REGION}:${ACCOUNT}:table/${TABLE}"
+PERMS_OK=true
 for ROLE in rigachat-api-role-4c9qsico rigachat-api-streaming-role-625vca9z; do
   DENIED=$(aws iam simulate-principal-policy \
     --policy-source-arn "arn:aws:iam::${ACCOUNT}:role/${ROLE}" \
@@ -57,8 +58,20 @@ for ROLE in rigachat-api-role-4c9qsico rigachat-api-streaming-role-625vca9z; do
   else
     echo "    $ROLE: DENIED $DENIED -- grant these on"
     echo "        $TABLE_ARN before deploying."
+    PERMS_OK=false
   fi
 done
+
+# provision-lead-state.sh prints the same warning and then carries on to print
+# "Done." A denied role means the callback 500s at runtime, so treat it as the
+# failure it is rather than setting the env var and declaring success.
+if [ "$PERMS_OK" = false ]; then
+  echo
+  echo "Aborting before the env-var step: at least one role cannot reach ${TABLE}."
+  echo "Grant the actions above, then re-run. The table itself is already created,"
+  echo "so a re-run will skip straight to the permission check."
+  exit 1
+fi
 
 # Merges onto existing Environment.Variables -- update-function-configuration
 # replaces the whole map, so a naive call would wipe every other var.

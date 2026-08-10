@@ -41,9 +41,18 @@ CLOUDFRONT_DISTRIBUTION_ID="${CLOUDFRONT_DISTRIBUTION_ID:-}"
 CLOUDFRONT_WIDGET_DISTRIBUTION_ID="${CLOUDFRONT_WIDGET_DISTRIBUTION_ID:-E2KNENIBJEZYTF}"
 VOICE_WS_URL="${VOICE_WS_URL:-}"
 
+# Before anything reads repo state. `gh variable list` infers the repository
+# from the working directory, so running this script by absolute path from
+# somewhere else (the likely thing to do when CI is down and you are in a
+# hurry) made every VITE_* resolve empty and aborted the deploy on a machine
+# that was authenticated the whole time.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$PROJECT_ROOT"
+
 # --- Frontend build config -------------------------------------------------
+#
 # Skipped entirely under --backend-only: none of these values are read.
-if [ "$BACKEND_ONLY" = false ]; then
 #
 # These used to be hardcoded defaults, and they drifted: VITE_COGNITO_REDIRECT_URI
 # still pointed at the retired beepboop.drsyeta.in, and the two staff-console
@@ -58,6 +67,7 @@ if [ "$BACKEND_ONLY" = false ]; then
 # wins; when neither exists the script ABORTS rather than guessing. A loud
 # failure before the build is the whole point -- a silent stale value is what
 # broke this before.
+if [ "$BACKEND_ONLY" = false ]; then
 GH_VARS_JSON=""
 if command -v gh &>/dev/null && command -v jq &>/dev/null && gh auth status &>/dev/null; then
   GH_VARS_JSON="$(gh variable list --json name,value 2>/dev/null || echo "")"
@@ -67,8 +77,6 @@ elif command -v gh &>/dev/null && ! command -v jq &>/dev/null; then
   echo "Note: gh is installed but jq is not, so repo variables cannot be read."
   echo "      Install jq (brew install jq) or export the VITE_* vars by hand."
 fi
-
-MISSING_VARS=()
 
 # Resolution order: exported env var > GitHub repo variable > abort.
 resolve_var() {
@@ -90,7 +98,9 @@ resolve_var() {
     fi
   fi
 
-  MISSING_VARS+=("$name")
+  # Deliberately prints nothing. Each call runs in a command substitution
+  # subshell, so appending to MISSING_VARS here would be invisible to the
+  # caller -- the loop below re-derives the list in the current shell instead.
 }
 
 VITE_API_URL="$(resolve_var VITE_API_URL)"
@@ -101,8 +111,6 @@ VITE_CDN_URL="$(resolve_var VITE_CDN_URL)"
 VITE_STAFF_COGNITO_CLIENT_ID="$(resolve_var VITE_STAFF_COGNITO_CLIENT_ID)"
 VITE_STAFF_COGNITO_REGION="$(resolve_var VITE_STAFF_COGNITO_REGION)"
 
-# resolve_var runs in a subshell for the assignments above, so MISSING_VARS
-# never accumulates there -- re-derive the list here in the current shell.
 MISSING_VARS=()
 for VAR in VITE_API_URL VITE_COGNITO_DOMAIN VITE_COGNITO_CLIENT_ID \
            VITE_COGNITO_REDIRECT_URI VITE_CDN_URL \
@@ -136,9 +144,6 @@ fi
 
 trap 'code=$?; rm -f frontend/.env.production; if [ $code -ne 0 ]; then echo "=============================="; echo "Deployment failed."; echo "=============================="; fi' EXIT
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-cd "$PROJECT_ROOT"
 
 echo "==> Step 1: Checking AWS CLI installation..."
 if ! command -v aws &> /dev/null; then
