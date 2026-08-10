@@ -55,7 +55,7 @@ beforeEach(() => {
   vi.spyOn(console, 'warn').mockImplementation(() => {})
   vi.spyOn(console, 'error').mockImplementation(() => {})
 
-  parseSignedRequest.mockReturnValue({ user_id: '4512644655638994' })
+  parseSignedRequest.mockReturnValue({ user_id: '100000000000001' })
   createMetaDeletionRequest.mockImplementation(async (record: unknown) => record)
   markMetaDeletionRequestNotified.mockResolvedValue(undefined)
   getContactNotificationAddress.mockReturnValue('support@vyostra.com')
@@ -81,7 +81,7 @@ describe('handleMetaDataDeletionRequest', () => {
 
     const stored = createMetaDeletionRequest.mock.calls[0][0]
     expect(stored.confirmationCode).toBe(result.confirmationCode)
-    expect(stored.metaUserId).toBe('4512644655638994')
+    expect(stored.metaUserId).toBe('100000000000001')
     expect(stored.status).toBe('received')
     expect(stored.notified).toBe(false)
     expect(Date.parse(stored.requestedAt)).not.toBeNaN()
@@ -105,7 +105,7 @@ describe('handleMetaDataDeletionRequest', () => {
     const email = sendEmail.mock.calls[0][0]
     expect(email.to).toBe('support@vyostra.com')
     expect(email.subject).toContain(result.confirmationCode)
-    expect(email.textBody).toContain('4512644655638994')
+    expect(email.textBody).toContain('100000000000001')
     expect(markMetaDeletionRequestNotified).toHaveBeenCalledWith(result.confirmationCode)
   })
 
@@ -155,7 +155,7 @@ describe('getMetaDeletionRequestStatus', () => {
   it('does not expose the Meta user id to the public status page', async () => {
     getMetaDeletionRequest.mockResolvedValue({
       confirmationCode: 'mdr_abc',
-      metaUserId: '4512644655638994',
+      metaUserId: '100000000000001',
       status: 'received',
       requestedAt: '2026-08-10T00:00:00.000Z',
       notified: true,
@@ -168,6 +168,6 @@ describe('getMetaDeletionRequestStatus', () => {
       status: 'received',
       requestedAt: '2026-08-10T00:00:00.000Z',
     })
-    expect(JSON.stringify(status)).not.toContain('4512644655638994')
+    expect(JSON.stringify(status)).not.toContain('100000000000001')
   })
 })
