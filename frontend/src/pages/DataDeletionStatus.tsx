@@ -90,10 +90,12 @@ export default function DataDeletionStatus() {
     setLookup({ phase: 'loading' })
 
     getMetaDeletionRequestStatus(confirmationCode)
-      .then((response) => {
+      .then((lookupResult) => {
         if (cancelled) return
-        if (response.success && response.data) {
-          setLookup({ phase: 'found', request: response.data })
+        // Only a real 404 reaches 'unknown'. Every other failure throws and
+        // lands in the catch below -- see the comment on the service function.
+        if (lookupResult.outcome === 'found') {
+          setLookup({ phase: 'found', request: lookupResult.request })
         } else {
           setLookup({ phase: 'unknown' })
         }

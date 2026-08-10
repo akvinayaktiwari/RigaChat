@@ -681,10 +681,40 @@ export function submitContactMessage(
 
 // Public: the person following Meta's deletion link has no Vyostra account.
 // The confirmation code in the path is the only credential.
-export function getMetaDeletionRequestStatus(
+//
+// Deliberately NOT apiClient. apiClient resolves a non-ok response to
+// { success: false } instead of throwing, which collapses "no such code" (404)
+// and "the backend is down" (500) into one indistinguishable value -- and this
+// is the one screen where that difference matters, because reporting a real
+// deletion request as nonexistent is the worst answer it can give. Reading the
+// status code is the only way to tell them apart, so this reads it.
+export type MetaDeletionLookup =
+  | { outcome: 'found'; request: MetaDeletionRequestStatus }
+  | { outcome: 'not_found' }
+
+export async function getMetaDeletionRequestStatus(
   confirmationCode: string
-): Promise<ApiResponse<MetaDeletionRequestStatus>> {
-  return apiClient<MetaDeletionRequestStatus>(
-    `/api/webhooks/meta/data-deletion/${encodeURIComponent(confirmationCode)}`
+): Promise<MetaDeletionLookup> {
+  const response = await fetch(
+    `${BASE_URL}/api/webhooks/meta/data-deletion/${encodeURIComponent(confirmationCode)}`,
+    { headers: { 'Content-Type': 'application/json' } }
   )
+
+  if (response.status === 404) {
+    return { outcome: 'not_found' }
+  }
+
+  // Anything else that is not a clean 200 is a failure to LOOK UP, not a
+  // verdict on the request. Throwing routes it to the page's error state.
+  if (!response.ok) {
+    throw new Error(`Deletion status lookup failed with status ${response.status}`)
+  }
+
+  const parsed = (await response.json()) as ApiResponse<MetaDeletionRequestStatus>
+
+  if (!parsed.success || !parsed.data) {
+    throw new Error(parsed.error || 'Deletion status lookup returned no data')
+  }
+
+  return { outcome: 'found', request: parsed.data }
 }
