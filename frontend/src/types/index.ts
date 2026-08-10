@@ -733,3 +733,12 @@ export interface SubmitContactMessageResult {
   messageId: string
   createdAt: string
 }
+
+// Mirrors the backend's MetaDeletionRequestStatus. Deliberately omits the
+// Meta app-scoped user id the stored record carries — the confirmation code
+// travels in a URL and may be shared or logged.
+export interface MetaDeletionRequestStatus {
+  confirmationCode: string
+  status: 'received' | 'completed'
+  requestedAt: string
+}

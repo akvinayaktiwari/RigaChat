@@ -25,6 +25,7 @@ export default defineConfig({
       DYNAMODB_TABLE_GUPSHUP_APP_LOOKUP: 'test-gupshup-app-lookup-table',
       DYNAMODB_TABLE_WHATSAPP_INBOUND_ACTIVITY: 'test-whatsapp-inbound-activity-table',
       EMAIL_LOGO_URL: 'https://example.com/logo.png',
+      DYNAMODB_TABLE_META_DELETION_REQUESTS: 'test-meta-deletion-requests-table',
     },
   },
 })

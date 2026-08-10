@@ -1,11 +1,14 @@
 import { Hono } from 'hono'
 import { logGupshupWebhookEvent, processRazorpayWebhook, verifyGupshupWebhookToken } from '../services/webhook-service.js'
 import {
+  getMetaDeletionRequestStatus,
   handleMetaDataDeletionRequest,
   handleMetaDeauthorize,
   processMetaLeadWebhook,
   verifyMetaWebhookChallenge,
 } from '../services/meta-lead-service.js'
+
+import type { ApiResponse, MetaDeletionRequestStatus } from '../types/index.js'
 
 export const webhookRoutes = new Hono()
 
@@ -97,7 +100,7 @@ webhookRoutes.post('/meta/data-deletion', async (c) => {
     return c.body(null, 400)
   }
 
-  const { verified, confirmationCode } = handleMetaDataDeletionRequest(signedRequest)
+  const { verified, confirmationCode } = await handleMetaDataDeletionRequest(signedRequest)
   if (!verified) {
     return c.body(null, 400)
   }
@@ -110,4 +113,20 @@ webhookRoutes.post('/meta/data-deletion', async (c) => {
     },
     200
   )
+})
+
+// Public by design: this is the page Meta hands the user, and they arrive
+// without a Vyostra account. The confirmation code is the credential -- 128
+// bits of randomness, so it is not enumerable -- and the response deliberately
+// omits the Meta user id that the stored record carries.
+webhookRoutes.get('/meta/data-deletion/:code', async (c) => {
+  const status = await getMetaDeletionRequestStatus(c.req.param('code'))
+
+  // ApiResponse envelope, unlike the Meta-facing callbacks above it: this one
+  // is consumed by our own frontend through apiClient, not by Meta.
+  if (!status) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'Not found' }, 404)
+  }
+
+  return c.json<ApiResponse<MetaDeletionRequestStatus>>({ success: true, data: status }, 200)
 })

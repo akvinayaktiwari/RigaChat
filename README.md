@@ -226,6 +226,7 @@ npm run dev
 | `META_WEBHOOK_VERIFY_TOKEN` | Optional | Meta Lead Ads webhook handshake |
 | `DYNAMODB_TABLE_META_LEADS` | Optional | Meta Lead Ads leads table name |
 | `DYNAMODB_TABLE_META_PAGE_LOOKUP` | Optional | Meta Page → client routing table name |
+| `DYNAMODB_TABLE_META_DELETION_REQUESTS` | Optional | Meta data-deletion request table name |
 | `SQS_CRAWLER_QUEUE_URL` | Required | Crawler job queue |
 | `LAMBDA_FUNCTION_NAME` | Required | Buffered Lambda, used by deploy script |
 | `LAMBDA_STREAMING_FUNCTION_NAME` | Required | Streaming Lambda, used by deploy script |

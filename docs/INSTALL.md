@@ -48,6 +48,7 @@ added by the Meta Lead Ads integration specifically:
 
 ```
 DYNAMODB_TABLE_META_LEADS   DYNAMODB_TABLE_META_PAGE_LOOKUP
+DYNAMODB_TABLE_META_DELETION_REQUESTS
 ```
 
 Read via `requireEnv('NAME')` — **the WhatsApp/Zoho ones throw at module load

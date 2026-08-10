@@ -1267,3 +1267,39 @@ export interface SubmitContactMessageResult {
   messageId: string
   createdAt: string
 }
+
+// A data deletion request that arrived on Meta's mandated callback.
+//
+// Deliberately NOT a record of a deletion that happened. Meta's signed request
+// carries only an app-scoped user_id, and nothing we store from Lead Ads
+// (field_data is name/email/phone) carries that id -- so there is no key to
+// correlate the request to a lead, and no automated purge is possible. See
+// TODOS.md, "Meta data deletion callback fabricates success". This row exists
+// so the request is durable and a human can act on it inside the 30 days the
+// status page promises, instead of the old behaviour: a confirmation code
+// invented from Date.now() and thrown away.
+export interface MetaDeletionRequest {
+  // Also the confirmation code handed back to Meta and shown to the user.
+  // Random, not sequential -- it is the only credential on the public status
+  // lookup, so it must not be guessable from another code or from a timestamp.
+  confirmationCode: string
+  // App-scoped user id from the signed request. Useless for correlation today,
+  // stored because it is the only identifier Meta gives us and a future
+  // correlation design would need it.
+  metaUserId: string
+  status: 'received' | 'completed'
+  requestedAt: string
+  // false when the ops notification email could not be sent (or SES is not
+  // configured). Same signal as ContactMessage.notified: the request is stored
+  // either way, but this flags rows nobody was pinged about.
+  notified: boolean
+}
+
+// What the public status endpoint returns. Deliberately narrower than the
+// stored record: no metaUserId, since the confirmation code travels in a URL
+// and may be shared or logged.
+export interface MetaDeletionRequestStatus {
+  confirmationCode: string
+  status: MetaDeletionRequest['status']
+  requestedAt: string
+}

@@ -69,6 +69,7 @@ POST /mcp/reminder   -> MCP server, schedule_reminder tool (real: creates a lead
 POST /mcp/quotation  -> MCP server, get_quotation tool (STUB -- no pricing-rule data model exists yet). Interim shared-secret auth, not Cognito.
 POST /mcp/brochure   -> MCP server, send_brochure tool (STUB -- no document/asset management exists yet). Interim shared-secret auth, not Cognito.
 POST /api/contact           -> marketing-site "Get in touch" form: store the message + email support (public, no auth; honeypot + per-ip/email rate limit)
+GET  /api/webhooks/meta/data-deletion/:code -> public status lookup for a Meta data-deletion request; the confirmation code is the only credential (no auth)
 GET  /api/admin/contact-messages -> staff console list of contact submissions; defaults to un-notified only, ?unnotifiedOnly=false for all (STAFF Cognito auth)
 
 ## Key Interfaces
@@ -129,6 +130,7 @@ interface KnowledgeBaseEntry {
 - journey_pending_replies — partition key: leadId (Step Functions callback tokens for executions parked on an await_reply step; TTL on expiresAt, because a timed-out execution never calls back to clean itself up)
 - journey_trigger_claims — partition key: claimKey (`agent:<agentId>#<trigger>` or `bot:<botId>#<trigger>`; atomic-claim so exactly ONE published bundle owns a trigger — prevents duplicate outreach. Doubles as the ignition index: "which journey runs for this lead" is a point read)
 - lead_state — partition key: leadId, GSI clientId-updatedAt-index (per-lead CRM working state: status/owner/nextActionAt/notes/leadScore. Its own table because the three lead tables have three different partition keys — same reason whatsapp_inbound_activity and journey_pending_replies are leadId-keyed side tables. Also where JourneyStep.recheckField's `replied`/`leadScore`/`appointmentBooked` finally live)
+- meta_deletion_requests — partition key: confirmationCode (Meta's mandated data-deletion callback. No GSI: every read is a point lookup by the code Meta hands the user. No TTL — the row is the evidence the request was handled)
 - contact_messages — partition key: messageId, GSI recordType-createdAt-index (marketing-site contact form; no clientId/botId — these are messages to us, not leads for a client's bot)
 
 ## Environment Variables
@@ -165,6 +167,7 @@ CAL_COM_CLIENT_SECRET
 CAL_COM_REDIRECT_URI
 DYNAMODB_TABLE_CONTACT_MESSAGES
 DYNAMODB_TABLE_LEAD_STATE
+DYNAMODB_TABLE_META_DELETION_REQUESTS
 SES_FROM_EMAIL
 CONTACT_NOTIFICATION_EMAIL
 COGNITO_USER_POOL_ID

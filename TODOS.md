@@ -126,10 +126,14 @@ Also confirm `META_REDIRECT_URI` is set to the deployed callback before going Li
 
 **Context:** Found during the adversarial pass of this branch's `/ship`. Needs a real design decision: either store enough Meta identifiers to actually locate and purge affected records (and build the `/data-deletion-status` page), or be upfront in the callback response about the manual process, rather than returning a URL that 404s. Relevant before submitting for Meta App Review, since reviewers may test this callback.
 
-**Progress (2026-08-09):** The `/data-deletion-status` page now exists and is routed (`frontend/src/pages/DataDeletionStatus.tsx`). It takes the second option deliberately — it reports that the request was received and verified and is completed manually within 30 days, and does NOT claim the data has been deleted, because `handleMetaDataDeletionRequest` still performs no purge. The remaining and larger half of this item is unchanged: nothing correlates a Meta `user_id` to stored records, so an actual automated deletion is still impossible. This stays P1.
+**Progress (2026-08-09):** The `/data-deletion-status` page now exists and is routed (`frontend/src/pages/DataDeletionStatus.tsx`). It takes the second option deliberately — it reports that the request was received and verified and is completed manually within 30 days, and does NOT claim the data has been deleted, because `handleMetaDataDeletionRequest` still performs no purge.
+
+**Progress (2026-08-10):** The "fabricates" half is fixed. `handleMetaDataDeletionRequest` is now async and persists a real record to the new `meta_deletion_requests` table (PK `confirmationCode`) before responding, emails ops via the same best-effort SES path contact-service uses, and issues a 128-bit random `mdr_<hex>` code instead of `meta-deletion-${Date.now()}` — which was both guessable to the second and collision-prone within a millisecond. A public `GET /api/webhooks/meta/data-deletion/:code` backs the status page, so a code that was never issued now says so instead of rendering an identical success page; the endpoint deliberately does not return the stored `metaUserId`. 10 tests in `meta-deletion-service.test.ts`. **Not yet provisioned** — run `scripts/provision-meta-deletion-requests.sh`.
+
+**What is still open:** the actual purge. Meta's signed request carries only an app-scoped `user_id`, and Lead Ads `field_data` (name/email/phone) carries no such id, so there is still no key to correlate a request to stored leads — deletion remains a human reading the notification email. Closing this properly needs either a correlation design (store something Meta-scoped at ingest) or acceptance that manual-within-30-days is the permanent answer. Dropped to P2: the callback is now honest and durable, which is what a reviewer tests.
 
 **Effort:** M
-**Priority:** P1
+**Priority:** P2 (was P1 — the dishonest-response half is fixed)
 **Depends on:** None
 
 ### Empty Graph API field_data on lead fetch is treated as a valid (empty) lead

@@ -26,6 +26,7 @@ import type {
   KnowledgeBaseEntry,
   Lead,
   LeadRef,
+  MetaDeletionRequestStatus,
   LeadState,
   LeadStatePatch,
   MetaConnection,
@@ -676,4 +677,14 @@ export function submitContactMessage(
   data: SubmitContactMessageInput
 ): Promise<ApiResponse<SubmitContactMessageResult>> {
   return apiClient<SubmitContactMessageResult>('/api/contact', 'POST', data)
+}
+
+// Public: the person following Meta's deletion link has no Vyostra account.
+// The confirmation code in the path is the only credential.
+export function getMetaDeletionRequestStatus(
+  confirmationCode: string
+): Promise<ApiResponse<MetaDeletionRequestStatus>> {
+  return apiClient<MetaDeletionRequestStatus>(
+    `/api/webhooks/meta/data-deletion/${encodeURIComponent(confirmationCode)}`
+  )
 }

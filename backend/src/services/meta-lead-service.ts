@@ -19,7 +19,21 @@ import {
   updateMetaLeadSyncStatus,
 } from '../repositories/meta-lead-repository.js'
 import { hasProcessed, markProcessed } from '../repositories/webhook-event-repository.js'
-import type { ClientRecord, FormField, MetaConnection, MetaLead } from '../types/index.js'
+import {
+  createMetaDeletionRequest,
+  getMetaDeletionRequest,
+  markMetaDeletionRequestNotified,
+} from '../repositories/meta-deletion-request-repository.js'
+import { getContactNotificationAddress, sendEmail } from '../repositories/email-repository.js'
+import type {
+  ClientRecord,
+  FormField,
+  MetaConnection,
+  MetaDeletionRequest,
+  MetaDeletionRequestStatus,
+  MetaLead,
+} from '../types/index.js'
+import crypto from 'crypto'
 
 // Idempotency keys in webhook_events are a bare eventId partition key shared
 // across every provider (Razorpay writes its own unnamespaced there today) --
@@ -351,20 +365,118 @@ export function handleMetaDeauthorize(signedRequest: string): { verified: boolea
   return { verified: true }
 }
 
-export function handleMetaDataDeletionRequest(signedRequest: string): {
+// The confirmation code is the only credential guarding the public status
+// lookup, so it is random rather than derived from the request. The previous
+// `meta-deletion-${Date.now()}` form was guessable to the second AND collided
+// for two requests in the same millisecond.
+function generateConfirmationCode(): string {
+  return `mdr_${crypto.randomBytes(16).toString('hex')}`
+}
+
+// Best-effort, exactly like contact-service's notify(): the request is already
+// durable in DynamoDB before this runs, so an SES outage must not turn a valid
+// deletion request into a 400 back to Meta. A failure leaves notified=false,
+// which is the signal to go read the table by hand.
+async function notifyDeletionRequest(record: MetaDeletionRequest): Promise<boolean> {
+  const destination = getContactNotificationAddress()
+
+  if (!destination) {
+    console.warn(
+      `Meta deletion request ${record.confirmationCode} stored but not emailed: SES_FROM_EMAIL / CONTACT_NOTIFICATION_EMAIL are not set.`
+    )
+    return false
+  }
+
+  try {
+    await sendEmail({
+      to: destination,
+      subject: `[Data deletion] Meta request ${record.confirmationCode}`,
+      textBody: [
+        'A Facebook user requested deletion of their data via Meta.',
+        '',
+        `Confirmation code: ${record.confirmationCode}`,
+        `Meta app-scoped user id: ${record.metaUserId}`,
+        `Requested at: ${record.requestedAt}`,
+        '',
+        'This requires MANUAL action. Meta sends only an app-scoped user id,',
+        'which does not appear on any lead record we store, so nothing can be',
+        'located automatically. Search the leads for the person if they can be',
+        'identified, delete what matches, then set status=completed on this row.',
+        '',
+        'The status page tells them this completes within 30 days.',
+      ].join('\n'),
+    })
+    return true
+  } catch (error) {
+    console.error(
+      `Meta deletion request ${record.confirmationCode} stored but notification email failed:`,
+      error instanceof Error ? error.message : String(error)
+    )
+    return false
+  }
+}
+
+export async function handleMetaDataDeletionRequest(signedRequest: string): Promise<{
   verified: boolean
   confirmationCode: string
-} {
+}> {
   const payload = metaProvider.parseSignedRequest(signedRequest)
-  const confirmationCode = `meta-deletion-${Date.now()}`
+  const confirmationCode = generateConfirmationCode()
 
   if (!payload) {
     console.error('Meta data deletion request: signature verification failed')
     return { verified: false, confirmationCode }
   }
 
-  console.log('Meta data deletion request received:', payload)
+  // Meta's signed request always carries user_id for this callback. Falling
+  // back to 'unknown' rather than rejecting: a request we cannot attribute is
+  // still a request someone made, and dropping it would be worse than storing
+  // it with a gap for the human to chase.
+  const metaUserId = typeof payload.user_id === 'string' ? payload.user_id : 'unknown'
+
+  const record = await createMetaDeletionRequest({
+    confirmationCode,
+    metaUserId,
+    status: 'received',
+    requestedAt: new Date().toISOString(),
+    notified: false,
+  })
+
+  const notified = await notifyDeletionRequest(record)
+
+  if (notified) {
+    // Non-fatal: the request is stored and the email already went out, so a
+    // failed flag write must not fail the callback. Worst case the row
+    // under-reports as un-notified.
+    await markMetaDeletionRequestNotified(confirmationCode).catch((error: unknown) => {
+      console.error(
+        `Failed to flag Meta deletion request ${confirmationCode} as notified:`,
+        error instanceof Error ? error.message : String(error)
+      )
+    })
+  }
+
   return { verified: true, confirmationCode }
+}
+
+// Backs the public status page. Returns null for an unknown code rather than
+// throwing, so the page can distinguish "we have no such request" from "the
+// lookup broke" -- the old page could only ever echo the code back, which made
+// a typo'd or fabricated code look identical to a real one.
+export async function getMetaDeletionRequestStatus(
+  confirmationCode: string
+): Promise<MetaDeletionRequestStatus | null> {
+  const record = await getMetaDeletionRequest(confirmationCode)
+
+  if (!record) {
+    return null
+  }
+
+  return {
+    confirmationCode: record.confirmationCode,
+    status: record.status,
+    requestedAt: record.requestedAt,
+  }
 }
 
 export interface MetaWebhookResult {
