@@ -38,9 +38,6 @@ export interface SubscriptionContextValue {
   // True only when there is nothing to show yet. A cache hit means false on
   // the first render, which is the whole point: no spinner on reload.
   isLoading: boolean
-  // A background revalidation is in flight over an already-painted value.
-  // Exposed for callers that want a subtle indicator; never gate render on it.
-  isValidating: boolean
   // Set when the last attempt failed AND nothing is painted. Stays null when
   // a revalidation fails over a good cached value, since the page is fine.
   // Settings surfaces this; without it a failed load spins forever in silence.
@@ -62,19 +59,29 @@ export function SubscriptionProvider({ children }: { children: ReactNode }): Rea
 
   const [subscription, setSubscription] = useState<SubscriptionSummary | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isValidating, setIsValidating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Lets an in-flight fetch know its account is no longer the current one, so
   // a slow response for account A cannot land after a switch to account B.
   const activeClientRef = useRef<string | null>(null)
 
+  // Sequence number so the LAST REQUEST wins rather than the last response.
+  // refresh() bypasses the focus throttle, so it can overlap a mount fetch --
+  // and the case that matters is right after a checkout, where an older
+  // in-flight response carrying the PRE-UPGRADE plan could otherwise land last
+  // and put the user back on their old limits until the next navigation.
+  const requestSeqRef = useRef(0)
+
   const fetchSubscription = useCallback(
     async (targetClientId: string): Promise<SubscriptionSummary | null> => {
-      setIsValidating(true)
+      requestSeqRef.current += 1
+      const seq = requestSeqRef.current
+      const isCurrent = (): boolean =>
+        activeClientRef.current === targetClientId && requestSeqRef.current === seq
+
       try {
         const res = await getMySubscription()
-        if (activeClientRef.current !== targetClientId) return null
+        if (!isCurrent()) return null
 
         if (res.success && res.data) {
           setSubscription(res.data)
@@ -86,12 +93,12 @@ export function SubscriptionProvider({ children }: { children: ReactNode }): Rea
         return null
       } catch {
         // Keep whatever is already painted. A failed revalidation must not
-        // blank out a working page.
-        setError('Failed to load subscription')
+        // blank out a working page. Guarded too: a superseded request that
+        // throws must not raise an error over a newer request still in flight.
+        if (isCurrent()) setError('Failed to load subscription')
         return null
       } finally {
-        if (activeClientRef.current === targetClientId) {
-          setIsValidating(false)
+        if (isCurrent()) {
           setIsLoading(false)
         }
       }
@@ -149,7 +156,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }): Rea
 
   return createElement(
     SubscriptionContext.Provider,
-    { value: { subscription, isLoading, isValidating, error, refresh } },
+    { value: { subscription, isLoading, error, refresh } },
     children
   )
 }

@@ -206,3 +206,46 @@ describe('useSubscription outside a provider', () => {
     consoleError.mockRestore()
   })
 })
+
+describe('out-of-order responses', () => {
+  // The case that matters is right after a checkout: refresh() bypasses the
+  // focus throttle, so it can overlap an in-flight mount fetch. If the older
+  // response were allowed to land last, the user would be put back on their
+  // pre-upgrade plan until the next navigation.
+  it('keeps the newest request even when an older response resolves last', async () => {
+    let resolveFirst: ((value: unknown) => void) | undefined
+    getMySubscription
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirst = resolve
+          })
+      )
+      .mockResolvedValueOnce({ success: true, data: summary('agency', true) })
+
+    sessionStorage.setItem(
+      KEY,
+      JSON.stringify({ fetchedAt: Date.now() - 60_000, data: summary('starter', false) })
+    )
+
+    renderProvider()
+    await waitFor(() => expect(getMySubscription).toHaveBeenCalledTimes(1))
+
+    // Second request (the "refresh after upgrade") starts and finishes first.
+    sessionStorage.setItem(
+      KEY,
+      JSON.stringify({ fetchedAt: Date.now() - 60_000, data: summary('starter', false) })
+    )
+    act(() => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    await waitFor(() => expect(screen.getByTestId('plan').textContent).toBe('agency'))
+
+    // Now the stale first response finally lands carrying the old plan.
+    await act(async () => {
+      resolveFirst?.({ success: true, data: summary('starter', false) })
+    })
+
+    expect(screen.getByTestId('plan').textContent).toBe('agency')
+  })
+})
