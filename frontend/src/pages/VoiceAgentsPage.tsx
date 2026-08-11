@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertCircle, Globe, Loader2, Lock, Mail, Mic, Plus, Trash2, Volume2 } from 'lucide-react'
-import { deleteVoiceAgent, getMySubscription, getVoiceAgents, updateVoiceAgent } from '../services/api'
+import { deleteVoiceAgent, getVoiceAgents, updateVoiceAgent } from '../services/api'
 import type { VoiceAgent } from '../types/index'
+import { useSubscription } from '../hooks/useSubscription'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 const URL_MAX_LENGTH = 40
@@ -84,21 +85,10 @@ export default function VoiceAgentsPage() {
   const [error, setError] = useState<string | null>(null)
   const [togglingAgentId, setTogglingAgentId] = useState<string | null>(null)
   const [deletingAgentId, setDeletingAgentId] = useState<string | null>(null)
-  const [voiceEnabled, setVoiceEnabled] = useState<boolean | null>(null)
-  const [subscriptionLoading, setSubscriptionLoading] = useState(true)
-
-  async function fetchSubscription() {
-    try {
-      const res = await getMySubscription()
-      if (res.success && res.data) {
-        setVoiceEnabled(res.data.features.voice.enabled)
-      }
-    } catch (err) {
-      console.error('Failed to fetch subscription:', err)
-    } finally {
-      setSubscriptionLoading(false)
-    }
-  }
+  // Shared across every gated page: fetched once, served from the session
+  // cache on reload, and refreshed the moment a plan change confirms.
+  const { subscription, isLoading: subscriptionLoading } = useSubscription()
+  const voiceEnabled = subscription?.features.voice.enabled ?? null
 
   async function fetchAgents() {
     setLoading(true)
@@ -120,7 +110,6 @@ export default function VoiceAgentsPage() {
 
   useEffect(() => {
     fetchAgents()
-    fetchSubscription()
   }, [])
 
   async function handleToggleEnabled(agent: VoiceAgent) {

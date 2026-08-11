@@ -23,11 +23,11 @@ import {
   deleteBot,
   getBotIndexingStatus,
   getMyBots,
-  getMySubscription,
   startBotIndexing,
 } from '../services/api'
 import IndexingProgressCard from '../components/IndexingProgressCard'
 import { useIndexingStatus } from '../hooks/useIndexingStatus'
+import { useSubscription } from '../hooks/useSubscription'
 import type { BotConfig, BotStatus } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -87,19 +87,17 @@ export default function BotsPage() {
   const [indexingBotId, setIndexingBotId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [openMenuBotId, setOpenMenuBotId] = useState<string | null>(null)
-  const [agentsLimit, setAgentsLimit] = useState<number | null>(null)
-  const [subscriptionLoading, setSubscriptionLoading] = useState(true)
+  // Shared across every gated page: fetched once, served from the session
+  // cache on reload, and refreshed the moment a plan change confirms. On a
+  // reload subscriptionLoading is already false, so capReady no longer holds
+  // the page behind a spinner.
+  const { subscription, isLoading: subscriptionLoading } = useSubscription()
+  const agentsLimit = subscription?.features.agents.limits.max ?? null
 
   useEffect(() => {
     getMyBots().then((res) => {
       setBots(res.data ?? [])
       setLoading(false)
-    })
-    getMySubscription().then((res) => {
-      if (res.success && res.data) {
-        setAgentsLimit(res.data.features.agents.limits.max)
-      }
-      setSubscriptionLoading(false)
     })
   }, [])
 
