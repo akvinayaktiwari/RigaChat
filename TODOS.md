@@ -28,16 +28,31 @@
 **Priority:** P2
 **Depends on:** None
 
-### Frontend has no test runner
+### [RESOLVED 2026-08-11] Frontend has no test runner — runner added; three libs still uncovered
 
-**What:** `frontend/` has no vitest/jest config and zero test files, so `lib/phone.ts` (E.164 normalization), `lib/lead-ref.ts` (URL <-> LeadRef round-tripping) and `lib/lead-display.ts` (the urgency tiers the whole lead queue is ordered by) ship untested. The backend has 273 tests; the frontend has none.
+**What it was:** `frontend/` had no vitest/jest config and zero test files, so the frontend shipped with no automated cover at all while the backend had 300+ tests.
 
-**Why:** All three are pure functions doing string and date arithmetic — the single most regression-prone code in the app and the cheapest possible thing to test. `leadUrgency`'s tier logic in particular has to agree exactly with `lead-inbox-service.ts`'s server-side sort, and nothing currently enforces that.
+**Fixed:** vitest + jsdom + @testing-library/react, pinned to the same vitest version as the backend so both halves run the same way. `frontend/vitest.config.ts`, a `test` script, and a "Run frontend tests" step in `ci.yml`'s check-frontend job (which previously only type-checked and built). 28 tests land with it, covering `lib/subscription-cache.ts` and `hooks/useSubscription.ts`.
 
-**Context:** Adding vitest to `frontend/` is roughly a 20-minute setup (`vitest.config.ts` + a `test` script + wiring it into `.github/workflows/ci.yml`'s check-frontend job). The three libs above are the obvious first targets and need no DOM or component testing to cover.
+**Still open, narrower:** the three libs this item originally named remain untested — `lib/phone.ts` (E.164 normalization), `lib/lead-ref.ts` (URL <-> LeadRef round-tripping) and `lib/lead-display.ts` (the urgency tiers the lead queue is ordered by). They are pure functions, need no DOM, and `leadUrgency`'s tiers still have to agree exactly with `lead-inbox-service.ts`'s server-side sort with nothing enforcing it. The setup cost that used to block this is now zero.
+
+**Effort:** S (runner done; the three libs are ~30 min of CC time)
+**Priority:** P2
+**Depends on:** None
+
+### Two latent traps in the subscription cache
+
+**What:** Neither is a live bug; both are things the next person could walk into.
+
+1. **`usage.chatConversations` is cached.** `SubscriptionSummary` carries a usage counter and the whole object goes into sessionStorage. No page reads it from the provider today (verified), but a future "you've used 47 of 100 conversations" display fed from `useSubscription()` would show a stale number until the next revalidation.
+2. **Prerender would throw if the landing page were ever added to it.** `useTierCheckout` now calls `useSubscription()`, which throws outside a provider. `prerender-entry.tsx` mounts only blog routes, so this cannot happen today; adding `/` to `getRoutes()` would fail the build with "useSubscription must be used within a SubscriptionProvider".
+
+**Why:** Both fail in ways that point somewhere other than the cause — a wrong number on screen, or a build error in a file nobody edited.
+
+**Context:** (1) is fixed either by excluding `usage` from what gets cached, or by having usage-displaying pages read it fresh. (2) is fixed by wrapping the prerender tree in the providers, which the file deliberately avoids so Cognito/browser-only code stays out of the Node render — so the honest fix is a comment on `getRoutes()` rather than a structural change.
 
 **Effort:** S
-**Priority:** P2
+**Priority:** P3
 **Depends on:** None
 
 ### Add a field-mapping UI for Meta Lead Ads custom questions
