@@ -26,6 +26,9 @@ export default defineConfig({
       DYNAMODB_TABLE_WHATSAPP_INBOUND_ACTIVITY: 'test-whatsapp-inbound-activity-table',
       EMAIL_LOGO_URL: 'https://example.com/logo.png',
       DYNAMODB_TABLE_META_DELETION_REQUESTS: 'test-meta-deletion-requests-table',
+      ZOHO_CLIENT_ID: 'test-zoho-client-id',
+      ZOHO_CLIENT_SECRET: 'test-zoho-client-secret',
+      ZOHO_REDIRECT_URI: 'https://api.example.com/api/integrations/zoho/callback',
     },
   },
 })

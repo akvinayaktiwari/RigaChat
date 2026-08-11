@@ -40,6 +40,15 @@ interface ZohoLeadsResponse {
 
 const PERMANENT_FAILURE_CODES = new Set(['INVALID_DATA', 'MANDATORY_NOT_FOUND', 'DUPLICATE_DATA'])
 
+// Label fallbacks for mapLead. A form field's declared `type` is the primary
+// signal, but the form builder happily saves an email field as plain text, and
+// Meta's synthetic fields carry no type at all -- without these the value is
+// silently dumped into Description instead of its own Zoho field.
+const EMAIL_LABEL = /e-?mail/i
+const PHONE_LABEL = /phone|mobile|whatsapp|contact\s*(no\b|number)/i
+const COMPANY_LABEL = /company|organi[sz]ation|business|firm|employer/i
+const NAME_LABEL = /name/i
+
 function isTokenExpiringSoon(tokenExpiry: string): boolean {
   const expiry = new Date(tokenExpiry)
   return new Date() >= new Date(expiry.getTime() - TOKEN_EXPIRY_BUFFER_MS)
@@ -222,17 +231,26 @@ export class ZohoProvider implements CRMProvider {
     let lastName = 'Unknown'
     let email = ''
     let phone = ''
+    let company = ''
     const otherFields: string[] = []
 
+    // First match wins for each Zoho field; every later candidate (a second
+    // email, a secondary phone) falls through to Description rather than
+    // overwriting what was already claimed.
     for (const field of formFields) {
       const value = customFields[field.fieldId]
       if (!value) continue
 
-      if (field.type === 'email') {
+      if (!email && (field.type === 'email' || EMAIL_LABEL.test(field.label))) {
         email = value
-      } else if (field.type === 'phone') {
+      } else if (!phone && (field.type === 'phone' || PHONE_LABEL.test(field.label))) {
         phone = value
-      } else if (field.type === 'text' && field.label.toLowerCase().includes('name')) {
+      } else if (!company && COMPANY_LABEL.test(field.label)) {
+        // Tested before the name branch on purpose: a label like
+        // "Company/Project Name" matches NAME_LABEL too, and checking name
+        // first would file the company as the lead's name.
+        company = value
+      } else if (lastName === 'Unknown' && field.type === 'text' && NAME_LABEL.test(field.label)) {
         lastName = value
       } else {
         otherFields.push(`${field.label}: ${value}`)
@@ -243,6 +261,7 @@ export class ZohoProvider implements CRMProvider {
       lastName,
       email: email || undefined,
       phone: phone || undefined,
+      company: company || undefined,
       leadSource: 'VyostraAI',
       description: otherFields.length > 0 ? otherFields.join('\n') : 'Lead captured via VyostraAI form',
       sourceUrl,
