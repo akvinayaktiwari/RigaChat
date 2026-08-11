@@ -12,11 +12,18 @@ const GRAPH_API_BASE = 'https://graph.facebook.com/v21.0'
 // pages_show_list: list the Pages the client manages.
 // pages_manage_metadata: required to read/manage a Page's webhook subscriptions.
 // pages_read_engagement + leads_retrieval: required to read Lead Ads field_data.
+// pages_manage_ads: not used by any call we make, but Meta REQUIRES it to be
+// present in the App Review submission for leads_retrieval -- a submission
+// without it is rejected regardless of how good the screencast is.
 // leads_retrieval requires Meta App Review before this scope works for any
 // Page outside the app's own test Pages/roles -- see design doc Dependencies.
-const META_OAUTH_SCOPES = ['pages_show_list', 'pages_manage_metadata', 'pages_read_engagement', 'leads_retrieval'].join(
-  ','
-)
+const META_OAUTH_SCOPES = [
+  'pages_show_list',
+  'pages_manage_metadata',
+  'pages_read_engagement',
+  'pages_manage_ads',
+  'leads_retrieval',
+].join(',')
 
 function requireEnv(name: string): string {
   const value = process.env[name]
