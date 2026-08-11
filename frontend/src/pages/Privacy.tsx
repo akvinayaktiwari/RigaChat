@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Helmet } from 'react-helmet-async'
 import {
   Calendar,
   Download,
@@ -456,6 +457,17 @@ export default function Privacy() {
 
   return (
     <div className="landing-page bg-background">
+      {/* Prerendered into dist/privacy-policy/index.html. Meta App Review fetches
+          this URL from App Settings, so the title and description must be present
+          in the static HTML, not only after the client bundle boots. */}
+      <Helmet>
+        <title>Privacy Policy — VyostraAI</title>
+        <meta
+          name="description"
+          content="How VyostraAI collects, stores, retains and deletes personal and lead data, including leads retrieved from Meta (Facebook/Instagram) Lead Ads."
+        />
+        <link rel="canonical" href="https://vyostra.com/privacy-policy" />
+      </Helmet>
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 
       <main className="pt-36 pb-24 px-6 lg:px-8">

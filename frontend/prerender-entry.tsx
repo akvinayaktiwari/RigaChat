@@ -5,6 +5,8 @@ import { Route, Routes } from 'react-router-dom'
 import { StaticRouter } from 'react-router-dom/server'
 import BlogIndex from './src/pages/BlogIndex'
 import BlogPost from './src/pages/BlogPost'
+import Privacy from './src/pages/Privacy'
+import Terms from './src/pages/Terms'
 import { getAllSlugs } from './src/content/blog/registry'
 
 /**
@@ -14,9 +16,20 @@ import { getAllSlugs } from './src/content/blog/registry'
  * land in dist/ as real static HTML, which is what search crawlers and
  * link-preview scrapers (which never run JS) actually read.
  *
- * Only blog routes are mounted. Prerendering the authenticated dashboard or
- * the auth pages would be pointless and would drag Cognito/browser-only code
- * into a Node render.
+ * Blog routes plus the two legal pages are mounted. The legal pages matter for a
+ * different reader than crawlers: Meta App Review fetches the Privacy Policy and
+ * Terms URLs declared in App Settings, and a client-rendered page answers that
+ * fetch with an empty <div id="root"> -- a documented App Review rejection, even
+ * though a human in a browser sees the full policy. Both pages touch window/
+ * document only inside useEffect, which never runs during SSR, so they render
+ * cleanly in Node.
+ *
+ * /data-deletion-status is deliberately NOT prerendered: its content is fetched
+ * per confirmation code at runtime, so a static render would only ever emit the
+ * empty state. Meta is given the callback endpoint, not this page.
+ *
+ * The authenticated dashboard and auth pages stay out -- prerendering them would
+ * be pointless and would drag Cognito/browser-only code into a Node render.
  */
 
 // react-helmet-async decides between its client and server dispatcher off this
@@ -33,6 +46,8 @@ export async function renderRoute(url: string): Promise<{ html: string; head: st
         <Routes>
           <Route path="/blog" element={<BlogIndex />} />
           <Route path="/blog/:slug" element={<BlogPost />} />
+          <Route path="/privacy-policy" element={<Privacy />} />
+          <Route path="/terms-of-service" element={<Terms />} />
         </Routes>
       </StaticRouter>
     </HelmetProvider>
@@ -80,5 +95,5 @@ export async function renderRoute(url: string): Promise<{ html: string; head: st
 
 /** Every route the prerender script should emit. */
 export function getRoutes(): string[] {
-  return ['/blog', ...getAllSlugs().map((slug) => `/blog/${slug}`)]
+  return ['/blog', ...getAllSlugs().map((slug) => `/blog/${slug}`), '/privacy-policy', '/terms-of-service']
 }

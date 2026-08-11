@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Helmet } from 'react-helmet-async'
 import { Calendar, Download, Mail, MapPin, FileCheck, Settings2, ShieldCheck, CreditCard, AlertTriangle, RefreshCw, ChevronDown } from 'lucide-react'
 import Navbar from '../components/landing/Navbar'
 import Footer from '../components/landing/Footer'
@@ -277,6 +278,16 @@ export default function Terms() {
 
   return (
     <div className="landing-page bg-background">
+      {/* Prerendered into dist/terms-of-service/index.html -- see the note in
+          Privacy.tsx; Meta App Review fetches this URL too. */}
+      <Helmet>
+        <title>Terms of Service — VyostraAI</title>
+        <meta
+          name="description"
+          content="The terms governing use of the VyostraAI platform, including acceptable use, data handling and subscription conditions."
+        />
+        <link rel="canonical" href="https://vyostra.com/terms-of-service" />
+      </Helmet>
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 
       <main className="pt-36 pb-24 px-6 lg:px-8">
