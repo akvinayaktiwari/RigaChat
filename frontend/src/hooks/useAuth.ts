@@ -1,6 +1,7 @@
 import { createContext, createElement, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { setAuthToken, syncMe } from '../services/api'
+import { clearSubscriptionCache } from '../lib/subscription-cache'
 
 export interface AuthUser {
   clientId: string
@@ -67,6 +68,11 @@ function saveSession(token: string, user: AuthUser): void {
 function clearSession(): void {
   sessionStorage.removeItem(SESSION_TOKEN_KEY)
   sessionStorage.removeItem(SESSION_USER_KEY)
+  // The cached subscription was fetched with the token being dropped here, so
+  // it dies with it. Without this, signing out and signing back in as a
+  // different account in the same tab would paint the previous account's plan
+  // until the first revalidation landed.
+  clearSubscriptionCache()
 }
 
 interface CognitoErrorBody {
