@@ -4,6 +4,7 @@ import type { BillingErrorCode } from '../services/api'
 import { loadRazorpayScript } from '../lib/razorpay-checkout'
 import { PRICING_TIERS } from '../lib/pricingTiers'
 import type { BillableTier } from '../lib/pricingTiers'
+import { useSubscription } from './useSubscription'
 
 const POLL_INTERVAL_MS = 3000
 const POLL_MAX_ATTEMPTS = 10
@@ -66,6 +67,11 @@ export interface UseTierCheckoutResult {
 // cards' post-signup checkout (PricingSection -> QuickSignupModal). Owns
 // only the checkout state machine; callers own their own open/close UI.
 export function useTierCheckout(onConfirmed?: () => void): UseTierCheckoutResult {
+  // The moment a payment confirms, the shared subscription cache is holding
+  // the plan the user just upgraded away from. Every gated page reads that
+  // cache, so without this refresh they would keep seeing the old limits and
+  // the upsell until the tab was closed.
+  const { refresh: refreshSubscription } = useSubscription()
   const [stage, setStage] = useState<TierCheckoutStage>('idle')
   const [submittingTier, setSubmittingTier] = useState<BillableTier | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -92,9 +98,16 @@ export function useTierCheckout(onConfirmed?: () => void): UseTierCheckoutResult
     const poll = async () => {
       attempts += 1
       try {
+        // Deliberately the raw API call, not the cached provider: this is
+        // polling FOR a change, so a cached read would return the pre-payment
+        // value on every attempt and the checkout would hang until timeout.
         const res = await getMySubscription()
         if (res.success && res.data?.status === 'active') {
           setStage('success')
+          // Push the new plan into the shared cache before handing control
+          // back. onConfirmed typically closes the modal or routes to the
+          // dashboard, and those pages read the cache on their next render.
+          await refreshSubscription()
           onConfirmed?.()
           return
         }
