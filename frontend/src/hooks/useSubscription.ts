@@ -1,7 +1,11 @@
 import { createContext, createElement, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { getMySubscription } from '../services/api'
-import { readSubscriptionCache, writeSubscriptionCache } from '../lib/subscription-cache'
+import {
+  readSubscriptionCache,
+  subscriptionCacheAgeMs,
+  writeSubscriptionCache,
+} from '../lib/subscription-cache'
 import type { SubscriptionSummary } from '../types'
 import { useAuth } from './useAuth'
 
@@ -37,10 +41,18 @@ export interface SubscriptionContextValue {
   // A background revalidation is in flight over an already-painted value.
   // Exposed for callers that want a subtle indicator; never gate render on it.
   isValidating: boolean
+  // Set when the last attempt failed AND nothing is painted. Stays null when
+  // a revalidation fails over a good cached value, since the page is fine.
+  // Settings surfaces this; without it a failed load spins forever in silence.
+  error: string | null
   // Forces a fresh read, bypassing and then overwriting the cache. Call this
   // after anything that changes the plan -- checkout confirmation above all.
   refresh: () => Promise<SubscriptionSummary | null>
 }
+
+// Long enough that alt-tabbing costs nothing, short enough that coming back
+// to a tab you left before upgrading shows the new plan.
+const FOCUS_REVALIDATE_AFTER_MS = 30 * 1000
 
 const SubscriptionContext = createContext<SubscriptionContextValue | undefined>(undefined)
 
@@ -51,6 +63,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }): Rea
   const [subscription, setSubscription] = useState<SubscriptionSummary | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isValidating, setIsValidating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // Lets an in-flight fetch know its account is no longer the current one, so
   // a slow response for account A cannot land after a switch to account B.
@@ -65,13 +78,16 @@ export function SubscriptionProvider({ children }: { children: ReactNode }): Rea
 
         if (res.success && res.data) {
           setSubscription(res.data)
+          setError(null)
           writeSubscriptionCache(targetClientId, res.data)
           return res.data
         }
+        setError(res.error ?? 'Failed to load subscription')
         return null
       } catch {
         // Keep whatever is already painted. A failed revalidation must not
         // blank out a working page.
+        setError('Failed to load subscription')
         return null
       } finally {
         if (activeClientRef.current === targetClientId) {
@@ -109,10 +125,16 @@ export function SubscriptionProvider({ children }: { children: ReactNode }): Rea
   // A plan bought in another tab, on another device, or through a support
   // action never reaches this tab otherwise. Revalidating when the user comes
   // back is the cheapest way to notice.
+  //
+  // Throttled: without this, every alt-tab is another request, and a user with
+  // the dashboard open beside their inbox would generate a steady stream of
+  // them all day for a value that changes a few times a year.
   useEffect(() => {
     if (!isAuthenticated || !clientId) return
 
     const onFocus = (): void => {
+      const age = subscriptionCacheAgeMs(clientId)
+      if (age !== null && age < FOCUS_REVALIDATE_AFTER_MS) return
       void fetchSubscription(clientId)
     }
 
@@ -127,7 +149,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }): Rea
 
   return createElement(
     SubscriptionContext.Provider,
-    { value: { subscription, isLoading, isValidating, refresh } },
+    { value: { subscription, isLoading, isValidating, error, refresh } },
     children
   )
 }

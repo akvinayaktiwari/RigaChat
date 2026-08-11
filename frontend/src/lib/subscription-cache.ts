@@ -26,6 +26,22 @@ function storageKey(clientId: string): string {
   return `${STORAGE_KEY_PREFIX}${clientId}`
 }
 
+// Age of the cached entry, or null when there is nothing usable cached.
+// Lets the provider decide whether a revalidation is worth a request.
+export function subscriptionCacheAgeMs(clientId: string): number | null {
+  try {
+    const raw = sessionStorage.getItem(storageKey(clientId))
+    if (!raw) return null
+
+    const parsed = JSON.parse(raw) as CachedSubscription
+    if (typeof parsed.fetchedAt !== 'number') return null
+
+    return Date.now() - parsed.fetchedAt
+  } catch {
+    return null
+  }
+}
+
 export function readSubscriptionCache(clientId: string): SubscriptionSummary | null {
   try {
     const raw = sessionStorage.getItem(storageKey(clientId))

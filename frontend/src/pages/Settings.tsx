@@ -64,7 +64,7 @@ export default function Settings() {
   // Shared subscription. Settings renders the plan card and the upgrade CTA,
   // so it benefits most from the cache: this page is where users land right
   // after upgrading, and refresh() has already run by the time they arrive.
-  const { subscription } = useSubscription()
+  const { subscription, error: subscriptionError } = useSubscription()
   const [isLoading, setIsLoading] = useState(true)
   const [zohoStatus, setZohoStatus] = useState<'connected' | 'disconnected' | 'loading'>('loading')
   const [calComStatus, setCalComStatus] = useState<'connected' | 'disconnected' | 'loading'>('loading')
@@ -75,6 +75,14 @@ export default function Settings() {
   const [savingProfile, setSavingProfile] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+
+  // The shared provider owns the subscription fetch now, so its failure has
+  // to be surfaced here instead of by the local try/catch this page used to
+  // have. Without it a failed load leaves the page on its loading state with
+  // no explanation, because the render below waits on `subscription`.
+  useEffect(() => {
+    if (subscriptionError) toast.show(subscriptionError, 'error')
+  }, [subscriptionError, toast])
 
   useEffect(() => {
     async function load() {
