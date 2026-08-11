@@ -49,6 +49,32 @@ const PHONE_LABEL = /phone|mobile|whatsapp|contact\s*(no\b|number)/i
 const COMPANY_LABEL = /company|organi[sz]ation|business|firm|employer/i
 const NAME_LABEL = /name/i
 
+// Zoho's Website field takes a real public URL and rejects anything else, so a
+// dev submission from localhost or a file:// page has to keep falling back to
+// Description. Returns null when sourceUrl is not something Zoho will accept.
+const ZOHO_WEBSITE_MAX_LENGTH = 255
+
+export function toPublicWebsiteUrl(sourceUrl: string): string | null {
+  if (sourceUrl.length > ZOHO_WEBSITE_MAX_LENGTH) return null
+
+  let parsed: URL
+  try {
+    parsed = new URL(sourceUrl)
+  } catch {
+    return null
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null
+
+  const host = parsed.hostname.toLowerCase()
+  // A hostname with no dot cannot be public (localhost, an intranet name), and
+  // .local/loopback addresses are reachable only from the machine that submitted.
+  if (!host.includes('.') || host.endsWith('.local')) return null
+  if (host === '127.0.0.1' || host === '0.0.0.0' || host.startsWith('192.168.')) return null
+
+  return sourceUrl
+}
+
 function isTokenExpiringSoon(tokenExpiry: string): boolean {
   const expiry = new Date(tokenExpiry)
   return new Date() >= new Date(expiry.getTime() - TOKEN_EXPIRY_BUFFER_MS)
@@ -157,6 +183,12 @@ export class ZohoProvider implements CRMProvider {
       }
     }
 
+    // sourceUrl is the page the form was submitted from. When it is a real
+    // public URL it belongs in Zoho's own Website field, where it stays
+    // clickable and filterable; otherwise it falls back into Description so the
+    // attribution is never lost outright.
+    const website = toPublicWebsiteUrl(lead.sourceUrl)
+
     const zohoLeadData = {
       Last_Name: lead.lastName,
       First_Name: lead.firstName ?? '',
@@ -164,10 +196,8 @@ export class ZohoProvider implements CRMProvider {
       Phone: lead.phone ?? '',
       Company: lead.company ?? 'Not specified',
       Lead_Source: lead.leadSource,
-      // sourceUrl is the page the form was submitted from, not a domain — Zoho's
-      // dedicated URL field rejects non-standard hosts (e.g. localhost), so it's
-      // folded into Description instead of sent as its own field.
-      Description: `${lead.description}\n\nSource: ${lead.sourceUrl}`,
+      ...(website ? { Website: website } : {}),
+      Description: website ? lead.description : `${lead.description}\n\nSource: ${lead.sourceUrl}`,
     }
 
     const postLead = (accessToken: string) =>

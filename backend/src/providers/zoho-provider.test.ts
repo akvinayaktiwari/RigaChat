@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FormField } from '../types/index.js'
-import { zohoProvider } from './zoho-provider.js'
+import { toPublicWebsiteUrl, zohoProvider } from './zoho-provider.js'
 
 // mapLead is the only place a captured lead is translated into Zoho's field
 // names. Anything it fails to recognise does not error -- it silently lands in
@@ -112,5 +112,33 @@ describe('mapLead', () => {
     const lead = zohoProvider.mapLead({ f1: '', f2: 'work@example.com' }, fields, SOURCE_URL)
 
     expect(lead.email).toBe('work@example.com')
+  })
+})
+
+describe('toPublicWebsiteUrl', () => {
+  it('accepts the public URLs a real embed submits from', () => {
+    expect(toPublicWebsiteUrl(SOURCE_URL)).toBe(SOURCE_URL)
+    expect(toPublicWebsiteUrl('https://wonderise.com/projects/zoya')).toBe(
+      'https://wonderise.com/projects/zoya'
+    )
+    expect(toPublicWebsiteUrl('http://example.co.in/contact?utm_source=meta')).toBe(
+      'http://example.co.in/contact?utm_source=meta'
+    )
+  })
+
+  // These fall back to Description rather than being sent as Website, which is
+  // what the original comment was guarding against.
+  it('rejects hosts Zoho will not accept, so they stay in the description', () => {
+    expect(toPublicWebsiteUrl('http://localhost:5173/form')).toBeNull()
+    expect(toPublicWebsiteUrl('http://127.0.0.1:3000/')).toBeNull()
+    expect(toPublicWebsiteUrl('http://192.168.1.20/form')).toBeNull()
+    expect(toPublicWebsiteUrl('http://my-macbook.local/form')).toBeNull()
+    expect(toPublicWebsiteUrl('file:///Users/test/index.html')).toBeNull()
+    expect(toPublicWebsiteUrl('not a url at all')).toBeNull()
+    expect(toPublicWebsiteUrl('')).toBeNull()
+  })
+
+  it('rejects a URL longer than the Zoho field allows', () => {
+    expect(toPublicWebsiteUrl(`https://example.com/${'a'.repeat(260)}`)).toBeNull()
   })
 })
