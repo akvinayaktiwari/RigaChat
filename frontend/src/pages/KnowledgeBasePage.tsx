@@ -24,12 +24,12 @@ import {
   getKBEntries,
   getKBUploadUrl,
   getMyBots,
-  getMySubscription,
   updateKBEntry,
 } from '../services/api'
 import { uploadFileWithProgress } from '../lib/upload-file-with-progress'
 import { translateEntitlementError } from '../lib/entitlementErrors'
 import { formatRelativeDate } from '../lib/date'
+import { useSubscription } from '../hooks/useSubscription'
 import type { KBFileType, KnowledgeBaseEntry } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -193,8 +193,10 @@ export default function KnowledgeBasePage() {
   const [addForm, setAddForm] = useState<EntryFormState>(EMPTY_FORM)
   const [editForm, setEditForm] = useState<EntryFormState>(EMPTY_FORM)
 
-  const [kbFileSizeLimit, setKbFileSizeLimit] = useState<number | null>(null)
-  const [entitlementsLoaded, setEntitlementsLoaded] = useState(false)
+  // Shared subscription: the upload size cap is plan-derived, so it comes
+  // from the same cached-and-revalidated source as every other gated value.
+  const { subscription, isLoading: subscriptionLoading } = useSubscription()
+  const kbFileSizeLimit = subscription?.features.kbFileSize.limits.maxBytes ?? null
 
   const [dragActive, setDragActive] = useState(false)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
@@ -219,12 +221,6 @@ export default function KnowledgeBasePage() {
       setLoading(false)
     })
 
-    getMySubscription().then((res) => {
-      if (res.success && res.data) {
-        setKbFileSizeLimit(res.data.features.kbFileSize.limits.maxBytes)
-      }
-      setEntitlementsLoaded(true)
-    })
   }, [botId])
 
   // Shared poll loop over the whole list (GET /:botId is the only KB read
@@ -577,7 +573,7 @@ export default function KnowledgeBasePage() {
             onDrop={handleDrop}
             className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center transition-colors ${
               dragActive ? 'border-violet-400 bg-violet-50' : 'border-gray-200'
-            } ${!entitlementsLoaded ? 'opacity-50 pointer-events-none' : ''}`}
+            } ${subscriptionLoading ? 'opacity-50 pointer-events-none' : ''}`}
           >
             <Upload className={`w-8 h-8 mb-2 ${dragActive ? 'text-violet-500' : 'text-gray-400'}`} />
             <p className="text-sm text-gray-600">

@@ -15,9 +15,10 @@ import {
   Phone,
   User,
 } from 'lucide-react'
-import { confirmBotIndexing, getMyBots, getMySubscription, setupBot, startBotIndexing } from '../services/api'
+import { confirmBotIndexing, getMyBots, setupBot, startBotIndexing } from '../services/api'
 import { Toggle } from '../components/Toggle'
 import { translateEntitlementError } from '../lib/entitlementErrors'
+import { useSubscription } from '../hooks/useSubscription'
 import type { BotConfig, LeadFormField } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -192,28 +193,31 @@ export default function NewBotPage() {
   const [totalPages, setTotalPages] = useState(0)
   const [selectedPages, setSelectedPages] = useState(0)
   const [launchError, setLaunchError] = useState<string | null>(null)
-  const [checkingAccess, setCheckingAccess] = useState(true)
-  const [atCap, setAtCap] = useState(false)
-  const [agentsLimit, setAgentsLimit] = useState<number | null>(null)
+  const [botCount, setBotCount] = useState<number | null>(null)
 
-  // Route-level gate, independent of BotsPage's button visibility — this
-  // re-checks on every mount, so direct navigation to /dashboard/bots/new
-  // can't bypass the cap. Mirrors NewVoiceAgentPage's checkAccess effect.
+  // Route-level gate, independent of BotsPage's button visibility, so direct
+  // navigation to /dashboard/bots/new still shows the cap. The limit comes
+  // from the shared subscription (cached, revalidated on mount); the COUNT is
+  // fetched live every time, because it is the half that actually moves --
+  // the user may have just deleted or created a bot. Neither is a security
+  // boundary: bot-service.ts's checkEntitlement() is what enforces the cap,
+  // and setupBot's LIMIT_EXCEEDED is already translated below.
+  const { subscription, isLoading: subscriptionLoading } = useSubscription()
+  const agentsLimit = subscription?.features.agents.limits.max ?? null
+  const atCap = agentsLimit !== null && botCount !== null && botCount >= agentsLimit
+  const checkingAccess = subscriptionLoading || botCount === null
+
   useEffect(() => {
-    async function checkAccess() {
-      try {
-        const [subRes, botsRes] = await Promise.all([getMySubscription(), getMyBots()])
-        const limit = subRes.success && subRes.data ? subRes.data.features.agents.limits.max : null
-        const count = botsRes.success && botsRes.data ? botsRes.data.length : 0
-        setAgentsLimit(limit)
-        setAtCap(limit !== null && count >= limit)
-      } catch (err) {
-        console.error('Failed to check agent entitlement:', err)
-      } finally {
-        setCheckingAccess(false)
-      }
-    }
-    checkAccess()
+    getMyBots()
+      .then((botsRes) => {
+        setBotCount(botsRes.success && botsRes.data ? botsRes.data.length : 0)
+      })
+      .catch((err: unknown) => {
+        console.error('Failed to count existing agents:', err)
+        // Fail open: the server still rejects an over-cap create, and blocking
+        // the form on a failed count would strand a user who is under it.
+        setBotCount(0)
+      })
   }, [])
 
   function update<K extends keyof FormData>(key: K, value: FormData[K]) {

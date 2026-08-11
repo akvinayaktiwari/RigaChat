@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, BookOpen, Check, Globe, Info, Loader2, Lock, Mail, Volume2 } from 'lucide-react'
-import { createVoiceAgent, getMySubscription } from '../services/api'
+import { createVoiceAgent } from '../services/api'
+import { useSubscription } from '../hooks/useSubscription'
 import type { VoiceAgentVoice } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -137,26 +138,13 @@ export default function NewVoiceAgentPage() {
   const [error, setError] = useState<string | null>(null)
   const [websiteUrlError, setWebsiteUrlError] = useState<string | null>(null)
   const [brandColorError, setBrandColorError] = useState<string | null>(null)
-  const [checkingAccess, setCheckingAccess] = useState(true)
-  const [voiceEnabled, setVoiceEnabled] = useState(false)
-
-  // Route-level gate, independent of VoiceAgentsPage's button visibility —
-  // this component re-checks on every mount, so direct navigation to
-  // /dashboard/voice-agents/new can't bypass the entitlement.
-  useEffect(() => {
-    async function checkAccess() {
-      try {
-        const res = await getMySubscription()
-        setVoiceEnabled(res.success && res.data ? res.data.features.voice.enabled : false)
-      } catch (err) {
-        console.error('Failed to check voice entitlement:', err)
-        setVoiceEnabled(false)
-      } finally {
-        setCheckingAccess(false)
-      }
-    }
-    checkAccess()
-  }, [])
+  // Route-level gate, independent of VoiceAgentsPage's button visibility, so
+  // direct navigation to /dashboard/voice-agents/new still shows the upsell.
+  // Reads the shared subscription, which revalidates on every mount, so a
+  // plan bought moments ago is reflected here. Not a security boundary: the
+  // voice token issuer is what actually enforces the entitlement.
+  const { subscription, isLoading: checkingAccess } = useSubscription()
+  const voiceEnabled = subscription?.features.voice.enabled ?? false
 
   function update<K extends keyof FormData>(key: K, value: FormData[K]) {
     setFormData((prev) => ({ ...prev, [key]: value }))

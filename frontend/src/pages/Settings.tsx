@@ -18,11 +18,11 @@ import {
   getCalComStatus,
   getIntegrationStatus,
   getMe,
-  getMySubscription,
   setCalComDefaultEventType,
   updateProfile,
 } from '../services/api'
 import type { CalComEventType, ClientRecord, Preferences, SubscriptionSummary } from '../types/index'
+import { useSubscription } from '../hooks/useSubscription'
 import type { BillableTier } from '../lib/pricingTiers'
 
 // Suggests the next tier up from the account's current plan; agency has no
@@ -61,7 +61,10 @@ export default function Settings() {
   const toast = useToast()
 
   const [profile, setProfile] = useState<ClientRecord | null>(null)
-  const [subscription, setSubscription] = useState<SubscriptionSummary | null>(null)
+  // Shared subscription. Settings renders the plan card and the upgrade CTA,
+  // so it benefits most from the cache: this page is where users land right
+  // after upgrading, and refresh() has already run by the time they arrive.
+  const { subscription } = useSubscription()
   const [isLoading, setIsLoading] = useState(true)
   const [zohoStatus, setZohoStatus] = useState<'connected' | 'disconnected' | 'loading'>('loading')
   const [calComStatus, setCalComStatus] = useState<'connected' | 'disconnected' | 'loading'>('loading')
@@ -81,14 +84,6 @@ export default function Settings() {
         else toast.show(res.error ?? 'Failed to load profile', 'error')
       } catch {
         toast.show('Failed to load profile', 'error')
-      }
-
-      try {
-        const subRes = await getMySubscription()
-        if (subRes.success && subRes.data) setSubscription(subRes.data)
-        else toast.show(subRes.error ?? 'Failed to load subscription', 'error')
-      } catch {
-        toast.show('Failed to load subscription', 'error')
       }
 
       try {
