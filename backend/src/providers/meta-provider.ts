@@ -116,32 +116,78 @@ export class MetaProvider {
     return `${META_OAUTH_URL}?${params.toString()}`
   }
 
-  // Meta's OAuth code exchange yields a short-lived USER access token, not a
-  // Page token -- a Page's Lead Ads data is only readable with a PAGE access
-  // token (from GET /me/accounts, using that user token). MVP connects
-  // whichever Page appears first in that list (see design doc Open
-  // Questions / Premise 4 -- one Page per client for now).
-  async exchangeCodeForPageCredentials(code: string): Promise<MetaPageCredentials> {
-    const clientId = requireEnv('META_APP_ID')
-    const clientSecret = requireEnv('META_APP_SECRET')
-    const redirectUri = requireEnv('META_REDIRECT_URI')
-
-    const tokenParams = new URLSearchParams({
+  // Step 1 of three: the authorization code buys a SHORT-LIVED user token
+  // (~1 hour). On its own that is not enough to store -- see the long-lived
+  // exchange below for why.
+  private async exchangeCodeForUserToken(
+    clientId: string,
+    clientSecret: string,
+    redirectUri: string,
+    code: string
+  ): Promise<string> {
+    const params = new URLSearchParams({
       client_id: clientId,
       client_secret: clientSecret,
       redirect_uri: redirectUri,
       code,
     })
 
-    const tokenResponse = await fetch(`${GRAPH_API_BASE}/oauth/access_token?${tokenParams.toString()}`)
-    const tokenData = (await tokenResponse.json()) as MetaTokenResponse
+    const response = await fetch(`${GRAPH_API_BASE}/oauth/access_token?${params.toString()}`)
+    const data = (await response.json()) as MetaTokenResponse
 
-    if (!tokenData.access_token) {
-      throw new MetaTokenExchangeError(tokenData.error?.message ?? 'Unknown error')
+    if (!data.access_token) {
+      throw new MetaTokenExchangeError(data.error?.message ?? 'Unknown error')
     }
 
+    return data.access_token
+  }
+
+  // Step 2 of three, and the reason this class has three steps instead of two:
+  // a Page token inherits the lifetime of the user token it was minted from. Mint
+  // it from the short-lived token and it dies in about an hour; mint it from a
+  // long-lived one and it does not expire at all. Since we STORE the Page token
+  // and reuse it for every future lead fetch, only the second is viable.
+  //
+  // Throwing rather than falling back to the short-lived token is deliberate: a
+  // fallback would produce a connection that looks healthy, syncs leads for an
+  // hour, then fails every Graph fetch with an expired token -- which from the
+  // dashboard is indistinguishable from Meta having broken something.
+  private async exchangeForLongLivedUserToken(
+    clientId: string,
+    clientSecret: string,
+    shortLivedToken: string
+  ): Promise<string> {
+    const params = new URLSearchParams({
+      grant_type: 'fb_exchange_token',
+      client_id: clientId,
+      client_secret: clientSecret,
+      fb_exchange_token: shortLivedToken,
+    })
+
+    const response = await fetch(`${GRAPH_API_BASE}/oauth/access_token?${params.toString()}`)
+    const data = (await response.json()) as MetaTokenResponse
+
+    if (!data.access_token) {
+      throw new MetaTokenExchangeError(`Long-lived token exchange failed: ${data.error?.message ?? 'Unknown error'}`)
+    }
+
+    return data.access_token
+  }
+
+  // Step 3 of three: a Page's Lead Ads data is only readable with a PAGE access
+  // token, obtained from GET /me/accounts using the (now long-lived) user token.
+  // MVP connects whichever Page appears first in that list (see design doc Open
+  // Questions / Premise 4 -- one Page per client for now).
+  async exchangeCodeForPageCredentials(code: string): Promise<MetaPageCredentials> {
+    const clientId = requireEnv('META_APP_ID')
+    const clientSecret = requireEnv('META_APP_SECRET')
+    const redirectUri = requireEnv('META_REDIRECT_URI')
+
+    const shortLivedToken = await this.exchangeCodeForUserToken(clientId, clientSecret, redirectUri, code)
+    const longLivedToken = await this.exchangeForLongLivedUserToken(clientId, clientSecret, shortLivedToken)
+
     const pagesParams = new URLSearchParams({
-      access_token: tokenData.access_token,
+      access_token: longLivedToken,
       fields: 'id,name,access_token',
     })
 

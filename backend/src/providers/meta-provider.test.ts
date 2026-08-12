@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { MetaMisconfiguredError } from '../lib/meta-connect-errors.js'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { MetaMisconfiguredError, MetaTokenExchangeError } from '../lib/meta-connect-errors.js'
 import { metaProvider } from './meta-provider.js'
 
 // getOAuthUrl is the last thing that runs before we hand a client to Facebook.
@@ -98,5 +98,70 @@ describe('getOAuthUrl', () => {
     delete process.env.META_APP_ID
 
     expect(() => metaProvider.getOAuthUrl('state')).toThrow(/META_APP_ID/)
+  })
+})
+
+// A Page access token inherits the lifetime of the user token it was minted
+// from. Minting it from the short-lived token yields a connection that works for
+// about an hour and then fails every lead fetch -- with no error at connect time
+// and nothing in the dashboard to distinguish it from Meta breaking. These tests
+// exist because that failure is invisible until it is a production incident.
+describe('exchangeCodeForPageCredentials', () => {
+  function mockFetchSequence(responses: unknown[]): ReturnType<typeof vi.fn> {
+    const fetchMock = vi.fn()
+    for (const body of responses) {
+      fetchMock.mockResolvedValueOnce({ json: async () => body } as unknown as Response)
+    }
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+
+  beforeEach(() => {
+    process.env.META_APP_SECRET = 'app-secret'
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('exchanges the short-lived token for a long-lived one before reading Pages', async () => {
+    const fetchMock = mockFetchSequence([
+      { access_token: 'short-lived-token' },
+      { access_token: 'long-lived-token' },
+      { data: [{ id: '111', name: 'Test Page', access_token: 'page-token' }] },
+    ])
+
+    const creds = await metaProvider.exchangeCodeForPageCredentials('auth-code')
+
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+
+    const exchangeUrl = String(fetchMock.mock.calls[1]?.[0])
+    expect(exchangeUrl).toContain('grant_type=fb_exchange_token')
+    expect(exchangeUrl).toContain('fb_exchange_token=short-lived-token')
+
+    // The whole point: /me/accounts must be called with the LONG-lived token.
+    // Called with the short-lived one, everything below still succeeds and the
+    // stored Page token silently expires within the hour.
+    const pagesUrl = String(fetchMock.mock.calls[2]?.[0])
+    expect(pagesUrl).toContain('/me/accounts')
+    expect(pagesUrl).toContain('access_token=long-lived-token')
+    expect(pagesUrl).not.toContain('short-lived-token')
+
+    expect(creds).toEqual({ pageId: '111', pageName: 'Test Page', pageAccessToken: 'page-token' })
+  })
+
+  it('fails the connect rather than falling back to the short-lived token', async () => {
+    const fetchMock = mockFetchSequence([
+      { access_token: 'short-lived-token' },
+      { error: { message: 'Invalid OAuth access token' } },
+    ])
+
+    await expect(metaProvider.exchangeCodeForPageCredentials('auth-code')).rejects.toBeInstanceOf(
+      MetaTokenExchangeError
+    )
+
+    // Stopped at the failed exchange -- it must not go on to mint a Page token
+    // from a token it already knows is short-lived.
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 })
