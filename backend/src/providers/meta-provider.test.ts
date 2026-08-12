@@ -42,11 +42,11 @@ describe('getOAuthUrl', () => {
   // screen -- an error whose text names no cause, so the regression it guards
   // against would be invisible until a client hit it.
   it('sends config_id instead of scope when a login configuration is set', () => {
-    process.env.META_LOGIN_CONFIG_ID = '1063430079829327'
+    process.env.META_LOGIN_CONFIG_ID = '000000000000001'
 
     const url = new URL(metaProvider.getOAuthUrl('client-1:abc123'))
 
-    expect(url.searchParams.get('config_id')).toBe('1063430079829327')
+    expect(url.searchParams.get('config_id')).toBe('000000000000001')
     expect(url.searchParams.get('scope')).toBeNull()
     // Without this, the dialog can return a token where we expect a `code`,
     // and exchangeCodeForPageCredentials has nothing to exchange.
