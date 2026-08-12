@@ -65,6 +65,13 @@ jobs:
           VITE_COGNITO_CLIENT_ID: ${{ vars.VITE_COGNITO_CLIENT_ID }}
           VITE_COGNITO_REDIRECT_URI: ${{ vars.VITE_COGNITO_REDIRECT_URI }}
           VITE_CDN_URL: ${{ vars.VITE_CDN_URL }}
+          # Vite inlines these at build time. Omitting them does not fail the
+          # build -- it ships a bundle where WhatsApp.tsx's META_APP_ID guard
+          # trips and the "Connect with Meta" button only ever toasts
+          # "Meta WhatsApp is not configured yet". Works locally off .env,
+          # broken in every deploy, with nothing in CI to say so.
+          VITE_META_APP_ID: ${{ vars.VITE_META_APP_ID }}
+          VITE_META_WHATSAPP_CONFIG_ID: ${{ vars.VITE_META_WHATSAPP_CONFIG_ID }}
         run: npm run build
 
   # Deploy jobs only run for real pushes to main (never for PRs or other
@@ -264,6 +271,8 @@ jobs:
           VITE_CDN_URL: ${{ vars.VITE_CDN_URL }}
           VITE_STAFF_COGNITO_CLIENT_ID: ${{ vars.VITE_STAFF_COGNITO_CLIENT_ID }}
           VITE_STAFF_COGNITO_REGION: ${{ vars.VITE_STAFF_COGNITO_REGION }}
+          VITE_META_APP_ID: ${{ vars.VITE_META_APP_ID }}
+          VITE_META_WHATSAPP_CONFIG_ID: ${{ vars.VITE_META_WHATSAPP_CONFIG_ID }}
         run: npm run build
 
       - uses: aws-actions/configure-aws-credentials@v4
