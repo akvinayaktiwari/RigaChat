@@ -31,9 +31,10 @@ describe('getOAuthUrl', () => {
     // produce a connection that looks fine and returns no lead data.
     expect(url.searchParams.get('scope')).toContain('leads_retrieval')
     expect(url.searchParams.get('scope')).toContain('pages_show_list')
-    // Meta rejects any App Review submission for leads_retrieval that does not
-    // also request pages_manage_ads, however good the screencast is.
-    expect(url.searchParams.get('scope')).toContain('pages_manage_ads')
+    // pages_manage_ads is deliberately NOT requested: this app's App Review
+    // submission does not offer it, and asking for a permission the app cannot
+    // request breaks the consent screen. See the note in meta-provider.ts.
+    expect(url.searchParams.get('scope')).not.toContain('pages_manage_ads')
   })
 
   // Facebook Login for Business drives the consent screen from a dashboard

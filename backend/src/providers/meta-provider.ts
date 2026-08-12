@@ -12,16 +12,19 @@ const GRAPH_API_BASE = 'https://graph.facebook.com/v21.0'
 // pages_show_list: list the Pages the client manages.
 // pages_manage_metadata: required to read/manage a Page's webhook subscriptions.
 // pages_read_engagement + leads_retrieval: required to read Lead Ads field_data.
-// pages_manage_ads: not used by any call we make, but Meta REQUIRES it to be
-// present in the App Review submission for leads_retrieval -- a submission
-// without it is rejected regardless of how good the screencast is.
+// pages_manage_ads was briefly listed here on the strength of Meta's Lead Ads
+// docs ("your submission must include leads_retrieval and pages_manage_ads").
+// This app's own App Review submission does not offer that permission at all,
+// and requesting a permission the app cannot request appears to be why the
+// consent screen answered "Facebook Login is currently unavailable for this
+// app, since we are updating additional details" rather than any error naming
+// the permission. The dashboard is the authority here, not the docs.
 // leads_retrieval requires Meta App Review before this scope works for any
 // Page outside the app's own test Pages/roles -- see design doc Dependencies.
 const META_OAUTH_SCOPES = [
   'pages_show_list',
   'pages_manage_metadata',
   'pages_read_engagement',
-  'pages_manage_ads',
   'leads_retrieval',
 ].join(',')
 
