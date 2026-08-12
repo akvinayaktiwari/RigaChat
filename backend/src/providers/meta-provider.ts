@@ -89,9 +89,29 @@ export class MetaProvider {
       client_id: clientId,
       redirect_uri: redirectUri,
       state,
-      scope: META_OAUTH_SCOPES,
       response_type: 'code',
     })
+
+    // This app is configured for Facebook Login for Business, where the consent
+    // screen is driven by a dashboard *configuration* rather than by a scope
+    // string. Sending raw scopes against a config-driven app is what produced
+    // Meta's "Facebook Login is currently unavailable for this app, since we are
+    // updating additional details" screen: there was no configuration matching
+    // the Page permissions we asked for, and Meta reports that as a vague
+    // "try again later" instead of an error naming the cause.
+    //
+    // override_default_response_type is required alongside config_id -- without
+    // it the dialog can hand back a token instead of the `code` we exchange.
+    //
+    // Falls back to the scope string when the env var is unset, so local dev and
+    // any app not on Login for Business keep working unchanged.
+    const configId = process.env.META_LOGIN_CONFIG_ID
+    if (configId) {
+      params.set('config_id', configId)
+      params.set('override_default_response_type', 'true')
+    } else {
+      params.set('scope', META_OAUTH_SCOPES)
+    }
 
     return `${META_OAUTH_URL}?${params.toString()}`
   }

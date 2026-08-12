@@ -12,6 +12,7 @@ beforeEach(() => {
   process.env.META_APP_ID = '1620710049625709'
   process.env.META_REDIRECT_URI = 'https://api.example.com/api/integrations/meta/callback'
   delete process.env.NODE_ENV
+  delete process.env.META_LOGIN_CONFIG_ID
 })
 
 afterEach(() => {
@@ -30,6 +31,36 @@ describe('getOAuthUrl', () => {
     // produce a connection that looks fine and returns no lead data.
     expect(url.searchParams.get('scope')).toContain('leads_retrieval')
     expect(url.searchParams.get('scope')).toContain('pages_show_list')
+    // Meta rejects any App Review submission for leads_retrieval that does not
+    // also request pages_manage_ads, however good the screencast is.
+    expect(url.searchParams.get('scope')).toContain('pages_manage_ads')
+  })
+
+  // Facebook Login for Business drives the consent screen from a dashboard
+  // configuration, not a scope string. Sending scopes to a config-driven app is
+  // what produced Meta's "Facebook Login is currently unavailable for this app"
+  // screen -- an error whose text names no cause, so the regression it guards
+  // against would be invisible until a client hit it.
+  it('sends config_id instead of scope when a login configuration is set', () => {
+    process.env.META_LOGIN_CONFIG_ID = '1063430079829327'
+
+    const url = new URL(metaProvider.getOAuthUrl('client-1:abc123'))
+
+    expect(url.searchParams.get('config_id')).toBe('1063430079829327')
+    expect(url.searchParams.get('scope')).toBeNull()
+    // Without this, the dialog can return a token where we expect a `code`,
+    // and exchangeCodeForPageCredentials has nothing to exchange.
+    expect(url.searchParams.get('override_default_response_type')).toBe('true')
+    expect(url.searchParams.get('response_type')).toBe('code')
+    expect(url.searchParams.get('state')).toBe('client-1:abc123')
+  })
+
+  it('keeps the scope flow when no login configuration is set', () => {
+    const url = new URL(metaProvider.getOAuthUrl('client-1:abc123'))
+
+    expect(url.searchParams.get('config_id')).toBeNull()
+    expect(url.searchParams.get('override_default_response_type')).toBeNull()
+    expect(url.searchParams.get('scope')).toContain('leads_retrieval')
   })
 
   // The failure this guard exists for: Meta ACCEPTS a localhost redirect,
