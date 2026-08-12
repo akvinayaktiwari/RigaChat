@@ -122,6 +122,19 @@ export default function WhatsApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Preloaded on mount, not on click. FB.login() opens a popup, and browsers
+  // only allow that inside the user gesture that triggered it -- awaiting the
+  // SDK's <script> download inside the click handler spends the gesture on a
+  // network round trip, after which window.open is blocked. That is what the
+  // SDK reports as POPUP_MAYBE_BLOCKED_OAUTH.
+  useEffect(() => {
+    void loadFacebookSdk().catch(() => {
+      // Deliberately silent: a failed preload is surfaced by the window.FB
+      // check in handleMetaConnect, where the user is actually asking for it.
+      // Toasting on page load would blame the user for merely visiting.
+    })
+  }, [])
+
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
       if (event.origin !== META_EMBEDDED_SIGNUP_ORIGIN) return
@@ -193,13 +206,17 @@ export default function WhatsApp() {
       toast.show('Meta WhatsApp is not configured yet', 'error')
       return
     }
+    // Must stay synchronous from here to FB.login() -- see the preload comment
+    // on the mount effect above.
+    if (!window.FB) {
+      toast.show('Meta SDK is still loading, try again in a moment', 'error')
+      return
+    }
 
     setMetaConnecting(true)
     metaSessionDataRef.current = null
 
     try {
-      await loadFacebookSdk()
-
       const code = await new Promise<string | null>((resolve) => {
         window.FB?.login(
           (response) => resolve(response.authResponse?.code ?? null),
