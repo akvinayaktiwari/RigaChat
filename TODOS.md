@@ -81,21 +81,63 @@
 **Priority:** P2
 **Depends on:** None
 
-### Meta app is in Development mode — no client can connect Lead Ads at all
+### Meta Lead Ads: consent screen still answers "Feature Unavailable"
 
-**What:** Meta app `1620710049625709` ("Vyostra AI Platform") is in Development mode with exactly one role holder, Facebook user `4512644655638994` (verified via `GET /v21.0/<app-id>/roles`, re-checked 2026-08-09 — unchanged since 2026-08-07). Any other Facebook account starting the OAuth flow gets Meta's "App not active — the app developer is aware of the issue" screen. That wording is misleading: nothing is broken and nobody is aware. It is a permissions refusal.
+**What:** `Meta Ads -> Connect with Facebook` never reaches a consent screen. Meta
+answers *"Facebook Login is currently unavailable for this app, since we are
+updating additional details for this app. Please try again later."* First seen
+2026-08-11 immediately after the app was published; still occurring 2026-08-12.
 
-**Why:** This is not a partial degradation. Development mode admits ONLY role holders, so the Meta Lead Ads integration is structurally closed to every customer. The code path is correct and now reports failures properly (`bc55944`) — but no client reaches it.
+**Everything below is verified DONE and is not the cause:**
+- App `1620710049625709` is **Published (Live)**; business verified as a **Tech
+  Provider** (2026-07-27); Required Actions empty; Alert Inbox has no warnings.
+- App-level webhook configured: object `page`, field `leadgen`, callback
+  `https://vyostra.com/api/webhooks/meta`. Confirmed via
+  `GET /{app-id}/subscriptions`. A dashboard test payload was delivered, passed
+  signature verification, and was processed correctly.
+- `vyostra.com/api/*` now routes to the Lambda — CloudFront `E2ZWB77M7V8J9X`
+  (NOT `E24Z9D4G4FY8PH`, which serves `beepboop.drsyeta.in`) had zero cache
+  behaviors, so every `/api/*` path returned the SPA. Fixed with an `/api/*`
+  behavior onto the Lambda Function URL origin.
+- Deauthorize + Data Deletion callback URLs set (both were EMPTY at publish time).
+- Valid OAuth Redirect URIs, `META_REDIRECT_URI` (prod), `META_WEBHOOK_VERIFY_TOKEN`
+  (prod matches local), `META_LOGIN_CONFIG_ID` on both Lambdas — all correct.
+- **Facebook Login on this app WORKS.** Proven 2026-08-12 via the WhatsApp
+  Embedded Signup flow: `FB.login()` opened a popup and the SDK logged
+  `client_login_start` -> `client_login_end` -> `client_login_complete_heartbeat`.
+  So this is NOT an app-wide gate and NOT a Meta outage.
 
-**Context:** Cannot be fixed in code; it is Meta App Dashboard work, and only the admin account can start it. Two steps:
-1. **To unblock testing now:** add role holders at `developers.facebook.com/apps/1620710049625709/roles/`. Invites must be accepted by the invited account.
-2. **To open it to clients:** take the app Live — needs Privacy Policy URL, app icon, and category under Settings → Basic, plus a Data Deletion callback. Separately, the `leads_retrieval` scope needs **App Review** before any Page outside the app's own roles returns lead data (`meta-provider.ts:11` already documents this).
+**Leading hypothesis (untested as of 2026-08-12):** the Lead Ads Login for
+Business configuration `1581255013395833` requests **`pages_manage_ads`**, which
+this app cannot request — the App Review "Allowed usage" list contains
+`pages_manage_metadata`, `pages_show_list`, `business_management`,
+`leads_retrieval`, `public_profile` and the two WhatsApp permissions, and **no
+`pages_manage_ads`**. Requesting a permission the app does not hold is the only
+difference found between the working WhatsApp configuration and the failing Lead
+Ads one. (`pages_manage_ads` was added on the strength of Meta's Lead Ads docs;
+the dashboard is the authority and disagrees.)
 
-Also confirm `META_REDIRECT_URI` is set to the deployed callback before going Live — it is `http://localhost:3000/...` in `backend/.env` today. The production guard added in `bc55944` catches that before the redirect rather than letting Meta answer "URL Blocked" after the client has left the dashboard.
+**Next action:** edit configuration `1581255013395833` to remove
+`pages_manage_ads`, leaving `pages_show_list`, `pages_manage_metadata`,
+`pages_read_engagement`, `leads_retrieval`. Retry the connect. If the permission
+cannot be edited after creation, create a new configuration and update
+`META_LOGIN_CONFIG_ID` on `rigachat-api` and `rigachat-api-streaming`. The code
+side is already done (`9da0425` removed the scope; a test asserts its absence).
 
-**Effort:** M (mostly waiting on Meta App Review)
+**If that fails:** file a Platform Bug Report under **Facebook Login** (draft text
+was prepared but MUST be rewritten — it claimed an app-wide Login failure, which
+is now disproven). Tech Provider status also grants Direct Support.
+
+**Still needed for App Review regardless:** a screencast. `leads_retrieval` and
+`public_profile` are already complete in the submission; the other five
+permissions each need "Upload screencast showing the end-to-end user experience",
+and the two WhatsApp ones also need API test calls. One recording can serve
+several permissions. See `docs/META_APP_REVIEW_SUBMISSION.md` and
+`scripts/record-meta-screencast.sh`.
+
+**Effort:** S to test the hypothesis; M if it goes to Meta support
 **Priority:** P0
-**Depends on:** Meta admin account 4512644655638994
+**Depends on:** Meta admin account 4512644655638994 (dashboard-only work)
 
 ### Meta deletion requests have no un-notified listing, and Meta retries duplicate them
 
