@@ -93,7 +93,20 @@ export async function renderRoute(url: string): Promise<{ html: string; head: st
   return { html, head }
 }
 
-/** Every route the prerender script should emit. */
+/**
+ * Every route the prerender script should emit.
+ *
+ * Only routes that render without the app's providers belong here. The tree
+ * mounted above is deliberately provider-free so Cognito and other
+ * browser-only code stays out of the Node render, which means any route
+ * reaching `useSubscription()` will throw "useSubscription must be used within
+ * a SubscriptionProvider" at build time, in a file nobody edited.
+ *
+ * `/` is the trap: the landing page calls `useTierCheckout`, which calls
+ * `useSubscription()`. Adding it here fails the build. Prerendering it means
+ * wrapping the tree in the providers first, and that is a real change, not a
+ * one-line addition to this array.
+ */
 export function getRoutes(): string[] {
   return ['/blog', ...getAllSlugs().map((slug) => `/blog/${slug}`), '/privacy-policy', '/terms-of-service']
 }

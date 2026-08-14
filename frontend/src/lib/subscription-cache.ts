@@ -59,9 +59,19 @@ export function readSubscriptionCache(clientId: string): SubscriptionSummary | n
   }
 }
 
+// `usage` is deliberately dropped before storing. Everything else here is an
+// entitlement -- what the account is allowed to do -- which changes only when a
+// plan changes and is safe to serve from cache for an hour. A usage counter is
+// the opposite: it moves with every conversation, so a cached one is wrong
+// almost immediately. No page reads it off the provider today, and this keeps
+// it that way by construction rather than by convention: a future
+// "47 of 100 conversations" display fed from useSubscription() gets `undefined`
+// on a cache hit and has to wait for the revalidation, instead of silently
+// rendering a stale number that looks authoritative.
 export function writeSubscriptionCache(clientId: string, data: SubscriptionSummary): void {
   try {
-    const payload: CachedSubscription = { fetchedAt: Date.now(), data }
+    const { usage: _usage, ...cacheable } = data
+    const payload: CachedSubscription = { fetchedAt: Date.now(), data: cacheable }
     sessionStorage.setItem(storageKey(clientId), JSON.stringify(payload))
   } catch {
     // Quota, or a privacy mode that blocks storage. The provider still works

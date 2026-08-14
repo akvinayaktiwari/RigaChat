@@ -524,7 +524,12 @@ export interface SubscriptionSummary {
   status: SubscriptionStatus
   trialEndsAt: string | null
   features: EntitlementFeatures
-  usage: { chatConversations: number }
+  // Optional because the sessionStorage cache deliberately does not store it --
+  // see subscription-cache.ts. Entitlements are stable enough to cache for an
+  // hour; a usage counter is not, and a stale "47 of 100 conversations" is
+  // worse than no number. A cache hit therefore has no usage until the
+  // revalidation lands. Read it as "absent means not loaded yet", never as zero.
+  usage?: { chatConversations: number }
 }
 
 export interface PaymentRecord {

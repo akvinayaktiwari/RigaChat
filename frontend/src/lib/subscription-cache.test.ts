@@ -35,11 +35,23 @@ afterEach(() => {
 })
 
 describe('writeSubscriptionCache / readSubscriptionCache', () => {
-  it('round-trips a summary under a clientId-scoped key', () => {
+  it('round-trips the entitlements under a clientId-scoped key', () => {
     writeSubscriptionCache(CLIENT_ID, SUMMARY)
 
+    const { usage: _usage, ...entitlements } = SUMMARY
     expect(sessionStorage.getItem(KEY)).not.toBeNull()
-    expect(readSubscriptionCache(CLIENT_ID)).toEqual(SUMMARY)
+    expect(readSubscriptionCache(CLIENT_ID)).toEqual(entitlements)
+  })
+
+  // Entitlements are safe to cache for an hour; a usage counter is not. Caching
+  // it would let Settings render a stale "47 of 100 conversations" that reads as
+  // authoritative. Absent means not loaded yet, and the provider revalidates on
+  // mount either way.
+  it('never stores the usage counter', () => {
+    writeSubscriptionCache(CLIENT_ID, SUMMARY)
+
+    expect(readSubscriptionCache(CLIENT_ID)?.usage).toBeUndefined()
+    expect(sessionStorage.getItem(KEY)).not.toContain('chatConversations')
   })
 
   // The reason the key is scoped at all: signing into a second account must

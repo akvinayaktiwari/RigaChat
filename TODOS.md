@@ -40,19 +40,35 @@
 **Priority:** P2
 **Depends on:** None
 
-### Two latent traps in the subscription cache
+### [RESOLVED 2026-08-14] Two traps in the subscription cache — one of them was live
 
-**What:** Neither is a live bug; both are things the next person could walk into.
+**Correction:** this item claimed "Neither is a live bug" and that `usage` was read by no
+page "(verified)". That was wrong. `Settings.tsx:67` takes `subscription` from
+`useSubscription()` and passes it to `SubscriptionSection`, which renders
+`usage.chatConversations` as "N of M used". Because the whole summary was cached for an
+hour, that number could be an hour stale on any cache hit. Found by `tsc` refusing the
+change, not by re-reading the code — the original grep missed it because the component
+destructures `usage` out of a prop rather than reading `.usage` anywhere.
+
+**Fixed:** `writeSubscriptionCache` now drops `usage` before storing, and
+`SubscriptionSummary.usage` is optional to make that honest at the type level. The
+provider revalidates on mount regardless (`useSubscription.ts:126`, "Revalidate either
+way"), so a cache hit paints entitlements instantly and the counter arrives with the
+request. `SubscriptionSection` shows "Loading" for that one request rather than a stale
+number. Absent means not loaded yet, never zero — stated in the type, the cache and the
+component. `getRoutes()` in `prerender-entry.tsx` now documents the `/` trap.
+
+**What it was:** Neither was thought to be a live bug; both were things the next person could walk into.
 
 1. **`usage.chatConversations` is cached.** `SubscriptionSummary` carries a usage counter and the whole object goes into sessionStorage. No page reads it from the provider today (verified), but a future "you've used 47 of 100 conversations" display fed from `useSubscription()` would show a stale number until the next revalidation.
 2. **Prerender would throw if the landing page were ever added to it.** `useTierCheckout` now calls `useSubscription()`, which throws outside a provider. `prerender-entry.tsx` mounts only blog routes, so this cannot happen today; adding `/` to `getRoutes()` would fail the build with "useSubscription must be used within a SubscriptionProvider".
 
 **Why:** Both fail in ways that point somewhere other than the cause — a wrong number on screen, or a build error in a file nobody edited.
 
-**Context:** (1) is fixed either by excluding `usage` from what gets cached, or by having usage-displaying pages read it fresh. (2) is fixed by wrapping the prerender tree in the providers, which the file deliberately avoids so Cognito/browser-only code stays out of the Node render — so the honest fix is a comment on `getRoutes()` rather than a structural change.
+**Context:** (1) was fixed by excluding `usage` from what gets cached. (2) was fixed by commenting `getRoutes()`, not structurally: wrapping the prerender tree in the providers is what the file deliberately avoids so Cognito/browser-only code stays out of the Node render, so prerendering `/` remains a real change rather than a one-line array addition.
 
-**Effort:** S
-**Priority:** P3
+**Effort:** done
+**Priority:** was P3 — trap (1) was really a live bug, so this was underrated
 **Depends on:** None
 
 ### Add a field-mapping UI for Meta Lead Ads custom questions

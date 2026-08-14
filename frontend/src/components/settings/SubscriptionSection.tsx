@@ -60,6 +60,17 @@ export default function SubscriptionSection({ subscription, onUpgradeClick }: Su
   const limits = describeFeatures(features)
   const chatLimit = features.chat.limits.conversations
 
+  // `usage` is absent on a cache hit: subscription-cache.ts stores entitlements
+  // but never the counter, because a stale "47 of 100" reads as authoritative
+  // and is wrong the moment a conversation happens. The provider revalidates on
+  // mount either way, so this shows for the length of one request and is
+  // replaced by the real number. Absent means not loaded yet, never zero.
+  const usageLabel = !usage
+    ? 'Loading'
+    : chatLimit === null
+      ? `${usage.chatConversations} used`
+      : `${usage.chatConversations} of ${chatLimit} used`
+
   return (
     <div className="bg-white rounded-2xl border border-black/5 p-6 shadow-sm">
       <div className="flex items-center justify-between pb-4 border-b border-gray-50 mb-6">
@@ -116,7 +127,7 @@ export default function SubscriptionSection({ subscription, onUpgradeClick }: Su
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Usage this period</p>
             <LimitRow
               label="Conversations"
-              value={chatLimit === null ? `${usage.chatConversations} used` : `${usage.chatConversations} of ${chatLimit} used`}
+              value={usageLabel}
             />
           </div>
         )}
