@@ -28,15 +28,19 @@
 **Priority:** P2
 **Depends on:** None
 
-### [RESOLVED 2026-08-11] Frontend has no test runner — runner added; three libs still uncovered
+### [RESOLVED 2026-08-14] Frontend has no test runner — runner added, and the three named libs are now covered
 
 **What it was:** `frontend/` had no vitest/jest config and zero test files, so the frontend shipped with no automated cover at all while the backend had 300+ tests.
 
 **Fixed:** vitest + jsdom + @testing-library/react, pinned to the same vitest version as the backend so both halves run the same way. `frontend/vitest.config.ts`, a `test` script, and a "Run frontend tests" step in `ci.yml`'s check-frontend job (which previously only type-checked and built). 28 tests land with it, covering `lib/subscription-cache.ts` and `hooks/useSubscription.ts`.
 
-**Still open, narrower:** the three libs this item originally named remain untested — `lib/phone.ts` (E.164 normalization), `lib/lead-ref.ts` (URL <-> LeadRef round-tripping) and `lib/lead-display.ts` (the urgency tiers the lead queue is ordered by). They are pure functions, need no DOM, and `leadUrgency`'s tiers still have to agree exactly with `lead-inbox-service.ts`'s server-side sort with nothing enforcing it. The setup cost that used to block this is now zero.
+**Also fixed 2026-08-14:** the three libs this item named are now covered — `lib/phone.ts` (wa.me/tel normalization, including the explicit-`+` and `00` international paths that must never take the India default), `lib/lead-ref.ts` (LeadRef round-tripping plus the legacy `?botId=`-only fallback) and `lib/lead-display.ts` (urgency labels and tiers). 56 tests, taking the frontend suite from 28 to 84.
 
-**Effort:** S (runner done; the three libs are ~30 min of CC time)
+The `leadUrgency` half carries a tier cross-check: a fixture matrix asserts the frontend's tone lands in the same tier `lead-inbox-service.ts` sorts by, so a row labelled "Overdue" can never render below one that is not. **Its `TIER_*` block is a hand-copy** — nothing imports across the two packages, so it does not auto-fail when the server's constants change. The server side is held by `lead-inbox-service.test.ts`'s own ordering tests; changing the tiers means updating both in the same commit. The pairing is the guard, not either file alone.
+
+**Still open:** nothing from this item.
+
+**Effort:** done
 **Priority:** P2
 **Depends on:** None
 
