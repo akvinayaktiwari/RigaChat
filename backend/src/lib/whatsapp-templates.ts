@@ -92,10 +92,12 @@ export const WHATSAPP_TEMPLATES: WhatsAppTemplateDefinition[] = [
   },
   {
     name: 'lead_welcome_qualify_1',
-    // Submitted as UTILITY because it answers an enquiry the lead initiated,
-    // but Meta reclassifies openers like this to MARKETING fairly often. If it
-    // comes back MARKETING that is a pricing change, not a bug — do not
-    // rewrite the copy to fight it.
+    // Submitted as UTILITY because it answers an enquiry the lead initiated.
+    // Meta RECLASSIFIED it to MARKETING on review (observed 2026-08-15 on WABA
+    // 1678448677253148: created UTILITY, approved MARKETING). Left as UTILITY
+    // deliberately — submitting the cheaper category costs nothing, since Meta
+    // reclassifies rather than rejects, and a future wording might hold as
+    // UTILITY. Budget for MARKETING pricing on this one regardless.
     category: 'UTILITY',
     body: "Hi {{1}}, thanks for your interest in {{2}}.\n\nTo point you to the right property, could you tell me your budget range and which area you're considering?",
     bodyExample: ['Ravi', 'Skyline Residences'],
