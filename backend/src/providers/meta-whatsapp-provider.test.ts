@@ -138,3 +138,58 @@ describe('GupshupProvider.sendTemplate', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })
+
+describe('MetaWhatsAppProvider.createMessageTemplate', () => {
+  it('emits HEADER, BODY, FOOTER in the order Meta requires and honours the language override', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ id: '1', status: 'PENDING', category: 'UTILITY' }), { status: 200 })
+    )
+
+    await metaWhatsAppProvider.createMessageTemplate('waba-1', 'tok', {
+      name: 'hello_world',
+      category: 'UTILITY',
+      language: 'en_US',
+      header: 'Hello World',
+      footer: 'sample message',
+      body: 'Welcome!',
+      bodyExample: [],
+      sentBy: 'test',
+    })
+
+    const body = sentBody()
+    expect(body.language).toBe('en_US')
+    expect((body.components as { type: string }[]).map((c) => c.type)).toEqual(['HEADER', 'BODY', 'FOOTER'])
+    // A zero-placeholder body must carry no example at all.
+    const bodyComponent = (body.components as { type: string; example?: unknown }[])[1]
+    expect(bodyComponent.example).toBeUndefined()
+  })
+
+  it('surfaces error_user_msg rather than the generic "Invalid parameter"', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          error: {
+            message: 'Invalid parameter',
+            error_user_title: 'Leading or trailing params not allowed',
+            error_user_msg: "Variables can't be at the start or end of the template.",
+          },
+        }),
+        { status: 400 }
+      )
+    )
+
+    const result = await metaWhatsAppProvider.createMessageTemplate('waba-1', 'tok', {
+      name: 'bad',
+      category: 'UTILITY',
+      body: '{{1}}',
+      bodyExample: ['x'],
+      sentBy: 'test',
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error).toContain("Variables can't be at the start or end")
+      expect(result.error).not.toBe('Invalid parameter')
+    }
+  })
+})

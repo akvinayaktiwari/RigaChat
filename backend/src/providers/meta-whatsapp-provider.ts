@@ -35,7 +35,8 @@ function requireEnv(name: string): string {
 }
 
 interface MetaTemplateComponent {
-  type: 'BODY' | 'BUTTONS'
+  type: 'HEADER' | 'BODY' | 'FOOTER' | 'BUTTONS'
+  format?: 'TEXT'
   text?: string
   example?: { body_text: string[][] }
   buttons?: { type: string; text: string; url?: string }[]
@@ -79,12 +80,22 @@ export type TemplateCreateResult =
 // whatsapp-templates.ts. body_text is an array OF arrays: one inner array per
 // example set, and we always send exactly one.
 function buildComponents(definition: WhatsAppTemplateDefinition): MetaTemplateComponent[] {
+  const components: MetaTemplateComponent[] = []
+
+  // Order matters to Meta: HEADER, BODY, FOOTER, BUTTONS.
+  if (definition.header) {
+    components.push({ type: 'HEADER', format: 'TEXT', text: definition.header })
+  }
+
   const body: MetaTemplateComponent = { type: 'BODY', text: definition.body }
   if (definition.bodyExample.length > 0) {
     body.example = { body_text: [definition.bodyExample] }
   }
+  components.push(body)
 
-  const components: MetaTemplateComponent[] = [body]
+  if (definition.footer) {
+    components.push({ type: 'FOOTER', text: definition.footer })
+  }
 
   if (definition.buttons && definition.buttons.length > 0) {
     components.push({
@@ -262,7 +273,7 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
         headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: definition.name,
-          language: WHATSAPP_TEMPLATE_LANGUAGE,
+          language: definition.language ?? WHATSAPP_TEMPLATE_LANGUAGE,
           category: definition.category,
           components: buildComponents(definition),
         }),

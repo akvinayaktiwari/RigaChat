@@ -17,7 +17,23 @@
 //     scripts/create-whatsapp-templates.ts [--dry-run]
 
 import { metaWhatsAppProvider } from '../src/providers/meta-whatsapp-provider.js'
-import { WHATSAPP_TEMPLATES, WHATSAPP_TEMPLATE_LANGUAGE } from '../src/lib/whatsapp-templates.js'
+import {
+  WHATSAPP_TEMPLATES,
+  WHATSAPP_TEMPLATE_LANGUAGE,
+  type WhatsAppTemplateDefinition,
+} from '../src/lib/whatsapp-templates.js'
+
+// A template's identity on a WABA is name + language, not name alone: the
+// same name in two languages is two separate templates, and Meta only rejects
+// a duplicate when BOTH match. Keying the skip check on name alone would
+// wrongly skip a template that exists only in another language.
+function templateKey(name: string, language: string): string {
+  return `${name}::${language}`
+}
+
+function languageOf(definition: WhatsAppTemplateDefinition): string {
+  return definition.language ?? WHATSAPP_TEMPLATE_LANGUAGE
+}
 
 interface ScriptConfig {
   wabaId: string
@@ -38,11 +54,13 @@ function readConfig(): ScriptConfig {
   return { wabaId, accessToken, dryRun: process.argv.includes('--dry-run') }
 }
 
-function printPlan(existingNames: Set<string>): void {
-  console.log(`\n=== Plan (language: ${WHATSAPP_TEMPLATE_LANGUAGE}) ===`)
+function printPlan(existingKeys: Set<string>): void {
+  console.log(`\n=== Plan (default language: ${WHATSAPP_TEMPLATE_LANGUAGE}) ===`)
   for (const template of WHATSAPP_TEMPLATES) {
-    const action = existingNames.has(template.name) ? 'SKIP (already exists)' : `CREATE as ${template.category}`
-    console.log(`  ${template.name.padEnd(26)} ${action}`)
+    const language = languageOf(template)
+    const exists = existingKeys.has(templateKey(template.name, language))
+    const action = exists ? 'SKIP (already exists)' : `CREATE as ${template.category}`
+    console.log(`  ${template.name.padEnd(26)} [${language}] ${action}`)
     console.log(`  ${' '.repeat(26)} sent by: ${template.sentBy}`)
   }
 }
@@ -54,11 +72,11 @@ interface RunSummary {
   reclassified: { name: string; requested: string; assigned: string }[]
 }
 
-async function createMissing(config: ScriptConfig, existingNames: Set<string>): Promise<RunSummary> {
+async function createMissing(config: ScriptConfig, existingKeys: Set<string>): Promise<RunSummary> {
   const summary: RunSummary = { created: 0, skipped: 0, failed: [], reclassified: [] }
 
   for (const template of WHATSAPP_TEMPLATES) {
-    if (existingNames.has(template.name)) {
+    if (existingKeys.has(templateKey(template.name, languageOf(template)))) {
       summary.skipped++
       continue
     }
@@ -112,8 +130,8 @@ async function main(): Promise<void> {
     console.log(`  - ${template.name} [${template.status}, ${template.category}, ${template.language}]`)
   }
 
-  const existingNames = new Set(existing.map((template) => template.name))
-  printPlan(existingNames)
+  const existingKeys = new Set(existing.map((template) => templateKey(template.name, template.language)))
+  printPlan(existingKeys)
 
   if (config.dryRun) {
     console.log('\nDry run - nothing created.')
@@ -121,7 +139,7 @@ async function main(): Promise<void> {
   }
 
   console.log('\n=== Creating ===')
-  printSummary(await createMissing(config, existingNames))
+  printSummary(await createMissing(config, existingKeys))
 }
 
 main().catch((error) => {

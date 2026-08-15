@@ -24,6 +24,16 @@ export interface WhatsAppTemplateButton {
 export interface WhatsAppTemplateDefinition {
   name: string
   category: WhatsAppTemplateCategory
+  // Overrides WHATSAPP_TEMPLATE_LANGUAGE for this template only. Needed
+  // because a template's identity is name + language, so an en and an en_US
+  // template of the same name are two DIFFERENT templates. Only set it where
+  // matching an existing template exactly matters (hello_world).
+  language?: string
+  // Optional TEXT header shown above the body in bold. No placeholders
+  // supported here -- a parameterised header needs its own example payload.
+  header?: string
+  // Optional small grey line under the body. Never takes placeholders.
+  footer?: string
   body: string
   // One sample value per {{n}} placeholder, in order. Meta REJECTS a template
   // whose body has placeholders and no example, so this is not optional
@@ -42,6 +52,34 @@ export interface WhatsAppTemplateDefinition {
 export const WHATSAPP_TEMPLATE_LANGUAGE = 'en'
 
 export const WHATSAPP_TEMPLATES: WhatsAppTemplateDefinition[] = [
+  {
+    // A zero-parameter smoke-test template, so that every WABA -- ours and
+    // each client's -- has one known-good template to prove delivery with
+    // before any real template has cleared review. Meta auto-creates its
+    // sample on TEST WABAs only, never on a real one, which is exactly when a
+    // working smoke test matters most.
+    //
+    // The wording is deliberately OURS and must stay that way. Meta rejects
+    // any template reusing its sample's exact body text ("Welcome and
+    // congratulations!! This message demonstrates your ability to send...")
+    // even under a different template name, and reports it as
+    // "(#200) Permissions error" -- an error that points nowhere near the
+    // actual cause. Verified against the live API 2026-08-15 by creating the
+    // same three components with generic copy (accepted) and with Meta's copy
+    // (rejected). Do not "restore" the original text.
+    //
+    // The NAME hello_world is kept because it is the conventional smoke-test
+    // name and is what scripts default to; only the copy differs.
+    name: 'hello_world',
+    category: 'UTILITY',
+    language: 'en_US',
+    header: 'Connection test',
+    footer: 'Sent by Vyostra AI',
+    body:
+      'This is a test message confirming that WhatsApp delivery is configured correctly for this account. No action is needed.',
+    bodyExample: [],
+    sentBy: 'Manual smoke tests only -- not sent by application code.',
+  },
   {
     name: 'lead_notification_1',
     category: 'UTILITY',
