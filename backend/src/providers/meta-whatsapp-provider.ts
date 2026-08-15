@@ -1,4 +1,5 @@
 import type { WhatsAppCredentials, WhatsAppProvider, WhatsAppSendResult } from '../lib/whatsapp-provider.js'
+import { WHATSAPP_TEMPLATE_LANGUAGE, type WhatsAppTemplateDefinition } from '../lib/whatsapp-templates.js'
 
 const GRAPH_API_BASE = 'https://graph.facebook.com/v21.0'
 
@@ -25,6 +26,60 @@ function requireEnv(name: string): string {
     )
   }
   return value
+}
+
+interface MetaTemplateComponent {
+  type: 'BODY' | 'BUTTONS'
+  text?: string
+  example?: { body_text: string[][] }
+  buttons?: { type: string; text: string; url?: string }[]
+}
+
+interface MetaTemplateCreateResponse {
+  id?: string
+  status?: string
+  category?: string
+  error?: { message?: string; code?: number; error_subcode?: number }
+}
+
+interface MetaTemplateListResponse {
+  data?: { name: string; status: string; category: string; language: string }[]
+  error?: { message?: string }
+}
+
+export interface ExistingTemplate {
+  name: string
+  status: string
+  category: string
+  language: string
+}
+
+export type TemplateCreateResult =
+  | { success: true; id: string; status: string; category: string }
+  | { success: false; error: string }
+
+// Meta requires an `example` for every {{n}} in the body and rejects the
+// template outright without one -- see the comment on bodyExample in
+// whatsapp-templates.ts. body_text is an array OF arrays: one inner array per
+// example set, and we always send exactly one.
+function buildComponents(definition: WhatsAppTemplateDefinition): MetaTemplateComponent[] {
+  const body: MetaTemplateComponent = { type: 'BODY', text: definition.body }
+  if (definition.bodyExample.length > 0) {
+    body.example = { body_text: [definition.bodyExample] }
+  }
+
+  const components: MetaTemplateComponent[] = [body]
+
+  if (definition.buttons && definition.buttons.length > 0) {
+    components.push({
+      type: 'BUTTONS',
+      buttons: definition.buttons.map((button) =>
+        button.url ? { type: button.type, text: button.text, url: button.url } : { type: button.type, text: button.text }
+      ),
+    })
+  }
+
+  return components
 }
 
 export interface MetaWhatsAppCredentialsExchange {
@@ -106,6 +161,59 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
         error: error instanceof Error ? error.message : String(error),
         retryable: true,
       }
+    }
+  }
+
+  // Template management is WABA-scoped, not phone-number-scoped, so these two
+  // take a wabaId + token directly rather than WhatsAppCredentials (which
+  // carries a phoneNumberId and is about sending). Requires
+  // whatsapp_business_management on the token, NOT whatsapp_business_messaging.
+  async listMessageTemplates(wabaId: string, accessToken: string): Promise<ExistingTemplate[]> {
+    const params = new URLSearchParams({
+      fields: 'name,status,category,language',
+      limit: '200',
+      access_token: accessToken,
+    })
+    const response = await fetch(`${GRAPH_API_BASE}/${wabaId}/message_templates?${params.toString()}`)
+    const data = (await response.json().catch(() => ({}))) as MetaTemplateListResponse
+
+    if (!response.ok || !data.data) {
+      throw new Error(`Listing templates failed: ${data.error?.message ?? `status ${response.status}`}`)
+    }
+
+    return data.data
+  }
+
+  async createMessageTemplate(
+    wabaId: string,
+    accessToken: string,
+    definition: WhatsAppTemplateDefinition
+  ): Promise<TemplateCreateResult> {
+    try {
+      const response = await fetch(`${GRAPH_API_BASE}/${wabaId}/message_templates`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: definition.name,
+          language: WHATSAPP_TEMPLATE_LANGUAGE,
+          category: definition.category,
+          components: buildComponents(definition),
+        }),
+      })
+
+      const data = (await response.json().catch(() => ({}))) as MetaTemplateCreateResponse
+
+      if (response.ok && data.id) {
+        // Meta may return a category different from the one requested -- it
+        // reclassifies on its own. Surfacing the returned value rather than the
+        // requested one is deliberate: it is a pricing change the caller needs
+        // to see.
+        return { success: true, id: data.id, status: data.status ?? 'UNKNOWN', category: data.category ?? definition.category }
+      }
+
+      return { success: false, error: data.error?.message ?? `Meta API returned status ${response.status}` }
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) }
     }
   }
 }
