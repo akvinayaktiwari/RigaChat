@@ -1,4 +1,9 @@
-import type { WhatsAppCredentials, WhatsAppProvider, WhatsAppSendResult } from '../lib/whatsapp-provider.js'
+import type {
+  WhatsAppCredentials,
+  WhatsAppProvider,
+  WhatsAppSendResult,
+  WhatsAppTemplateSend,
+} from '../lib/whatsapp-provider.js'
 
 const GUPSHUP_API_URL = 'https://api.gupshup.io/wa/api/v1/msg'
 
@@ -58,6 +63,31 @@ export class GupshupProvider implements WhatsAppProvider {
         error: error instanceof Error ? error.message : String(error),
         retryable: true,
       }
+    }
+  }
+
+  // An honest, structural "not supported" rather than a silent failure or a
+  // guessed implementation. Gupshup templates are NOT interchangeable with
+  // Meta's: they live at a different endpoint (/template/msg) and are
+  // addressed by a per-app template UUID, not by the name that
+  // whatsapp-templates.ts and WhatsAppTemplateSend are built around. There is
+  // no mapping from one to the other in this codebase, and inventing one
+  // unverified would produce sends that fail at Gupshup with a far more
+  // confusing error than this.
+  //
+  // Returns retryable: false deliberately -- a missing capability is not a
+  // transient fault, so sendWithRetry must not burn three attempts on it.
+  async sendTemplate(
+    _to: string,
+    template: WhatsAppTemplateSend,
+    _credentials: WhatsAppCredentials
+  ): Promise<WhatsAppSendResult> {
+    return {
+      success: false,
+      error:
+        `Template sends are not implemented for the Gupshup provider (template "${template.templateName}"). ` +
+        'Gupshup addresses templates by per-app UUID rather than by name; switch the client to the meta_direct provider to send templates.',
+      retryable: false,
     }
   }
 }

@@ -1,7 +1,13 @@
 import { gupshupProvider } from '../providers/gupshup-provider.js'
 import { metaWhatsAppProvider } from '../providers/meta-whatsapp-provider.js'
 import { decrypt, encrypt } from '../lib/kms.js'
-import type { WhatsAppCredentials, WhatsAppProvider, WhatsAppSendResult } from '../lib/whatsapp-provider.js'
+import type {
+  WhatsAppCredentials,
+  WhatsAppProvider,
+  WhatsAppSendResult,
+  WhatsAppTemplateSend,
+} from '../lib/whatsapp-provider.js'
+import { WHATSAPP_TEMPLATE_LANGUAGE } from '../lib/whatsapp-templates.js'
 import {
   clearActiveWhatsappProvider,
   getClientById,
@@ -96,18 +102,17 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-async function sendWithRetry(
-  to: string,
-  message: string,
-  provider: WhatsAppProvider,
-  credentials: WhatsAppCredentials
-): Promise<WhatsAppSendResult> {
+// Takes a thunk rather than (to, message, provider, credentials) so the same
+// backoff covers free-form AND template sends -- a template send that loses a
+// race with a 5xx deserves the same three attempts a text send gets, and
+// duplicating this loop per message type is how the two quietly diverge.
+async function sendWithRetry(send: () => Promise<WhatsAppSendResult>): Promise<WhatsAppSendResult> {
   let attempts = 0
   let lastResult: WhatsAppSendResult = { success: false, error: 'No send attempt made' }
 
   while (attempts < MAX_RETRY_ATTEMPTS) {
     attempts++
-    lastResult = await provider.sendMessage(to, message, credentials)
+    lastResult = await send()
 
     if (lastResult.success) return lastResult
     if (!lastResult.retryable) return lastResult
@@ -259,11 +264,12 @@ export async function sendLeadNotification(clientId: string, leadSummary: string
 
     console.log('WhatsApp notification sending to:', sender.notificationNumber)
 
-    const result = await sendWithRetry(
-      sender.notificationNumber,
-      `New lead captured!\n\n${leadSummary}`,
-      sender.provider,
-      sender.credentials
+    const result = await sendWithRetry(() =>
+      sender.provider.sendMessage(
+        sender.notificationNumber,
+        `New lead captured!\n\n${leadSummary}`,
+        sender.credentials
+      )
     )
 
     console.log('WhatsApp notification result:', result)
@@ -293,7 +299,38 @@ export async function sendWhatsAppMessageToLead(
     return { success: false, error: 'No active WhatsApp connection for this client', retryable: false }
   }
 
-  return sendWithRetry(toNumber, message, sender.provider, sender.credentials)
+  return sendWithRetry(() => sender.provider.sendMessage(toNumber, message, sender.credentials))
+}
+
+// The business-initiated counterpart to sendWhatsAppMessageToLead above.
+// Unlike that one it does NOT require an open 24h session window -- which is
+// the entire point: journey outreach, reminders and lead notifications all
+// fire on a schedule, long after any window has closed.
+//
+// Takes the template name + ordered params rather than a
+// WhatsAppTemplateDefinition so a caller can send a template this codebase
+// does not define (hello_world, or one a client authored on their own WABA).
+// languageCode defaults to WHATSAPP_TEMPLATE_LANGUAGE so callers cannot drift
+// from what create-side approved.
+export async function sendWhatsAppTemplateToLead(
+  clientId: string,
+  toNumber: string,
+  templateName: string,
+  bodyParams: string[] = [],
+  languageCode: string = WHATSAPP_TEMPLATE_LANGUAGE
+): Promise<WhatsAppSendResult> {
+  const client = await getClientById(clientId)
+  if (!client) {
+    return { success: false, error: 'Client not found', retryable: false }
+  }
+
+  const sender = await getActiveProviderAndCredentials(client)
+  if (!sender) {
+    return { success: false, error: 'No active WhatsApp connection for this client', retryable: false }
+  }
+
+  const template: WhatsAppTemplateSend = { templateName, languageCode, bodyParams }
+  return sendWithRetry(() => sender.provider.sendTemplate(toNumber, template, sender.credentials))
 }
 
 const WHATSAPP_SESSION_WINDOW_MS = 24 * 60 * 60 * 1000
@@ -340,7 +377,7 @@ export async function sendWeeklyReport(clientId: string): Promise<void> {
     `- Chat widget: ${chatLeadCount}\n` +
     `- Forms: ${formLeadCount}`
 
-  await sendWithRetry(sender.notificationNumber, message, sender.provider, sender.credentials)
+  await sendWithRetry(() => sender.provider.sendMessage(sender.notificationNumber, message, sender.credentials))
 }
 
 export async function sendWeeklyReportsForAllClients(): Promise<void> {

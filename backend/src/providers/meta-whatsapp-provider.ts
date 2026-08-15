@@ -1,4 +1,10 @@
-import type { WhatsAppCredentials, WhatsAppProvider, WhatsAppSendResult } from '../lib/whatsapp-provider.js'
+import type {
+  MetaDirectCredentials,
+  WhatsAppCredentials,
+  WhatsAppProvider,
+  WhatsAppSendResult,
+  WhatsAppTemplateSend,
+} from '../lib/whatsapp-provider.js'
 import { WHATSAPP_TEMPLATE_LANGUAGE, type WhatsAppTemplateDefinition } from '../lib/whatsapp-templates.js'
 
 const GRAPH_API_BASE = 'https://graph.facebook.com/v21.0'
@@ -87,6 +93,33 @@ export interface MetaWhatsAppCredentialsExchange {
   displayPhoneNumber: string
 }
 
+// Shared by sendMessage and sendTemplate: both hit the same /messages
+// endpoint and get the same envelope back, so the success test and the
+// retryable classification belong in one place. 4xx = bad number/token/
+// payload, or an unapproved template -- none of which a retry fixes. 5xx or a
+// network error is transient.
+async function interpretSendResponse(response: Response): Promise<WhatsAppSendResult> {
+  const data = (await response.json().catch(() => ({}))) as MetaSendResponse
+
+  if (response.ok && data.messages?.[0]?.id) {
+    return { success: true, messageId: data.messages[0].id }
+  }
+
+  return {
+    success: false,
+    error: data.error?.message ?? `Meta API returned status ${response.status}`,
+    retryable: response.status >= 500 || response.status === 0,
+  }
+}
+
+function toSendFailure(error: unknown): WhatsAppSendResult {
+  return {
+    success: false,
+    error: error instanceof Error ? error.message : String(error),
+    retryable: true,
+  }
+}
+
 export class MetaWhatsAppProvider implements WhatsAppProvider {
   getProviderName(): string {
     return 'meta_direct'
@@ -126,42 +159,66 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
     }
 
     try {
-      const response = await fetch(`${GRAPH_API_BASE}/${credentials.phoneNumberId}/messages`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${credentials.accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to,
-          type: 'text',
-          text: { body: message },
-        }),
+      const response = await this.postMessage(credentials, {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'text',
+        text: { body: message },
       })
-
-      const data = (await response.json().catch(() => ({}))) as MetaSendResponse
-
-      if (response.ok && data.messages?.[0]?.id) {
-        return { success: true, messageId: data.messages[0].id }
-      }
-
-      // 4xx = bad number/token/payload, won't succeed on retry.
-      // 5xx or network errors = transient, safe to retry.
-      const retryable = response.status >= 500 || response.status === 0
-
-      return {
-        success: false,
-        error: data.error?.message ?? `Meta API returned status ${response.status}`,
-        retryable,
-      }
+      return await interpretSendResponse(response)
     } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-        retryable: true,
-      }
+      return toSendFailure(error)
     }
+  }
+
+  async sendTemplate(
+    to: string,
+    template: WhatsAppTemplateSend,
+    credentials: WhatsAppCredentials
+  ): Promise<WhatsAppSendResult> {
+    if (credentials.provider !== 'meta_direct') {
+      return { success: false, error: 'MetaWhatsAppProvider received non-Meta credentials', retryable: false }
+    }
+
+    try {
+      const response = await this.postMessage(credentials, {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'template',
+        template: {
+          name: template.templateName,
+          language: { code: template.languageCode },
+          // components is OMITTED entirely when there are no parameters, not
+          // sent as an empty array: Meta rejects a body component carrying an
+          // empty parameters list, which is exactly the zero-placeholder case
+          // (hello_world).
+          ...(template.bodyParams.length > 0
+            ? {
+                components: [
+                  {
+                    type: 'body',
+                    parameters: template.bodyParams.map((text) => ({ type: 'text', text })),
+                  },
+                ],
+              }
+            : {}),
+        },
+      })
+      return await interpretSendResponse(response)
+    } catch (error) {
+      return toSendFailure(error)
+    }
+  }
+
+  private postMessage(credentials: MetaDirectCredentials, payload: Record<string, unknown>): Promise<Response> {
+    return fetch(`${GRAPH_API_BASE}/${credentials.phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${credentials.accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    })
   }
 
   // Template management is WABA-scoped, not phone-number-scoped, so these two
