@@ -506,6 +506,10 @@ export function connectMetaWhatsApp(data: ConnectMetaWhatsAppInput): Promise<Api
   return apiClient<{ success: boolean }>('/api/integrations/meta-whatsapp/callback', 'POST', data)
 }
 
+export function sendMetaWhatsAppTestMessage(toNumber: string): Promise<ApiResponse<{ messageId?: string }>> {
+  return apiClient<{ messageId?: string }>('/api/integrations/meta-whatsapp/test-message', 'POST', { toNumber })
+}
+
 export function disconnectMetaWhatsApp(): Promise<ApiResponse<{ success: boolean }>> {
   return apiClient<{ success: boolean }>('/api/integrations/meta-whatsapp/disconnect', 'DELETE')
 }

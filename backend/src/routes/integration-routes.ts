@@ -22,6 +22,7 @@ import {
   disconnectWhatsApp,
   getMetaWhatsAppStatus,
   getWhatsAppStatus,
+  sendWhatsAppTestMessage,
 } from '../services/whatsapp-service.js'
 import {
   connectMetaAds,
@@ -198,6 +199,38 @@ integrationRoutes.delete('/meta-whatsapp/disconnect', requireAuth, async (c) => 
   try {
     await disconnectMetaWhatsApp(clientId)
     return c.json<ApiResponse<{ success: boolean }>>({ success: true, data: { success: true } }, 200)
+  } catch (error) {
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+interface TestMessageBody {
+  toNumber: string
+}
+
+// Sends the smoke-test template to an arbitrary number so a client can prove
+// their WhatsApp connection works without waiting for a real lead. Returns the
+// provider's failure reason verbatim on a failed send rather than a generic
+// message -- an unapproved template, a number missing from the allow-list and
+// an expired token are three different problems with three different fixes,
+// and collapsing them is what made this flow undebuggable before.
+integrationRoutes.post('/meta-whatsapp/test-message', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const body = await c.req.json<TestMessageBody>()
+  const toNumber = body.toNumber?.trim()
+
+  if (!toNumber) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'A recipient number is required' }, 400)
+  }
+
+  try {
+    const result = await sendWhatsAppTestMessage(clientId, toNumber)
+
+    if (!result.success) {
+      return c.json<ApiResponse<null>>({ success: false, error: result.error ?? 'Send failed' }, 502)
+    }
+
+    return c.json<ApiResponse<{ messageId?: string }>>({ success: true, data: { messageId: result.messageId } }, 200)
   } catch (error) {
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }

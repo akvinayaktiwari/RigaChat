@@ -47,3 +47,19 @@ describe('hasActiveWhatsAppSession', () => {
     expect(await hasActiveWhatsAppSession('lead-1')).toBe(false)
   })
 })
+
+describe('sendWhatsAppTestMessage', () => {
+  it('sends the smoke-test template under the language its definition declares', async () => {
+    const { WHATSAPP_SMOKE_TEST_TEMPLATE, templateLanguageOf, findTemplate } = await import(
+      '../lib/whatsapp-templates.js'
+    )
+
+    // The definition must exist, or the dashboard test button sends a template
+    // name that was never created on any WABA.
+    expect(findTemplate(WHATSAPP_SMOKE_TEST_TEMPLATE)).toBeDefined()
+    // en_US, not the en default -- a mismatch here fails at Meta with 132001.
+    expect(templateLanguageOf(WHATSAPP_SMOKE_TEST_TEMPLATE)).toBe('en_US')
+    // And it must take no parameters, since the test button supplies none.
+    expect(findTemplate(WHATSAPP_SMOKE_TEST_TEMPLATE)?.bodyExample).toEqual([])
+  })
+})

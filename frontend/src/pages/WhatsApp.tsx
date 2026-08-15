@@ -8,6 +8,7 @@ import {
   disconnectWhatsApp,
   getMetaWhatsAppStatus,
   getWhatsAppStatus,
+  sendMetaWhatsAppTestMessage,
 } from '../services/api'
 import { MetaIcon, WhatsAppIcon } from '../components/landing/BrandIcons'
 import type { ConnectWhatsAppInput, MetaDirectWhatsAppConnection, WhatsAppConnection } from '../types/index'
@@ -134,6 +135,12 @@ export default function WhatsApp() {
   const [metaDisconnecting, setMetaDisconnecting] = useState(false)
   const [metaConnecting, setMetaConnecting] = useState(false)
   const [metaNotificationNumber, setMetaNotificationNumber] = useState('')
+  const [metaTestNumber, setMetaTestNumber] = useState('')
+  const [metaTesting, setMetaTesting] = useState(false)
+  // Kept inline next to the button rather than in a toast: a failed test is a
+  // diagnostic the user needs to read carefully (and often copy), and a toast
+  // disappears before a long Meta error can be read.
+  const [metaTestResult, setMetaTestResult] = useState<{ ok: boolean; message: string } | null>(null)
 
   const metaConnectButtonRef = useRef<HTMLButtonElement>(null)
   const metaSessionDataRef = useRef<EmbeddedSignupSessionData | null>(null)
@@ -325,6 +332,28 @@ export default function WhatsApp() {
       // of the flow we can manage).
       metaConnectButtonRef.current?.focus()
       setMetaConnecting(false)
+    }
+  }
+
+  async function handleMetaTestMessage() {
+    if (!metaTestNumber.trim()) {
+      setMetaTestResult({ ok: false, message: 'Enter a number to send the test to.' })
+      return
+    }
+
+    setMetaTesting(true)
+    setMetaTestResult(null)
+    try {
+      const res = await sendMetaWhatsAppTestMessage(metaTestNumber.trim())
+      setMetaTestResult(
+        res.success
+          ? { ok: true, message: `Sent. Check WhatsApp on ${metaTestNumber.trim()}.` }
+          : { ok: false, message: res.error ?? 'Send failed.' }
+      )
+    } catch (error) {
+      setMetaTestResult({ ok: false, message: error instanceof Error ? error.message : 'Send failed.' })
+    } finally {
+      setMetaTesting(false)
     }
   }
 
@@ -547,6 +576,43 @@ export default function WhatsApp() {
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Phone Number</p>
                 <p className="text-gray-900 font-medium mt-1">{metaStatus.displayPhoneNumber}</p>
               </div>
+
+              <div className="pt-4 border-t border-gray-100">
+                <label htmlFor="meta-wa-test-number" className={LABEL_CLASSES}>
+                  Send a test message
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Sends an approved template to confirm delivery works. Use a number that can receive WhatsApp — not
+                  your business number itself.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    id="meta-wa-test-number"
+                    type="text"
+                    value={metaTestNumber}
+                    onChange={(e) => setMetaTestNumber(e.target.value)}
+                    className={INPUT_CLASSES}
+                    placeholder="919999999999"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleMetaTestMessage}
+                    disabled={metaTesting}
+                    className="shrink-0 inline-flex items-center justify-center border border-violet-200 text-violet-700 font-semibold px-4 py-2.5 rounded-xl text-sm hover:bg-violet-50 transition-colors disabled:opacity-50"
+                  >
+                    {metaTesting ? 'Sending...' : 'Send test'}
+                  </button>
+                </div>
+                {metaTestResult && (
+                  <p
+                    className={`text-xs mt-2 ${metaTestResult.ok ? 'text-emerald-600' : 'text-red-600'}`}
+                    role="status"
+                  >
+                    {metaTestResult.message}
+                  </p>
+                )}
+              </div>
+
               <button
                 type="button"
                 onClick={handleMetaDisconnect}

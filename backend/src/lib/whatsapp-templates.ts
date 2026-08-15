@@ -51,6 +51,11 @@ export interface WhatsAppTemplateDefinition {
 // send-side on one constant is what stops that drift.
 export const WHATSAPP_TEMPLATE_LANGUAGE = 'en'
 
+// The template the dashboard's "send test message" button uses. Named here
+// rather than inlined at the call sites so the route, the UI copy and the
+// definition below can never drift apart.
+export const WHATSAPP_SMOKE_TEST_TEMPLATE = 'connection_test_1'
+
 export const WHATSAPP_TEMPLATES: WhatsAppTemplateDefinition[] = [
   {
     // A zero-parameter smoke-test template, so that every WABA -- ours and
@@ -153,3 +158,15 @@ export const WHATSAPP_TEMPLATES: WhatsAppTemplateDefinition[] = [
     sentBy: 'journey-templates/real-estate-lead-qualification.ts step "hand_to_agent"',
   },
 ]
+
+// Resolves a template by name so callers can send it without restating its
+// language. Sending a template under the wrong language code fails with error
+// 132001, so the language must always come from the definition rather than a
+// literal at the call site.
+export function findTemplate(name: string): WhatsAppTemplateDefinition | undefined {
+  return WHATSAPP_TEMPLATES.find((template) => template.name === name)
+}
+
+export function templateLanguageOf(name: string): string {
+  return findTemplate(name)?.language ?? WHATSAPP_TEMPLATE_LANGUAGE
+}

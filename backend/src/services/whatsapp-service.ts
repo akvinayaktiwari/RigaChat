@@ -7,7 +7,11 @@ import type {
   WhatsAppSendResult,
   WhatsAppTemplateSend,
 } from '../lib/whatsapp-provider.js'
-import { WHATSAPP_TEMPLATE_LANGUAGE } from '../lib/whatsapp-templates.js'
+import {
+  WHATSAPP_SMOKE_TEST_TEMPLATE,
+  WHATSAPP_TEMPLATE_LANGUAGE,
+  templateLanguageOf,
+} from '../lib/whatsapp-templates.js'
 import {
   clearActiveWhatsappProvider,
   getClientById,
@@ -157,12 +161,27 @@ interface ConnectMetaWhatsAppInput {
   notificationNumber: string
 }
 
-export async function connectMetaWhatsApp(clientId: string, input: ConnectMetaWhatsAppInput): Promise<void> {
-  const { accessToken, displayPhoneNumber } = await metaWhatsAppProvider.exchangeCodeForCredentials(
-    input.code,
-    input.phoneNumberId
-  )
-  const accessTokenEncrypted = await encrypt(accessToken)
+export interface StoreMetaWhatsAppConnectionInput {
+  wabaId: string
+  phoneNumberId: string
+  notificationNumber: string
+  accessToken: string
+  displayPhoneNumber: string
+}
+
+// Split out of connectMetaWhatsApp so the Embedded Signup path and the
+// seed script (scripts/seed-meta-whatsapp-connection.ts) store a connection
+// through ONE implementation. The only thing that differs between them is
+// where the access token came from -- an OAuth code exchange versus a token
+// issued directly in the Meta dashboard -- and everything after that point
+// (encryption, active-provider arbitration, the record shape) must stay
+// identical or the seeded connection would behave subtly differently from a
+// real one, which would make it useless for testing.
+export async function storeMetaWhatsAppConnection(
+  clientId: string,
+  input: StoreMetaWhatsAppConnectionInput
+): Promise<void> {
+  const accessTokenEncrypted = await encrypt(input.accessToken)
 
   const client = await getClientById(clientId)
   // A brand-new client with no active Gupshup connection gets Meta Direct
@@ -184,11 +203,26 @@ export async function connectMetaWhatsApp(clientId: string, input: ConnectMetaWh
       // Embedded Signup docs (see design doc Open Question 3).
       businessAccountId: input.wabaId,
       accessTokenEncrypted,
-      displayPhoneNumber,
+      displayPhoneNumber: input.displayPhoneNumber,
       notificationNumber: input.notificationNumber,
       connectedAt: new Date().toISOString(),
     },
     ...(hasActiveGupshup ? {} : { activeWhatsappProvider: 'meta_direct' }),
+  })
+}
+
+export async function connectMetaWhatsApp(clientId: string, input: ConnectMetaWhatsAppInput): Promise<void> {
+  const { accessToken, displayPhoneNumber } = await metaWhatsAppProvider.exchangeCodeForCredentials(
+    input.code,
+    input.phoneNumberId
+  )
+
+  await storeMetaWhatsAppConnection(clientId, {
+    wabaId: input.wabaId,
+    phoneNumberId: input.phoneNumberId,
+    notificationNumber: input.notificationNumber,
+    accessToken,
+    displayPhoneNumber,
   })
 }
 
@@ -331,6 +365,25 @@ export async function sendWhatsAppTemplateToLead(
 
   const template: WhatsAppTemplateSend = { templateName, languageCode, bodyParams }
   return sendWithRetry(() => sender.provider.sendTemplate(toNumber, template, sender.credentials))
+}
+
+// Powers the dashboard's "send test message" button. Deliberately sends a
+// TEMPLATE rather than free text: a test is only meaningful if it exercises
+// the same business-initiated path real journey outreach uses, and free text
+// would fail outside a 24h session window anyway -- which is always, for a
+// number that has never messaged the business.
+//
+// Returns the provider's WhatsAppSendResult unchanged rather than collapsing
+// it to a boolean, because the whole point of a test button is the reason it
+// failed (unapproved template, number not on the allow-list, expired token).
+export async function sendWhatsAppTestMessage(clientId: string, toNumber: string): Promise<WhatsAppSendResult> {
+  return sendWhatsAppTemplateToLead(
+    clientId,
+    toNumber,
+    WHATSAPP_SMOKE_TEST_TEMPLATE,
+    [],
+    templateLanguageOf(WHATSAPP_SMOKE_TEST_TEMPLATE)
+  )
 }
 
 const WHATSAPP_SESSION_WINDOW_MS = 24 * 60 * 60 * 1000
