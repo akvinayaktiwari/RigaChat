@@ -7,6 +7,7 @@ import {
   processMetaLeadWebhook,
   verifyMetaWebhookChallenge,
 } from '../services/meta-lead-service.js'
+import { processMetaWhatsAppWebhook } from '../services/meta-whatsapp-webhook-service.js'
 
 import type { ApiResponse, MetaDeletionRequestStatus } from '../types/index.js'
 
@@ -74,6 +75,38 @@ webhookRoutes.post('/meta', async (c) => {
 
   const result = await processMetaLeadWebhook(rawBody, signature)
   return c.json({ message: result.message }, result.status)
+})
+
+// WhatsApp Cloud API webhooks. A SEPARATE endpoint from /meta above, which is
+// the page/leadgen one: the two carry different payload shapes and different
+// verification requirements, and folding WhatsApp statuses into the Lead Ads
+// handler would put the flow pending App Review at risk for no benefit.
+webhookRoutes.get('/meta-whatsapp', (c) => {
+  const challenge = verifyMetaWebhookChallenge(
+    c.req.query('hub.mode'),
+    c.req.query('hub.verify_token'),
+    c.req.query('hub.challenge')
+  )
+
+  if (!challenge) {
+    return c.body(null, 403)
+  }
+
+  return c.text(challenge, 200)
+})
+
+// Awaited, not fire-and-forget: Lambda freezes the execution environment as
+// soon as the response promise resolves, so an un-awaited call here could be
+// killed before a status or inbound message is ever recorded. Same reasoning
+// as the Gupshup route above.
+//
+// Always 200, even on a malformed body: Meta retries non-2xx responses and
+// disables a webhook that keeps failing. processMetaWhatsAppWebhook never
+// throws for payload problems, it logs them.
+webhookRoutes.post('/meta-whatsapp', async (c) => {
+  const body: unknown = await c.req.json().catch(() => null)
+  await processMetaWhatsAppWebhook(body)
+  return c.body(null, 200)
 })
 
 // Meta platform requirement: called when a user deauthorizes the app.
