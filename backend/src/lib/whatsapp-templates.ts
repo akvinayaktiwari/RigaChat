@@ -86,7 +86,10 @@ export const WHATSAPP_TEMPLATES: WhatsAppTemplateDefinition[] = [
   {
     name: 'site_visit_reminder_1',
     category: 'UTILITY',
-    body: 'Reminder: your site visit at {{1}} is tomorrow, {{2}} at {{3}}.',
+    // Trailing sentence is required, not decorative: Meta rejects a body that
+    // ends with a variable (error_subcode 2388299, "Variables can't be at the
+    // start or end of the template"), and a trailing "." does not satisfy it.
+    body: 'Reminder: your site visit at {{1}} is tomorrow, {{2}} at {{3}}. Tap below to confirm or reschedule.',
     bodyExample: ['Skyline Residences', 'Sat 22 Aug', '11:00 AM'],
     buttons: [
       { type: 'QUICK_REPLY', text: 'Confirm' },

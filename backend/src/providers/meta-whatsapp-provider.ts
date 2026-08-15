@@ -45,7 +45,17 @@ interface MetaTemplateCreateResponse {
   id?: string
   status?: string
   category?: string
-  error?: { message?: string; code?: number; error_subcode?: number }
+  // error.message on template rejections is almost always the useless string
+  // "Invalid parameter". The actionable reason lives in error_user_title /
+  // error_user_msg, so both are captured and surfaced by describeTemplateError
+  // below -- without them a rejection costs a manual curl to diagnose.
+  error?: {
+    message?: string
+    code?: number
+    error_subcode?: number
+    error_user_title?: string
+    error_user_msg?: string
+  }
 }
 
 interface MetaTemplateListResponse {
@@ -268,11 +278,18 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
         return { success: true, id: data.id, status: data.status ?? 'UNKNOWN', category: data.category ?? definition.category }
       }
 
-      return { success: false, error: data.error?.message ?? `Meta API returned status ${response.status}` }
+      return { success: false, error: describeTemplateError(data, response.status) }
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : String(error) }
     }
   }
+}
+
+function describeTemplateError(data: MetaTemplateCreateResponse, status: number): string {
+  const { message, error_user_title: title, error_user_msg: detail } = data.error ?? {}
+  const specific = [title, detail].filter(Boolean).join(': ')
+  if (specific) return specific
+  return message ?? `Meta API returned status ${status}`
 }
 
 export const metaWhatsAppProvider = new MetaWhatsAppProvider()
