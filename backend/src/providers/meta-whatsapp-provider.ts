@@ -229,19 +229,44 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
   // Unlike exchangeCodeForCredentials below (the Embedded Signup path, which
   // sends no redirect_uri), a redirect-based grant MUST echo back the exact
   // redirect_uri that started it or Meta rejects the exchange.
+  //
+  // TWO steps, not one, for the same reason meta-provider.ts has three: the
+  // code exchange returns a SHORT-LIVED token good for about an hour. We STORE
+  // this token and reuse it for every future send, so storing the short-lived
+  // one produces a connection that works during the connect and then dies
+  // quietly ~an hour later, while the client is still logged in and everything
+  // still looks connected. That exact bug was already fixed once for Lead Ads
+  // in df5405a; this is the WhatsApp equivalent.
   async exchangeCodeForToken(code: string, redirectUri: string): Promise<string> {
-    const params = new URLSearchParams({
-      client_id: requireEnv('META_APP_ID'),
-      client_secret: requireEnv('META_APP_SECRET'),
-      redirect_uri: redirectUri,
-      code,
-    })
+    const clientId = requireEnv('META_APP_ID')
+    const clientSecret = requireEnv('META_APP_SECRET')
 
+    const shortLived = await this.requestToken(
+      new URLSearchParams({ client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, code }),
+      'code exchange'
+    )
+
+    // Throwing rather than falling back to the short-lived token is
+    // deliberate: a fallback would look like a successful connect and then
+    // fail every send an hour later, which from the dashboard is
+    // indistinguishable from Meta having broken something.
+    return this.requestToken(
+      new URLSearchParams({
+        grant_type: 'fb_exchange_token',
+        client_id: clientId,
+        client_secret: clientSecret,
+        fb_exchange_token: shortLived,
+      }),
+      'long-lived token exchange'
+    )
+  }
+
+  private async requestToken(params: URLSearchParams, stage: string): Promise<string> {
     const response = await fetch(`${GRAPH_API_BASE}/oauth/access_token?${params.toString()}`)
-    const data = (await response.json()) as MetaTokenResponse
+    const data = (await response.json().catch(() => ({}))) as MetaTokenResponse
 
     if (!data.access_token) {
-      throw new Error(`Meta WhatsApp token exchange failed: ${data.error?.message ?? 'Unknown error'}`)
+      throw new Error(`Meta WhatsApp ${stage} failed: ${data.error?.message ?? 'Unknown error'}`)
     }
 
     return data.access_token

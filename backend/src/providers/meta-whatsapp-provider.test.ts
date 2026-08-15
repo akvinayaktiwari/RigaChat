@@ -193,3 +193,42 @@ describe('MetaWhatsAppProvider.createMessageTemplate', () => {
     }
   })
 })
+
+describe('MetaWhatsAppProvider.exchangeCodeForToken', () => {
+  beforeEach(() => {
+    process.env.META_APP_ID = 'app-1'
+    process.env.META_APP_SECRET = 'secret-1'
+  })
+
+  // The whole point of this function. Storing the short-lived token produces a
+  // connection that works for an hour and then dies while still looking
+  // connected -- the bug df5405a already fixed once for Lead Ads.
+  it('exchanges the code AND then upgrades to a long-lived token', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: 'SHORT' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: 'LONG' }), { status: 200 }))
+
+    const token = await metaWhatsAppProvider.exchangeCodeForToken('code-1', 'https://vyostra.com/cb')
+
+    expect(token).toBe('LONG')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+
+    const [firstUrl] = fetchMock.mock.calls[0] as [string]
+    const [secondUrl] = fetchMock.mock.calls[1] as [string]
+    // Step 1 must echo the redirect_uri; step 2 must not, and must carry the
+    // short-lived token as fb_exchange_token.
+    expect(firstUrl).toContain('redirect_uri=')
+    expect(secondUrl).toContain('grant_type=fb_exchange_token')
+    expect(secondUrl).toContain('fb_exchange_token=SHORT')
+  })
+
+  it('throws rather than falling back to the short-lived token', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: 'SHORT' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: 'nope' } }), { status: 400 }))
+
+    await expect(metaWhatsAppProvider.exchangeCodeForToken('code-1', 'https://vyostra.com/cb')).rejects.toThrow(
+      'long-lived token exchange failed'
+    )
+  })
+})
