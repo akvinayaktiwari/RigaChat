@@ -80,6 +80,46 @@ function loadFacebookSdk(): Promise<void> {
 interface EmbeddedSignupSessionData {
   phone_number_id?: string
   waba_id?: string
+  // Present on CANCEL: the step the user bailed out on. The single most
+  // useful field for diagnosing a failed signup, and it used to be dropped.
+  current_step?: string
+  error_message?: string
+}
+
+// The last WA_EMBEDDED_SIGNUP message received, whatever its event type.
+// Kept separately from the FINISH payload so a CANCEL or an error can be
+// turned into a specific message instead of a generic one.
+interface EmbeddedSignupEvent {
+  event?: string
+  data?: EmbeddedSignupSessionData
+}
+
+// Meta emits more than one terminal event. FINISH is the full onboarding;
+// FINISH_ONLY_WABA fires when a WABA exists but no phone number was added,
+// which yields no phone_number_id and so cannot complete a connection here.
+const EMBEDDED_SIGNUP_SUCCESS_EVENTS = ['FINISH', 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING']
+
+// Turns whatever Embedded Signup last told us into something a human can act
+// on. Without this every failure -- popup blocked, user cancelled halfway, no
+// phone number on the WABA, config not owned by this app -- surfaced as the
+// same "was not completed" string.
+function describeSignupFailure(code: string | null, signupEvent: EmbeddedSignupEvent | null): string {
+  if (signupEvent?.event === 'CANCEL') {
+    const step = signupEvent.data?.current_step
+    return step
+      ? `Signup was cancelled at the "${step}" step. Complete every step to finish connecting.`
+      : 'Signup was cancelled before it finished.'
+  }
+  if (signupEvent?.data?.error_message) {
+    return `Meta reported: ${signupEvent.data.error_message}`
+  }
+  if (signupEvent?.event === 'FINISH_ONLY_WABA') {
+    return 'Your WhatsApp Business Account was created but has no phone number yet. Add and verify a number, then connect again.'
+  }
+  if (!code) {
+    return 'Meta did not return an authorization code. If no popup appeared, allow popups for this site and try again.'
+  }
+  return 'Meta did not return the WhatsApp account details needed to finish connecting.'
 }
 
 export default function WhatsApp() {
@@ -97,6 +137,7 @@ export default function WhatsApp() {
 
   const metaConnectButtonRef = useRef<HTMLButtonElement>(null)
   const metaSessionDataRef = useRef<EmbeddedSignupSessionData | null>(null)
+  const metaSignupEventRef = useRef<EmbeddedSignupEvent | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -140,13 +181,21 @@ export default function WhatsApp() {
       if (event.origin !== META_EMBEDDED_SIGNUP_ORIGIN) return
 
       let data: { type?: string; event?: string; data?: EmbeddedSignupSessionData }
+
       try {
         data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data
       } catch {
         return
       }
 
-      if (data?.type === 'WA_EMBEDDED_SIGNUP' && data.event === 'FINISH' && data.data) {
+      if (data?.type !== 'WA_EMBEDDED_SIGNUP') return
+
+      // Logged unconditionally: this popup is the only place that knows why a
+      // signup failed, and the message is gone the moment it closes.
+      console.log('[WA_EMBEDDED_SIGNUP]', data.event, data.data)
+      metaSignupEventRef.current = { event: data.event, data: data.data }
+
+      if (data.event && EMBEDDED_SIGNUP_SUCCESS_EVENTS.includes(data.event) && data.data) {
         metaSessionDataRef.current = data.data
       }
     }
@@ -215,24 +264,38 @@ export default function WhatsApp() {
 
     setMetaConnecting(true)
     metaSessionDataRef.current = null
+    metaSignupEventRef.current = null
 
     try {
       const code = await new Promise<string | null>((resolve) => {
         window.FB?.login(
-          (response) => resolve(response.authResponse?.code ?? null),
+          (response) => {
+            // Logged in full: response.status carries Meta's own reason for a
+            // refusal (unknown config_id, app not permitted, popup blocked),
+            // and it was previously discarded along with everything except
+            // the code.
+            console.log('[FB.login] response', response)
+            resolve(response.authResponse?.code ?? null)
+          },
           {
             config_id: META_WHATSAPP_CONFIG_ID,
             response_type: 'code',
             override_default_response_type: true,
-            extras: { sessionInfoVersion: '3' },
+            // setup and featureType are part of Meta's documented Embedded
+            // Signup call; only sessionInfoVersion was being sent.
+            extras: { setup: {}, featureType: '', sessionInfoVersion: '3' },
           }
         )
       })
 
+      // Cast is load-bearing, not laziness: the ref is reset to null just
+      // above and is only ever repopulated by the window message listener,
+      // which TypeScript's control-flow analysis cannot see. Without it the
+      // ref narrows to `never` here and every field read fails to compile.
       const sessionData = metaSessionDataRef.current as EmbeddedSignupSessionData | null
 
       if (!code || !sessionData?.waba_id || !sessionData?.phone_number_id) {
-        toast.show('Meta connection was not completed', 'error')
+        toast.show(describeSignupFailure(code, metaSignupEventRef.current as EmbeddedSignupEvent | null), 'error')
         return
       }
 
@@ -251,8 +314,10 @@ export default function WhatsApp() {
       } else {
         toast.show(res.error ?? 'Failed to connect Meta WhatsApp', 'error')
       }
-    } catch {
-      toast.show('Failed to connect Meta WhatsApp', 'error')
+    } catch (error) {
+      // Was a bare `catch {}`, so the actual failure never reached anyone.
+      console.error('[MetaWhatsApp] connect failed', error)
+      toast.show(error instanceof Error ? error.message : 'Failed to connect Meta WhatsApp', 'error')
     } finally {
       // Return focus to the trigger button before the toast fires, so
       // keyboard/screen-reader users aren't left stranded on a closed popup
