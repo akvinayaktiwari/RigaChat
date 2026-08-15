@@ -8,22 +8,44 @@ Record the screencast with `scripts/record-meta-screencast.sh` and upload the
 
 ---
 
+## Submit exactly these six
+
+| Permission | Justification text | API calls made |
+|---|---|---|
+| `leads_retrieval` | below | yes — `GET /{leadgen_id}?fields=field_data` |
+| `pages_show_list` | below | yes — `GET /me/accounts` |
+| `pages_manage_metadata` | below | yes — `POST /{page-id}/subscribed_apps` |
+| `pages_read_engagement` | below | yes — Page identity during connect |
+| `email` | complete in the draft | baseline |
+| `public_profile` | complete in the draft | baseline |
+
+Every one is genuinely requested by `META_OAUTH_SCOPES` and backed by a real call
+made on 2026-08-15. One screencast covers all of them — upload the same file to each
+block. Anything not on this list is covered in "Do NOT submit these" below.
+
 ## Before you submit — hard gates
 
-- [ ] **At least one successful API call per requested permission, within the last
-      30 days.** Meta checks this mechanically. Connect a real Page and pull a real
-      test lead (Lead Ads Testing Tool) before submitting, or the submission fails
-      on this alone.
-- [ ] App is **Published** (done)
-- [ ] Business verification **complete** (done)
-- [ ] Webhook: object `page`, field `leadgen`, callback
-      `https://vyostra.com/api/webhooks/meta` (done — verified via
-      `GET /{app-id}/subscriptions`)
-- [ ] Deauthorize callback set → `https://vyostra.com/api/webhooks/meta/deauthorize`
-- [ ] Data deletion callback set → `https://vyostra.com/api/webhooks/meta/data-deletion`
-- [ ] Valid OAuth Redirect URI → `https://vyostra.com/api/integrations/meta/callback`
-- [ ] Privacy Policy and Terms reachable **without JavaScript** (fixed in `f93892b`
-      — must be deployed to S3/CloudFront before submitting, not just committed)
+Verified 2026-08-15 unless noted.
+
+- [x] **At least one successful API call per requested permission, within the last
+      30 days.** Meta checks this mechanically. Satisfied for all four Page
+      permissions: Page "The Simplest Solution" (`353635678632363`) was connected
+      and four test leads were retrieved with complete `field_data`. This is the
+      gate `business_management` and Business Asset User Profile Access would fail.
+- [x] App is **Published**
+- [x] Business verification **complete** (Tech Provider, 2026-07-27)
+- [x] Webhook: object `page`, field `leadgen` v26.0, callback
+      `https://vyostra.com/api/webhooks/meta`, active — via
+      `GET /{app-id}/subscriptions`
+- [x] Deauthorize callback → returns 400 JSON on an unsigned POST, so it is live
+- [x] Data deletion callback → returns 400 JSON on an unsigned POST, so it is live
+- [x] Valid OAuth Redirect URI → `https://vyostra.com/api/integrations/meta/callback`
+- [x] Privacy Policy and Terms render **without JavaScript** — both 200 with
+      server-rendered text (603 and 364 words), plus title, description and
+      canonical. Prerendered and deployed, not merely committed.
+- [ ] **`pages_manage_ads` removed from login config `1581255013395833`** — the one
+      remaining item, dashboard-only, and it invalidates any screencast recorded
+      before the change.
 
 ---
 
@@ -70,13 +92,29 @@ Record the screencast with `scripts/record-meta-screencast.sh` and upload the
 >
 > We do not sell, share, or transfer lead data to third parties.
 
-## `pages_manage_ads`
+## Do NOT submit these — and remove one from the login config
 
-> Included because Meta requires `pages_manage_ads` to accompany `leads_retrieval`
-> for Lead Ads retrieval. It is requested as part of the same customer-initiated
-> Page connection, and is used only in the context of reading that customer's own
-> Lead Ads data for the Page they connected. We do not create, edit, or manage ad
-> campaigns on behalf of customers.
+**`pages_manage_ads` — remove from Login for Business config `1581255013395833`.**
+The code stopped requesting it in `9da0425`, but we send `config_id` and the
+dashboard config overrides `META_OAUTH_SCOPES` entirely, so it still appears on the
+live consent screen as "Create and manage ads for your Page". Three reasons it goes:
+we never call an ads endpoint; the app's allowed-usage list does not contain it; and
+every customer currently sees a lead-capture tool asking to create ads on their Page,
+which costs connections long after review is done. **Removing it requires a new
+screencast**, because the recording must match the permissions actually requested.
+
+**`business_management` — do not submit.** Never requested and never called
+(`grep` across `backend/src` returns nothing). It requires "performed required API
+test calls", which Meta verifies mechanically, so submitting it fails the whole
+submission on that gate alone.
+
+**Business Asset User Profile Access — do not submit.** Same reason: not requested
+anywhere, and it carries the same API-test-call requirement.
+
+**`whatsapp_business_messaging` / `whatsapp_business_management` — separate
+submission.** WhatsApp Embedded Signup is a different flow with its own config
+(`1063430079829327`) and its own screencast. Both also require API test calls. Ship
+Lead Ads first; a smaller submission that passes beats a larger one that is rejected.
 
 ## `pages_show_list`
 
