@@ -1,8 +1,13 @@
 import { failureReasonOf } from '../lib/meta-connect-errors.js'
-import crypto from 'node:crypto'
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { requireAuth, requireAuthFromQuery } from '../lib/cognito.js'
+import {
+  buildLeadAdsOAuthState,
+  buildWhatsAppOAuthState,
+  clientIdFromState,
+  isWhatsAppOAuthState,
+} from '../lib/meta-oauth-state.js'
 import { zohoProvider } from '../providers/zoho-provider.js'
 import { metaProvider } from '../providers/meta-provider.js'
 import { metaWhatsAppProvider } from '../providers/meta-whatsapp-provider.js'
@@ -255,15 +260,20 @@ integrationRoutes.get('/meta-whatsapp/status', requireAuth, async (c) => {
 const META_WA_STATE_COOKIE = 'meta_wa_oauth_state'
 const META_WA_NOTIFY_COOKIE = 'meta_wa_notify'
 
-// Derived from META_REDIRECT_URI's origin rather than read from its own env
-// var: the two callbacks must share a host anyway (the state cookie is
-// host-only -- that exact mismatch caused the "connection link expired" bug
-// fixed in 12c1673), and the Lambda's environment is near the 4KB ceiling, so
-// not adding a variable that can be computed is deliberate.
+// WhatsApp deliberately reuses the LEAD ADS redirect URI rather than having
+// one of its own. Meta only accepts redirect URIs that are explicitly
+// allowlisted in the App Dashboard, and META_REDIRECT_URI is already
+// allowlisted and proven working. A new path would need a dashboard change
+// before it could ever succeed, and would fail with Meta's "URL Blocked"
+// page -- indistinguishable, from the user's side, from the flow just being
+// broken.
+//
+// The two flows are told apart by a marker on the OAuth `state` instead; see
+// lib/meta-oauth-state.ts and the branch at the top of /meta/callback.
 function metaWhatsAppRedirectUri(): string {
-  const base = process.env.META_REDIRECT_URI
-  if (!base) throw new Error('Missing META_REDIRECT_URI')
-  return `${new URL(base).origin}/api/integrations/meta-whatsapp/oauth-callback`
+  const uri = process.env.META_REDIRECT_URI
+  if (!uri) throw new Error('Missing META_REDIRECT_URI')
+  return uri
 }
 
 // The redirect-based WhatsApp connect: same mechanism as /meta/connect below,
@@ -278,7 +288,7 @@ integrationRoutes.get('/meta-whatsapp/connect', requireAuthFromQuery, (c) => {
     return c.redirect(`${FRONTEND_URL}/dashboard/whatsapp?metaWa=error&reason=missing_notification_number`)
   }
 
-  const state = `${clientId}:${crypto.randomBytes(16).toString('hex')}`
+  const state = buildWhatsAppOAuthState(clientId)
   const cookieOptions = {
     httpOnly: true,
     maxAge: 600,
@@ -298,42 +308,9 @@ integrationRoutes.get('/meta-whatsapp/connect', requireAuthFromQuery, (c) => {
   }
 })
 
-integrationRoutes.get('/meta-whatsapp/oauth-callback', async (c) => {
-  const code = c.req.query('code')
-  const state = c.req.query('state')
-  const expectedState = getCookie(c, META_WA_STATE_COOKIE)
-  const notificationNumber = getCookie(c, META_WA_NOTIFY_COOKIE)
-
-  deleteCookie(c, META_WA_STATE_COOKIE, { path: '/' })
-  deleteCookie(c, META_WA_NOTIFY_COOKIE, { path: '/' })
-
-  if (!code) {
-    return c.redirect(`${FRONTEND_URL}/dashboard/whatsapp?metaWa=error&reason=permission_declined`)
-  }
-  if (!state || !expectedState || state !== expectedState || !notificationNumber) {
-    return c.redirect(`${FRONTEND_URL}/dashboard/whatsapp?metaWa=error&reason=invalid_state`)
-  }
-
-  const clientId = state.split(':')[0]
-
-  try {
-    await connectMetaWhatsAppViaOAuth(clientId, code, metaWhatsAppRedirectUri(), notificationNumber)
-    return c.redirect(`${FRONTEND_URL}/dashboard/whatsapp?metaWa=connected`)
-  } catch (error) {
-    // The message is carried to the UI rather than flattened to a code: the
-    // useful failures here ("no WhatsApp account was shared with this app",
-    // "account has no phone number") are precisely the ones a generic reason
-    // string would destroy.
-    console.error('Meta WhatsApp OAuth callback error:', errorMessage(error))
-    const reason = encodeURIComponent(errorMessage(error).slice(0, 300))
-    return c.redirect(`${FRONTEND_URL}/dashboard/whatsapp?metaWa=error&message=${reason}`)
-  }
-})
-
 integrationRoutes.get('/meta/connect', requireAuthFromQuery, (c) => {
   const clientId = c.get('user').sub
-  const random = crypto.randomBytes(16).toString('hex')
-  const state = `${clientId}:${random}`
+  const state = buildLeadAdsOAuthState(clientId)
 
   setCookie(c, META_STATE_COOKIE, state, {
     httpOnly: true,
@@ -355,9 +332,50 @@ integrationRoutes.get('/meta/connect', requireAuthFromQuery, (c) => {
   }
 })
 
+// Handles the WhatsApp half of the shared callback. Split into its own
+// function so the Lead Ads path below reads exactly as it did before -- that
+// flow is working and verified, and the cost of breaking it is far higher
+// than the cost of a little duplication here.
+async function handleWhatsAppOAuthCallback(c: Context<AuthEnv>, code: string | undefined, state: string): Promise<Response> {
+  const expectedState = getCookie(c, META_WA_STATE_COOKIE)
+  const notificationNumber = getCookie(c, META_WA_NOTIFY_COOKIE)
+
+  deleteCookie(c, META_WA_STATE_COOKIE, { path: '/' })
+  deleteCookie(c, META_WA_NOTIFY_COOKIE, { path: '/' })
+
+  if (c.req.query('error')) {
+    return c.redirect(`${FRONTEND_URL}/dashboard/whatsapp?metaWa=error&reason=permission_declined`)
+  }
+  if (!code || !expectedState || state !== expectedState || !notificationNumber) {
+    return c.redirect(`${FRONTEND_URL}/dashboard/whatsapp?metaWa=error&reason=invalid_state`)
+  }
+
+  try {
+    await connectMetaWhatsAppViaOAuth(clientIdFromState(state), code, metaWhatsAppRedirectUri(), notificationNumber)
+    return c.redirect(`${FRONTEND_URL}/dashboard/whatsapp?metaWa=connected`)
+  } catch (error) {
+    // Carried to the UI verbatim rather than flattened to a reason code: the
+    // useful failures here ("no WhatsApp account was shared with this app",
+    // "account has no phone number") are exactly the ones a code destroys.
+    console.error('Meta WhatsApp OAuth callback error:', errorMessage(error))
+    return c.redirect(
+      `${FRONTEND_URL}/dashboard/whatsapp?metaWa=error&message=${encodeURIComponent(errorMessage(error).slice(0, 300))}`
+    )
+  }
+}
+
 integrationRoutes.get('/meta/callback', async (c) => {
   const code = c.req.query('code')
   const state = c.req.query('state')
+
+  // Checked FIRST and returned early: WhatsApp and Lead Ads share this one
+  // callback because only this redirect URI is allowlisted with Meta. The
+  // marker is put on the state by /meta-whatsapp/connect, so a Lead Ads
+  // callback can never take this branch.
+  if (state && isWhatsAppOAuthState(state)) {
+    return handleWhatsAppOAuthCallback(c, code, state)
+  }
+
   const storedState = getCookie(c, META_STATE_COOKIE)
 
   setCookie(c, META_STATE_COOKIE, '', { path: '/', maxAge: 0 })
