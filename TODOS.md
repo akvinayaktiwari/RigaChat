@@ -38,6 +38,63 @@ integration.
 **Priority:** P2
 **Depends on:** None
 
+### An expired session renders a dashboard that looks signed in and fails at everything
+
+**What:** Cognito ID tokens last one hour. Nothing refreshes them and nothing reacts to a
+401. `apiClient` (`frontend/src/services/api.ts`) parses the 401 body and returns it as an
+ordinary `ApiResponse` — no redirect, no session clear, no retry. `useAuth` never
+re-authenticates: Cognito hands back a `RefreshToken` and it is **thrown away**. Grep the
+whole repo for `RefreshToken` and you get exactly one hit, the type annotation at
+`hooks/useAuth.ts:250` that names it in the response shape it discards.
+
+So an hour after signing in, the header still shows the user's name and avatar, the sidebar
+still renders, and every single call underneath returns 401. Pages that guard on `data`
+render empty; pages that guard on `error` show a generic failure. Nothing anywhere says
+"you are signed out".
+
+**Why:** Hit for real on 2026-08-15 while preparing the Meta App Review screencast — the
+Leads page "wouldn't open", and twenty minutes went into checking the API, entitlements and
+the page component before the actual cause (a six-hour-old token) surfaced. A customer who
+leaves the tab open over lunch gets the same experience with no way to interpret it, and
+the natural read is "your product is broken", not "sign in again".
+
+**Context:** Two layers, and the cheap one is worth doing alone. **Minimum:** have
+`apiClient` detect 401, clear the session and redirect to `/login` — turns a silent
+failure into an obvious one, and is maybe an hour. **Proper:** keep the refresh token and
+exchange it on 401, retrying the original request once, so an open tab simply keeps
+working. Note the refresh token is a longer-lived credential than the ID token, so decide
+deliberately where it lives — `useAuth.ts:58` documents why the session is in
+sessionStorage rather than localStorage, and that reasoning applies more strongly here.
+
+**Effort:** S (redirect on 401) / M (real refresh flow)
+**Priority:** P2
+**Depends on:** None
+
+### A lead can never be deleted, by anyone
+
+**What:** There is no delete path for a lead anywhere. No route in `lead-routes.ts`, no
+service function, no repository function — `grep -rn "deleteLead"` across `backend/src`
+returns nothing. Once a lead row is written it is permanent, for the client and for us.
+
+**Why:** Every capture surface is public and unauthenticated by design — `POST /api/leads`
+takes a `botId` and a body, and the Meta webhook writes whatever Meta delivers. So spam,
+test submissions and mistakes all land in the same CRM the client works out of, and the
+only available response is to ignore them forever. It also blocks honouring a deletion
+request properly: `handleMetaDataDeletionRequest` records and acknowledges the request,
+but nothing can actually remove the rows, which is why the submission doc carries a
+"known weakness" paragraph admitting the purge is manual.
+
+**Context:** Concrete today — the App Review reviewer account permanently holds six
+`<test lead: dummy data...>` rows from screencast takes, and there is no way to tidy them. Design decisions needed before building: soft delete versus hard
+delete (soft keeps the lead-cap accounting honest and is reversible); whether deletion is
+per-lead, bulk, or filtered; and whether it needs a staff/admin path as well as a client
+one, since the Meta deletion callback is answered by us, not by the client. Soft delete
+plus a `deleted` filter on the unified inbox is probably the smallest honest version.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None
+
 ### Add error handling to data-load effects app-wide
 
 **What:** 15 pages (including `DashboardHome.tsx`, `LeadsPage.tsx`, `BotsPage.tsx`, `BotDetailPage.tsx`, `FormDetailPage.tsx`, `FormsPage.tsx`, `KnowledgeBasePage.tsx`, `LeadDetailPage.tsx`, `FormLeadsPage.tsx`, `NewBotPage.tsx`, `VoiceKnowledgeBasePage.tsx`, `VoiceAgentDetailPage.tsx`, `AuthCallbackPage.tsx`, `SchedulerPage.tsx`, `AppointmentsPage.tsx`) load data via a `.then((res) => setX(res.data ?? []))`-shaped effect with no check on `res.success` and no `.catch()`. Two distinct failure symptoms, same root cause: a genuinely rejected promise (network error) leaves `loading` stuck `true` forever (infinite skeleton); an HTTP error response that still resolves normally (e.g. a 500 with a well-formed `{success:false, error:...}` body) has its failure silently swallowed by `res.data ?? []`, showing a *misleading empty state* ("No schedules yet") instead of either an error or the truth.
