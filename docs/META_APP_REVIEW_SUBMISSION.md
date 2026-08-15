@@ -109,10 +109,18 @@ Record the screencast with `scripts/record-meta-screencast.sh` and upload the
 
 ## Reviewer test instructions
 
+**Never put the reviewer account's password in this file.** This repository is
+public, so a password committed here is a published credential for a live account
+on production. An earlier version of this section told you to do exactly that.
+
+The dedicated reviewer account exists (created 2026-08-15, seeded with a demo bot
+and three demo leads so the CRM screens show real content). Its credentials live
+outside the repo — paste them straight into Meta's "How can we test?" field, and
+keep a copy in a password manager, not here.
+
 Paste into the "How can we test?" / instructions field.
 
-> Test credentials: <create a dedicated reviewer account and put the email +
-> password here — do NOT use a real customer account>
+> Test credentials: <paste them into Meta's form directly — see the warning below>
 >
 > 1. Go to https://vyostra.com/login and sign in with the credentials above.
 > 2. In the left sidebar, click **Meta Ads**.
