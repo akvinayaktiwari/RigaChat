@@ -68,9 +68,17 @@ export const WHATSAPP_TEMPLATES: WhatsAppTemplateDefinition[] = [
     // same three components with generic copy (accepted) and with Meta's copy
     // (rejected). Do not "restore" the original text.
     //
-    // The NAME hello_world is kept because it is the conventional smoke-test
-    // name and is what scripts default to; only the copy differs.
-    name: 'hello_world',
+    // The name is NOT hello_world, and cannot be. Meta reserves that name on
+    // every WABA whether or not the sample actually exists there: creating it
+    // fails with "Template name is already used as a sample template"
+    // (observed 2026-08-15 on WABA 1353319399571291). This is a SECOND,
+    // independent reservation on top of the body-text one above -- a real
+    // WABA rejects both the name and the copy, so a faithful hello_world
+    // clone is impossible by two separate mechanisms.
+    //
+    // Test WABAs hide this: Meta pre-creates hello_world there, so the script
+    // skips it and never attempts the create that would have revealed it.
+    name: 'connection_test_1',
     category: 'UTILITY',
     language: 'en_US',
     header: 'Connection test',
