@@ -54,6 +54,32 @@ import type {
 
 const BASE_URL = import.meta.env.VITE_API_URL
 
+// Where OAuth *browser navigations* go, which is not always where `fetch` goes.
+//
+// An OAuth connect route sets a CSRF state cookie and the matching callback
+// reads it back. That cookie is host-only -- setCookie in
+// backend/src/routes/integration-routes.ts passes no `domain` -- so the browser
+// returns it to the exact hostname that set it and nowhere else. **The connect
+// route and the provider's configured redirect URI must therefore be the same
+// origin**, or the callback sees no cookie and fails with invalid_state.
+//
+// They drifted apart for Meta: BASE_URL is the raw Lambda Function URL, while
+// META_REDIRECT_URI is https://vyostra.com/... (the two are different
+// registrable domains, so no cookie is shared). Every connect attempt died on
+// "That connection link expired", which stayed invisible while Facebook Login
+// was blocked upstream and nothing ever reached the callback.
+//
+// Deliberately NOT solved by pointing VITE_API_URL at vyostra.com: CloudFront's
+// distribution-wide CustomErrorResponses map 403 and 404 onto /index.html with
+// HTTP 200, which would turn every API error into an HTML success for `fetch`.
+// Only the top-level navigations move; see TODOS.md for the proper fix.
+//
+// Falls back to BASE_URL when unset, which is correct for local dev (no
+// CloudFront in front of the API) and for any provider whose redirect URI
+// already points at the Lambda host -- Zoho's does, which is why it works and
+// Meta's did not.
+const OAUTH_BASE_URL = import.meta.env.VITE_OAUTH_BASE_URL || BASE_URL
+
 let authToken: string | null = null
 
 export function setAuthToken(token: string | null): void {
@@ -423,6 +449,10 @@ export function disconnectCRM(): Promise<ApiResponse<{ success: boolean }>> {
 // param instead, verified server-side by requireAuthFromQuery.
 export function connectZoho(): void {
   if (!authToken) return
+  // Stays on BASE_URL deliberately: ZOHO_REDIRECT_URI points at the Lambda
+  // host, so connect and callback already share an origin. Moving this would
+  // break a working integration -- the rule is that the two must match, not
+  // that either one has to be vyostra.com.
   window.location.href = `${BASE_URL}/api/integrations/zoho/connect?token=${encodeURIComponent(authToken)}`
 }
 
@@ -491,7 +521,9 @@ export function getMetaStatus(): Promise<ApiResponse<MetaConnection | null>> {
 // verified server-side by requireAuthFromQuery.
 export function connectMeta(): void {
   if (!authToken) return
-  window.location.href = `${BASE_URL}/api/integrations/meta/connect?token=${encodeURIComponent(authToken)}`
+  // OAUTH_BASE_URL, not BASE_URL: this must originate from the same host as
+  // META_REDIRECT_URI or the state cookie never comes back. See the constant.
+  window.location.href = `${OAUTH_BASE_URL}/api/integrations/meta/connect?token=${encodeURIComponent(authToken)}`
 }
 
 export function disconnectMeta(): Promise<ApiResponse<{ success: boolean }>> {

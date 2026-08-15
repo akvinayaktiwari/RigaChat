@@ -2,6 +2,42 @@
 
 ## Frontend
 
+### The frontend talks to two different API hosts, and OAuth state cookies fall through the gap
+
+**What:** `VITE_API_URL` is the raw Lambda Function URL, but `vyostra.com/api/*` also
+routes to the same Lambda through CloudFront. So the app has two working API origins and
+uses both. That is harmless for `fetch`, and fatal for OAuth: an integration's connect
+route sets a **host-only** CSRF state cookie (`setCookie` in `integration-routes.ts`
+passes no `domain`), and the provider's redirect URI decides which host the callback
+lands on. If those two differ, the cookie is never sent and the callback fails
+`invalid_state`.
+
+Meta hit exactly this — connect on the Lambda host, `META_REDIRECT_URI` on
+`vyostra.com`, two different registrable domains. Every connect attempt failed with
+"That connection link expired", invisible for days because Facebook Login was blocked
+upstream and nothing reached the callback. Patched 2026-08-15 by sending only the Meta
+connect navigation to `VITE_OAUTH_BASE_URL` (`https://vyostra.com`). Zoho was left on
+`BASE_URL` because `ZOHO_REDIRECT_URI` already points at the Lambda host — the rule is
+that connect and callback must match, not that either must be a particular domain.
+
+**Why:** the current state is correct but load-bearing on a comment. Any new OAuth
+integration picks a host by accident and gets a failure whose message ("that link
+expired") points at session length rather than at cookie scope. Cal.com is next in line
+and `CAL_COM_REDIRECT_URI` is currently unset.
+
+**Context:** the real fix is one origin for everything — point `VITE_API_URL` at
+`https://vyostra.com` and delete `VITE_OAUTH_BASE_URL`. Blocked on CloudFront: the
+distribution-wide `CustomErrorResponses` map 403 and 404 onto `/index.html` with HTTP
+200, and CloudFront applies them to **every** behaviour including `/api/*`, so every API
+error would arrive as an HTML success and `apiClient` would parse it as one. Fixing that
+means replacing the blanket error responses with a CloudFront Function doing SPA
+rewrites on the default behaviour only, then flipping `VITE_API_URL` and re-testing every
+integration.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None
+
 ### Add error handling to data-load effects app-wide
 
 **What:** 15 pages (including `DashboardHome.tsx`, `LeadsPage.tsx`, `BotsPage.tsx`, `BotDetailPage.tsx`, `FormDetailPage.tsx`, `FormsPage.tsx`, `KnowledgeBasePage.tsx`, `LeadDetailPage.tsx`, `FormLeadsPage.tsx`, `NewBotPage.tsx`, `VoiceKnowledgeBasePage.tsx`, `VoiceAgentDetailPage.tsx`, `AuthCallbackPage.tsx`, `SchedulerPage.tsx`, `AppointmentsPage.tsx`) load data via a `.then((res) => setX(res.data ?? []))`-shaped effect with no check on `res.success` and no `.catch()`. Two distinct failure symptoms, same root cause: a genuinely rejected promise (network error) leaves `loading` stuck `true` forever (infinite skeleton); an HTTP error response that still resolves normally (e.g. a 500 with a well-formed `{success:false, error:...}` body) has its failure silently swallowed by `res.data ?? []`, showing a *misleading empty state* ("No schedules yet") instead of either an error or the truth.
