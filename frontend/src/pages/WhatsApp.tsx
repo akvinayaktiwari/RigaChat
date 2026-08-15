@@ -8,6 +8,7 @@ import {
   disconnectWhatsApp,
   getMetaWhatsAppStatus,
   getWhatsAppStatus,
+  connectMetaWhatsAppOAuth,
   sendMetaWhatsAppTestMessage,
 } from '../services/api'
 import { MetaIcon, WhatsAppIcon } from '../components/landing/BrandIcons'
@@ -40,6 +41,15 @@ const META_WHATSAPP_CONFIG_ID = import.meta.env.VITE_META_WHATSAPP_CONFIG_ID as 
 // this is a different trust model than the cookie-based OAuth state check
 // used for the redirect-based Meta Lead Ads / Zoho connect flows.
 const META_EMBEDDED_SIGNUP_ORIGIN = 'https://www.facebook.com'
+
+// Coarse failure reasons produced before the request ever reaches Meta.
+// Anything Meta itself said arrives as `message` instead and is shown verbatim.
+const REASON_MESSAGES: Record<string, string> = {
+  missing_notification_number: 'Enter a notification number before connecting.',
+  not_configured: 'Meta WhatsApp is not configured on the server yet.',
+  permission_declined: 'You declined the permissions Meta asked for.',
+  invalid_state: 'That connection link expired. Start the connect again.',
+}
 
 declare global {
   interface Window {
@@ -183,6 +193,30 @@ export default function WhatsApp() {
     })
   }, [])
 
+  // The OAuth callback redirects back here with the outcome in the query
+  // string. Without this the redirect lands on a page that looks exactly like
+  // it did before the user left, whether it worked or not.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const outcome = params.get('metaWa')
+    if (!outcome) return
+
+    if (outcome === 'connected') {
+      toast.show('WhatsApp connected successfully', 'success')
+      void getMetaWhatsAppStatus().then((res) => setMetaStatus(res.success ? (res.data ?? null) : null))
+    } else {
+      // `message` carries Meta's real failure text; `reason` is the coarse
+      // fallback for failures that happen before we ever reach Meta.
+      const message = params.get('message')
+      const reason = params.get('reason')
+      setMetaTestResult({ ok: false, message: message ?? REASON_MESSAGES[reason ?? ''] ?? 'Could not connect WhatsApp.' })
+    }
+
+    // Strip the params so a refresh does not replay the toast.
+    window.history.replaceState({}, '', window.location.pathname)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
       if (event.origin !== META_EMBEDDED_SIGNUP_ORIGIN) return
@@ -253,7 +287,19 @@ export default function WhatsApp() {
     }
   }
 
-  async function handleMetaConnect() {
+  // Redirect-based connect, matching the Meta Lead Ads flow that is proven
+  // working, rather than the FB.login() popup Embedded Signup uses. The popup
+  // path and its postMessage listener are kept below only as a fallback while
+  // this is being validated -- see handleMetaConnectPopup.
+  function handleMetaConnect() {
+    if (!metaNotificationNumber.trim()) {
+      toast.show('Notification number is required', 'error')
+      return
+    }
+    connectMetaWhatsAppOAuth(metaNotificationNumber.trim())
+  }
+
+  async function handleMetaConnectPopup() {
     if (!metaNotificationNumber.trim()) {
       toast.show('Notification number is required', 'error')
       return
@@ -641,15 +687,31 @@ export default function WhatsApp() {
                   placeholder="919999999999"
                 />
               </div>
-              <button
-                ref={metaConnectButtonRef}
-                type="button"
-                onClick={handleMetaConnect}
-                disabled={metaConnecting}
-                className="inline-flex items-center justify-center bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity disabled:opacity-50"
-              >
-                {metaConnecting ? 'Connecting...' : 'Connect with Meta'}
-              </button>
+              <div className="space-y-2">
+                <button
+                  ref={metaConnectButtonRef}
+                  type="button"
+                  onClick={handleMetaConnect}
+                  className="inline-flex items-center justify-center bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity"
+                >
+                  Connect with Meta
+                </button>
+                {/* Embedded Signup fallback. Kept reachable rather than
+                    removed: Meta requires the popup flow for businesses that
+                    still need a WhatsApp account CREATED (the redirect flow
+                    can only connect one that already exists), so this is the
+                    path a brand-new client needs. */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={handleMetaConnectPopup}
+                    disabled={metaConnecting}
+                    className="text-xs text-gray-500 underline hover:text-gray-700 transition-colors disabled:opacity-50"
+                  >
+                    {metaConnecting ? 'Opening Meta...' : "Don't have a WhatsApp Business account yet? Set one up"}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </section>

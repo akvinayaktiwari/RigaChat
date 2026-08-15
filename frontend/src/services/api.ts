@@ -506,6 +506,15 @@ export function connectMetaWhatsApp(data: ConnectMetaWhatsAppInput): Promise<Api
   return apiClient<{ success: boolean }>('/api/integrations/meta-whatsapp/callback', 'POST', data)
 }
 
+// Top-level browser navigation, not a fetch — same pattern and same
+// OAUTH_BASE_URL reasoning as connectMeta below: this must leave from the host
+// the callback returns to, or the host-only state cookie never comes back.
+export function connectMetaWhatsAppOAuth(notificationNumber: string): void {
+  if (!authToken) return
+  const params = new URLSearchParams({ token: authToken, notificationNumber })
+  window.location.href = `${OAUTH_BASE_URL}/api/integrations/meta-whatsapp/connect?${params.toString()}`
+}
+
 export function sendMetaWhatsAppTestMessage(toNumber: string): Promise<ApiResponse<{ messageId?: string }>> {
   return apiClient<{ messageId?: string }>('/api/integrations/meta-whatsapp/test-message', 'POST', { toNumber })
 }

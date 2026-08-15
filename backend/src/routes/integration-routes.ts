@@ -1,10 +1,11 @@
 import { failureReasonOf } from '../lib/meta-connect-errors.js'
 import crypto from 'node:crypto'
 import { Hono } from 'hono'
-import { getCookie, setCookie } from 'hono/cookie'
+import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { requireAuth, requireAuthFromQuery } from '../lib/cognito.js'
 import { zohoProvider } from '../providers/zoho-provider.js'
 import { metaProvider } from '../providers/meta-provider.js'
+import { metaWhatsAppProvider } from '../providers/meta-whatsapp-provider.js'
 import { connectZohoCRM, disconnectCRM, getCRMStatus } from '../services/crm-service.js'
 import {
   connectCalCom,
@@ -23,6 +24,7 @@ import {
   getMetaWhatsAppStatus,
   getWhatsAppStatus,
   sendWhatsAppTestMessage,
+  connectMetaWhatsAppViaOAuth,
 } from '../services/whatsapp-service.js'
 import {
   connectMetaAds,
@@ -247,6 +249,84 @@ integrationRoutes.get('/meta-whatsapp/status', requireAuth, async (c) => {
     )
   } catch (error) {
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+const META_WA_STATE_COOKIE = 'meta_wa_oauth_state'
+const META_WA_NOTIFY_COOKIE = 'meta_wa_notify'
+
+// Derived from META_REDIRECT_URI's origin rather than read from its own env
+// var: the two callbacks must share a host anyway (the state cookie is
+// host-only -- that exact mismatch caused the "connection link expired" bug
+// fixed in 12c1673), and the Lambda's environment is near the 4KB ceiling, so
+// not adding a variable that can be computed is deliberate.
+function metaWhatsAppRedirectUri(): string {
+  const base = process.env.META_REDIRECT_URI
+  if (!base) throw new Error('Missing META_REDIRECT_URI')
+  return `${new URL(base).origin}/api/integrations/meta-whatsapp/oauth-callback`
+}
+
+// The redirect-based WhatsApp connect: same mechanism as /meta/connect below,
+// which is proven working, rather than the FB.login() popup used by Embedded
+// Signup. The notification number cannot survive an OAuth round trip on its
+// own, so it rides in a short-lived host-only cookie next to the state.
+integrationRoutes.get('/meta-whatsapp/connect', requireAuthFromQuery, (c) => {
+  const clientId = c.get('user').sub
+  const notificationNumber = c.req.query('notificationNumber')?.trim()
+
+  if (!notificationNumber) {
+    return c.redirect(`${FRONTEND_URL}/dashboard/whatsapp?metaWa=error&reason=missing_notification_number`)
+  }
+
+  const state = `${clientId}:${crypto.randomBytes(16).toString('hex')}`
+  const cookieOptions = {
+    httpOnly: true,
+    maxAge: 600,
+    path: '/',
+    sameSite: 'Lax' as const,
+    secure: process.env.NODE_ENV === 'production',
+  }
+
+  setCookie(c, META_WA_STATE_COOKIE, state, cookieOptions)
+  setCookie(c, META_WA_NOTIFY_COOKIE, notificationNumber, cookieOptions)
+
+  try {
+    return c.redirect(metaWhatsAppProvider.getOAuthUrl(state, metaWhatsAppRedirectUri()))
+  } catch (error) {
+    console.error('Meta WhatsApp connect setup error:', errorMessage(error))
+    return c.redirect(`${FRONTEND_URL}/dashboard/whatsapp?metaWa=error&reason=not_configured`)
+  }
+})
+
+integrationRoutes.get('/meta-whatsapp/oauth-callback', async (c) => {
+  const code = c.req.query('code')
+  const state = c.req.query('state')
+  const expectedState = getCookie(c, META_WA_STATE_COOKIE)
+  const notificationNumber = getCookie(c, META_WA_NOTIFY_COOKIE)
+
+  deleteCookie(c, META_WA_STATE_COOKIE, { path: '/' })
+  deleteCookie(c, META_WA_NOTIFY_COOKIE, { path: '/' })
+
+  if (!code) {
+    return c.redirect(`${FRONTEND_URL}/dashboard/whatsapp?metaWa=error&reason=permission_declined`)
+  }
+  if (!state || !expectedState || state !== expectedState || !notificationNumber) {
+    return c.redirect(`${FRONTEND_URL}/dashboard/whatsapp?metaWa=error&reason=invalid_state`)
+  }
+
+  const clientId = state.split(':')[0]
+
+  try {
+    await connectMetaWhatsAppViaOAuth(clientId, code, metaWhatsAppRedirectUri(), notificationNumber)
+    return c.redirect(`${FRONTEND_URL}/dashboard/whatsapp?metaWa=connected`)
+  } catch (error) {
+    // The message is carried to the UI rather than flattened to a code: the
+    // useful failures here ("no WhatsApp account was shared with this app",
+    // "account has no phone number") are precisely the ones a generic reason
+    // string would destroy.
+    console.error('Meta WhatsApp OAuth callback error:', errorMessage(error))
+    const reason = encodeURIComponent(errorMessage(error).slice(0, 300))
+    return c.redirect(`${FRONTEND_URL}/dashboard/whatsapp?metaWa=error&message=${reason}`)
   }
 })
 

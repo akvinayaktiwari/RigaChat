@@ -226,6 +226,29 @@ export async function connectMetaWhatsApp(clientId: string, input: ConnectMetaWh
   })
 }
 
+// The redirect-OAuth counterpart to connectMetaWhatsApp above. Both end at
+// the same storeMetaWhatsAppConnection, so a connection made this way is
+// indistinguishable from an Embedded Signup one -- which is the point: this
+// exists so the WhatsApp connect can reuse the redirect flow already proven
+// working for Meta Lead Ads, not to create a second class of connection.
+export async function connectMetaWhatsAppViaOAuth(
+  clientId: string,
+  code: string,
+  redirectUri: string,
+  notificationNumber: string
+): Promise<void> {
+  const accessToken = await metaWhatsAppProvider.exchangeCodeForToken(code, redirectUri)
+  const discovered = await metaWhatsAppProvider.discoverWhatsAppAccount(accessToken)
+
+  await storeMetaWhatsAppConnection(clientId, {
+    wabaId: discovered.wabaId,
+    phoneNumberId: discovered.phoneNumberId,
+    notificationNumber,
+    accessToken,
+    displayPhoneNumber: discovered.displayPhoneNumber,
+  })
+}
+
 export async function disconnectWhatsApp(clientId: string): Promise<void> {
   const client = await getClientById(clientId)
 

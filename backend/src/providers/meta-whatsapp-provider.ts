@@ -8,6 +8,7 @@ import type {
 import { WHATSAPP_TEMPLATE_LANGUAGE, type WhatsAppTemplateDefinition } from '../lib/whatsapp-templates.js'
 
 const GRAPH_API_BASE = 'https://graph.facebook.com/v21.0'
+const META_OAUTH_DIALOG_URL = 'https://www.facebook.com/v21.0/dialog/oauth'
 
 interface MetaSendResponse {
   messages?: { id: string }[]
@@ -109,6 +110,27 @@ function buildComponents(definition: WhatsAppTemplateDefinition): MetaTemplateCo
   return components
 }
 
+export interface DiscoveredWhatsAppAccount {
+  wabaId: string
+  phoneNumberId: string
+  displayPhoneNumber: string
+}
+
+interface MetaBusinessListResponse {
+  data?: { id: string; name?: string }[]
+  error?: { message?: string }
+}
+
+interface MetaWabaListResponse {
+  data?: { id: string; name?: string }[]
+  error?: { message?: string }
+}
+
+interface MetaPhoneListResponse {
+  data?: { id: string; display_phone_number?: string }[]
+  error?: { message?: string }
+}
+
 export interface MetaWhatsAppCredentialsExchange {
   accessToken: string
   displayPhoneNumber: string
@@ -172,6 +194,120 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
     }
 
     return { accessToken: tokenData.access_token, displayPhoneNumber: phoneData.display_phone_number }
+  }
+
+  // The redirect-based alternative to Embedded Signup, mirroring the Lead Ads
+  // flow in meta-provider.ts exactly: a top-level browser navigation to
+  // /dialog/oauth driven by a dashboard login CONFIGURATION rather than a raw
+  // scope string, because this app is Facebook Login for Business and raw
+  // scopes are not a supported path for it.
+  //
+  // config_id is therefore mandatory, and override_default_response_type is
+  // required alongside it or the dialog can hand back a token instead of the
+  // `code` we exchange. Same reasoning as meta-provider.ts:106 -- see there.
+  getOAuthUrl(state: string, redirectUri: string): string {
+    const configId = process.env.META_WHATSAPP_CONFIG_ID
+    if (!configId) {
+      throw new Error(
+        'Missing META_WHATSAPP_CONFIG_ID. It is the Meta login configuration carrying the WhatsApp permissions; ' +
+          'without it a Login for Business app cannot show a consent screen at all.'
+      )
+    }
+
+    const params = new URLSearchParams({
+      client_id: requireEnv('META_APP_ID'),
+      redirect_uri: redirectUri,
+      state,
+      response_type: 'code',
+      config_id: configId,
+      override_default_response_type: 'true',
+    })
+
+    return `${META_OAUTH_DIALOG_URL}?${params.toString()}`
+  }
+
+  // Unlike exchangeCodeForCredentials below (the Embedded Signup path, which
+  // sends no redirect_uri), a redirect-based grant MUST echo back the exact
+  // redirect_uri that started it or Meta rejects the exchange.
+  async exchangeCodeForToken(code: string, redirectUri: string): Promise<string> {
+    const params = new URLSearchParams({
+      client_id: requireEnv('META_APP_ID'),
+      client_secret: requireEnv('META_APP_SECRET'),
+      redirect_uri: redirectUri,
+      code,
+    })
+
+    const response = await fetch(`${GRAPH_API_BASE}/oauth/access_token?${params.toString()}`)
+    const data = (await response.json()) as MetaTokenResponse
+
+    if (!data.access_token) {
+      throw new Error(`Meta WhatsApp token exchange failed: ${data.error?.message ?? 'Unknown error'}`)
+    }
+
+    return data.access_token
+  }
+
+  // Replaces what Embedded Signup hands over via postMessage. ES tells the
+  // browser the waba_id and phone_number_id directly; a redirect grant does
+  // not, so we walk businesses -> WABAs -> phone numbers instead.
+  //
+  // Every failure here is reported with the specific thing that was empty,
+  // because they mean different things and have different fixes. In
+  // particular an empty WABA list almost always means the user did not tick
+  // their WhatsApp account on the asset-selection screen -- Meta grants these
+  // permissions PER ASSET, and a token scoped to zero WABAs reads exactly
+  // like a token with no permission at all.
+  async discoverWhatsAppAccount(accessToken: string): Promise<DiscoveredWhatsAppAccount> {
+    const businesses = await this.getJson<MetaBusinessListResponse>('me/businesses', accessToken, 'id,name')
+    const business = businesses.data?.[0]
+    if (!business) {
+      throw new Error('No Meta business portfolio is visible to this account.')
+    }
+
+    const wabas = await this.getJson<MetaWabaListResponse>(
+      `${business.id}/owned_whatsapp_business_accounts`,
+      accessToken,
+      'id,name'
+    )
+    const waba = wabas.data?.[0]
+    if (!waba) {
+      throw new Error(
+        'No WhatsApp Business Account was shared with this app. On the Meta consent screen, select the ' +
+          'WhatsApp account you want to connect -- permissions are granted per account, not app-wide.'
+      )
+    }
+
+    const phones = await this.getJson<MetaPhoneListResponse>(
+      `${waba.id}/phone_numbers`,
+      accessToken,
+      'id,display_phone_number'
+    )
+    const phone = phones.data?.[0]
+    if (!phone?.id) {
+      throw new Error(`WhatsApp account "${waba.name ?? waba.id}" has no phone number added yet.`)
+    }
+
+    return {
+      wabaId: waba.id,
+      phoneNumberId: phone.id,
+      displayPhoneNumber: phone.display_phone_number ?? '',
+    }
+  }
+
+  private async getJson<T extends { error?: { message?: string } }>(
+    path: string,
+    accessToken: string,
+    fields: string
+  ): Promise<T> {
+    const params = new URLSearchParams({ access_token: accessToken, fields })
+    const response = await fetch(`${GRAPH_API_BASE}/${path}?${params.toString()}`)
+    const data = (await response.json().catch(() => ({}))) as T
+
+    if (!response.ok) {
+      throw new Error(`Meta lookup ${path} failed: ${data.error?.message ?? `status ${response.status}`}`)
+    }
+
+    return data
   }
 
   async sendMessage(to: string, message: string, credentials: WhatsAppCredentials): Promise<WhatsAppSendResult> {
