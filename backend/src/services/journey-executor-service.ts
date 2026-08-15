@@ -4,12 +4,17 @@ import { isOptedOut } from '../repositories/whatsapp-inbound-activity-repository
 import { getAppointmentRequestsByBotId } from '../repositories/appointment-request-repository.js'
 import { AWAIT_REPLY_TIMEOUT_SECONDS } from './journey-compiler-service.js'
 import { readJourneyLead, toLeadRef } from './lead-resolution-service.js'
+import { resolveTemplateParams } from '../lib/journey-template-params.js'
 import { bookAppointment } from '../mcp/booking-mcp-server.js'
 import { scheduleReminder } from '../mcp/reminder-mcp-server.js'
 import { getQuotation } from '../mcp/quotation-mcp-server.js'
 import { sendBrochure } from '../mcp/brochure-mcp-server.js'
-import { hasActiveWhatsAppSession, sendWhatsAppMessageToLead } from './whatsapp-service.js'
-import type { JourneyExecutorEvent, WaitAndRecheckResult } from '../types/index.js'
+import {
+  hasActiveWhatsAppSession,
+  sendWhatsAppMessageToLead,
+  sendWhatsAppTemplateToLead,
+} from './whatsapp-service.js'
+import type { JourneyExecutorEvent, JourneyLead, WaitAndRecheckResult } from '../types/index.js'
 
 // The Lambda handler journey-compiler-service.ts's compiled Task states
 // actually invoke (via journeyExecutorLambdaArn) -- see backend/index.ts's
@@ -62,19 +67,31 @@ async function handleSendMessage(event: JourneyExecutorEvent): Promise<Record<st
     return { sent: false, reason: 'no_phone_number', message: 'Lead has no phone number on file.' }
   }
 
-  // See whatsapp-service.ts's hasActiveWhatsAppSession() for why this is
-  // currently always false, and what unlocks a real check.
-  if (!(await hasActiveWhatsAppSession(event.leadId))) {
+  // Free text is preferred while the window is open -- it is free to send and
+  // reads like a person. Outside the window Meta rejects free text outright
+  // (error 131047), so the step's approved template is the only way through.
+  if (await hasActiveWhatsAppSession(event.leadId)) {
+    const result = await sendWhatsAppMessageToLead(
+      event.clientId,
+      lead.phone,
+      event.messageHint ?? DEFAULT_SEND_MESSAGE_TEXT
+    )
+    return { sent: result.success, ...result }
+  }
+
+  if (!event.whatsappTemplateName) {
     return {
       sent: false,
       reason: 'no_active_session',
       message:
-        'Cannot send free-text outside a 24h WhatsApp session window; template-based sends are not implemented yet.',
+        'Outside the 24h WhatsApp session window and this step names no approved template. ' +
+        'Set whatsappTemplateName on the step to allow it to send here.',
     }
   }
 
-  const result = await sendWhatsAppMessageToLead(event.clientId, lead.phone, event.messageHint ?? DEFAULT_SEND_MESSAGE_TEXT)
-  return { sent: result.success, ...result }
+  const params = resolveTemplateParams(event.whatsappTemplateParams ?? [], lead)
+  const result = await sendWhatsAppTemplateToLead(event.clientId, lead.phone, event.whatsappTemplateName, params)
+  return { sent: result.success, viaTemplate: event.whatsappTemplateName, ...result }
 }
 
 // Extracts a required string field out of toolInput (a Record<string,

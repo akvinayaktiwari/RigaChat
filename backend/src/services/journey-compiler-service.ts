@@ -261,6 +261,8 @@ export function compileJourneyToAsl(journey: JourneyDefinition): AslStateMachine
             operation: 'send_message',
             stepId: step.stepId,
             messageHint: step.messageHint,
+            whatsappTemplateName: step.whatsappTemplateName,
+            whatsappTemplateParams: step.whatsappTemplateParams,
             ...CONTEXT_PASSTHROUGH_PARAMETERS,
           },
           ResultPath: TASK_RESULT_PATH,

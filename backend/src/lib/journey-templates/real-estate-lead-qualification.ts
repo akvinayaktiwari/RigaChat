@@ -25,6 +25,11 @@ import type { JourneyTemplate } from '../../types/index.js'
 // answers, and only then moves on. Each falls back to the same nudge when the
 // 24h WhatsApp window closes without a reply.
 //
+// Outbound outside the 24h window now works: send_message falls back to the
+// step's approved WhatsApp template when the session is shut, so greet and
+// nudge can actually reach a lead who has never messaged first. Free text is
+// still used while a window is open, because it is free and reads better.
+//
 // STILL A LIMITATION, and an honest one: send_message delivers messageHint
 // literally today rather than composing a reply from what the lead just said,
 // so the journey can branch on a reply arriving but not yet on its content. The
@@ -56,10 +61,9 @@ export const realEstateLeadQualification: JourneyTemplate = {
     toneDescription: 'Warm, direct, and brief. Never pushy.',
     mcpToolbox: ['booking', 'reminder'],
     channelConfig: {
-      // Empty rather than absent: WhatsApp template config only applies once
-      // outbound-outside-the-24h-window is real (blocked on Meta template
-      // approval). Until then this journey only sends inside an open session.
-      whatsapp: {},
+      // Agent-wide default for send_message steps that name no template of
+      // their own. Steps that do name one (greet, nudge) override this.
+      whatsapp: { messageTemplateName: 'connection_test_1' },
     },
   },
 
@@ -78,6 +82,10 @@ export const realEstateLeadQualification: JourneyTemplate = {
         // than as an instruction to the model.
         messageHint:
           'Hi! Thanks for your interest. To point you to the right property, could you tell me your budget range and which area you are considering?',
+        // This step fires on lead_captured, so the session window is almost
+        // always shut -- the template is the path that actually sends.
+        whatsappTemplateName: 'lead_welcome_qualify_1',
+        whatsappTemplateParams: ['{{lead.name}}', '{{lead.propertyInterest}}'],
         next: 'await_qualification',
       },
       {
@@ -110,6 +118,10 @@ export const realEstateLeadQualification: JourneyTemplate = {
         type: 'send_message',
         messageHint:
           'Just checking in -- would a weekend site visit work for you? I can hold a slot and share the exact location and directions.',
+        // Reached only after 24h of silence, so the window is shut by
+        // definition. Without a template this step could never send at all.
+        whatsappTemplateName: 'lead_followup_nudge_1',
+        whatsappTemplateParams: ['{{lead.name}}'],
         next: 'wait_for_booking',
       },
       {

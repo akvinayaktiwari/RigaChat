@@ -580,9 +580,23 @@ interface JourneyStepBase {
 export interface SendMessageStep extends JourneyStepBase {
   type: 'send_message'
   // Agent composes the actual message from its systemPrompt/KB context; this
-  // is an optional steer, not a hard template (WhatsApp's hard template
-  // requirement lives on AgentChannelConfig, not here).
+  // is an optional steer, not a hard template.
   messageHint?: string
+  // The approved WhatsApp template to fall back to when the 24h session window
+  // is CLOSED, which is the normal case for any step that fires on a schedule
+  // rather than straight after a reply. Free text is still preferred while the
+  // window is open: it is free, and it reads like a person rather than a form.
+  //
+  // Per-step rather than only on AgentChannelConfig because one journey
+  // legitimately needs different templates at different points -- a greeting,
+  // a nudge and a booking confirmation are three different approved templates.
+  // AgentChannelConfig.messageTemplateName remains the agent-wide default for
+  // steps that do not name one.
+  whatsappTemplateName?: string
+  // Values for the template's {{n}} placeholders, in order. A value may be a
+  // literal, or a `{{lead.field}}` reference resolved against the lead at send
+  // time -- see resolveTemplateParams in journey-executor-service.ts.
+  whatsappTemplateParams?: string[]
   next?: string
 }
 
@@ -1189,6 +1203,10 @@ export interface JourneyExecutorEvent {
   promptHint?: string
   stepId?: string
   messageHint?: string
+  // Carried through from SendMessageStep by the compiler so the executor can
+  // fall back to a template when the session window is shut.
+  whatsappTemplateName?: string
+  whatsappTemplateParams?: string[]
   // Typed, but this event arrives from Step Functions rather than from our own
   // call site, so journey-executor-service.ts still keeps a runtime default
   // branch -- the type describes what a correctly compiled Journey sends, not
