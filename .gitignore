@@ -29,3 +29,7 @@ e2e/playwright-report/
 
 # Agent worktrees — machine-local scratch, never shared
 .claude/worktrees/
+
+# local test credentials + state for scripts/test-meta-journey-run.sh
+.test.env
+.test-journey-state.json
