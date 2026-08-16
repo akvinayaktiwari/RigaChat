@@ -240,6 +240,42 @@ component. `getRoutes()` in `prerender-entry.tsx` now documents the `/` trap.
 
 ## Backend
 
+### Deferred by the eng review of Epic A (2026-08-16)
+
+Three items pushed out of [#16](https://github.com/akvinayaktiwari/RigaChat/issues/16)
+during `/plan-eng-review`. None block the epic. Two were found by the codex outside
+voice rather than by reading the plan.
+
+**Make the `MessageChannel` interface real.** `types/index.ts:1-13` declares
+`MessageChannel` / `ChannelMessage` / `ChannelContext` with **zero implementations**,
+while CLAUDE.md rule 4 states that all incoming messages flow through it and future
+channels are added as new implementations only. Both channels grew their own handling
+instead, so the architecture doc is currently fiction. Deferred out of #11 because web
+chat is revenue-carrying and must not sit in the blast radius of a feature that has
+never run; #11 knowingly duplicates the compose logic as the price of that safety.
+Do this once #11 is proven, implementing `WebWidgetChannel` and `WhatsAppChannel`.
+**Depends on:** #11 shipping and running clean.
+
+**An abuse record for messages dropped by the inbound cap.** #10's spam guard, as
+corrected by this review, creates no lead and sends no reply when a client exceeds the
+hourly inbound-lead cap. `lead_events` is partitioned by `leadId`, so a dropped message
+has nowhere durable to go and the only trace is a CloudWatch line nobody greps. Needs a
+separate audit/counter shape so an abuse event is queryable, and so a client can be told
+"you hit the cap, here is when". **Depends on:** #10 defining the cap.
+
+**Real cross-namespace RAG ranking.** `voice-routes.ts:288` does
+`[...agentChunks, ...botChunks].slice(0, 5)`: it concatenates two Pinecone namespaces
+and takes the first five, ignoring score ordering entirely. #11 is about to copy that
+pattern to WhatsApp, which spreads a known-weak ranking from one channel to three.
+Replace with real cross-namespace scoring honouring the project's stated retrieval
+settings (topK 5, candidate pool 10, MMR lambda 0.7, threshold 0.7). Wants the eval
+suite from #11 in place first so the change can be measured rather than guessed.
+**Depends on:** #11's shared retrieval helper and eval suite.
+
+**Effort:** M / S / M
+**Priority:** P2
+**Depends on:** all three depend on #11
+
 ### Deferred out of Epic A / Epic B (filed 2026-08-16)
 
 Everything below was explicitly scoped OUT of [#16](https://github.com/akvinayaktiwari/RigaChat/issues/16)
