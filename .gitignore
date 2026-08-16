@@ -33,3 +33,5 @@ e2e/playwright-report/
 # local test credentials + state for scripts/test-meta-journey-run.sh
 .test.env
 .test-journey-state.json
+
+test-results/
