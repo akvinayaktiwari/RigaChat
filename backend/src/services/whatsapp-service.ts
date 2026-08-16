@@ -413,6 +413,46 @@ export async function sendWhatsAppTemplateToLead(
   return sendWithRetry(() => sender.provider.sendTemplate(toNumber, template, sender.credentials))
 }
 
+// The inward-facing counterpart to sendWhatsAppTemplateToLead: same
+// business-initiated template path, but addressed to the CLIENT's own
+// notificationNumber instead of a lead's phone. Handoff alerts and lead
+// reminders both need it -- they are messages ABOUT a lead, TO the human who
+// owns them.
+//
+// Kept here rather than resolved by the caller because notificationNumber
+// lives behind getActiveProviderAndCredentials, which is private: which of
+// the two connection records holds the number depends on the active provider,
+// and that is exactly the branch callers should not be re-deriving.
+//
+// A missing notificationNumber is reported as its own non-retryable error
+// rather than folded into "no active connection". The two mean different
+// things to whoever reads the log: one client never connected WhatsApp, the
+// other connected it and has nowhere to be told about it.
+export async function sendWhatsAppTemplateToClientNumber(
+  clientId: string,
+  templateName: string,
+  bodyParams: string[] = [],
+  languageCode: string = WHATSAPP_TEMPLATE_LANGUAGE
+): Promise<WhatsAppSendResult> {
+  const client = await getClientById(clientId)
+  if (!client) {
+    return { success: false, error: 'Client not found', retryable: false }
+  }
+
+  const sender = await getActiveProviderAndCredentials(client)
+  if (!sender) {
+    return { success: false, error: 'No active WhatsApp connection for this client', retryable: false }
+  }
+
+  const notificationNumber = sender.notificationNumber?.trim()
+  if (!notificationNumber) {
+    return { success: false, error: 'Client has no notificationNumber configured', retryable: false }
+  }
+
+  const template: WhatsAppTemplateSend = { templateName, languageCode, bodyParams }
+  return sendWithRetry(() => sender.provider.sendTemplate(notificationNumber, template, sender.credentials))
+}
+
 // Powers the dashboard's "send test message" button. Deliberately sends a
 // TEMPLATE rather than free text: a test is only meaningful if it exercises
 // the same business-initiated path real journey outreach uses, and free text

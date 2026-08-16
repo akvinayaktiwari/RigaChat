@@ -25,14 +25,6 @@ const ACTION_TYPE_LABELS: Record<ScheduledAction['actionType'], string> = {
   lead_reminder: 'Lead reminder',
 }
 
-// A lead_reminder's schedule is real -- EventBridge fires it on time -- but
-// scheduler-service.ts's handler for it is still a console.log, because no
-// notification infrastructure exists to remind anyone yet. Saying so on the row
-// is the difference between "we cancelled a follow-up" and "we cancelled
-// nothing, and did not know it." Delete this badge the same commit the handler
-// becomes real.
-const UNDELIVERED_ACTION_TYPES: ScheduledAction['actionType'][] = ['lead_reminder']
-
 function describeCadence(cadence: ScheduleCadence): string {
   if (cadence.type === 'interval_days') {
     return `Every ${cadence.intervalDays} day${cadence.intervalDays === 1 ? '' : 's'}`
@@ -244,14 +236,6 @@ export default function SchedulerPage() {
                     <h3 className="font-bold text-gray-900" style={JAKARTA_FONT}>
                       {ACTION_TYPE_LABELS[action.actionType]}
                     </h3>
-                    {UNDELIVERED_ACTION_TYPES.includes(action.actionType) && (
-                      <span
-                        title="This reminder is scheduled and will fire on time, but nothing is delivered to anyone yet."
-                        className="inline-flex border border-amber-200 bg-amber-50 text-amber-700 text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0"
-                      >
-                        Not delivered yet
-                      </span>
-                    )}
                   </div>
                   <p className="text-sm text-gray-500">{describeCadence(action.cadence)}</p>
                   {action.leadId &&
@@ -391,8 +375,6 @@ export default function SchedulerPage() {
             <p className="text-sm text-gray-500 mt-2">
               {ACTION_TYPE_LABELS[actionToDelete.actionType]} — {describeCadence(actionToDelete.cadence)} will be
               cancelled.
-              {UNDELIVERED_ACTION_TYPES.includes(actionToDelete.actionType) &&
-                ' This reminder does not deliver anything yet, so no message is being stopped.'}
             </p>
             <div className="flex items-center justify-end gap-3 mt-6">
               <button

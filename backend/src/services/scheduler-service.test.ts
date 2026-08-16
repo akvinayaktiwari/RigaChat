@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // compileScheduleExpression is pure and doesn't touch whatsapp-service.js at
 // all, but scheduler-service.ts imports it (for executeScheduledAction's
@@ -16,7 +16,12 @@ vi.mock('./whatsapp-service.js', () => ({ sendWeeklyReport: vi.fn() }))
 // test doesn't exercise.
 vi.mock('./agent-service.js', () => ({ resolveOwningAgentId: vi.fn().mockResolvedValue(undefined) }))
 
-const { compileScheduleExpression, ScheduleValidationError } = await import('./scheduler-service.js')
+const sendHandoffAlert = vi.fn()
+vi.mock('./notification-service.js', () => ({ sendHandoffAlert }))
+
+const { compileScheduleExpression, executeScheduledAction, ScheduleValidationError } = await import(
+  './scheduler-service.js'
+)
 
 describe('compileScheduleExpression', () => {
   it('compiles an interval_days cadence to an EventBridge rate() expression', () => {
@@ -52,5 +57,34 @@ describe('compileScheduleExpression', () => {
   it('rejects a one_off cadence in the past', () => {
     const past = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
     expect(() => compileScheduleExpression({ type: 'one_off', at: past })).toThrow(/must be in the future/)
+  })
+})
+
+// AC6: lead_reminder stopped being a console.log. A reminder and a handoff are
+// the same thing to the person receiving it -- "look at this lead now" -- so
+// both go out through the one notification path rather than each growing its
+// own send.
+describe('executeScheduledAction lead_reminder', () => {
+  beforeEach(() => {
+    sendHandoffAlert.mockReset()
+    sendHandoffAlert.mockResolvedValue({ notified: true })
+  })
+
+  it('notifies the human through the same path a handoff uses', async () => {
+    await executeScheduledAction('client-1', 'lead_reminder', { leadId: 'lead-1', botId: 'bot-1' })
+
+    expect(sendHandoffAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        leadRef: { source: 'chat', botId: 'bot-1', leadId: 'lead-1' },
+        clientId: 'client-1',
+        trigger: 'lead_reminder',
+      })
+    )
+  })
+
+  it('skips a schedule with no lead context instead of throwing', async () => {
+    await expect(executeScheduledAction('client-1', 'lead_reminder', {})).resolves.toBeUndefined()
+
+    expect(sendHandoffAlert).not.toHaveBeenCalled()
   })
 })

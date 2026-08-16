@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { McpCapability } from '../types/index.js'
 
 const isOptedOut = vi.fn()
+const appendLeadEvent = vi.fn()
 vi.mock('../repositories/lead-event-repository.js', () => ({
-  appendLeadEvent: vi.fn(),
+  appendLeadEvent,
   getEventByWamid: vi.fn(),
 }))
 vi.mock('../repositories/whatsapp-inbound-activity-repository.js', () => ({ isOptedOut }))
@@ -46,6 +47,9 @@ const getMetaLeadById = vi.fn()
 vi.mock('../repositories/meta-lead-repository.js', () => ({ getMetaLeadById }))
 vi.mock('./whatsapp-service.js', () => ({ hasActiveWhatsAppSession, sendWhatsAppMessageToLead }))
 
+const sendHandoffAlert = vi.fn()
+vi.mock('./notification-service.js', () => ({ sendHandoffAlert }))
+
 const { executeJourneyStep } = await import('./journey-executor-service.js')
 
 const baseContext = {
@@ -75,6 +79,9 @@ beforeEach(() => {
   getPublicFormConfig.mockResolvedValue(null)
   hasActiveWhatsAppSession.mockReset()
   sendWhatsAppMessageToLead.mockReset()
+  appendLeadEvent.mockReset()
+  sendHandoffAlert.mockReset()
+  sendHandoffAlert.mockResolvedValue({ notified: true })
 })
 
 describe('executeJourneyStep', () => {
@@ -306,9 +313,34 @@ describe('executeJourneyStep', () => {
     })
   })
 
-  it('human_handoff acknowledges the handoff', async () => {
+  it('human_handoff notifies a human and reports that it did', async () => {
+    const result = await executeJourneyStep({
+      ...baseContext,
+      operation: 'human_handoff',
+      stepId: 'handoff',
+      reason: 'No booking after 3 follow-ups',
+    })
+
+    expect(result).toEqual({ handedOff: true, notified: true })
+    expect(sendHandoffAlert).toHaveBeenCalledWith({
+      leadRef: { source: 'chat', botId: 'bot-1', leadId: 'lead-1' },
+      clientId: 'client-1',
+      reason: 'No booking after 3 follow-ups',
+      trigger: 'hand_to_agent',
+    })
+  })
+
+  // AC3/AC4: the handoff event is the durable record that the agent stopped.
+  // It has to survive a notification that never lands -- otherwise a client
+  // with no WhatsApp connection gets a lead silently abandoned with nothing in
+  // the timeline to show for it.
+  it('records the handoff event even when nobody could be notified', async () => {
+    sendHandoffAlert.mockResolvedValueOnce({ notified: false, skipReason: 'no_notification_number' })
+
     const result = await executeJourneyStep({ ...baseContext, operation: 'human_handoff', stepId: 'handoff' })
-    expect(result).toEqual({ handedOff: true })
+
+    expect(result).toEqual({ handedOff: true, notified: false })
+    expect(appendLeadEvent).toHaveBeenCalledWith(expect.objectContaining({ type: 'handoff', leadId: 'lead-1' }))
   })
 })
 

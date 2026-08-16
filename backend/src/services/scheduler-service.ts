@@ -9,6 +9,7 @@ import {
 } from '../repositories/scheduled-action-repository.js'
 import { sendWeeklyReport } from './whatsapp-service.js'
 import { resolveOwningAgentId } from './agent-service.js'
+import { sendHandoffAlert } from './notification-service.js'
 import type { ScheduleCadence, ScheduledAction, ScheduledActionType } from '../types/index.js'
 
 export class ScheduleValidationError extends Error {
@@ -143,15 +144,39 @@ export async function executeScheduledAction(
       await sendWeeklyReport(clientId)
       return
     case 'lead_reminder':
-      // STUB, same as journey-executor-service.ts's send-related stubs: no
-      // notification infra exists yet to actually remind anyone. The real,
-      // non-stub part of this feature is that a live EventBridge schedule
-      // got created for this specific lead at the client-requested time
-      // (backend/src/mcp/reminder-mcp-server.ts) -- what happens when it
-      // fires is the same undesigned piece as send_message.
-      console.log(
-        `[scheduler] STUB lead_reminder fired: client=${clientId} lead=${context?.leadId} bot=${context?.botId}`
-      )
+      await runLeadReminder(clientId, context)
       return
   }
+}
+
+// A lead_reminder and a hand_to_agent are the same thing to the person on the
+// other end -- "look at this lead now" -- so both go out through
+// notification-service rather than each growing its own send path. The trigger
+// is what distinguishes them in the message.
+//
+// The LeadRef is reconstructed as a chat lead because that is all a
+// ScheduledAction records: it carries leadId and botId but no source, since it
+// predates the three-table lead split. A reminder set on a form or Meta lead
+// therefore resolves to nothing and logs lead_not_found rather than notifying
+// about the wrong record. Filed in TODOS.md -- the fix is a leadSource on
+// ScheduledAction, which is a schema change this issue does not need.
+async function runLeadReminder(
+  clientId: string,
+  context?: { leadId?: string; botId?: string }
+): Promise<void> {
+  if (!context?.leadId || !context.botId) {
+    console.log(`[scheduler] lead_reminder skipped: no lead context client=${clientId}`)
+    return
+  }
+
+  const result = await sendHandoffAlert({
+    leadRef: { source: 'chat', botId: context.botId, leadId: context.leadId },
+    clientId,
+    reason: 'A reminder you set for this lead is due now.',
+    trigger: 'lead_reminder',
+  })
+
+  console.log(
+    `[scheduler] lead_reminder fired: client=${clientId} lead=${context.leadId} bot=${context.botId} notified=${result.notified}${result.skipReason ? ` skip=${result.skipReason}` : ''}`
+  )
 }
