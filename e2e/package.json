@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "node --env-file=../backend/.env ./node_modules/.bin/playwright test",
-    "test:headed": "node --env-file=../backend/.env ./node_modules/.bin/playwright test --headed"
+    "test:headed": "node --env-file=../backend/.env ./node_modules/.bin/playwright test --headed",
+    "test:prod": "playwright test tests/journey-lead-capture.spec.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
