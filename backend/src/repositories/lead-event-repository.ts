@@ -127,3 +127,41 @@ export async function getClientEvents(clientId: string, limit = 100): Promise<Le
     )
   }
 }
+
+// Counts inbound-created leads for a client since a timestamp, for #10's spam
+// guard. Reuses the client index rather than adding a counter table: the
+// lead_captured events are already there, already partitioned by client, and
+// already sorted by time, so the cap is a bounded Query rather than new state to
+// keep consistent.
+//
+// Counts only WhatsApp-channel captures. A client running a busy web widget must
+// not have their widget traffic starve the WhatsApp path.
+export async function countInboundLeadsSince(clientId: string, sinceIso: string): Promise<number> {
+  try {
+    const result = await dynamoClient.send(
+      new QueryCommand({
+        TableName: TABLE_NAME(),
+        IndexName: CLIENT_INDEX,
+        KeyConditionExpression: 'clientId = :clientId AND ts > :since',
+        FilterExpression: '#type = :type AND channel = :channel',
+        ExpressionAttributeNames: { '#type': 'type' },
+        ExpressionAttributeValues: {
+          ':clientId': clientId,
+          ':since': sinceIso,
+          ':type': 'lead_captured',
+          ':channel': 'whatsapp',
+        },
+        Select: 'COUNT',
+      })
+    )
+    return result.Count ?? 0
+  } catch (error) {
+    // Fail OPEN with a loud log. A broken counter must not stop a real lead
+    // reaching a client; the cap exists to blunt abuse, not to gate the product.
+    console.error(
+      `[lead-events] inbound lead count failed for client ${clientId}:`,
+      error instanceof Error ? error.message : error
+    )
+    return 0
+  }
+}

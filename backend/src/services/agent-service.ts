@@ -4,6 +4,7 @@ import {
   deleteAgent as deleteAgentRecord,
   getAgentById,
   getAgentsByClientId,
+  updateAgent as updateAgentRecord,
 } from '../repositories/agent-repository.js'
 import {
   claimAgentBinding,
@@ -11,6 +12,7 @@ import {
   removeAgentBinding,
 } from '../repositories/agent-binding-lookup-repository.js'
 import { getBotById } from '../repositories/bot-repository.js'
+import { getClientById } from '../repositories/client-repository.js'
 import { getVoiceAgentById } from '../repositories/voice-repository.js'
 import type { Agent, AgentChannel, AgentChannelBinding } from '../types/index.js'
 
@@ -21,10 +23,16 @@ export interface CreateAgentInput {
 }
 
 // Only web (botId) and voice (voice agentId) bindings point at a real,
-// per-agent implementation record that can be owned and uniquely claimed. A
-// whatsapp binding is a marker -- its connection lives on the client, so there
-// is no resourceId to validate or claim.
-const CLAIMABLE_CHANNELS: AgentChannel[] = ['web', 'voice']
+// per-agent implementation record that can be owned and uniquely claimed.
+//
+// whatsapp joined this list on 2026-08-16. It used to be a marker with no
+// resourceId, because the connection lives on the client record and there was
+// nothing per-agent to claim. Binding the phoneNumberId changes that, and buys
+// the product rule "one WhatsApp number belongs to exactly one Agent" for free:
+// claimAgentBinding's ConditionExpression already rejects a second Agent, even
+// one owned by the same client. The rule becomes a database constraint rather
+// than a convention nobody enforces.
+const CLAIMABLE_CHANNELS: AgentChannel[] = ['web', 'voice', 'whatsapp']
 
 function claimableResources(
   channels: Partial<Record<AgentChannel, AgentChannelBinding>>
@@ -58,6 +66,16 @@ async function assertBindingsOwned(
       const voiceAgent = await getVoiceAgentById(resourceId)
       if (!voiceAgent || voiceAgent.clientId !== clientId) {
         throw new Error('Voice agent not found')
+      }
+    } else if (channel === 'whatsapp') {
+      // The resourceId must be THIS client's connected phone number. Without
+      // this, a client could bind a phoneNumberId belonging to someone else and
+      // start receiving their inbound messages, since inbound routing resolves
+      // by phoneNumberId alone.
+      const client = await getClientById(clientId)
+      const connection = client?.metaDirectWhatsAppConnection
+      if (!connection?.connected || connection.phoneNumberId !== resourceId) {
+        throw new Error('WhatsApp number not found')
       }
     }
   }
@@ -132,4 +150,67 @@ export async function deleteAgent(agentId: string, clientId: string): Promise<vo
     await removeAgentBinding(resourceId).catch(() => {})
   }
   await deleteAgentRecord(agentId, clientId)
+}
+
+// -------------------------------------------------------------------------
+// Turning WhatsApp on for an Agent. This is what the "Also available on
+// WhatsApp" toggle calls.
+//
+// A web binding is REQUIRED, and that is a real constraint rather than an
+// incidental one. An inbound WhatsApp lead has to be stored somewhere, scoped
+// for RAG, and handed to a journey, and all three are keyed by botId: the leads
+// table is partitioned by botId, the Pinecone namespace IS the botId (rule 5),
+// and journey ignition resolves through the web binding. An Agent with WhatsApp
+// and no bot has nowhere to put a lead and no knowledge to answer from.
+//
+// This also matches how the product is described: you switch WhatsApp on FOR a
+// chatbot, so a bot always exists by the time anyone reaches here.
+// -------------------------------------------------------------------------
+export async function bindWhatsAppToAgent(agentId: string, clientId: string): Promise<Agent> {
+  const agent = await getOwnedAgent(agentId, clientId)
+
+  if (!agent.channels.web?.resourceId) {
+    throw new Error(
+      'This Agent has no chatbot yet. WhatsApp needs one for its knowledge base and to store leads against.'
+    )
+  }
+
+  const client = await getClientById(clientId)
+  const connection = client?.metaDirectWhatsAppConnection
+  if (!connection?.connected) {
+    throw new Error('Connect WhatsApp for this account before enabling it on an Agent.')
+  }
+
+  const channels = { ...agent.channels, whatsapp: { resourceId: connection.phoneNumberId } }
+
+  // Ownership first, then the atomic claim, mirroring createAgent. A second
+  // Agent claiming the same number fails here rather than silently sharing it.
+  await assertBindingsOwned({ whatsapp: channels.whatsapp }, clientId)
+  await claimAgentBinding(connection.phoneNumberId, agentId, clientId)
+
+  try {
+    return await updateAgentRecord(agentId, clientId, { channels })
+  } catch (error) {
+    // Release the claim so a failed write does not leave the number owned by an
+    // Agent that never recorded the binding. Same compensation pattern as
+    // createAgent; not a transaction, but sufficient for a single writer.
+    await removeAgentBinding(connection.phoneNumberId).catch(() => undefined)
+    throw error
+  }
+}
+
+export async function unbindWhatsAppFromAgent(agentId: string, clientId: string): Promise<Agent> {
+  const agent = await getOwnedAgent(agentId, clientId)
+  const resourceId = agent.channels.whatsapp?.resourceId
+
+  const { whatsapp: _removed, ...channels } = agent.channels
+  const updated = await updateAgentRecord(agentId, clientId, { channels })
+
+  // After the record, so a failure above leaves the claim intact rather than
+  // freeing a number the Agent still lists.
+  if (resourceId) {
+    await removeAgentBinding(resourceId)
+  }
+
+  return updated
 }

@@ -1,10 +1,16 @@
 import { metaProvider } from '../providers/meta-provider.js'
 import { getConnectedWhatsAppClients } from '../repositories/client-repository.js'
-import { appendLeadEvent, getEventByWamid } from '../repositories/lead-event-repository.js'
+import {
+  appendLeadEvent,
+  countInboundLeadsSince,
+  getEventByWamid,
+} from '../repositories/lead-event-repository.js'
+import { createLead } from '../repositories/lead-repository.js'
+import { resolveAgentForInboundMessage } from './inbound-agent-resolution-service.js'
 import { recordInboundMessage } from '../repositories/whatsapp-inbound-activity-repository.js'
 import { logInboundMatch, matchLeadForInboundMessage } from './inbound-lead-match-service.js'
 import { handleInboundLeadMessage } from './journey-reply-service.js'
-import type { MessageDeliveryStatus } from '../types/index.js'
+import type { ClientRecord, Lead, MessageDeliveryStatus } from '../types/index.js'
 
 // Meta Cloud API webhook payloads. Only the parts we act on are typed; the
 // envelope carries a lot more that we deliberately ignore.
@@ -98,6 +104,86 @@ async function logStatuses(statuses: MetaStatus[]): Promise<void> {
 // then record the inbound so the 24h session window and any parked await_reply
 // step both see it. Never throws -- a processing problem must not turn a
 // received message into a 500 that makes Meta redeliver it.
+
+// How many leads one client may have created from unknown numbers in an hour.
+// Leads cannot be deleted anywhere in this product, so an unauthenticated public
+// surface that writes permanent CRM rows needs a ceiling. Sized to be far above
+// any real inbound rate and far below what a script could do.
+const MAX_INBOUND_LEADS_PER_HOUR = 60
+const INBOUND_LEAD_WINDOW_MS = 60 * 60 * 1000
+
+// Creates a lead for a number we have never seen, or returns null and explains
+// why it refused.
+//
+// Over the cap this creates NOTHING and answers NOTHING. An earlier draft of
+// this rule said "still answer, just do not store", which cannot work: leadId is
+// the key for opt-out, for the 24h session window, and for lead_events. Replying
+// to someone you keep no record of means they cannot opt out of the replies you
+// are sending them, which is worse than staying quiet.
+async function createInboundLead(
+  owner: ClientRecord,
+  phoneNumberId: string,
+  message: MetaInboundMessage
+): Promise<Lead | null> {
+  const from = message.from
+  const body = message.text?.body?.trim()
+
+  // Reactions, system notices and status-only payloads are not a person
+  // introducing themselves, and must not mint a permanent CRM row.
+  if (!from || message.type !== 'text' || !body) {
+    console.log(`[wa-inbound] ignoring non-text inbound from ${from ?? 'unknown'} (type=${message.type ?? 'none'})`)
+    return null
+  }
+
+  const since = new Date(Date.now() - INBOUND_LEAD_WINDOW_MS).toISOString()
+  const recent = await countInboundLeadsSince(owner.clientId, since)
+  if (recent >= MAX_INBOUND_LEADS_PER_HOUR) {
+    console.error(
+      `[wa-inbound] client ${owner.clientId} hit the inbound lead cap ` +
+        `(${recent}/${MAX_INBOUND_LEADS_PER_HOUR} in the last hour); dropping message from ${from}`
+    )
+    return null
+  }
+
+  const resolution = await resolveAgentForInboundMessage(phoneNumberId, owner.clientId, body)
+  if (!resolution) {
+    console.error(
+      `[wa-inbound] no Agent resolves for phone_number_id ${phoneNumberId} (client ${owner.clientId}); cannot create a lead`
+    )
+    return null
+  }
+
+  // Stored in the leads table under the Agent's bound botId, which makes this a
+  // 'chat' lead as far as LeadRef is concerned. That is not a mislabel: 'chat'
+  // means "lives in the leads table, keyed by botId", and the botId is what
+  // scopes Pinecone (rule 5) and partitions the row. The CHANNEL is whatsapp,
+  // and that is recorded on the lead_events rows, which is where channel belongs.
+  const lead = await createLead({
+    botId: resolution.botId,
+    clientId: owner.clientId,
+    phone: from,
+    // The first thing they said is the start of the conversation, and makes the
+    // CRM row readable on its own rather than an anonymous phone number.
+    chatTranscript: `Lead: ${body}`,
+    sourceUrl: `whatsapp:${owner.metaDirectWhatsAppConnection?.displayPhoneNumber ?? phoneNumberId}`,
+  })
+
+  console.log(
+    `[wa-inbound] created lead ${lead.leadId} from ${from} via ${resolution.strategy} (bot ${resolution.botId})`
+  )
+
+  await appendLeadEvent({
+    leadId: lead.leadId,
+    clientId: owner.clientId,
+    botId: resolution.botId,
+    type: 'lead_captured',
+    channel: 'whatsapp',
+    body: lead.sourceUrl,
+  })
+
+  return lead
+}
+
 async function recordInbound(phoneNumberId: string | undefined, message: MetaInboundMessage): Promise<void> {
   try {
     if (!phoneNumberId || !message.from) return
@@ -110,13 +196,16 @@ async function recordInbound(phoneNumberId: string | undefined, message: MetaInb
     }
 
     const match = await matchLeadForInboundMessage(owner.clientId, message.from)
-    if (!match) {
-      console.log(`[wa-inbound] message from ${message.from} matched no lead for client ${owner.clientId}`)
-      return
-    }
-    logInboundMatch('wa-inbound', message.from, match)
 
-    const lead = match.lead
+    // Nobody by that number yet. Before #10 the message was dropped here, which
+    // made the whole click-to-WhatsApp flow a no-op: a visitor taps the button on
+    // a client's site, messages the number, and nothing exists to answer them.
+    const lead = match
+      ? match.lead
+      : await createInboundLead(owner, phoneNumberId, message)
+
+    if (!lead) return
+    if (match) logInboundMatch('wa-inbound', message.from, match)
     await recordInboundMessage(lead.leadId)
 
     await appendLeadEvent({
@@ -131,7 +220,10 @@ async function recordInbound(phoneNumberId: string | undefined, message: MetaInb
     const outcome = await handleInboundLeadMessage(lead.leadId, message.text?.body ?? '')
     if (outcome.handled !== 'no_pending_journey') {
       console.log(`[journey-reply] lead ${lead.leadId}: ${JSON.stringify(outcome)}`)
-    } else if (match.candidateCount > 1) {
+    } else if (match && match.candidateCount > 1) {
+      // `match` is null for a lead created moments ago by createInboundLead, and
+      // a brand-new lead cannot have several candidates by definition, so this
+      // ambiguity warning only applies to a lead we matched rather than made.
       // Normally silent -- most inbound messages have no journey waiting and
       // logging every one would be noise. But when several leads shared the
       // phone number, "nothing was waiting" is exactly the symptom of having

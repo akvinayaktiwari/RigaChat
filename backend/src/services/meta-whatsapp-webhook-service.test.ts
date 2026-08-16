@@ -11,6 +11,9 @@ const matchLeadForInboundMessage = vi.fn()
 const handleInboundLeadMessage = vi.fn()
 const appendLeadEvent = vi.fn()
 const getEventByWamid = vi.fn()
+const countInboundLeadsSince = vi.fn()
+const createLead = vi.fn()
+const resolveAgentForInboundMessage = vi.fn()
 
 vi.mock('../repositories/client-repository.js', () => ({ getConnectedWhatsAppClients }))
 vi.mock('../repositories/whatsapp-inbound-activity-repository.js', () => ({ recordInboundMessage }))
@@ -19,7 +22,13 @@ vi.mock('./inbound-lead-match-service.js', () => ({
   logInboundMatch: vi.fn(),
 }))
 vi.mock('./journey-reply-service.js', () => ({ handleInboundLeadMessage }))
-vi.mock('../repositories/lead-event-repository.js', () => ({ appendLeadEvent, getEventByWamid }))
+vi.mock('../repositories/lead-event-repository.js', () => ({
+  appendLeadEvent,
+  getEventByWamid,
+  countInboundLeadsSince,
+}))
+vi.mock('../repositories/lead-repository.js', () => ({ createLead }))
+vi.mock('./inbound-agent-resolution-service.js', () => ({ resolveAgentForInboundMessage }))
 
 const APP_SECRET = 'test-app-secret'
 
@@ -60,6 +69,13 @@ beforeEach(() => {
   handleInboundLeadMessage.mockReset().mockResolvedValue({ handled: 'resumed' })
   appendLeadEvent.mockReset().mockResolvedValue(undefined)
   getEventByWamid.mockReset().mockResolvedValue(null)
+  countInboundLeadsSince.mockReset().mockResolvedValue(0)
+  createLead.mockReset().mockResolvedValue({ leadId: 'new-lead', botId: 'bot-1', clientId: 'client-1' })
+  resolveAgentForInboundMessage.mockReset().mockResolvedValue({
+    agent: { agentId: 'agent-1' },
+    botId: 'bot-1',
+    strategy: 'number_binding',
+  })
 })
 
 describe('processMetaWhatsAppWebhook signature verification', () => {
@@ -226,5 +242,85 @@ describe('lead_events written from the webhook', () => {
     await processMetaWhatsAppWebhook(body, sign(body))
 
     expect(appendLeadEvent).not.toHaveBeenCalled()
+  })
+})
+
+describe('inbound lead creation (click-to-WhatsApp)', () => {
+  // The flow that was a complete no-op before #10: a visitor taps a client's
+  // WhatsApp button, messages the number, and no lead existed to answer them.
+  it('creates a lead for a number that has never messaged before', async () => {
+    matchLeadForInboundMessage.mockResolvedValue(null)
+
+    await processMetaWhatsAppWebhook(INBOUND_BODY, sign(INBOUND_BODY))
+
+    expect(createLead).toHaveBeenCalledWith(
+      expect.objectContaining({ botId: 'bot-1', clientId: 'client-1', phone: '919000000001' })
+    )
+    expect(appendLeadEvent).toHaveBeenCalledWith(expect.objectContaining({ type: 'lead_captured', channel: 'whatsapp' }))
+  })
+
+  // Lead requires a sourceUrl and a WhatsApp lead has no page. A marker naming
+  // the number beats an empty string in the CRM's Source column.
+  it('records the business number as the source', async () => {
+    matchLeadForInboundMessage.mockResolvedValue(null)
+
+    await processMetaWhatsAppWebhook(INBOUND_BODY, sign(INBOUND_BODY))
+
+    expect(createLead).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceUrl: expect.stringContaining('whatsapp:') })
+    )
+  })
+
+  it('reuses an existing lead rather than creating a second', async () => {
+    await processMetaWhatsAppWebhook(INBOUND_BODY, sign(INBOUND_BODY))
+
+    expect(createLead).not.toHaveBeenCalled()
+  })
+
+  // Over the cap: create NOTHING and answer NOTHING. Replying to someone with no
+  // lead row means they cannot opt out of the replies, since opt-out is keyed by
+  // leadId.
+  it('creates nothing and answers nothing over the hourly cap', async () => {
+    matchLeadForInboundMessage.mockResolvedValue(null)
+    countInboundLeadsSince.mockResolvedValue(60)
+
+    await processMetaWhatsAppWebhook(INBOUND_BODY, sign(INBOUND_BODY))
+
+    expect(createLead).not.toHaveBeenCalled()
+    expect(handleInboundLeadMessage).not.toHaveBeenCalled()
+    expect(appendLeadEvent).not.toHaveBeenCalled()
+  })
+
+  it('does not create a lead from a non-text message', async () => {
+    matchLeadForInboundMessage.mockResolvedValue(null)
+    const reaction = JSON.stringify({
+      object: 'whatsapp_business_account',
+      entry: [{ changes: [{ value: { metadata: { phone_number_id: 'phone-1' }, messages: [{ from: '919000000001', type: 'reaction' }] } }] }],
+    })
+
+    await processMetaWhatsAppWebhook(reaction, sign(reaction))
+
+    expect(createLead).not.toHaveBeenCalled()
+  })
+
+  it('does not create a lead from an empty text body', async () => {
+    matchLeadForInboundMessage.mockResolvedValue(null)
+    const empty = JSON.stringify({
+      object: 'whatsapp_business_account',
+      entry: [{ changes: [{ value: { metadata: { phone_number_id: 'phone-1' }, messages: [{ from: '919000000001', type: 'text', text: { body: '   ' } }] } }] }],
+    })
+
+    await processMetaWhatsAppWebhook(empty, sign(empty))
+
+    expect(createLead).not.toHaveBeenCalled()
+  })
+
+  it('creates nothing when no Agent resolves for the number', async () => {
+    matchLeadForInboundMessage.mockResolvedValue(null)
+    resolveAgentForInboundMessage.mockResolvedValue(null)
+
+    await processMetaWhatsAppWebhook(INBOUND_BODY, sign(INBOUND_BODY))
+
+    expect(createLead).not.toHaveBeenCalled()
   })
 })
