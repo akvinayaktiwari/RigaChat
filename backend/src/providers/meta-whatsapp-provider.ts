@@ -403,6 +403,60 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
     })
   }
 
+  // Subscribes THIS app to the WABA's webhooks. Without it Meta delivers
+  // nothing to our endpoint -- the endpoint can pass verification, the
+  // credentials can send messages, and inbound is still silently dead.
+  //
+  // The Lead Ads flow has always done the Page-level equivalent
+  // (meta-provider.ts's POST /{pageId}/subscribed_apps). The WhatsApp flow
+  // never had its WABA-level counterpart, which is why no reply ever reached a
+  // journey. Found by the first live journey run on 2026-08-16, ~24h after the
+  // send path was proven working -- send and receive fail independently, and
+  // only receive fails quietly.
+  //
+  // Fields come from the app's webhook configuration in the Meta dashboard, not
+  // from this call, so `messages` must be ticked there too. This only says
+  // "deliver this WABA's events to this app".
+  async subscribeWabaToApp(wabaId: string, accessToken: string): Promise<void> {
+    const response = await fetch(`${GRAPH_API_BASE}/${wabaId}/subscribed_apps`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    const data = (await response.json().catch(() => ({}))) as {
+      success?: boolean
+      error?: { message?: string }
+    }
+
+    if (!response.ok || data.success !== true) {
+      throw new Error(
+        `Subscribing WABA ${wabaId} to the app failed: ${data.error?.message ?? `status ${response.status}`}`
+      )
+    }
+  }
+
+  // Reads back which apps a WABA delivers to, so a subscribe can be CONFIRMED
+  // rather than assumed from its own 200. Worth the extra call precisely
+  // because the bug this whole path exists to fix was a subscription that was
+  // never made and never noticed -- trusting a write to have worked is the
+  // habit that produced it.
+  async isWabaSubscribedToApp(wabaId: string, accessToken: string): Promise<boolean> {
+    const appId = requireEnv('META_APP_ID')
+    const params = new URLSearchParams({ access_token: accessToken })
+    const response = await fetch(`${GRAPH_API_BASE}/${wabaId}/subscribed_apps?${params.toString()}`)
+    const data = (await response.json().catch(() => ({}))) as {
+      data?: { whatsapp_business_api_data?: { id?: string } }[]
+      error?: { message?: string }
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        `Reading subscribed apps for WABA ${wabaId} failed: ${data.error?.message ?? `status ${response.status}`}`
+      )
+    }
+
+    return (data.data ?? []).some((entry) => entry.whatsapp_business_api_data?.id === appId)
+  }
+
   // Template management is WABA-scoped, not phone-number-scoped, so these two
   // take a wabaId + token directly rather than WhatsAppCredentials (which
   // carries a phoneNumberId and is about sending). Requires

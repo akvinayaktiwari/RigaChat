@@ -216,6 +216,19 @@ export interface MetaDirectWhatsAppConnection {
   displayPhoneNumber: string
   notificationNumber: string
   connectedAt: string
+  // Whether POST /{wabaId}/subscribed_apps succeeded for this connection.
+  //
+  // Load-bearing, not diagnostic. Storing credentials makes a connection able
+  // to SEND; only this subscription makes it able to RECEIVE. Without it Meta
+  // delivers nothing -- no inbound messages, no delivery statuses -- so every
+  // await_reply step times out at 24h and the 24h session window never opens.
+  // That failure is completely invisible from the sending side, which is how
+  // it survived until the first live journey run on 2026-08-16.
+  //
+  // Optional because connections written before the subscribe call existed
+  // have no value here; treat `undefined` as "unknown, probably not subscribed"
+  // and repair with scripts/subscribe-whatsapp-webhooks.ts.
+  webhookSubscribed?: boolean
 }
 
 export type WhatsAppActiveProvider = 'gupshup' | 'meta_direct'

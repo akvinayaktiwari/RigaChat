@@ -183,6 +183,28 @@ export async function storeMetaWhatsAppConnection(
 ): Promise<void> {
   const accessTokenEncrypted = await encrypt(input.accessToken)
 
+  // Subscribe BEFORE storing, so the stored record can state honestly whether
+  // this connection can actually receive anything.
+  //
+  // Deliberately does NOT throw on failure. A connection that can send but not
+  // receive is degraded, not worthless, and discarding working credentials
+  // because a second call failed would be the worse outcome -- especially since
+  // the caller is mid-OAuth-redirect and has nowhere good to put an error. The
+  // flag is what stops it being SILENTLY degraded, which is the actual bug this
+  // fixes: inbound was dead for every Meta client and nothing anywhere said so.
+  let webhookSubscribed = false
+  try {
+    await metaWhatsAppProvider.subscribeWabaToApp(input.wabaId, input.accessToken)
+    webhookSubscribed = true
+  } catch (error) {
+    console.error(
+      `[whatsapp] WABA ${input.wabaId} connected for client ${clientId} but NOT subscribed to webhooks -- ` +
+        `inbound messages and delivery statuses will not arrive. ` +
+        `Repair with scripts/subscribe-whatsapp-webhooks.ts. Cause:`,
+      error
+    )
+  }
+
   const client = await getClientById(clientId)
   // A brand-new client with no active Gupshup connection gets Meta Direct
   // set active automatically (nothing to switch from). A client who already
@@ -206,6 +228,7 @@ export async function storeMetaWhatsAppConnection(
       displayPhoneNumber: input.displayPhoneNumber,
       notificationNumber: input.notificationNumber,
       connectedAt: new Date().toISOString(),
+      webhookSubscribed,
     },
     ...(hasActiveGupshup ? {} : { activeWhatsappProvider: 'meta_direct' }),
   })
