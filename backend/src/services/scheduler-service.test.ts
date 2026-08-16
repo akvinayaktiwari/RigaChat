@@ -87,4 +87,44 @@ describe('executeScheduledAction lead_reminder', () => {
 
     expect(sendHandoffAlert).not.toHaveBeenCalled()
   })
+
+  // botId identifies the BOT, and a Meta lead is keyed by pageId in a
+  // different table. Reconstructing a chat ref for one resolved to nothing and
+  // nobody was told -- which is why leadSource/leadParentId are on the record.
+  it('resolves a reminder on a Meta lead to the Meta table, not the chat table', async () => {
+    await executeScheduledAction('client-1', 'lead_reminder', {
+      leadId: 'lead-9',
+      botId: 'bot-1',
+      leadSource: 'meta',
+      leadParentId: 'page-7',
+    })
+
+    expect(sendHandoffAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ leadRef: { source: 'meta', pageId: 'page-7', leadId: 'lead-9' } })
+    )
+  })
+
+  it('resolves a reminder on a form lead to the form table', async () => {
+    await executeScheduledAction('client-1', 'lead_reminder', {
+      leadId: 'lead-8',
+      botId: 'bot-1',
+      leadSource: 'form',
+      leadParentId: 'form-2',
+    })
+
+    expect(sendHandoffAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ leadRef: { source: 'form', formId: 'form-2', leadId: 'lead-8' } })
+    )
+  })
+
+  // The compatibility path that lets this ship without a backfill: schedules
+  // created before leadSource existed carry only leadId and botId, and have to
+  // keep landing on 'chat' exactly as they always did.
+  it('still treats a schedule created before leadSource existed as a chat lead', async () => {
+    await executeScheduledAction('client-1', 'lead_reminder', { leadId: 'lead-1', botId: 'bot-1' })
+
+    expect(sendHandoffAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ leadRef: { source: 'chat', botId: 'bot-1', leadId: 'lead-1' } })
+    )
+  })
 })

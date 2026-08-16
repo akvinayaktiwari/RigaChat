@@ -607,29 +607,6 @@ several permissions. See `docs/META_APP_REVIEW_SUBMISSION.md` and
 **Priority:** P2
 **Depends on:** None technically, but low urgency until an external MCP client actually exists
 
-### A ScheduledAction cannot tell you which table its lead lives in
-
-**What:** `ScheduledAction` records `leadId` and `botId` but no `leadSource`. It predates the split
-into three lead tables (`leads`/botId, `form_leads`/formId, `meta_leads`/pageId), so
-`executeScheduledAction`'s `lead_reminder` handler has to reconstruct the `LeadRef` as
-`{ source: 'chat', botId, leadId }` — the only ref those two fields can build.
-
-**Why:** A reminder set on a form or Meta lead resolves to nothing. `notification-service.ts` logs
-`lead_not_found` and nobody is told, which is correct behaviour over notifying about the wrong
-record, but it is still a reminder that silently does not arrive. Today the only path that creates a
-`lead_reminder` is `reminder-mcp-server.ts` from inside a journey, and journeys currently run on
-chat leads, so the gap is latent rather than live — it opens the moment a journey ignites on a Meta
-lead.
-
-**Context:** The fix is a `leadSource` field on `ScheduledAction`, threaded from
-`reminder-mcp-server.ts` through `createScheduledAction` into the EventBridge target Input, with the
-chat reconstruction kept as the fallback for rows written before it. Deliberately left out of #14,
-which needed the delivery path, not a schema change.
-
-**Effort:** S
-**Priority:** P2
-**Depends on:** None
-
 ### Build real quotation and brochure logic
 
 **What:** `quotation-mcp-server.ts`'s `get_quotation` and `brochure-mcp-server.ts`'s `send_brochure` are deliberate stubs — both return a canned `{ stub: true, message: '...' }` regardless of input. Unlike booking (persists a real `AppointmentRequest`) and reminder (creates a real `ScheduledAction`), neither has any real data model to build against yet.

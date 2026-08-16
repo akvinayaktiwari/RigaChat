@@ -1235,6 +1235,16 @@ export interface ScheduledAction {
   // for.
   leadId?: string
   botId?: string
+  // Which table the lead lives in. botId alone cannot say: it identifies the
+  // BOT, and a form or Meta lead is keyed by formId/pageId in a different
+  // table entirely. Without these, executeScheduledAction could only ever
+  // reconstruct a chat LeadRef, so a reminder on a form or Meta lead resolved
+  // to nothing and nobody was told.
+  //
+  // Optional, and read through toLeadRef, whose chat fallback is what keeps
+  // rows written before this field resolving exactly as they did.
+  leadSource?: LeadSource
+  leadParentId?: string
   // The owning cross-channel Agent, resolved from botId's binding at create
   // time when a botId is present. Optional/additive; clientId stays the
   // partition key.

@@ -148,7 +148,12 @@ export const WHATSAPP_TEMPLATES: WhatsAppTemplateDefinition[] = [
       { type: 'QUICK_REPLY', text: 'Confirm' },
       { type: 'QUICK_REPLY', text: 'Reschedule' },
     ],
-    sentBy: 'appointment-service.ts / lead_reminder ScheduledAction',
+    // NOT SENT BY ANYTHING YET. It previously claimed the lead_reminder
+    // ScheduledAction, which as of 2026-08-16 sends lead_handoff_alert_1 to
+    // the CLIENT instead -- a reminder is "look at this lead", not a message
+    // to the lead about a visit. Approved and waiting for the appointment
+    // reminder path that will send it.
+    sentBy: 'Nothing yet -- reserved for the appointment reminder path.',
   },
   {
     name: 'agent_handoff_1',

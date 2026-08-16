@@ -10,7 +10,18 @@ import {
 import { sendWeeklyReport } from './whatsapp-service.js'
 import { resolveOwningAgentId } from './agent-service.js'
 import { sendHandoffAlert } from './notification-service.js'
-import type { ScheduleCadence, ScheduledAction, ScheduledActionType } from '../types/index.js'
+import { toLeadRef } from './lead-resolution-service.js'
+import type { LeadSource, ScheduleCadence, ScheduledAction, ScheduledActionType } from '../types/index.js'
+
+// What EventBridge hands back when a lead-scoped schedule fires. Every field is
+// optional because the payload is whatever createSchedule wrote at create time,
+// and schedules created before a field existed are still out there firing.
+export interface ScheduledActionContext {
+  leadId?: string
+  botId?: string
+  leadSource?: LeadSource
+  leadParentId?: string
+}
 
 export class ScheduleValidationError extends Error {
   constructor(message: string) {
@@ -57,6 +68,8 @@ interface CreateScheduledActionInput {
   // account-level ones (weekly_report). See ScheduledAction's own comment.
   leadId?: string
   botId?: string
+  leadSource?: LeadSource
+  leadParentId?: string
 }
 
 export async function createScheduledAction(input: CreateScheduledActionInput): Promise<ScheduledAction> {
@@ -68,6 +81,8 @@ export async function createScheduledAction(input: CreateScheduledActionInput): 
     actionType: input.actionType,
     leadId: input.leadId,
     botId: input.botId,
+    leadSource: input.leadSource,
+    leadParentId: input.leadParentId,
   })
 
   // Lead-scoped actions carry a botId; stamp the owning Agent when that bot is
@@ -83,6 +98,8 @@ export async function createScheduledAction(input: CreateScheduledActionInput): 
       cadence: input.cadence,
       leadId: input.leadId,
       botId: input.botId,
+      ...(input.leadSource ? { leadSource: input.leadSource } : {}),
+      ...(input.leadParentId ? { leadParentId: input.leadParentId } : {}),
       ...(agentId ? { agentId } : {}),
       enabled: true,
     })
@@ -137,7 +154,7 @@ export async function deleteScheduledAction(clientId: string, scheduleId: string
 export async function executeScheduledAction(
   clientId: string,
   actionType: ScheduledActionType,
-  context?: { leadId?: string; botId?: string }
+  context?: ScheduledActionContext
 ): Promise<void> {
   switch (actionType) {
     case 'weekly_report':
@@ -154,23 +171,24 @@ export async function executeScheduledAction(
 // notification-service rather than each growing its own send path. The trigger
 // is what distinguishes them in the message.
 //
-// The LeadRef is reconstructed as a chat lead because that is all a
-// ScheduledAction records: it carries leadId and botId but no source, since it
-// predates the three-table lead split. A reminder set on a form or Meta lead
-// therefore resolves to nothing and logs lead_not_found rather than notifying
-// about the wrong record. Filed in TODOS.md -- the fix is a leadSource on
-// ScheduledAction, which is a schema change this issue does not need.
-async function runLeadReminder(
-  clientId: string,
-  context?: { leadId?: string; botId?: string }
-): Promise<void> {
+// The LeadRef comes from toLeadRef rather than being built here, which is what
+// makes a reminder on a form or Meta lead resolve to the right table. Its chat
+// fallback is also the compatibility path: a schedule created before
+// leadSource existed carries only leadId and botId, and lands on 'chat'
+// exactly as it always did.
+async function runLeadReminder(clientId: string, context?: ScheduledActionContext): Promise<void> {
   if (!context?.leadId || !context.botId) {
     console.log(`[scheduler] lead_reminder skipped: no lead context client=${clientId}`)
     return
   }
 
   const result = await sendHandoffAlert({
-    leadRef: { source: 'chat', botId: context.botId, leadId: context.leadId },
+    leadRef: toLeadRef({
+      leadId: context.leadId,
+      botId: context.botId,
+      ...(context.leadSource ? { leadSource: context.leadSource } : {}),
+      ...(context.leadParentId ? { leadParentId: context.leadParentId } : {}),
+    }),
     clientId,
     reason: 'A reminder you set for this lead is due now.',
     trigger: 'lead_reminder',
