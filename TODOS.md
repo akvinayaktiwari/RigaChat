@@ -121,6 +121,68 @@ plus a `deleted` filter on the unified inbox is probably the smallest honest ver
 **Priority:** P2
 **Depends on:** None
 
+### The journey layer is four nav items for one idea, and the Journeys page is scoped by the wrong unit
+
+**What:** Three separate problems that all come from the same place — the dashboard nav
+presents the post-lead-capture machinery at four top-level entries (Agents, Journeys,
+Appointments, Scheduler) when it is one mental model.
+
+1. **Wrong altitude.** `Appointments` and `Scheduler` are *outputs* of a Journey, shown at
+   the same level as the thing that produces them. `AppointmentsPage.tsx` is read-only.
+   `SchedulerPage.tsx` has exactly one self-serve action (the weekly report) and everything
+   else on it is a read-only row a Journey created. Neither is a place a user goes to do
+   work, and nothing in the UI draws the line from Journey -> reminder -> appointment
+   except one sentence of body copy on the Scheduler banner.
+2. **Wrong unit of organization, and this one produces a real error.** `JourneysPage.tsx`
+   is scoped by **bot** — a bot dropdown, journeys listed per bot. But uniqueness is
+   enforced per **Agent**: `triggerClaimKey` (`journey-trigger-claim-repository.ts:26`)
+   returns `agent:<agentId>#<trigger>` and only falls back to `bot:<botId>` when the bot
+   has no Agent. So for a client whose two bots sit under one Agent, the UI shows two
+   independent journey lists and publishing `lead_captured` on the second bot is refused
+   by a claim held by a bundle that is not on screen.
+3. **The refusal has no UI.** `journey-trigger-claim-repository.ts:29` says the rejection
+   "is the signal the route turns into an explicit 'this would replace your current
+   lead-captured journey' decision for the client." That decision UI was never built. The
+   route 409s (`journey-routes.ts:230`) and `handlePublish` toasts the raw string, so the
+   user sees `Another published journey already handles this trigger (bundle 7f3a2b1c…)` —
+   a UUID they have never seen, for a bundle under a bot they did not select.
+
+**Why:** (2) and (3) are the urgent pair — together they turn a legitimate guardrail into
+an unexplainable failure, and they get worse the moment a client has more than one bot per
+Agent, which the Agent identity model exists to support. (1) is the slower cost: twelve
+nav items with two the user cannot act on, and no visible relationship between the journey
+that schedules a reminder and the page the reminder appears on.
+
+**Context:** Found 2026-08-16 while reviewing the journey/scheduler UI ahead of the
+Meta-transport seam test (`scripts/test-meta-journey-run.sh`). Deliberately NOT fixed then
+— a nav refactor mid-test changes the thing being measured. The claim-vs-UI mismatch is the
+part worth knowing before testing: run the seam test on a single-Agent, single-bot client
+and a 409 will not appear.
+
+Proposed shape, smallest honest version first:
+- **(3) first, it is S.** Catch the 409 in `handlePublish` and render a real choice —
+  name the journey currently holding the trigger and offer to replace it. The backend
+  already carries `heldByBundleId`; the route just needs to return it structured rather
+  than baked into a string.
+- **(2) next.** Scope `JourneysPage` by Agent, falling back to bot for unwrapped bots —
+  matching what `triggerClaimKey` already does. This is the same collapse
+  ["Agents" now collides with the Agent identity model](#agents-now-collides-with-the-agent-identity-model)
+  argues for, and doing them together is cheaper than doing either alone.
+- **(1) last.** Appointments folds into the Leads inbox (it is lead data, and Leads already
+  fans out across bots). The weekly report becomes a Settings toggle — one account
+  preference is not a "Scheduler". Lead reminders surface on the lead's own timeline where
+  the name and context already exist. Nav goes 12 -> 10.
+
+Note (1) is partly blocked on the `lead_reminder` handler being real — see
+"Build the lead_reminder delivery path". Folding reminders into a lead timeline while
+they still deliver nothing just moves the honesty problem to a more prominent page. The
+row on `SchedulerPage` is badged "Not delivered yet" as of 2026-08-16 so the current
+surface at least does not lie.
+
+**Effort:** S (3) / M (2) / L (1)
+**Priority:** P2 — but (3) is P1-shaped the day a client has two bots under one Agent
+**Depends on:** (1) depends on a real `lead_reminder` handler
+
 ### [RESOLVED 2026-08-11] Frontend has no test runner — runner added; three libs still uncovered
 
 **What it was:** `frontend/` had no vitest/jest config and zero test files, so the frontend shipped with no automated cover at all while the backend had 300+ tests.
@@ -448,6 +510,31 @@ several permissions. See `docs/META_APP_REVIEW_SUBMISSION.md` and
 **Effort:** M
 **Priority:** P2
 **Depends on:** None technically, but low urgency until an external MCP client actually exists
+
+### Build the lead_reminder delivery path
+
+**What:** `scheduler-service.ts`'s `executeScheduledAction()` handles `weekly_report` for real
+(`sendWeeklyReport`) and handles `lead_reminder` with a `console.log`. So the *scheduling* half is
+genuine end to end — `reminder-mcp-server.ts` creates a real EventBridge schedule for a real lead at
+a client-requested time, and it fires on time — and then nothing is delivered to anybody.
+
+**Why:** It is the one stub a user can see and act on. A reminder appears on the Scheduler page as a
+normal row with Edit and Cancel, so a client can cancel a follow-up believing they stopped a message
+that was never going to send. Badged "Not delivered yet" on 2026-08-16 so the surface stops lying,
+but a badge is not the fix.
+
+**Context:** The undesigned piece is the same one `send_message` has for non-WhatsApp channels: who
+gets reminded, and how. A reminder is plausibly *to the client* (their agent flagging a lead needing
+attention) rather than to the lead, which would make it the first thing in the product that notifies
+a client outside of WhatsApp — so it needs the notification-channel decision (email? dashboard
+inbox? WhatsApp to `notificationNumber`?) made once, deliberately, rather than picked here by
+default. Note `lead_reminder` is a `ScheduledActionType` fired without a Journey execution context,
+so it cannot reuse the journey executor's send path as-is.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** A notification-channel decision; blocks folding reminders into the lead timeline
+(see "The journey layer is four nav items for one idea")
 
 ### Build real quotation and brochure logic
 

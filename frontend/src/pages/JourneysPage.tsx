@@ -267,10 +267,10 @@ export default function JourneysPage() {
             <GitBranch className="w-7 h-7 text-violet-400" />
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2" style={JAKARTA_FONT}>
-            Create a agent first
+            Create an agent first
           </h2>
           <p className="text-sm text-gray-500 text-center max-w-xs">
-            Journeys run on top of a agent — set one up before building an agent
+            A journey runs on top of an agent — set one up before building a journey
           </p>
         </div>
       ) : loading ? (

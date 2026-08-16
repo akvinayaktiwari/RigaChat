@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Clock, Info, Plus, Trash2, X } from 'lucide-react'
 import {
   createScheduledAction,
   deleteScheduledAction,
+  getLeadInbox,
   getScheduledActions,
   updateScheduledActionCadence,
 } from '../services/api'
+import { leadDetailPath } from '../lib/lead-ref'
 import type { ScheduleCadence, ScheduledAction } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -21,6 +24,14 @@ const ACTION_TYPE_LABELS: Record<ScheduledAction['actionType'], string> = {
   weekly_report: 'Weekly WhatsApp report',
   lead_reminder: 'Lead reminder',
 }
+
+// A lead_reminder's schedule is real -- EventBridge fires it on time -- but
+// scheduler-service.ts's handler for it is still a console.log, because no
+// notification infrastructure exists to remind anyone yet. Saying so on the row
+// is the difference between "we cancelled a follow-up" and "we cancelled
+// nothing, and did not know it." Delete this badge the same commit the handler
+// becomes real.
+const UNDELIVERED_ACTION_TYPES: ScheduledAction['actionType'][] = ['lead_reminder']
 
 function describeCadence(cadence: ScheduleCadence): string {
   if (cadence.type === 'interval_days') {
@@ -70,6 +81,7 @@ export default function SchedulerPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const [actionToDelete, setActionToDelete] = useState<ScheduledAction | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [leadLinks, setLeadLinks] = useState<Record<string, { name: string; href: string }>>({})
 
   useEffect(() => {
     getScheduledActions().then((res) => {
@@ -77,6 +89,36 @@ export default function SchedulerPage() {
       setLoading(false)
     })
   }, [])
+
+  // Resolve the raw leadIds on lead-scoped rows into names. Via the unified
+  // inbox rather than getLeadById, which reads the chat leads table only -- a
+  // journey can schedule a reminder for a form or Meta lead just as easily, and
+  // those would resolve to nothing. Fetched only when a lead-scoped row exists,
+  // and a failure degrades to the short id rather than blocking the page.
+  useEffect(() => {
+    if (!actions.some((action) => action.leadId)) return
+
+    let cancelled = false
+    getLeadInbox()
+      .then((res) => {
+        if (cancelled || !res.success) return
+        const links: Record<string, { name: string; href: string }> = {}
+        for (const lead of res.data ?? []) {
+          links[lead.leadId] = {
+            name: lead.name?.trim() || lead.phone || lead.email || 'Unnamed lead',
+            href: leadDetailPath(lead.leadRef),
+          }
+        }
+        setLeadLinks(links)
+      })
+      .catch(() => {
+        /* keeps the short-id fallback below */
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [actions])
 
   function openCreate() {
     setForm(EMPTY_FORM)
@@ -158,8 +200,9 @@ export default function SchedulerPage() {
       <div className="bg-violet-50 border border-violet-100 rounded-2xl p-4 mt-4 flex items-start gap-3">
         <Info size={18} className="text-violet-500 shrink-0 mt-0.5" />
         <p className="text-violet-700 text-sm">
-          Weekly reports are self-serve here. Lead reminders are created automatically by a Journey and shown
-          read-only below — cancel one if a follow-up is no longer needed.
+          Weekly reports are self-serve here and send for real. Lead reminders are created automatically by a
+          Journey and shown read-only below — they are scheduled and fire on time, but nothing is delivered to
+          anyone yet, so cancelling one does not stop a message going out.
         </p>
       </div>
 
@@ -196,12 +239,34 @@ export default function SchedulerPage() {
                 <div className="bg-violet-50 text-violet-500 rounded-xl p-2.5 w-10 h-10 flex items-center justify-center shrink-0">
                   <Clock size={20} />
                 </div>
-                <div>
-                  <h3 className="font-bold text-gray-900" style={JAKARTA_FONT}>
-                    {ACTION_TYPE_LABELS[action.actionType]}
-                  </h3>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-bold text-gray-900" style={JAKARTA_FONT}>
+                      {ACTION_TYPE_LABELS[action.actionType]}
+                    </h3>
+                    {UNDELIVERED_ACTION_TYPES.includes(action.actionType) && (
+                      <span
+                        title="This reminder is scheduled and will fire on time, but nothing is delivered to anyone yet."
+                        className="inline-flex border border-amber-200 bg-amber-50 text-amber-700 text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0"
+                      >
+                        Not delivered yet
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-gray-500">{describeCadence(action.cadence)}</p>
-                  {action.leadId && <p className="text-xs text-gray-400 mt-0.5">Lead: {action.leadId}</p>}
+                  {action.leadId &&
+                    (leadLinks[action.leadId] ? (
+                      <Link
+                        to={leadLinks[action.leadId].href}
+                        className="text-xs text-violet-600 hover:underline mt-0.5 inline-block"
+                      >
+                        {leadLinks[action.leadId].name}
+                      </Link>
+                    ) : (
+                      // Unresolved: the lead is older than the inbox window, or
+                      // the inbox call failed. A short id beats a full uuid.
+                      <p className="text-xs text-gray-400 mt-0.5">Lead {action.leadId.slice(0, 8)}</p>
+                    ))}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -326,6 +391,8 @@ export default function SchedulerPage() {
             <p className="text-sm text-gray-500 mt-2">
               {ACTION_TYPE_LABELS[actionToDelete.actionType]} — {describeCadence(actionToDelete.cadence)} will be
               cancelled.
+              {UNDELIVERED_ACTION_TYPES.includes(actionToDelete.actionType) &&
+                ' This reminder does not deliver anything yet, so no message is being stopped.'}
             </p>
             <div className="flex items-center justify-end gap-3 mt-6">
               <button
