@@ -6,6 +6,10 @@ import {
   getEventByWamid,
 } from '../repositories/lead-event-repository.js'
 import { createLead } from '../repositories/lead-repository.js'
+import {
+  claimWebhookEvent,
+  releaseWebhookEventClaim,
+} from '../repositories/webhook-event-repository.js'
 import { resolveAgentForInboundMessage } from './inbound-agent-resolution-service.js'
 import { runAgentTurn } from './agent-turn-service.js'
 import { normalizeChatLead } from './lead-resolution-service.js'
@@ -31,6 +35,8 @@ interface MetaStatus {
 }
 
 interface MetaInboundMessage {
+  // Meta's message id (a wamid). The idempotency key for retries.
+  id?: string
   from?: string
   type?: string
   text?: { body?: string }
@@ -187,8 +193,24 @@ async function createInboundLead(
 }
 
 async function recordInbound(phoneNumberId: string | undefined, message: MetaInboundMessage): Promise<void> {
+  if (!phoneNumberId || !message.from) return
+
+  // Idempotency on the message id, BEFORE any work. Meta retries a webhook it
+  // considers slow or failed, and processing now means an OpenAI completion and
+  // a WhatsApp send: a duplicate is a second bill and a second message to a real
+  // person. An atomic claim rather than hasProcessed()+markProcessed(), because
+  // that pair is a read then an unconditional write and two concurrent retries
+  // both pass the read.
+  //
+  // No id (older payload shapes) means no claim is possible; proceed rather than
+  // drop a real message.
+  const eventId = message.id
+  if (eventId && !(await claimWebhookEvent(eventId, 'meta_whatsapp', 'inbound_message'))) {
+    console.log(`[wa-inbound] ${eventId} already processed, ignoring retry`)
+    return
+  }
+
   try {
-    if (!phoneNumberId || !message.from) return
 
     const clients = await getConnectedWhatsAppClients()
     const owner = clients.find((client) => client.metaDirectWhatsAppConnection?.phoneNumberId === phoneNumberId)
@@ -263,6 +285,10 @@ async function recordInbound(phoneNumberId: string | undefined, message: MetaInb
     }
   } catch (error) {
     console.error('[wa-inbound] failed to record inbound message:', error)
+    // Hand the claim back so Meta's retry can genuinely redo the work. Claiming
+    // and then failing would otherwise swallow a real customer message
+    // permanently, which is worse than the duplicate the claim prevents.
+    if (eventId) await releaseWebhookEventClaim(eventId)
   }
 }
 

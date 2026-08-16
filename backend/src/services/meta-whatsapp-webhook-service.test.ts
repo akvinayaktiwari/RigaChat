@@ -15,6 +15,8 @@ const countInboundLeadsSince = vi.fn()
 const createLead = vi.fn()
 const resolveAgentForInboundMessage = vi.fn()
 const runAgentTurn = vi.fn()
+const claimWebhookEvent = vi.fn()
+const releaseWebhookEventClaim = vi.fn()
 
 vi.mock('../repositories/client-repository.js', () => ({ getConnectedWhatsAppClients }))
 vi.mock('../repositories/whatsapp-inbound-activity-repository.js', () => ({ recordInboundMessage }))
@@ -31,6 +33,10 @@ vi.mock('../repositories/lead-event-repository.js', () => ({
 vi.mock('../repositories/lead-repository.js', () => ({ createLead }))
 vi.mock('./inbound-agent-resolution-service.js', () => ({ resolveAgentForInboundMessage }))
 vi.mock('./agent-turn-service.js', () => ({ runAgentTurn }))
+vi.mock('../repositories/webhook-event-repository.js', () => ({
+  claimWebhookEvent,
+  releaseWebhookEventClaim,
+}))
 
 const APP_SECRET = 'test-app-secret'
 
@@ -49,7 +55,7 @@ const INBOUND_BODY = JSON.stringify({
           field: 'messages',
           value: {
             metadata: { phone_number_id: 'phone-1' },
-            messages: [{ from: '919000000001', type: 'text', text: { body: 'hello' } }],
+            messages: [{ id: 'wamid-inbound-1', from: '919000000001', type: 'text', text: { body: 'hello' } }],
           },
         },
       ],
@@ -79,6 +85,8 @@ beforeEach(() => {
     strategy: 'number_binding',
   })
   runAgentTurn.mockReset().mockResolvedValue({ status: 'sent', text: 'an answer' })
+  claimWebhookEvent.mockReset().mockResolvedValue(true)
+  releaseWebhookEventClaim.mockReset().mockResolvedValue(undefined)
 })
 
 describe('processMetaWhatsAppWebhook signature verification', () => {
@@ -383,5 +391,57 @@ describe('agent turn ordering (D12: exactly one message per inbound message)', (
 
     expect(runAgentTurn).not.toHaveBeenCalled()
     expect(handleInboundLeadMessage).toHaveBeenCalledWith('lead-1', 'hello', undefined)
+  })
+})
+
+describe('retry safety (D6)', () => {
+  // Processing now costs an OpenAI completion and a WhatsApp send, so a Meta
+  // retry must not redo it. The claim is atomic because hasProcessed +
+  // markProcessed is a read then an unconditional write, which two concurrent
+  // retries both pass.
+  it('claims the message id before doing any work', async () => {
+    await processMetaWhatsAppWebhook(INBOUND_BODY, sign(INBOUND_BODY))
+
+    expect(claimWebhookEvent).toHaveBeenCalledWith('wamid-inbound-1', 'meta_whatsapp', 'inbound_message')
+  })
+
+  it('does nothing when the claim is already held', async () => {
+    claimWebhookEvent.mockResolvedValue(false)
+
+    await processMetaWhatsAppWebhook(INBOUND_BODY, sign(INBOUND_BODY))
+
+    expect(runAgentTurn).not.toHaveBeenCalled()
+    expect(handleInboundLeadMessage).not.toHaveBeenCalled()
+    expect(appendLeadEvent).not.toHaveBeenCalled()
+  })
+
+  // Claim-then-crash would swallow a real customer message forever, which is
+  // worse than the duplicate the claim prevents.
+  it('hands the claim back when processing fails', async () => {
+    runAgentTurn.mockRejectedValue(new Error('openai exploded'))
+
+    await processMetaWhatsAppWebhook(INBOUND_BODY, sign(INBOUND_BODY))
+
+    expect(releaseWebhookEventClaim).toHaveBeenCalledWith('wamid-inbound-1')
+  })
+
+  it('keeps the claim when processing succeeds', async () => {
+    await processMetaWhatsAppWebhook(INBOUND_BODY, sign(INBOUND_BODY))
+
+    expect(releaseWebhookEventClaim).not.toHaveBeenCalled()
+  })
+
+  // Older payload shapes carry no id. Dropping a real message because we cannot
+  // deduplicate it would be the wrong trade.
+  it('still processes a message that carries no id', async () => {
+    const noId = JSON.stringify({
+      object: 'whatsapp_business_account',
+      entry: [{ changes: [{ value: { metadata: { phone_number_id: 'phone-1' }, messages: [{ from: '919000000001', type: 'text', text: { body: 'hi' } }] } }] }],
+    })
+
+    await processMetaWhatsAppWebhook(noId, sign(noId))
+
+    expect(claimWebhookEvent).not.toHaveBeenCalled()
+    expect(handleInboundLeadMessage).toHaveBeenCalled()
   })
 })
