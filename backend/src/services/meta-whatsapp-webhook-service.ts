@@ -1,3 +1,4 @@
+import { metaProvider } from '../providers/meta-provider.js'
 import { getConnectedWhatsAppClients } from '../repositories/client-repository.js'
 import { recordInboundMessage } from '../repositories/whatsapp-inbound-activity-repository.js'
 import { logInboundMatch, matchLeadForInboundMessage } from './inbound-lead-match-service.js'
@@ -100,9 +101,65 @@ async function recordInbound(phoneNumberId: string | undefined, message: MetaInb
   }
 }
 
-export async function processMetaWhatsAppWebhook(body: unknown): Promise<void> {
-  const payload = body as MetaWhatsAppWebhookBody
-  if (payload?.object !== 'whatsapp_business_account') return
+export interface MetaWhatsAppWebhookResult {
+  status: 200 | 400 | 500
+}
+
+// Takes the RAW body, not a parsed object: the signature is an HMAC over the
+// exact bytes Meta sent, so parsing first and re-serialising would compare
+// against something Meta never signed.
+//
+// Until 2026-08-16 this endpoint parsed and trusted whatever arrived, while the
+// Lead Ads endpoint 34 lines above it in routes/webhooks.ts verified properly.
+// The gap was survivable only because resuming a journey needs a callback token
+// this system stored for that specific lead (see journey-reply-service.ts), so a
+// forged message could not start a journey or skip a step. Inbound-created leads
+// remove that bound entirely, which is why this landed before that work.
+//
+// On status codes. The rule this endpoint has always followed is "always 200,
+// because Meta retries non-2xx and disables a webhook that keeps failing". That
+// rule protects DELIVERIES FROM META, and it still applies below: a signed but
+// unparseable body returns 200 rather than inviting an infinite retry loop.
+// It does not apply to an unsigned request, because Meta did not send it, so
+// there is nothing to retry and nothing to disable. A misconfigured
+// META_APP_SECRET is the one case that could reject genuine Meta traffic, so it
+// is 500 (our fault, retry) and never 400 (your request is bad) -- the same
+// split meta-lead-service.ts:496-507 makes. That verification block is
+// deliberately duplicated rather than shared: extracting it would mean editing
+// the Lead Ads path while it is pending App Review, which is not a change to
+// bundle into a security fix.
+export async function processMetaWhatsAppWebhook(
+  rawBody: string,
+  signatureHeader: string | undefined
+): Promise<MetaWhatsAppWebhookResult> {
+  let signatureValid: boolean
+  try {
+    signatureValid = metaProvider.verifyWebhookSignature(rawBody, signatureHeader)
+  } catch (error) {
+    console.error('[wa-webhook] signature verification misconfigured:', error)
+    return { status: 500 }
+  }
+
+  if (!signatureValid) {
+    // Missing and mismatched are logged differently on purpose. If inbound goes
+    // quiet after this ships, that one word is the difference between "Meta is
+    // not signing these at all, revert" and "our META_APP_SECRET is wrong for
+    // this app, fix the config" -- a distinction that cost most of a day the
+    // last time inbound broke without instrumentation to explain it.
+    const reason = signatureHeader === undefined ? 'header absent' : 'signature mismatch'
+    console.error(`[wa-webhook] rejected: ${reason}`)
+    return { status: 400 }
+  }
+
+  let payload: MetaWhatsAppWebhookBody
+  try {
+    payload = JSON.parse(rawBody) as MetaWhatsAppWebhookBody
+  } catch {
+    console.error('[wa-webhook] signed request had a body that is not valid JSON')
+    return { status: 200 }
+  }
+
+  if (payload?.object !== 'whatsapp_business_account') return { status: 200 }
 
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
@@ -116,4 +173,6 @@ export async function processMetaWhatsAppWebhook(body: unknown): Promise<void> {
       }
     }
   }
+
+  return { status: 200 }
 }
