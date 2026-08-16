@@ -131,6 +131,7 @@ interface KnowledgeBaseEntry {
 - journey_trigger_claims — partition key: claimKey (`agent:<agentId>#<trigger>` or `bot:<botId>#<trigger>`; atomic-claim so exactly ONE published bundle owns a trigger — prevents duplicate outreach. Doubles as the ignition index: "which journey runs for this lead" is a point read)
 - lead_state — partition key: leadId, GSI clientId-updatedAt-index (per-lead CRM working state: status/owner/nextActionAt/notes/leadScore. Its own table because the three lead tables have three different partition keys — same reason whatsapp_inbound_activity and journey_pending_replies are leadId-keyed side tables. Also where JourneyStep.recheckField's `replied`/`leadScore`/`appointmentBooked` finally live)
 - meta_deletion_requests — partition key: confirmationCode (Meta's mandated data-deletion callback. No GSI: every read is a point lookup by the code Meta hands the user. No TTL — the row is the evidence the request was handled)
+- lead_events — partition key: leadId, sort key: ts (`<iso>#<uuid>`), GSI clientId-ts-index, sparse GSI wamid-index (append-only record of everything that happened to a lead: messages both directions, delivery statuses, journey steps, tool calls, handoffs. The wamid index exists because a Meta status webhook carries a wamid and no leadId. No TTL — this is the audit record)
 - contact_messages — partition key: messageId, GSI recordType-createdAt-index (marketing-site contact form; no clientId/botId — these are messages to us, not leads for a client's bot)
 
 ## Environment Variables
@@ -138,21 +139,11 @@ OPENAI_API_KEY
 PINECONE_API_KEY
 PINECONE_INDEX_NAME
 AWS_REGION
-DYNAMODB_TABLE_CLIENTS
-DYNAMODB_TABLE_BOTS
-DYNAMODB_TABLE_LEADS
-DYNAMODB_TABLE_CONVERSATIONS
-DYNAMODB_TABLE_KB
-DYNAMODB_TABLE_JOURNEYS
-DYNAMODB_TABLE_SCHEDULED_ACTIONS
-DYNAMODB_TABLE_JOURNEY_EXECUTIONS
-DYNAMODB_TABLE_APPOINTMENT_REQUESTS
-DYNAMODB_TABLE_GUPSHUP_APP_LOOKUP
-DYNAMODB_TABLE_WHATSAPP_INBOUND_ACTIVITY
-DYNAMODB_TABLE_AGENTS
-DYNAMODB_TABLE_AGENT_BINDING_LOOKUP
-DYNAMODB_TABLE_JOURNEY_TRIGGER_CLAIMS
-DYNAMODB_TABLE_JOURNEY_PENDING_REPLIES
+DYNAMODB_TABLE_PREFIX   <- optional; the ONLY table-name env var. The 30 DYNAMODB_TABLE_* vars were
+                           removed on 2026-08-16: 28 of them were the key spelled twice
+                           (DYNAMODB_TABLE_LEADS=leads) and they consumed 1250 of the Lambda's
+                           4KB env budget. Names now live in backend/src/lib/table-names.ts.
+                           Set the prefix only to point a stack at a separate set of tables.
 COGNITO_USER_POOL_ID
 COGNITO_CLIENT_ID
 FRONTEND_URL
