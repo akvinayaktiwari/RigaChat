@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { getTableName, TABLE_NAMES, type TableKey } from './table-names.js'
 
 // The safety net for moving 30 table names out of the Lambda environment and
@@ -44,8 +44,21 @@ const PRODUCTION_TABLE_NAMES: Record<TableKey, string> = {
   lead_events: 'lead_events',
 }
 
-afterEach(() => {
+// vitest.config.ts sets DYNAMODB_TABLE_PREFIX=test- as a safety boundary, so an
+// unmocked repository call in any test hits a table that does not exist rather
+// than production. This file is asserting the UNPREFIXED production names, so it
+// clears the prefix for itself and restores it afterwards. Do not "simplify"
+// this by dropping the prefix from the config: it is what stops a forgotten mock
+// writing real rows.
+const SUITE_PREFIX = process.env.DYNAMODB_TABLE_PREFIX
+
+beforeEach(() => {
   delete process.env.DYNAMODB_TABLE_PREFIX
+})
+
+afterEach(() => {
+  if (SUITE_PREFIX === undefined) delete process.env.DYNAMODB_TABLE_PREFIX
+  else process.env.DYNAMODB_TABLE_PREFIX = SUITE_PREFIX
 })
 
 describe('table name resolution', () => {

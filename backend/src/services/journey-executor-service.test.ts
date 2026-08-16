@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { McpCapability } from '../types/index.js'
 
 const isOptedOut = vi.fn()
+vi.mock('../repositories/lead-event-repository.js', () => ({
+  appendLeadEvent: vi.fn(),
+  getEventByWamid: vi.fn(),
+}))
 vi.mock('../repositories/whatsapp-inbound-activity-repository.js', () => ({ isOptedOut }))
 
 const claimPendingReply = vi.fn()

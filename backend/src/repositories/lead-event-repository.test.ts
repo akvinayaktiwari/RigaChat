@@ -29,8 +29,11 @@ describe('appendLeadEvent', () => {
       body: 'hello',
     })
 
+    // Prefixed because vitest.config.ts sets DYNAMODB_TABLE_PREFIX=test- so an
+    // unmocked write can never reach the real table. Asserting the prefixed name
+    // keeps that boundary visible rather than papering over it.
     const input = send.mock.calls[0]?.[0].input
-    expect(input.TableName).toBe('lead_events')
+    expect(input.TableName).toBe('test-lead_events')
     expect(input.Item.leadId).toBe('lead-1')
   })
 

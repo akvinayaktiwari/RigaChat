@@ -1,31 +1,39 @@
 import { defineConfig } from 'vitest/config'
 
 // Dummy values for env vars that are validated at module-import time
-// (e.g. dynamo-client.ts's getTableName(), auth-service.ts's Cognito pool
-// check) so importing a service under test doesn't throw before any test
-// runs, even for services whose import graph reaches unrelated repositories.
+// (e.g. auth-service.ts's Cognito pool check) so importing a service under test
+// doesn't throw before any test runs, even for services whose import graph
+// reaches unrelated repositories.
+//
+// DYNAMODB_TABLE_PREFIX IS A SAFETY BOUNDARY, NOT A CONVENIENCE.
+//
+// Every table name resolves through lib/table-names.ts, which prefixes each one
+// with this value. With `test-` set, an unmocked repository call in a test hits
+// `test-leads` or `test-lead_events`, which do not exist, so the call fails and
+// nothing is written anywhere real.
+//
+// Without it, unmocked calls hit PRODUCTION. That is not hypothetical: this file
+// previously listed ~15 DYNAMODB_TABLE_* variables pointing at `test-*-table`
+// names, and those were doing this job. When table names moved into code on
+// 2026-08-16 those variables stopped being read, the boundary silently
+// disappeared, and a test-suite run wrote 70 rows into the real lead_events
+// table under fixture ids like `lead-1`. It was invisible because
+// appendLeadEvent deliberately swallows its errors, so nothing failed.
+//
+// Do not remove this line. Mocking repositories per test file is still correct
+// and still expected; this is the net for when someone forgets.
 export default defineConfig({
   test: {
     environment: 'node',
     env: {
       AWS_REGION: 'ap-south-1',
+      DYNAMODB_TABLE_PREFIX: 'test-',
       COGNITO_USER_POOL_ID: 'test-pool-id',
       COGNITO_CLIENT_ID: 'test-client-id',
-      DYNAMODB_TABLE_CLIENTS: 'test-clients-table',
-      DYNAMODB_TABLE_LEAD_STATE: 'test-lead-state-table',
-      DYNAMODB_TABLE_SUBSCRIPTIONS: 'test-subscriptions-table',
-      DYNAMODB_TABLE_JOURNEYS: 'test-journeys-table',
       JOURNEY_EXECUTOR_LAMBDA_ARN: 'arn:aws:lambda:ap-south-1:000000000000:function:test-journey-executor',
-      DYNAMODB_TABLE_SCHEDULED_ACTIONS: 'test-scheduled-actions-table',
       SCHEDULER_TARGET_LAMBDA_ARN: 'arn:aws:lambda:ap-south-1:000000000000:function:test-scheduler-target',
       SCHEDULER_EXECUTION_ROLE_ARN: 'arn:aws:iam::000000000000:role/test-scheduler-execution-role',
-      DYNAMODB_TABLE_JOURNEY_EXECUTIONS: 'test-journey-executions-table',
-      DYNAMODB_TABLE_PAYMENT_HISTORY: 'test-payment-history-table',
-      DYNAMODB_TABLE_WEBHOOK_EVENTS: 'test-webhook-events-table',
-      DYNAMODB_TABLE_GUPSHUP_APP_LOOKUP: 'test-gupshup-app-lookup-table',
-      DYNAMODB_TABLE_WHATSAPP_INBOUND_ACTIVITY: 'test-whatsapp-inbound-activity-table',
       EMAIL_LOGO_URL: 'https://example.com/logo.png',
-      DYNAMODB_TABLE_META_DELETION_REQUESTS: 'test-meta-deletion-requests-table',
       ZOHO_CLIENT_ID: 'test-zoho-client-id',
       ZOHO_CLIENT_SECRET: 'test-zoho-client-secret',
       ZOHO_REDIRECT_URI: 'https://api.example.com/api/integrations/zoho/callback',
