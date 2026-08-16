@@ -114,9 +114,17 @@ api() {
   fi
 }
 
+# Normalises the empty case. `aws dynamodb get-item` on a missing key exits 0
+# and prints NOTHING -- not `{}` -- so a bare `|| echo '{}'` never fires and the
+# caller pipes an empty string into jq, which then emits nothing at all. Every
+# `// "default"` fallback downstream is silently skipped. That bug made `watch`
+# report an OPEN WhatsApp session window for a lead who had never messaged us:
+# the unsafe direction, since it claims free text will send when only a template
+# can.
 ddb_get() {
-  aws dynamodb get-item --region "$REGION" --table-name "$1" --key "$2" \
-    --output json 2>/dev/null || echo '{}'
+  local out
+  out="$(aws dynamodb get-item --region "$REGION" --table-name "$1" --key "$2" --output json 2>/dev/null)" || out=''
+  [ -n "$out" ] && printf '%s' "$out" || printf '{}'
 }
 
 state_get() { jq -r "$1 // empty" "$STATE_FILE" 2>/dev/null || true; }

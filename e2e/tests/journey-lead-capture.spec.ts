@@ -74,6 +74,17 @@ test.describe('journey lead capture via the real widget', () => {
     }
     await expect(page.locator('#ciq-window.ciq-open')).toBeVisible({ timeout: 15_000 })
 
+    // Wait for the greeting before typing anything. Opening the window kicks
+    // off startConversation(), and handleSend() early-returns on
+    // !state.conversationId -- so the input is ENABLED a moment before it is
+    // actually usable, and a message sent into that gap is dropped in silence.
+    // The greeting bubble landing is the observable proof the conversation
+    // exists. (Enabled does not mean ready; that gap cost a run.)
+    await expect(
+      page.locator('#ciq-messages .ciq-msg-bot:not(.ciq-lead-card)'),
+      'greeting never arrived — the conversation was never started'
+    ).toHaveCount(1, { timeout: 45_000 })
+
     // Two turns, because this bot's leadTriggerAfterMessages is 2. The trigger
     // is decided server-side (/api/chat/lead-trigger/...), not by counting in
     // the browser, so the cards appear only after the backend agrees.
