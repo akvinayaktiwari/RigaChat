@@ -108,6 +108,40 @@ async function main(): Promise<void> {
     }
   }
 
+  // Meta's own sent-vs-delivered counts. This is the ONLY server-side evidence
+  // of delivery available while status webhooks are not arriving: the send call
+  // returns a wamid for messages that are later dropped, so "we sent it" proves
+  // nothing. sent > 0 with delivered == 0 is the signature of acceptance
+  // followed by silent non-delivery.
+  console.log(`\nMESSAGE ANALYTICS (last 3 days, by day)`)
+  const end = Math.floor(Date.now() / 1000)
+  const start = end - 3 * 24 * 60 * 60
+  const analyticsParams = new URLSearchParams({
+    fields: `analytics.start(${start}).end(${end}).granularity(DAY)`,
+    access_token: token,
+  })
+  const analyticsResponse = await fetch(`${GRAPH}/${connection.wabaId}?${analyticsParams.toString()}`)
+  const analyticsData = (await analyticsResponse.json().catch(() => ({}))) as {
+    analytics?: { data_points?: { start?: number; sent?: number; delivered?: number }[] }
+    error?: { message?: string }
+  }
+
+  if (analyticsData.error) {
+    console.log(`    unavailable: ${analyticsData.error.message}`)
+  } else {
+    const points = analyticsData.analytics?.data_points ?? []
+    if (points.length === 0) {
+      console.log('    no data points returned')
+    }
+    for (const point of points) {
+      const day = point.start ? new Date(point.start * 1000).toISOString().slice(0, 10) : '?'
+      const sent = point.sent ?? 0
+      const delivered = point.delivered ?? 0
+      const flag = sent > 0 && delivered === 0 ? '   <- accepted but NOTHING delivered' : ''
+      console.log(`    ${day}  sent=${String(sent).padEnd(4)} delivered=${String(delivered).padEnd(4)}${flag}`)
+    }
+  }
+
   console.log('')
 }
 
