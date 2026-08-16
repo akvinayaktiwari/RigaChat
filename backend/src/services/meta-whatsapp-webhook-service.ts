@@ -1,7 +1,6 @@
 import { getConnectedWhatsAppClients } from '../repositories/client-repository.js'
 import { recordInboundMessage } from '../repositories/whatsapp-inbound-activity-repository.js'
-import { phonesMatch } from '../lib/phone-match.js'
-import { getLeadsForClient } from './lead-service.js'
+import { logInboundMatch, matchLeadForInboundMessage } from './inbound-lead-match-service.js'
 import { handleInboundLeadMessage } from './journey-reply-service.js'
 
 // Meta Cloud API webhook payloads. Only the parts we act on are typed; the
@@ -74,18 +73,27 @@ async function recordInbound(phoneNumberId: string | undefined, message: MetaInb
       return
     }
 
-    const leads = await getLeadsForClient(owner.clientId)
-    const lead = leads.find((candidate) => candidate.phone && phonesMatch(candidate.phone, message.from as string))
-    if (!lead) {
+    const match = await matchLeadForInboundMessage(owner.clientId, message.from)
+    if (!match) {
       console.log(`[wa-inbound] message from ${message.from} matched no lead for client ${owner.clientId}`)
       return
     }
+    logInboundMatch('wa-inbound', message.from, match)
 
+    const lead = match.lead
     await recordInboundMessage(lead.leadId)
 
     const outcome = await handleInboundLeadMessage(lead.leadId, message.text?.body ?? '')
     if (outcome.handled !== 'no_pending_journey') {
       console.log(`[journey-reply] lead ${lead.leadId}: ${JSON.stringify(outcome)}`)
+    } else if (match.candidateCount > 1) {
+      // Normally silent -- most inbound messages have no journey waiting and
+      // logging every one would be noise. But when several leads shared the
+      // phone number, "nothing was waiting" is exactly the symptom of having
+      // picked the wrong one, and that combination went unnoticed for a day.
+      console.log(
+        `[wa-inbound] chose lead ${lead.leadId} from ${match.candidateCount} matches and it had no parked journey`
+      )
     }
   } catch (error) {
     console.error('[wa-inbound] failed to record inbound message:', error)

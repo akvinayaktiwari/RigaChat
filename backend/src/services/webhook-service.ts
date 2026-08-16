@@ -5,7 +5,7 @@ import {
   isGupshupIncomingMessage,
   type GupshupIncomingMessage,
 } from '../lib/gupshup-webhook.js'
-import { phonesMatch } from '../lib/phone-match.js'
+import { logInboundMatch, matchLeadForInboundMessage } from './inbound-lead-match-service.js'
 import { razorpayProvider } from '../providers/razorpay-provider.js'
 import { getByAccountId, updatePartial } from '../repositories/subscription-repository.js'
 import { hasProcessed, markProcessed } from '../repositories/webhook-event-repository.js'
@@ -14,7 +14,6 @@ import { getClientIdForGupshupApp } from '../repositories/gupshup-app-lookup-rep
 import { recordInboundMessage } from '../repositories/whatsapp-inbound-activity-repository.js'
 import { invalidateEntitlementsCache } from './entitlement-service.js'
 import { handleInboundLeadMessage } from './journey-reply-service.js'
-import { getLeadsForClient } from './lead-service.js'
 import type { PlanTier, Subscription, SubscriptionStatus } from '../types/index.js'
 
 const BILLABLE_TIERS: ReadonlySet<PlanTier> = new Set(['starter', 'growth', 'agency'])
@@ -72,13 +71,14 @@ async function resolveAndRecordInboundMessage(event: GupshupIncomingMessage): Pr
       return
     }
 
-    const leads = await getLeadsForClient(clientId)
-    const matchingLead = leads.find((lead) => lead.phone && phonesMatch(lead.phone, event.payload.source))
-    if (!matchingLead) {
+    const match = await matchLeadForInboundMessage(clientId, event.payload.source)
+    if (!match) {
       console.log(`Gupshup incoming message from ${event.payload.source} (client ${clientId}) matched no lead`)
       return
     }
+    logInboundMatch('gupshup-inbound', event.payload.source, match)
 
+    const matchingLead = match.lead
     await recordInboundMessage(matchingLead.leadId)
 
     // The message is now more than a timestamp: if a journey is parked on this
@@ -89,6 +89,14 @@ async function resolveAndRecordInboundMessage(event: GupshupIncomingMessage): Pr
     const outcome = await handleInboundLeadMessage(matchingLead.leadId, event.payload.payload.text ?? '')
     if (outcome.handled !== 'no_pending_journey') {
       console.log(`[journey-reply] lead ${matchingLead.leadId}: ${JSON.stringify(outcome)}`)
+    } else if (match.candidateCount > 1) {
+      // See the same branch in meta-whatsapp-webhook-service.ts: "several
+      // leads matched AND nothing was waiting" is the signature of choosing
+      // the wrong one, so that pair is worth a line even though the common
+      // no-journey case is not.
+      console.log(
+        `[gupshup-inbound] chose lead ${matchingLead.leadId} from ${match.candidateCount} matches and it had no parked journey`
+      )
     }
   } catch (error) {
     console.error('Failed to resolve/record Gupshup incoming message:', error)
