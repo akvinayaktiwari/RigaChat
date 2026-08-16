@@ -51,7 +51,9 @@ import type {
   VoiceUsageSummary,
   WhatsAppConnection,
   BotWhatsAppStatus,
+  LeadEvent,
 } from '../types/index'
+import { leadRefToSearch } from '../lib/lead-ref'
 
 const BASE_URL = import.meta.env.VITE_API_URL
 
@@ -201,6 +203,11 @@ export function getLeadInbox(): Promise<ApiResponse<UnifiedLead[]>> {
 
 // The whole LeadRef travels in the query string because this is a GET reached
 // by opening a link — see lib/lead-ref.ts for the URL shape.
+// The lead's timeline. Same LeadRef-in-query-params shape as the detail call.
+export function getLeadEvents(leadRef: LeadRef): Promise<ApiResponse<LeadEvent[]>> {
+  return apiClient<LeadEvent[]>(`/api/leads/events?${leadRefToSearch(leadRef)}`)
+}
+
 export function getUnifiedLeadDetail(leadRef: LeadRef): Promise<ApiResponse<UnifiedLeadDetail>> {
   const params = new URLSearchParams({ source: leadRef.source, leadId: leadRef.leadId })
   if (leadRef.source === 'chat') params.set('botId', leadRef.botId)

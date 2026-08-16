@@ -3,6 +3,8 @@ import type { FormLead, Lead, LeadState, MetaLead } from '../types/index.js'
 
 const getLeadsByClientId = vi.fn()
 const getLeadById = vi.fn()
+const getLeadEvents = vi.fn()
+vi.mock('../repositories/lead-event-repository.js', () => ({ getLeadEvents }))
 vi.mock('../repositories/lead-repository.js', () => ({ getLeadsByClientId, getLeadById }))
 
 const getFormLeadsByClientId = vi.fn()
@@ -30,6 +32,7 @@ vi.mock('../repositories/lead-state-repository.js', () => ({
 
 const {
   addLeadNoteForClient,
+  getLeadTimeline,
   getUnifiedInbox,
   getUnifiedLeadDetail,
   updateLeadStateForClient,
@@ -420,5 +423,52 @@ describe('getUnifiedLeadDetail', () => {
     await expect(
       getUnifiedLeadDetail({ source: 'meta', pageId: 'page-1', leadId: 'gone' }, CLIENT)
     ).rejects.toThrow('Lead not found')
+  })
+})
+
+describe('getLeadTimeline', () => {
+  beforeEach(() => {
+    getLeadEvents.mockReset().mockResolvedValue([])
+  })
+
+  // Ownership is checked against the SOURCE RECORD, not the events.
+  // lead_events is partitioned by leadId alone, so a leadId lifted from a URL
+  // would otherwise read another tenant's whole conversation. Filtering after
+  // the read is not a boundary: it still fetched the rows.
+  it('refuses a lead belonging to another client', async () => {
+    getLeadById.mockResolvedValue({ leadId: 'lead-1', clientId: 'someone-else', botId: 'bot-1' })
+
+    await expect(
+      getLeadTimeline({ source: 'chat', botId: 'bot-1', leadId: 'lead-1' }, 'client-1')
+    ).rejects.toThrow('Lead not found')
+
+    expect(getLeadEvents).not.toHaveBeenCalled()
+  })
+
+  it('refuses a lead that does not exist, with the same error', async () => {
+    getLeadById.mockResolvedValue(null)
+
+    await expect(
+      getLeadTimeline({ source: 'chat', botId: 'bot-1', leadId: 'lead-1' }, 'client-1')
+    ).rejects.toThrow('Lead not found')
+  })
+
+  it('returns the events for a lead the client owns', async () => {
+    getLeadById.mockResolvedValue({ leadId: 'lead-1', clientId: 'client-1', botId: 'bot-1' })
+    getLeadEvents.mockResolvedValue([{ leadId: 'lead-1', type: 'message_in', ts: 'x' }])
+
+    const events = await getLeadTimeline({ source: 'chat', botId: 'bot-1', leadId: 'lead-1' }, 'client-1')
+
+    expect(events).toHaveLength(1)
+  })
+
+  // A long nurture can accumulate hundreds of rows; one lead must not pull an
+  // unbounded read on a Lambda shared with every other request.
+  it('bounds the read', async () => {
+    getLeadById.mockResolvedValue({ leadId: 'lead-1', clientId: 'client-1', botId: 'bot-1' })
+
+    await getLeadTimeline({ source: 'chat', botId: 'bot-1', leadId: 'lead-1' }, 'client-1')
+
+    expect(getLeadEvents).toHaveBeenCalledWith('lead-1', 500)
   })
 })
