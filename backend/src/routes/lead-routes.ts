@@ -10,6 +10,7 @@ import {
 } from '../services/lead-service.js'
 import {
   addLeadNoteForClient,
+  getLeadTimeline,
   getUnifiedInbox,
   getUnifiedLeadDetail,
   updateLeadStateForClient,
@@ -22,6 +23,7 @@ import {
 import type {
   ApiResponse,
   Lead,
+  LeadEvent,
   LeadRef,
   LeadState,
   UnifiedLead,
@@ -127,6 +129,32 @@ leadRoutes.get('/inbox', requireAuth, async (c) => {
     const leads = await getUnifiedInbox(clientId)
     return c.json<ApiResponse<UnifiedLead[]>>({ success: true, data: leads }, 200)
   } catch (error) {
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+// The lead's full timeline. Same LeadRef-in-query-params shape as /detail above,
+// for the same reason: this is a GET reached by opening a link.
+leadRoutes.get('/events', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const leadRef = parseLeadRef({
+    source: c.req.query('source'),
+    leadId: c.req.query('leadId'),
+    botId: c.req.query('botId'),
+    formId: c.req.query('formId'),
+    pageId: c.req.query('pageId'),
+  })
+  if (!leadRef) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'A valid leadRef is required' }, 400)
+  }
+
+  try {
+    const events = await getLeadTimeline(leadRef, clientId)
+    return c.json<ApiResponse<LeadEvent[]>>({ success: true, data: events }, 200)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Lead not found') {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
+    }
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }
 })

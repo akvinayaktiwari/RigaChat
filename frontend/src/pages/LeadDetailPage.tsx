@@ -13,7 +13,7 @@ import {
   Phone,
   StickyNote,
 } from 'lucide-react'
-import { addLeadNote, getUnifiedLeadDetail, updateLeadState } from '../services/api'
+import { addLeadNote, getLeadEvents, getUnifiedLeadDetail, updateLeadState } from '../services/api'
 import { useToast } from '../components/Toast/Toast'
 import { describeApiError } from '../lib/api-error'
 import { parseLeadRef } from '../lib/lead-ref'
@@ -28,7 +28,8 @@ import {
   STATUS_LABELS,
   STATUS_ORDER,
 } from '../lib/lead-display'
-import type { LeadOutcome, LeadStatePatch, LeadStatus, UnifiedLeadDetail } from '../types/index'
+import type { LeadEvent, LeadOutcome, LeadStatePatch, LeadStatus, UnifiedLeadDetail } from '../types/index'
+import LeadTimeline from '../components/leads/LeadTimeline'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -136,7 +137,38 @@ export default function LeadDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [events, setEvents] = useState<LeadEvent[]>([])
+  const [eventsLoading, setEventsLoading] = useState(true)
+  const [eventsError, setEventsError] = useState<string | null>(null)
   const [noteDraft, setNoteDraft] = useState('')
+
+  // Loaded separately from the lead itself. A timeline failure must not blank a
+  // page whose main job is showing the lead's contact details, and a failed load
+  // has to look different from an empty one -- see the app-wide data-load item
+  // in TODOS.md.
+  useEffect(() => {
+    if (!leadRef) return
+    let cancelled = false
+
+    setEventsLoading(true)
+    getLeadEvents(leadRef)
+      .then((res) => {
+        if (cancelled) return
+        if (res.success) setEvents(res.data ?? [])
+        else setEventsError(describeApiError('leads/events', res.error, 'We could not load this lead\u2019s activity.'))
+        setEventsLoading(false)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setEventsError('We could not load this lead\u2019s activity.')
+        setEventsLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leadRef?.leadId])
 
   useEffect(() => {
     if (!leadRef) {
@@ -433,6 +465,20 @@ export default function LeadDetailPage() {
                 ))}
               </ul>
             )}
+          </div>
+
+          {/* Above the transcript on purpose. The transcript is the raw text of a
+              web chat; this is what the AGENT did across every channel, which is
+              the thing a client is actually deciding whether to trust. */}
+          <div className="bg-white rounded-2xl border border-black/5 p-6 shadow-sm">
+            <h2 className="font-bold text-lg text-gray-900 mb-1" style={JAKARTA_FONT}>
+              Activity
+            </h2>
+            <p className="text-sm text-gray-500 mb-5">
+              Messages, delivery, and what the agent did
+            </p>
+
+            <LeadTimeline events={events} loading={eventsLoading} error={eventsError} />
           </div>
 
           <div className="bg-white rounded-2xl border border-black/5 p-6 shadow-sm">

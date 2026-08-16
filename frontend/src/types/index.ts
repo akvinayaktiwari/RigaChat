@@ -757,3 +757,39 @@ export interface BotWhatsAppStatus {
   displayPhoneNumber?: string
   blockedReason?: string
 }
+
+// Mirrors backend LeadEvent. The append-only record of everything that happened
+// to a lead: messages both directions, delivery statuses, journey steps, tool
+// calls, handoffs.
+export type LeadEventType =
+  | 'lead_captured'
+  | 'journey_started'
+  | 'journey_step'
+  | 'message_out'
+  | 'message_status'
+  | 'message_in'
+  | 'tool_call'
+  | 'handoff'
+  | 'journey_ended'
+  | 'state_change'
+
+export type MessageDeliveryStatus = 'sent' | 'delivered' | 'read' | 'failed'
+
+export interface LeadEvent {
+  leadId: string
+  ts: string
+  clientId: string
+  botId: string
+  type: LeadEventType
+  channel?: 'whatsapp' | 'web_widget'
+  wamid?: string
+  mode?: 'template' | 'free_text'
+  templateName?: string
+  body?: string
+  status?: MessageDeliveryStatus
+  errorDetail?: string
+  bundleId?: string
+  stepId?: string
+  toolName?: string
+  reason?: string
+}

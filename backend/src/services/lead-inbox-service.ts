@@ -15,7 +15,10 @@ import {
   normalizeMetaLead,
   readJourneyLead,
 } from './lead-resolution-service.js'
-import type { FormField, LeadRef, LeadState, UnifiedLead, UnifiedLeadDetail } from '../types/index.js'
+import type { FormField, LeadRef, LeadState, UnifiedLead, UnifiedLeadDetail,
+  LeadEvent,
+} from '../types/index.js'
+import { getLeadEvents } from '../repositories/lead-event-repository.js'
 
 // One inbox across chat, form and Meta leads.
 //
@@ -232,4 +235,31 @@ export async function addLeadNoteForClient(
 ): Promise<LeadState> {
   await assertLeadOwnedByClient(leadRef, clientId)
   return appendLeadNote(leadRef.leadId, clientId, body, authorId)
+}
+
+// -------------------------------------------------------------------------
+// The lead's timeline: everything that happened to them, in order.
+//
+// Ownership is checked the SAME way getUnifiedLeadDetail does, and against the
+// source record rather than the events. lead_events is partitioned by leadId
+// alone, so a leadId guessed or lifted from a URL would otherwise read another
+// tenant's conversation. The events themselves carry a clientId, but filtering
+// after the read is not a boundary: it still fetched the rows.
+//
+// Bounded by default. A long-running nurture can accumulate hundreds of rows and
+// the page renders all of them; the cap keeps one lead from pulling an unbounded
+// read on a Lambda shared with every other request.
+// -------------------------------------------------------------------------
+const MAX_TIMELINE_EVENTS = 500
+
+export async function getLeadTimeline(leadRef: LeadRef, clientId: string): Promise<LeadEvent[]> {
+  const record = await readSourceRecord(leadRef)
+
+  // 404 either way, so a non-owner cannot distinguish "does not exist" from
+  // "not yours".
+  if (!record || record.clientId !== clientId) {
+    throw new Error('Lead not found')
+  }
+
+  return getLeadEvents(leadRef.leadId, MAX_TIMELINE_EVENTS)
 }
