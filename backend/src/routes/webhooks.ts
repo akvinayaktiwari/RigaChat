@@ -100,13 +100,21 @@ webhookRoutes.get('/meta-whatsapp', (c) => {
 // killed before a status or inbound message is ever recorded. Same reasoning
 // as the Gupshup route above.
 //
-// Always 200, even on a malformed body: Meta retries non-2xx responses and
-// disables a webhook that keeps failing. processMetaWhatsAppWebhook never
-// throws for payload problems, it logs them.
+// Raw text body read BEFORE any parse, same as the /meta route above: the
+// X-Hub-Signature-256 HMAC covers the exact bytes Meta sent, so a parse-then-
+// re-serialise would verify against something Meta never signed.
+//
+// Still 200 for anything Meta genuinely sent, including a body we cannot use --
+// Meta retries non-2xx and disables a webhook that keeps failing, and
+// processMetaWhatsAppWebhook never throws for payload problems, it logs them.
+// Non-2xx is reserved for requests that fail verification (400, not from Meta,
+// so nothing to retry) and for a misconfigured secret (500, our fault).
 webhookRoutes.post('/meta-whatsapp', async (c) => {
-  const body: unknown = await c.req.json().catch(() => null)
-  await processMetaWhatsAppWebhook(body)
-  return c.body(null, 200)
+  const rawBody = await c.req.text()
+  const signature = c.req.header('X-Hub-Signature-256')
+
+  const result = await processMetaWhatsAppWebhook(rawBody, signature)
+  return c.body(null, result.status)
 })
 
 // Meta platform requirement: called when a user deauthorizes the app.
