@@ -114,6 +114,61 @@ export async function retrieveContext(
   }
 }
 
+// -------------------------------------------------------------------------
+// "Everything this Agent knows", across its bound channels.
+//
+// An Agent can own a web bot and a voice agent, each with its own Pinecone
+// namespace. The 2026-07-29 design settled that the Agent's shared brain is the
+// UNION of its bindings, aggregated at query time, so no vectors move and rule 5
+// (every query scoped by a namespace id) stays intact.
+//
+// voice-routes.ts implemented that inline first. This is the same behaviour
+// extracted so the WhatsApp turn handler cannot drift from it: without one
+// definition, a client who put pricing in their voice agent's KB would get
+// correct answers on a call and "I don't have that information" on WhatsApp,
+// from what the dashboard calls one Agent.
+//
+// The embedding is generated ONCE and reused across namespaces. Generating it
+// per namespace would double the OpenAI cost of every two-binding turn for an
+// identical vector.
+//
+// KNOWN WEAK RANKING, tracked in TODOS.md: concatenate then take the first
+// `limit`. That ignores score ordering across namespaces, so a strong voice-KB
+// chunk can lose to a weak web-KB one purely because web is queried first. It is
+// what voice already does, and unifying on it is better than inventing a second
+// ranking; replacing it wants the eval suite in place to measure against.
+// -------------------------------------------------------------------------
+export async function retrieveAgentContext(
+  namespaceIds: string[],
+  query: string,
+  limit = 5
+): Promise<string[]> {
+  const unique = [...new Set(namespaceIds.filter((id) => id.length > 0))]
+  if (unique.length === 0) return []
+
+  const queryEmbedding = await generateEmbedding(query)
+
+  const perNamespace = await Promise.all(
+    unique.map(async (namespaceId) => {
+      try {
+        return await retrieveContext(namespaceId, query, queryEmbedding)
+      } catch (error) {
+        // One namespace failing must not silence the Agent entirely. A partial
+        // answer from the bindings that did respond beats no answer, and the
+        // miss is logged rather than swallowed, because a namespace that is
+        // always failing looks exactly like a sparse knowledge base.
+        console.error(
+          `[rag] namespace ${namespaceId} failed during agent retrieval:`,
+          error instanceof Error ? error.message : error
+        )
+        return []
+      }
+    })
+  )
+
+  return perNamespace.flat().slice(0, limit)
+}
+
 export async function reindexNamespace(
   namespaceId: string,
   websiteUrl: string

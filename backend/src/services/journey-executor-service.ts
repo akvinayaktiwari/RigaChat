@@ -72,7 +72,12 @@ async function handleSendMessage(event: JourneyExecutorEvent): Promise<Record<st
   // reads like a person. Outside the window Meta rejects free text outright
   // (error 131047), so the step's approved template is the only way through.
   if (await hasActiveWhatsAppSession(event.leadId)) {
-    const body = event.messageHint ?? DEFAULT_SEND_MESSAGE_TEXT
+    // Precedence, and it is the whole point of D12: the agent's grounded answer
+    // to what the lead just said beats the step's authored hint, which beats the
+    // generic default. `composedReply` arrives on the resume payload from the
+    // turn handler, so this step sends the agent's words instead of a script and
+    // the lead receives exactly one message for their message.
+    const body = event.lastResult?.composedReply ?? event.messageHint ?? DEFAULT_SEND_MESSAGE_TEXT
     const result = await sendWhatsAppMessageToLead(event.clientId, lead.phone, body)
 
     // Recorded even when the send failed. "We tried and Meta refused" is the

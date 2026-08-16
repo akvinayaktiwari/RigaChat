@@ -28,6 +28,11 @@ export default defineConfig({
     env: {
       AWS_REGION: 'ap-south-1',
       DYNAMODB_TABLE_PREFIX: 'test-',
+      // Validated at module scope by openai-service.ts. A test that only
+      // transitively imports it (any service reaching the agent turn handler)
+      // would otherwise fail at import with a message about .env, which reads
+      // like a broken setup rather than a missing mock.
+      OPENAI_API_KEY: 'test-openai-key',
       COGNITO_USER_POOL_ID: 'test-pool-id',
       COGNITO_CLIENT_ID: 'test-client-id',
       JOURNEY_EXECUTOR_LAMBDA_ARN: 'arn:aws:lambda:ap-south-1:000000000000:function:test-journey-executor',

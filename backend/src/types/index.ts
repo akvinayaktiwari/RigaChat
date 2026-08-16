@@ -1293,6 +1293,20 @@ export interface JourneyExecutorEvent {
   promptHint?: string
   stepId?: string
   messageHint?: string
+  // The previous Task's result, merged in at $.lastResult by the compiler. After
+  // an await_reply resume this carries what the lead said and, when an agent turn
+  // ran, its grounded answer. Passed as a whole object because a JSONPath into a
+  // key that may not exist throws States.Runtime at runtime.
+  lastResult?: {
+    replied?: boolean
+    message?: string
+    repliedAt?: string
+    // The agent's grounded answer to the message that resumed this execution.
+    // Takes precedence over messageHint on a free-text send. Absent when no
+    // agent turn ran (the Gupshup path, or a step reached without an inbound
+    // reply).
+    composedReply?: string
+  }
   // Carried through from SendMessageStep by the compiler so the executor can
   // fall back to a template when the session window is shut.
   whatsappTemplateName?: string
