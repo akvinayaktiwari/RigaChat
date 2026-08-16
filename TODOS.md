@@ -240,6 +240,66 @@ component. `getRoutes()` in `prerender-entry.tsx` now documents the `/` trap.
 
 ## Backend
 
+### Deferred out of Epic A / Epic B (filed 2026-08-16)
+
+Everything below was explicitly scoped OUT of [#16](https://github.com/akvinayaktiwari/RigaChat/issues/16)
+(WhatsApp agent can hold a conversation) and
+[#17](https://github.com/akvinayaktiwari/RigaChat/issues/17) (client can see it working),
+so that each epic stays shippable. They are listed here rather than lost in an
+issue's "Out of scope" section, because most of them are the difference between a
+working product and an enterprise one.
+
+**Ordered by value, highest first.**
+
+**Datetime extraction into `book_appointment`.** `handleToolCall`
+(`journey-executor-service.ts:138`) reads `requestedAt` from `event.toolInput`, a
+value baked into the step at authoring time. Nothing parses "next sunday works"
+into a datetime. Cal.com booking is real and connected; the only missing piece is
+turning a human's words into a concrete slot. This is the demo moment that did not
+land on 2026-08-16, and it is roughly a fifth of the work of full AI composition.
+
+**KB citations under agent replies.** RAG already returns chunks with scores.
+Rendering "answered from: Pricing page, Floor plans" beneath an agent message is
+nearly free and is the most convincing single answer to an enterprise buyer's
+hallucination question. Nobody in the WhatsApp CRM category does this.
+
+**Quiet hours and per-lead rate caps.** Nothing stops a journey messaging a lead at
+3am or twice inside a minute. This appears on procurement checklists, and on the
+lead's side it is the line between helpful and harassment.
+
+**Confidence-based handoff.** When RAG returns nothing above the 0.7 threshold, the
+agent currently says it does not know and stalls. Handing off there converts the
+weakest moment in the product into the most trustworthy one.
+
+**Client digest and CRM webhook out.** `lead_events` (#9) makes both cheap: a daily
+or weekly summary to the client's WhatsApp number, and an outbound webhook so an
+enterprise client can push lead activity into their own CRM. The weekly report
+scheduler already exists and currently carries only one action type.
+
+**Human takeover of a conversation.** Deliberately deferred: read-only timeline
+first (#13), takeover later. Once two people can send on one thread, collision
+detection (showing when a colleague is already typing) becomes table stakes, as
+does assignment and routing. That is a shared-inbox product and should be scoped as
+its own epic, not bolted onto the timeline.
+
+**Ref-code attribution / many Agents per one number.** Current rule is one WhatsApp
+number to exactly one Agent, enforced by the atomic claim in
+`agent_binding_lookup`. #10 leaves the resolver extension point in place
+(`resolveAgentForInboundMessage` runs a ref-code strategy first, unimplemented),
+so this becomes implementing one branch. Needed when a client wants several Agents
+sharing one number, or per-source attribution on inbound.
+
+**Retention policy for lead conversations.** `lead_events` has no TTL by design,
+because it is the audit record. Combined with "a lead can never be deleted, by
+anyone" (below) and inbound-created leads from any number (#10), an enterprise
+client has no way to honour a deletion request. The lead delete path is the
+prerequisite.
+
+**Effort:** varies, S to L per item
+**Priority:** P2, except datetime extraction which is P1-shaped for demos
+**Depends on:** most depend on #9 (`lead_events`) landing first
+
+
 ### Backfill backend test coverage onto the pre-vitest services and repositories
 
 **What:** The *framework* half of this item is done — `backend/vitest.config.ts` exists (with the module-import-time env var stubs services need), `package.json` has `"test": "vitest run"` and `vitest ^4.1.10`, and 13 test files / 85 tests pass today. What's left is coverage: **8 of 29 services and 2 of 25 repositories have a `.test.ts`**. Everything tested so far was written alongside new work (journeys, scheduler, agents, MCP, Cal.com, webhooks); nothing older was ever retrofitted. Untested services include the ones carrying the most external-integration risk: `crm-service.ts`, `meta-lead-service.ts`, `chat-service.ts`, `rag-service.ts`, `form-lead-service.ts`, `billing-service.ts`, `openai-service.ts`, `crawler-service.ts`.
