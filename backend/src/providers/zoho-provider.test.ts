@@ -26,14 +26,14 @@ describe('mapLead', () => {
     ]
 
     const lead = zohoProvider.mapLead(
-      { f1: 'Test', f2: '9648658889', f3: '4 BHK', f4: 'test@gmail.com', f5: 'investor' },
+      { f1: 'Test', f2: '9000000001', f3: '4 BHK', f4: 'test@gmail.com', f5: 'investor' },
       fields,
       SOURCE_URL
     )
 
     expect(lead.email).toBe('test@gmail.com')
     expect(lead.lastName).toBe('Test')
-    expect(lead.phone).toBe('9648658889')
+    expect(lead.phone).toBe('9000000001')
     expect(lead.description).not.toContain('test@gmail.com')
     expect(lead.description).toContain('Interested In: 4 BHK')
     expect(lead.description).toContain('Buyer Type: investor')

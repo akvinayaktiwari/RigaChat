@@ -32,13 +32,13 @@ describe('matchLeadForInboundMessage', () => {
   it('returns null when no lead has that phone', async () => {
     getLeadsForClient.mockResolvedValue([lead('a', '2026-01-01T00:00:00Z', '911111111111')])
 
-    expect(await matchLeadForInboundMessage('client-1', '919648658889')).toBeNull()
+    expect(await matchLeadForInboundMessage('client-1', '919000000001')).toBeNull()
   })
 
   it('matches across phone formats, since one person is one person', async () => {
-    getLeadsForClient.mockResolvedValue([lead('a', '2026-01-01T00:00:00Z', '9648658889')])
+    getLeadsForClient.mockResolvedValue([lead('a', '2026-01-01T00:00:00Z', '9000000001')])
 
-    const match = await matchLeadForInboundMessage('client-1', '919648658889')
+    const match = await matchLeadForInboundMessage('client-1', '919000000001')
 
     expect(match?.lead.leadId).toBe('a')
     expect(match?.reason).toBe('only_match')
@@ -49,12 +49,12 @@ describe('matchLeadForInboundMessage', () => {
   // on that morning's lead never resumed.
   it('prefers the most recent lead when several share the phone', async () => {
     getLeadsForClient.mockResolvedValue([
-      lead('july', '2026-07-07T14:17:59Z', '9648658889', 'bot-old'),
-      lead('august', '2026-08-16T12:09:43Z', '919648658889', 'bot-new'),
-      lead('older', '2026-07-11T17:55:52Z', '9648658889', 'bot-older'),
+      lead('july', '2026-07-07T14:17:59Z', '9000000001', 'bot-old'),
+      lead('august', '2026-08-16T12:09:43Z', '919000000001', 'bot-new'),
+      lead('older', '2026-07-11T17:55:52Z', '9000000001', 'bot-older'),
     ])
 
-    const match = await matchLeadForInboundMessage('client-1', '919648658889')
+    const match = await matchLeadForInboundMessage('client-1', '919000000001')
 
     expect(match?.lead.leadId).toBe('august')
     expect(match?.reason).toBe('most_recent')
@@ -65,23 +65,23 @@ describe('matchLeadForInboundMessage', () => {
   // recency -- otherwise a newer stray lead would strand a live conversation.
   it('prefers a lead with a parked journey over a newer one without', async () => {
     getLeadsForClient.mockResolvedValue([
-      lead('parked', '2026-07-07T14:17:59Z', '9648658889'),
-      lead('newer', '2026-08-16T12:09:43Z', '9648658889'),
+      lead('parked', '2026-07-07T14:17:59Z', '9000000001'),
+      lead('newer', '2026-08-16T12:09:43Z', '9000000001'),
     ])
     getPendingReply.mockImplementation(async (leadId: string) =>
       leadId === 'parked' ? { leadId, taskToken: 't' } : null
     )
 
-    const match = await matchLeadForInboundMessage('client-1', '9648658889')
+    const match = await matchLeadForInboundMessage('client-1', '9000000001')
 
     expect(match?.lead.leadId).toBe('parked')
     expect(match?.reason).toBe('pending_reply')
   })
 
   it('does not probe pending replies when there is only one candidate', async () => {
-    getLeadsForClient.mockResolvedValue([lead('only', '2026-08-16T12:09:43Z', '9648658889')])
+    getLeadsForClient.mockResolvedValue([lead('only', '2026-08-16T12:09:43Z', '9000000001')])
 
-    await matchLeadForInboundMessage('client-1', '9648658889')
+    await matchLeadForInboundMessage('client-1', '9000000001')
 
     expect(getPendingReply).not.toHaveBeenCalled()
   })
@@ -91,11 +91,11 @@ describe('matchLeadForInboundMessage', () => {
   it('caps how many candidates get a pending-reply lookup', async () => {
     getLeadsForClient.mockResolvedValue(
       Array.from({ length: 25 }, (_, i) =>
-        lead(`l${i}`, `2026-08-${String(i + 1).padStart(2, '0')}T00:00:00Z`, '9648658889')
+        lead(`l${i}`, `2026-08-${String(i + 1).padStart(2, '0')}T00:00:00Z`, '9000000001')
       )
     )
 
-    await matchLeadForInboundMessage('client-1', '9648658889')
+    await matchLeadForInboundMessage('client-1', '9000000001')
 
     expect(getPendingReply.mock.calls.length).toBeLessThanOrEqual(10)
   })
