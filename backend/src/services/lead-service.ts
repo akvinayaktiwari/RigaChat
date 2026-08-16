@@ -6,6 +6,7 @@ import {
 } from '../repositories/lead-repository.js'
 import { markLeadCaptured } from '../repositories/conversation-repository.js'
 import { sendLeadNotification } from './whatsapp-service.js'
+import { appendLeadEvent } from '../repositories/lead-event-repository.js'
 import { igniteJourneysForLead } from './journey-ignition-service.js'
 import { getBotConfig } from './bot-service.js'
 import type { BotConfig, Lead } from '../types/index.js'
@@ -67,6 +68,15 @@ export async function captureLead(bot: BotConfig, input: CreateLeadInput): Promi
     })
 
     await markLeadCaptured(input.botId, input.conversationId)
+
+    await appendLeadEvent({
+      leadId: lead.leadId,
+      clientId: input.clientId,
+      botId: input.botId,
+      type: 'lead_captured',
+      channel: 'web_widget',
+      body: input.sourceUrl,
+    })
 
     // Hand the lead to its Agent. Safe inside this try/catch because
     // igniteJourneysForLead never throws -- if it could, a journey-layer

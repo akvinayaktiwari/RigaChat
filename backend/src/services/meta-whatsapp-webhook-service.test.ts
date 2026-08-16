@@ -9,6 +9,8 @@ const getConnectedWhatsAppClients = vi.fn()
 const recordInboundMessage = vi.fn()
 const matchLeadForInboundMessage = vi.fn()
 const handleInboundLeadMessage = vi.fn()
+const appendLeadEvent = vi.fn()
+const getEventByWamid = vi.fn()
 
 vi.mock('../repositories/client-repository.js', () => ({ getConnectedWhatsAppClients }))
 vi.mock('../repositories/whatsapp-inbound-activity-repository.js', () => ({ recordInboundMessage }))
@@ -17,6 +19,7 @@ vi.mock('./inbound-lead-match-service.js', () => ({
   logInboundMatch: vi.fn(),
 }))
 vi.mock('./journey-reply-service.js', () => ({ handleInboundLeadMessage }))
+vi.mock('../repositories/lead-event-repository.js', () => ({ appendLeadEvent, getEventByWamid }))
 
 const APP_SECRET = 'test-app-secret'
 
@@ -55,6 +58,8 @@ beforeEach(() => {
     reason: 'only_match',
   })
   handleInboundLeadMessage.mockReset().mockResolvedValue({ handled: 'resumed' })
+  appendLeadEvent.mockReset().mockResolvedValue(undefined)
+  getEventByWamid.mockReset().mockResolvedValue(null)
 })
 
 describe('processMetaWhatsAppWebhook signature verification', () => {
@@ -136,5 +141,90 @@ describe('processMetaWhatsAppWebhook signature verification', () => {
 
     expect(result.status).toBe(200)
     expect(matchLeadForInboundMessage).not.toHaveBeenCalled()
+  })
+})
+
+describe('lead_events written from the webhook', () => {
+  it('records message_in for a signed inbound message', async () => {
+    await processMetaWhatsAppWebhook(INBOUND_BODY, sign(INBOUND_BODY))
+
+    expect(appendLeadEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        leadId: 'lead-1',
+        type: 'message_in',
+        channel: 'whatsapp',
+        body: 'hello',
+      })
+    )
+  })
+
+  it('writes nothing when the signature is rejected', async () => {
+    await processMetaWhatsAppWebhook(INBOUND_BODY, undefined)
+
+    expect(appendLeadEvent).not.toHaveBeenCalled()
+  })
+
+  // A status payload has a wamid and a recipient and no leadId. The sparse
+  // wamid GSI is the only way back to the conversation it belongs to.
+  it('correlates a delivery status to its lead via the wamid index', async () => {
+    getEventByWamid.mockResolvedValue({
+      leadId: 'lead-9',
+      clientId: 'client-9',
+      botId: 'bot-9',
+    })
+    const body = JSON.stringify({
+      object: 'whatsapp_business_account',
+      entry: [{ changes: [{ value: { statuses: [{ id: 'wamid-abc', status: 'delivered', recipient_id: '91900' }] } }] }],
+    })
+
+    await processMetaWhatsAppWebhook(body, sign(body))
+
+    expect(getEventByWamid).toHaveBeenCalledWith('wamid-abc')
+    expect(appendLeadEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ leadId: 'lead-9', type: 'message_status', status: 'delivered', wamid: 'wamid-abc' })
+    )
+  })
+
+  // Statuses also arrive for the client-notification template and manual smoke
+  // tests, which belong to no lead. Normal, not an error.
+  it('records nothing for a status whose wamid is not ours', async () => {
+    getEventByWamid.mockResolvedValue(null)
+    const body = JSON.stringify({
+      object: 'whatsapp_business_account',
+      entry: [{ changes: [{ value: { statuses: [{ id: 'not-ours', status: 'read' }] } }] }],
+    })
+
+    const result = await processMetaWhatsAppWebhook(body, sign(body))
+
+    expect(result.status).toBe(200)
+    expect(appendLeadEvent).not.toHaveBeenCalled()
+  })
+
+  it('keeps Meta failure detail verbatim on a failed status', async () => {
+    getEventByWamid.mockResolvedValue({ leadId: 'lead-9', clientId: 'c', botId: 'b' })
+    const body = JSON.stringify({
+      object: 'whatsapp_business_account',
+      entry: [{ changes: [{ value: { statuses: [{ id: 'w1', status: 'failed', errors: [{ code: 131047, title: 'Re-engagement message' }] }] } }] }],
+    })
+
+    await processMetaWhatsAppWebhook(body, sign(body))
+
+    expect(appendLeadEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'failed', errorDetail: expect.stringContaining('131047') })
+    )
+  })
+
+  // Meta has added status values over time. Anything outside the four we model
+  // is logged and dropped rather than written as something the UI cannot render.
+  it('ignores a status value it does not model', async () => {
+    getEventByWamid.mockResolvedValue({ leadId: 'lead-9', clientId: 'c', botId: 'b' })
+    const body = JSON.stringify({
+      object: 'whatsapp_business_account',
+      entry: [{ changes: [{ value: { statuses: [{ id: 'w1', status: 'warped' }] } }] }],
+    })
+
+    await processMetaWhatsAppWebhook(body, sign(body))
+
+    expect(appendLeadEvent).not.toHaveBeenCalled()
   })
 })

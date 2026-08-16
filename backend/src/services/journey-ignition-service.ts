@@ -3,6 +3,7 @@ import {
   getJourneyTriggerClaim,
   triggerClaimKey,
 } from '../repositories/journey-trigger-claim-repository.js'
+import { appendLeadEvent } from '../repositories/lead-event-repository.js'
 import { executionNameFor, startExecution } from '../lib/step-functions.js'
 import { resolveLeadAgentContext } from './lead-resolution-service.js'
 import type {
@@ -111,6 +112,15 @@ async function ignite(input: IgniteJourneyInput): Promise<IgnitionOutcome> {
   if (!result.started) {
     return { status: 'already_started', bundleId: bundle.bundleId }
   }
+
+  await appendLeadEvent({
+    leadId: context.leadId,
+    clientId: context.clientId,
+    botId: context.botId,
+    type: 'journey_started',
+    bundleId: bundle.bundleId,
+    body: bundle.name,
+  })
 
   return {
     status: 'started',
