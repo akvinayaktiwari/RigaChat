@@ -35,3 +35,7 @@ e2e/playwright-report/
 .test-journey-state.json
 
 test-results/
+
+# Lambda env backups from scripts/consolidate-table-env.sh — full production
+# credentials. The script writes to ~/.rigachat/ now; this covers older runs.
+.table-env-backup/

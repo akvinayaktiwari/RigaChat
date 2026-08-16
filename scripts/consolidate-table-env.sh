@@ -27,7 +27,13 @@ set -euo pipefail
 
 REGION="${AWS_REGION:-ap-south-1}"
 FUNCTIONS=(rigachat-api rigachat-api-streaming rigachat-crawler)
-BACKUP_DIR="${BACKUP_DIR:-./.table-env-backup}"
+# OUTSIDE THE REPO, deliberately. These backups are a full dump of each Lambda's
+# environment, which includes OPENAI_API_KEY, PINECONE_API_KEY, META_APP_SECRET,
+# RAZORPAY_KEY_SECRET and every other production credential. Writing them under
+# the working tree means one `git add -A` away from committing the lot -- which
+# is exactly what happened on 2026-08-16, caught by the pre-push secret scanner
+# rather than by anyone noticing.
+BACKUP_DIR="${BACKUP_DIR:-$HOME/.rigachat/table-env-backup}"
 
 MODE="dryrun"
 case "${1:-}" in
@@ -81,6 +87,7 @@ fi
 # Dry run and delete both start by reading the current state.
 # ---------------------------------------------------------------------------
 mkdir -p "$BACKUP_DIR"
+chmod 700 "$BACKUP_DIR"
 TOTAL_FREED=0
 
 for FN in "${FUNCTIONS[@]}"; do

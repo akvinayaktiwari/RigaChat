@@ -194,7 +194,7 @@ integration since:
 ```
 CLIENTS   BOTS   LEADS   CONVERSATIONS   KB                    <- in CLAUDE.md
 SUBSCRIPTIONS   VOICE_AGENTS   VOICE_CALL_LOGS   VOICE_KB      <- added since, undocumented in CLAUDE.md
-META_LEADS   META_PAGE_LOOKUP                                  <- added by Meta Lead Ads integration (partition keys: clientId+leadId / pageId, see backend/src/lib/dynamo-schema.ts)
+META_LEADS   META_PAGE_LOOKUP                                  <- added by Meta Lead Ads integration (partition keys: clientId+leadId / pageId; table names live in backend/src/lib/table-names.ts, key schemas in the scripts/provision-*.sh that create each table)
 ```
 
 (`backend/src/repositories/dynamo-client.ts`'s `tableEnvVarNames` map lists
