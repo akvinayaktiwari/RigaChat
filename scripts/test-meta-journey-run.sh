@@ -518,10 +518,26 @@ teardown() {
       || fail "delete failed: $(echo "$res" | jq -c '.error // .')"
   fi
 
+  # StopExecution does NOT call back, so an execution parked on await_reply
+  # leaves its journey_pending_replies row behind. The TTL clears it within 24h,
+  # but until then claimPendingReply's `attribute_not_exists(leadId)` guard
+  # rejects any new journey that parks on the same lead --
+  # PendingReplyConflictError, from a bundle that no longer exists. Observed on
+  # the 2026-08-16 run: teardown reported clean while the token stayed parked.
+  local lead_id; lead_id="$(state_get '.leadId')"
+  if [ -n "$lead_id" ]; then
+    phase "TEARDOWN — release the parked callback token"
+    if aws dynamodb delete-item --region "$REGION" --table-name journey_pending_replies \
+        --key "{\"leadId\":{\"S\":\"$lead_id\"}}" >/dev/null 2>&1; then
+      pass "pending reply cleared for lead $lead_id"
+    else
+      warn "could not clear the pending reply row — it will TTL out within 24h"
+    fi
+  fi
+
   # The test lead itself CANNOT be removed — there is no delete path for a lead
   # anywhere in the codebase (see TODOS.md). It stays in the client's CRM
   # forever. Worth knowing before running this against a real account.
-  local lead_id; lead_id="$(state_get '.leadId')"
   [ -n "$lead_id" ] && warn "lead $lead_id is PERMANENT — no delete path exists (TODOS.md)"
 
   rm -f "$STATE_FILE"
