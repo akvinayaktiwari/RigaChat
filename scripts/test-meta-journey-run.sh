@@ -50,14 +50,28 @@ fi
 REGION="${AWS_REGION:-ap-south-1}"
 LEAD_NAME="${LEAD_NAME:-Journey Seam Test}"
 
-# Validated lazily so `--help` and a bare invocation still print usage.
+# Per-phase, not global. preflight is pure AWS reads and needs no dashboard
+# credential at all -- demanding an ID_TOKEN to run a read-only check would push
+# someone into minting an hour-lived token before they have learned whether the
+# run is even worth doing. Validated lazily so a bare invocation prints usage.
+requirements_for() {
+  case "$1" in
+    preflight) echo "CLIENT_ID BOT_ID" ;;
+    arm)       echo "API_BASE ID_TOKEN CLIENT_ID BOT_ID" ;;
+    ignite)    echo "API_BASE ID_TOKEN CLIENT_ID BOT_ID LEAD_PHONE" ;;
+    watch)     echo "" ;;
+    optout)    echo "LEAD_PHONE" ;;
+    teardown)  echo "API_BASE ID_TOKEN BOT_ID" ;;
+  esac
+}
+
 require_config() {
-  local missing=()
-  for v in API_BASE ID_TOKEN CLIENT_ID BOT_ID LEAD_PHONE; do
+  local missing=() v
+  for v in $(requirements_for "$1"); do
     [ -n "${!v:-}" ] || missing+=("$v")
   done
   if [ ${#missing[@]} -gt 0 ]; then
-    printf 'missing config: %s\n' "${missing[*]}" >&2
+    printf 'missing config for %s: %s\n' "$1" "${missing[*]}" >&2
     printf 'cp scripts/test-meta-journey-run.env.example %s and fill it in\n' "$ENV_FILE" >&2
     exit 1
   fi
@@ -85,6 +99,7 @@ gate() {
 }
 
 FAILED=0
+AGENT_ID=""
 
 api() {
   local method="$1" path="$2" body="${3:-}"
@@ -196,37 +211,40 @@ preflight() {
   fi
 
   phase "PREFLIGHT 5/6 — ignition will resolve to exactly one Agent"
-  # resolveLeadAgentContext returns ambiguous_agent when a client has >1 Agent
-  # and the lead cannot be pinned to one. The 2026-08-06 notes flag this for the
-  # main account specifically: it relies on the "client's only Agent" fallback,
-  # so adding a second Agent silently stops ignition.
-  local agents count
+  # This script ignites via a CHAT lead, and the chat branch of findAgentForLead
+  # (lead-resolution-service.ts:239) has NO "client's only Agent" fallback -- it
+  # requires a binding row on this exact botId and returns no_agent without one.
+  # The single-Agent fallback exists only for form and Meta leads, which have no
+  # bot to look up. So Agent COUNT is not the check here; the binding is, and a
+  # client with 23 bots and 1 Agent can start a journey from exactly one of them.
+  local agents count binding bound_agent
   agents="$(aws dynamodb query --region "$REGION" --table-name agents \
     --key-condition-expression 'clientId = :c' \
     --expression-attribute-values "{\":c\":{\"S\":\"$CLIENT_ID\"}}" \
     --output json 2>/dev/null || echo '{"Count":0}')"
   count="$(echo "$agents" | jq -r '.Count')"
   info "agents for this client: $count"
-  if [ "$count" = "1" ]; then
-    pass "exactly one Agent — the fallback resolves cleanly"
-  elif [ "$count" = "0" ]; then
-    fail "no Agent — ignition returns no_agent and nothing starts"
+
+  binding="$(ddb_get agent_binding_lookup "{\"resourceId\":{\"S\":\"$BOT_ID\"}}")"
+  bound_agent="$(echo "$binding" | jq -r '.Item.agentId.S // ""')"
+  if [ -z "$bound_agent" ]; then
+    fail "bot $BOT_ID has NO Agent binding — a chat lead on it resolves no_agent and nothing ignites"
+    info "pick a bot that appears as a resourceId in agent_binding_lookup for this client"
+  elif [ "$(echo "$binding" | jq -r '.Item.clientId.S // ""')" != "$CLIENT_ID" ]; then
+    # A binding pointing at another tenant's Agent is refused rather than
+    # followed across the boundary -- it reports as no_agent too.
+    fail "bot $BOT_ID is bound to an Agent owned by a different client"
   else
-    warn "$count Agents — resolution must pin the lead to one or you get ambiguous_agent"
-    info "verify agent_binding_lookup has a row for botId=$BOT_ID"
-    local binding
-    binding="$(ddb_get agent_binding_lookup "{\"resourceId\":{\"S\":\"$BOT_ID\"}}")"
-    if echo "$binding" | jq -e '.Item' >/dev/null 2>&1; then
-      pass "binding exists: bot $BOT_ID -> agent $(echo "$binding" | jq -r '.Item.agentId.S')"
-    else
-      fail "no binding for bot $BOT_ID — with $count Agents this lead resolves ambiguous"
-    fi
+    pass "bot $BOT_ID -> agent $bound_agent"
+    AGENT_ID="$bound_agent"
   fi
 
   phase "PREFLIGHT 6/6 — no stale trigger claim on lead_captured"
   # Exactly one published bundle may own a trigger. A claim left over from an
   # earlier run points ignition at a bundle you are about to replace.
-  for key in "agent:$(echo "$agents" | jq -r '.Items[0].agentId.S // "none"')#lead_captured" "bot:${BOT_ID}#lead_captured"; do
+  # Both shapes checked: triggerClaimKey prefers agent:<id> and only falls back
+  # to bot:<id> for an unbound bot, so a stale claim can exist under either.
+  for key in "agent:${AGENT_ID:-none}#lead_captured" "bot:${BOT_ID}#lead_captured"; do
     local claim
     claim="$(ddb_get journey_trigger_claims "{\"claimKey\":{\"S\":\"$key\"}}")"
     if echo "$claim" | jq -e '.Item' >/dev/null 2>&1; then
@@ -511,6 +529,6 @@ summary() {
 }
 
 case "${1:-}" in
-  preflight|arm|ignite|watch|optout|teardown) require_config; "$1" ;;
+  preflight|arm|ignite|watch|optout|teardown) require_config "$1"; "$1" ;;
   *) sed -n '3,34p' "$0" | sed 's/^#\{1,\} \{0,1\}//'; exit 1 ;;
 esac
