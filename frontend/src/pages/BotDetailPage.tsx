@@ -1,9 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AlertTriangle, BookOpen, Check, ChevronLeft, Code, Copy, Loader2, RefreshCw, Trash2 } from 'lucide-react'
-import { confirmBotIndexing, deleteBot, getBotById, getBotIndexingStatus, startBotIndexing, updateBot } from '../services/api'
+import { AlertTriangle, BookOpen, Check, ChevronLeft, Code, Copy, Loader2, MessageCircle, RefreshCw, Trash2 } from 'lucide-react'
+import {
+  confirmBotIndexing,
+  deleteBot,
+  disableBotWhatsApp,
+  enableBotWhatsApp,
+  getBotById,
+  getBotIndexingStatus,
+  getBotWhatsAppStatus,
+  startBotIndexing,
+  updateBot,
+} from '../services/api'
+import { toWhatsAppNumber } from '../lib/phone'
 import IndexingProgressCard from '../components/IndexingProgressCard'
-import type { BotConfig, BotStatus, IndexingJob } from '../types/index'
+import type { BotConfig, BotStatus, BotWhatsAppStatus, IndexingJob } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -82,6 +93,11 @@ function LoadingSkeleton() {
 }
 
 export default function BotDetailPage() {
+  const [whatsapp, setWhatsapp] = useState<BotWhatsAppStatus | null>(null)
+  const [whatsappBusy, setWhatsappBusy] = useState(false)
+  const [whatsappError, setWhatsappError] = useState<string | null>(null)
+  const [waCopied, setWaCopied] = useState(false)
+
   const { botId } = useParams<{ botId: string }>()
   const navigate = useNavigate()
 
@@ -234,6 +250,60 @@ export default function BotDetailPage() {
       setDeleting(false)
       setShowDeleteModal(false)
     }
+  }
+
+
+  // Loaded separately from the bot so a WhatsApp failure never blanks the page.
+  // Distinguishes a failed load from "not connected": the first shows an error,
+  // the second hides the card, and conflating them is the app-wide data-load bug
+  // in TODOS.md.
+  useEffect(() => {
+    if (!botId) return
+    let cancelled = false
+
+    getBotWhatsAppStatus(botId)
+      .then((res) => {
+        if (cancelled) return
+        if (res.success && res.data) setWhatsapp(res.data)
+        else setWhatsappError(res.error ?? 'Could not load the WhatsApp channel.')
+      })
+      .catch(() => {
+        if (!cancelled) setWhatsappError('Could not load the WhatsApp channel.')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [botId])
+
+  async function handleToggleWhatsApp() {
+    if (!botId || !whatsapp) return
+    setWhatsappBusy(true)
+    setWhatsappError(null)
+    try {
+      const res = whatsapp.enabled ? await disableBotWhatsApp(botId) : await enableBotWhatsApp(botId)
+      if (res.success && res.data) setWhatsapp(res.data)
+      // The backend returns 409 with a reason a client can act on (no Agent,
+      // number already claimed, WhatsApp not connected). Show it rather than a
+      // generic failure.
+      else setWhatsappError(res.error ?? 'Could not change the WhatsApp channel.')
+    } catch {
+      setWhatsappError('Could not change the WhatsApp channel.')
+    } finally {
+      setWhatsappBusy(false)
+    }
+  }
+
+  // Built from the DISPLAY number. phoneNumberId is Meta's internal resource id
+  // and produces a dead link, which is why the backend never sends it here.
+  const waNumber = toWhatsAppNumber(whatsapp?.displayPhoneNumber)
+  const waLink = waNumber ? `https://wa.me/${waNumber}` : null
+
+  async function handleCopyWaLink() {
+    if (!waLink) return
+    await navigator.clipboard.writeText(waLink)
+    setWaCopied(true)
+    setTimeout(() => setWaCopied(false), 2000)
   }
 
   async function handleCopyEmbed() {
@@ -492,6 +562,104 @@ export default function BotDetailPage() {
               {saving ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
+
+          {/* Sits beside Embed Code because both answer "how do people reach this
+              bot". Hidden entirely when the client has not connected WhatsApp:
+              a toggle that cannot work is worse than no toggle. */}
+          {whatsapp?.connectionAvailable && (
+            <div className="bg-white rounded-2xl p-6 border border-black/5 shadow-sm mt-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <MessageCircle size={18} className="text-emerald-600" />
+                    <h2 className="font-bold text-lg text-gray-900" style={JAKARTA_FONT}>
+                      Also available on WhatsApp
+                    </h2>
+                  </div>
+                  <p className="text-gray-500 text-sm">
+                    Visitors message{' '}
+                    <span className="font-medium text-gray-700">{whatsapp.displayPhoneNumber}</span> and this
+                    chatbot answers, using the same knowledge base.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleToggleWhatsApp}
+                  disabled={whatsappBusy || Boolean(whatsapp.blockedReason)}
+                  aria-pressed={whatsapp.enabled}
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-40 ${
+                    whatsapp.enabled ? 'bg-emerald-500' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      whatsapp.enabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {whatsapp.blockedReason && (
+                <p className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                  {whatsapp.blockedReason}
+                </p>
+              )}
+
+              {whatsappError && (
+                <p className="mt-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                  {whatsappError}
+                </p>
+              )}
+
+              {/* The link only appears once the channel is on, so a client cannot
+                  publish a button that reaches a number nothing is answering. */}
+              {whatsapp.enabled && waLink && (
+                <div className="mt-5">
+                  <p className="text-gray-500 text-sm mb-2">
+                    Put this link behind a WhatsApp button on your site
+                  </p>
+                  <pre className="bg-gray-900 text-green-400 rounded-xl p-4 font-mono text-xs overflow-x-auto">
+                    {waLink}
+                  </pre>
+                  <div className="flex items-center gap-3 mt-3">
+                    <button
+                      type="button"
+                      onClick={handleCopyWaLink}
+                      className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm ${primaryButtonClasses}`}
+                    >
+                      {waCopied ? (
+                        <>
+                          <Check size={16} />
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={16} />
+                          Copy Link
+                        </>
+                      )}
+                    </button>
+                    <a
+                      href={waLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm text-gray-600 hover:text-gray-900 underline"
+                    >
+                      Test it
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {whatsapp.enabled && !waLink && (
+                <p className="mt-3 text-sm text-amber-700">
+                  The connected number ({whatsapp.displayPhoneNumber}) could not be turned into a valid
+                  wa.me link. Check the number on the WhatsApp settings page.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="bg-white rounded-2xl p-6 border border-black/5 shadow-sm">
             <div className="flex items-center gap-2 mb-1">

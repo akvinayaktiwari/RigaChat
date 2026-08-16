@@ -747,3 +747,13 @@ export interface MetaDeletionRequestStatus {
   status: 'received' | 'completed'
   requestedAt: string
 }
+
+// Mirrors backend BotWhatsAppStatus. `displayPhoneNumber` is the human-dialable
+// number; the backend never sends phoneNumberId here because Meta's internal
+// resource id cannot form a wa.me link.
+export interface BotWhatsAppStatus {
+  connectionAvailable: boolean
+  enabled: boolean
+  displayPhoneNumber?: string
+  blockedReason?: string
+}
