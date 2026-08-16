@@ -24,6 +24,9 @@ frontend/*.zip
 
 e2e/test-results/
 e2e/playwright-report/
+# Generated per run. They are the deliverable of the full-loop spec, but they
+# are artifacts to collect from disk, not files to version.
+e2e/screenshots/
 
 .DS_Store
 
