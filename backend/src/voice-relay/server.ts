@@ -4,24 +4,24 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { WebSocketServer, type WebSocket } from 'ws'
 import type { VoiceAgentVoice } from '../types/index.js'
+import { getTableName } from '../lib/table-names.js'
 import { validateToken } from './auth.js'
 import { VoiceSession } from './session.js'
 
 const PORT = 3100
 
 const region = process.env.AWS_REGION
-const tableName = process.env.DYNAMODB_TABLE_VOICE_AGENTS
+// Shared with the Lambda via lib/table-names.ts rather than read from this
+// process's own environment. This relay is deployed separately (npm run
+// build:relay, port 3100, its own env), so a private copy of the name is exactly
+// how the two drift apart. It still needs AWS_REGION and VOICE_AUTH_SECRET from
+// its environment; only the table NAME moved.
+const tableName = getTableName('voice_agents')
 const authSecret = process.env.VOICE_AUTH_SECRET
 
 if (!region) {
   throw new Error(
     'Missing required environment variable AWS_REGION. Set it in your .env file before starting the server.'
-  )
-}
-
-if (!tableName) {
-  throw new Error(
-    'Missing required environment variable DYNAMODB_TABLE_VOICE_AGENTS. Set it in your .env file before starting the server.'
   )
 }
 
