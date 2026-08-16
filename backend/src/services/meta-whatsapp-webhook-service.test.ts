@@ -14,6 +14,9 @@ const getEventByWamid = vi.fn()
 const countInboundLeadsSince = vi.fn()
 const createLead = vi.fn()
 const resolveAgentForInboundMessage = vi.fn()
+const runAgentTurn = vi.fn()
+const claimWebhookEvent = vi.fn()
+const releaseWebhookEventClaim = vi.fn()
 
 vi.mock('../repositories/client-repository.js', () => ({ getConnectedWhatsAppClients }))
 vi.mock('../repositories/whatsapp-inbound-activity-repository.js', () => ({ recordInboundMessage }))
@@ -29,6 +32,11 @@ vi.mock('../repositories/lead-event-repository.js', () => ({
 }))
 vi.mock('../repositories/lead-repository.js', () => ({ createLead }))
 vi.mock('./inbound-agent-resolution-service.js', () => ({ resolveAgentForInboundMessage }))
+vi.mock('./agent-turn-service.js', () => ({ runAgentTurn }))
+vi.mock('../repositories/webhook-event-repository.js', () => ({
+  claimWebhookEvent,
+  releaseWebhookEventClaim,
+}))
 
 const APP_SECRET = 'test-app-secret'
 
@@ -47,7 +55,7 @@ const INBOUND_BODY = JSON.stringify({
           field: 'messages',
           value: {
             metadata: { phone_number_id: 'phone-1' },
-            messages: [{ from: '919000000001', type: 'text', text: { body: 'hello' } }],
+            messages: [{ id: 'wamid-inbound-1', from: '919000000001', type: 'text', text: { body: 'hello' } }],
           },
         },
       ],
@@ -76,6 +84,9 @@ beforeEach(() => {
     botId: 'bot-1',
     strategy: 'number_binding',
   })
+  runAgentTurn.mockReset().mockResolvedValue({ status: 'sent', text: 'an answer' })
+  claimWebhookEvent.mockReset().mockResolvedValue(true)
+  releaseWebhookEventClaim.mockReset().mockResolvedValue(undefined)
 })
 
 describe('processMetaWhatsAppWebhook signature verification', () => {
@@ -124,7 +135,9 @@ describe('processMetaWhatsAppWebhook signature verification', () => {
     expect(result.status).toBe(200)
     expect(matchLeadForInboundMessage).toHaveBeenCalledWith('client-1', '919000000001')
     expect(recordInboundMessage).toHaveBeenCalledWith('lead-1')
-    expect(handleInboundLeadMessage).toHaveBeenCalledWith('lead-1', 'hello')
+    // Third arg is the agent's composed reply, undefined here because the turn
+    // already sent it (no journey was parked).
+    expect(handleInboundLeadMessage).toHaveBeenCalledWith('lead-1', 'hello', undefined)
   })
 
   // A misconfigured secret would reject GENUINE Meta traffic. That must read as
@@ -322,5 +335,113 @@ describe('inbound lead creation (click-to-WhatsApp)', () => {
     await processMetaWhatsAppWebhook(INBOUND_BODY, sign(INBOUND_BODY))
 
     expect(createLead).not.toHaveBeenCalled()
+  })
+})
+
+describe('agent turn ordering (D12: exactly one message per inbound message)', () => {
+  // The whole point. When a journey is parked the turn composes but does NOT
+  // send; the text rides into the resume payload so the journey's next
+  // send_message step sends it. Both sending is the double-send this prevents.
+  it('hands the composed reply to the journey instead of sending it', async () => {
+    runAgentTurn.mockResolvedValue({ status: 'composed_for_journey', text: 'A 3 BHK starts at 90L.' })
+
+    await processMetaWhatsAppWebhook(INBOUND_BODY, sign(INBOUND_BODY))
+
+    expect(handleInboundLeadMessage).toHaveBeenCalledWith('lead-1', 'hello', 'A 3 BHK starts at 90L.')
+  })
+
+  it('passes no composed reply when the turn already sent one', async () => {
+    runAgentTurn.mockResolvedValue({ status: 'sent', text: 'sent directly' })
+
+    await processMetaWhatsAppWebhook(INBOUND_BODY, sign(INBOUND_BODY))
+
+    expect(handleInboundLeadMessage).toHaveBeenCalledWith('lead-1', 'hello', undefined)
+  })
+
+  it('passes no composed reply when the turn was skipped', async () => {
+    runAgentTurn.mockResolvedValue({ status: 'skipped', reason: 'opted_out' })
+
+    await processMetaWhatsAppWebhook(INBOUND_BODY, sign(INBOUND_BODY))
+
+    expect(handleInboundLeadMessage).toHaveBeenCalledWith('lead-1', 'hello', undefined)
+  })
+
+  // The turn runs first so its answer can ride into the resume. Reversing the
+  // order means the state machine wakes and sends before the agent has composed.
+  it('runs the turn before resuming the journey', async () => {
+    const order: string[] = []
+    runAgentTurn.mockImplementation(async () => {
+      order.push('turn')
+      return { status: 'composed_for_journey', text: 'x' }
+    })
+    handleInboundLeadMessage.mockImplementation(async () => {
+      order.push('resume')
+      return { handled: 'resumed' }
+    })
+
+    await processMetaWhatsAppWebhook(INBOUND_BODY, sign(INBOUND_BODY))
+
+    expect(order).toEqual(['turn', 'resume'])
+  })
+
+  it('still resumes the journey when no Agent resolves', async () => {
+    resolveAgentForInboundMessage.mockResolvedValue(null)
+
+    await processMetaWhatsAppWebhook(INBOUND_BODY, sign(INBOUND_BODY))
+
+    expect(runAgentTurn).not.toHaveBeenCalled()
+    expect(handleInboundLeadMessage).toHaveBeenCalledWith('lead-1', 'hello', undefined)
+  })
+})
+
+describe('retry safety (D6)', () => {
+  // Processing now costs an OpenAI completion and a WhatsApp send, so a Meta
+  // retry must not redo it. The claim is atomic because hasProcessed +
+  // markProcessed is a read then an unconditional write, which two concurrent
+  // retries both pass.
+  it('claims the message id before doing any work', async () => {
+    await processMetaWhatsAppWebhook(INBOUND_BODY, sign(INBOUND_BODY))
+
+    expect(claimWebhookEvent).toHaveBeenCalledWith('wamid-inbound-1', 'meta_whatsapp', 'inbound_message')
+  })
+
+  it('does nothing when the claim is already held', async () => {
+    claimWebhookEvent.mockResolvedValue(false)
+
+    await processMetaWhatsAppWebhook(INBOUND_BODY, sign(INBOUND_BODY))
+
+    expect(runAgentTurn).not.toHaveBeenCalled()
+    expect(handleInboundLeadMessage).not.toHaveBeenCalled()
+    expect(appendLeadEvent).not.toHaveBeenCalled()
+  })
+
+  // Claim-then-crash would swallow a real customer message forever, which is
+  // worse than the duplicate the claim prevents.
+  it('hands the claim back when processing fails', async () => {
+    runAgentTurn.mockRejectedValue(new Error('openai exploded'))
+
+    await processMetaWhatsAppWebhook(INBOUND_BODY, sign(INBOUND_BODY))
+
+    expect(releaseWebhookEventClaim).toHaveBeenCalledWith('wamid-inbound-1')
+  })
+
+  it('keeps the claim when processing succeeds', async () => {
+    await processMetaWhatsAppWebhook(INBOUND_BODY, sign(INBOUND_BODY))
+
+    expect(releaseWebhookEventClaim).not.toHaveBeenCalled()
+  })
+
+  // Older payload shapes carry no id. Dropping a real message because we cannot
+  // deduplicate it would be the wrong trade.
+  it('still processes a message that carries no id', async () => {
+    const noId = JSON.stringify({
+      object: 'whatsapp_business_account',
+      entry: [{ changes: [{ value: { metadata: { phone_number_id: 'phone-1' }, messages: [{ from: '919000000001', type: 'text', text: { body: 'hi' } }] } }] }],
+    })
+
+    await processMetaWhatsAppWebhook(noId, sign(noId))
+
+    expect(claimWebhookEvent).not.toHaveBeenCalled()
+    expect(handleInboundLeadMessage).toHaveBeenCalled()
   })
 })

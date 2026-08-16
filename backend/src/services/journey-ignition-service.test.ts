@@ -79,6 +79,11 @@ describe('igniteJourneysForLead — the happy path that did not exist before', (
       leadSource: 'meta',
       leadParentId: 'page-9',
       journeyVersion: 2,
+      // Seeded empty so the compiled `'lastResult.$': '$.lastResult'`
+      // passthrough resolves on the FIRST state. Without it the first
+      // send_message dies with States.Runtime on a path nothing has written yet
+      // -- the same failure class as the missing ResultPath bug of 2026-08-06.
+      lastResult: {},
     })
   })
 

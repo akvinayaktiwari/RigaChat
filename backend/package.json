@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && esbuild index.ts --bundle --platform=node --target=node20 --outfile=dist/index.js && echo '{\"type\":\"commonjs\"}' > dist/package.json",
     "build:relay": "npx esbuild src/voice-relay/server.ts --bundle --platform=node --format=cjs --outfile=dist/voice-relay.js --external:@aws-sdk/*",
     "deploy": "npm run build && node scripts/deploy.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "eval": "TS_NODE_TRANSPILE_ONLY=true node --env-file=.env --loader ts-node/esm evals/agent-grounding.eval.ts"
   },
   "dependencies": {
     "@aws-sdk/client-apigatewaymanagementapi": "^3.1087.0",

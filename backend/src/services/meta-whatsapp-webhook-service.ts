@@ -6,7 +6,13 @@ import {
   getEventByWamid,
 } from '../repositories/lead-event-repository.js'
 import { createLead } from '../repositories/lead-repository.js'
+import {
+  claimWebhookEvent,
+  releaseWebhookEventClaim,
+} from '../repositories/webhook-event-repository.js'
 import { resolveAgentForInboundMessage } from './inbound-agent-resolution-service.js'
+import { runAgentTurn } from './agent-turn-service.js'
+import { normalizeChatLead } from './lead-resolution-service.js'
 import { recordInboundMessage } from '../repositories/whatsapp-inbound-activity-repository.js'
 import { logInboundMatch, matchLeadForInboundMessage } from './inbound-lead-match-service.js'
 import { handleInboundLeadMessage } from './journey-reply-service.js'
@@ -29,6 +35,8 @@ interface MetaStatus {
 }
 
 interface MetaInboundMessage {
+  // Meta's message id (a wamid). The idempotency key for retries.
+  id?: string
   from?: string
   type?: string
   text?: { body?: string }
@@ -185,8 +193,24 @@ async function createInboundLead(
 }
 
 async function recordInbound(phoneNumberId: string | undefined, message: MetaInboundMessage): Promise<void> {
+  if (!phoneNumberId || !message.from) return
+
+  // Idempotency on the message id, BEFORE any work. Meta retries a webhook it
+  // considers slow or failed, and processing now means an OpenAI completion and
+  // a WhatsApp send: a duplicate is a second bill and a second message to a real
+  // person. An atomic claim rather than hasProcessed()+markProcessed(), because
+  // that pair is a read then an unconditional write and two concurrent retries
+  // both pass the read.
+  //
+  // No id (older payload shapes) means no claim is possible; proceed rather than
+  // drop a real message.
+  const eventId = message.id
+  if (eventId && !(await claimWebhookEvent(eventId, 'meta_whatsapp', 'inbound_message'))) {
+    console.log(`[wa-inbound] ${eventId} already processed, ignoring retry`)
+    return
+  }
+
   try {
-    if (!phoneNumberId || !message.from) return
 
     const clients = await getConnectedWhatsAppClients()
     const owner = clients.find((client) => client.metaDirectWhatsAppConnection?.phoneNumberId === phoneNumberId)
@@ -217,7 +241,34 @@ async function recordInbound(phoneNumberId: string | undefined, message: MetaInb
       body: message.text?.body ?? '',
     })
 
-    const outcome = await handleInboundLeadMessage(lead.leadId, message.text?.body ?? '')
+    // The agent turn runs BEFORE the journey is resumed, and deliberately does
+    // not send when a journey is parked. It returns the grounded answer, which
+    // rides into the resume payload so the journey's next send_message step
+    // sends the agent's words. That ordering is what guarantees exactly one
+    // message per inbound message (D12): letting both the handler and the woken
+    // state machine send is the double-send this design exists to prevent.
+    const body = message.text?.body ?? ''
+    let composedReply: string | undefined
+
+    const resolution = await resolveAgentForInboundMessage(phoneNumberId, owner.clientId, body)
+    if (resolution) {
+      const turn = await runAgentTurn({
+        agent: resolution.agent,
+        botId: resolution.botId,
+        clientId: owner.clientId,
+        lead: normalizeChatLead(lead),
+        message: body,
+      })
+      if (turn.status === 'composed_for_journey') {
+        composedReply = turn.text
+      }
+    } else {
+      console.error(
+        `[wa-inbound] no Agent resolves for phone_number_id ${phoneNumberId}; lead ${lead.leadId} gets no answer`
+      )
+    }
+
+    const outcome = await handleInboundLeadMessage(lead.leadId, body, composedReply)
     if (outcome.handled !== 'no_pending_journey') {
       console.log(`[journey-reply] lead ${lead.leadId}: ${JSON.stringify(outcome)}`)
     } else if (match && match.candidateCount > 1) {
@@ -234,6 +285,10 @@ async function recordInbound(phoneNumberId: string | undefined, message: MetaInb
     }
   } catch (error) {
     console.error('[wa-inbound] failed to record inbound message:', error)
+    // Hand the claim back so Meta's retry can genuinely redo the work. Claiming
+    // and then failing would otherwise swallow a real customer message
+    // permanently, which is worse than the duplicate the claim prevents.
+    if (eventId) await releaseWebhookEventClaim(eventId)
   }
 }
 

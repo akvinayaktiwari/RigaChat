@@ -106,6 +106,11 @@ async function ignite(input: IgniteJourneyInput): Promise<IgnitionOutcome> {
       leadSource: input.leadRef.source,
       leadParentId: leadParentIdOf(input.leadRef),
       journeyVersion,
+      // Seeded empty so the compiled 'lastResult.$' passthrough resolves on the
+      // FIRST state, before any Task has produced a result. Without it the very
+      // first send_message dies with States.Runtime on a path that does not
+      // exist yet.
+      lastResult: {},
     }
   )
 

@@ -263,6 +263,16 @@ export function compileJourneyToAsl(journey: JourneyDefinition): AslStateMachine
             messageHint: step.messageHint,
             whatsappTemplateName: step.whatsappTemplateName,
             whatsappTemplateParams: step.whatsappTemplateParams,
+            // The WHOLE previous result, never 'composedReply.$':
+            // '$.lastResult.composedReply'. A JSONPath into a missing key throws
+            // States.Runtime, and lastResult has no composedReply unless the
+            // previous state was an await_reply that a human actually answered.
+            // Pointing at a field would therefore kill every journey whose step
+            // before a send was anything else -- the same failure class as the
+            // missing ResultPath documented above. journey-ignition seeds
+            // lastResult: {} into the execution input so this path always
+            // resolves, including on the very first state.
+            'lastResult.$': '$.lastResult',
             ...CONTEXT_PASSTHROUGH_PARAMETERS,
           },
           ResultPath: TASK_RESULT_PATH,

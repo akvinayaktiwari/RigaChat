@@ -52,7 +52,16 @@ export function isOptOutMessage(text: string): boolean {
 // Never throws. It is called from the Gupshup webhook handler, where a failure
 // would turn a successfully-received message into a 500 and make Gupshup redeliver
 // something we already have. Callers get a structured outcome instead.
-export async function handleInboundLeadMessage(leadId: string, text: string): Promise<InboundReplyOutcome> {
+// `composedReply` is the agent's grounded answer to this message, when the
+// turn handler produced one. It rides along in the resume payload so the
+// journey's next send_message step can send THAT rather than composing again or
+// falling back to a scripted line. Optional, so the Gupshup path and any caller
+// without an agent turn keeps working unchanged.
+export async function handleInboundLeadMessage(
+  leadId: string,
+  text: string,
+  composedReply?: string
+): Promise<InboundReplyOutcome> {
   // Opt-out is checked BEFORE the pending-reply lookup, and short-circuits it.
   // Treating "STOP" as a conversational reply would advance the journey and send
   // the next message -- responding to a request to stop by messaging them again.
@@ -84,6 +93,7 @@ export async function handleInboundLeadMessage(leadId: string, text: string): Pr
     replied: true,
     message: text,
     repliedAt: new Date().toISOString(),
+    ...(composedReply ? { composedReply } : {}),
   })
 
   // Clear regardless of outcome: the token is single-use, and a stale one is
