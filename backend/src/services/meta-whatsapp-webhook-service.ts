@@ -1,8 +1,10 @@
 import { metaProvider } from '../providers/meta-provider.js'
 import { getConnectedWhatsAppClients } from '../repositories/client-repository.js'
+import { appendLeadEvent, getEventByWamid } from '../repositories/lead-event-repository.js'
 import { recordInboundMessage } from '../repositories/whatsapp-inbound-activity-repository.js'
 import { logInboundMatch, matchLeadForInboundMessage } from './inbound-lead-match-service.js'
 import { handleInboundLeadMessage } from './journey-reply-service.js'
+import type { MessageDeliveryStatus } from '../types/index.js'
 
 // Meta Cloud API webhook payloads. Only the parts we act on are typed; the
 // envelope carries a lot more that we deliberately ignore.
@@ -42,19 +44,52 @@ interface MetaWhatsAppWebhookBody {
 // id even for messages that never arrive, so without this every failure looks
 // exactly like a success. Failures are logged with Meta's full error detail
 // (code + title + details) because that detail is the whole diagnostic value.
-function logStatuses(statuses: MetaStatus[]): void {
+const DELIVERY_STATUSES: MessageDeliveryStatus[] = ['sent', 'delivered', 'read', 'failed']
+
+function toDeliveryStatus(value: string | undefined): MessageDeliveryStatus | undefined {
+  return DELIVERY_STATUSES.find((candidate) => candidate === value)
+}
+
+async function logStatuses(statuses: MetaStatus[]): Promise<void> {
   for (const status of statuses) {
+    const reasons = (status.errors ?? [])
+      .map((e) => `code=${e.code} ${e.title ?? ''} ${e.error_data?.details ?? e.message ?? ''}`.trim())
+      .join(' | ')
+
     if (status.status === 'failed') {
-      const reasons = (status.errors ?? [])
-        .map((e) => `code=${e.code} ${e.title ?? ''} ${e.error_data?.details ?? e.message ?? ''}`.trim())
-        .join(' | ')
       console.error(
         `[wa-status] FAILED to ${status.recipient_id} (${status.id}): ${reasons || 'no error detail supplied'}`
       )
-      continue
+    } else {
+      console.log(`[wa-status] ${status.status} to ${status.recipient_id} (${status.id})`)
     }
 
-    console.log(`[wa-status] ${status.status} to ${status.recipient_id} (${status.id})`)
+    // A status payload carries a wamid and a recipient and NO leadId, so the
+    // only way to attach it to a conversation is to look the wamid back up to
+    // the message_out row that produced it. A miss is normal, not an error:
+    // statuses also arrive for the client-notification template and for manual
+    // smoke tests, neither of which belongs to a lead.
+    if (!status.id || !status.status) continue
+
+    // Meta's status vocabulary is open-ended (it has added values over time),
+    // so anything outside the four we model is logged above and then dropped
+    // rather than written as a status we cannot render.
+    const delivery = toDeliveryStatus(status.status)
+    if (!delivery) continue
+
+    const origin = await getEventByWamid(status.id)
+    if (!origin) continue
+
+    await appendLeadEvent({
+      leadId: origin.leadId,
+      clientId: origin.clientId,
+      botId: origin.botId,
+      type: 'message_status',
+      channel: 'whatsapp',
+      wamid: status.id,
+      status: delivery,
+      ...(reasons ? { errorDetail: reasons } : {}),
+    })
   }
 }
 
@@ -83,6 +118,15 @@ async function recordInbound(phoneNumberId: string | undefined, message: MetaInb
 
     const lead = match.lead
     await recordInboundMessage(lead.leadId)
+
+    await appendLeadEvent({
+      leadId: lead.leadId,
+      clientId: owner.clientId,
+      botId: lead.botId,
+      type: 'message_in',
+      channel: 'whatsapp',
+      body: message.text?.body ?? '',
+    })
 
     const outcome = await handleInboundLeadMessage(lead.leadId, message.text?.body ?? '')
     if (outcome.handled !== 'no_pending_journey') {
@@ -166,7 +210,7 @@ export async function processMetaWhatsAppWebhook(
       const value = change.value
       if (!value) continue
 
-      if (value.statuses?.length) logStatuses(value.statuses)
+      if (value.statuses?.length) await logStatuses(value.statuses)
 
       for (const message of value.messages ?? []) {
         await recordInbound(value.metadata?.phone_number_id, message)

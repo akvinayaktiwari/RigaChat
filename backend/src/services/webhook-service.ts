@@ -11,6 +11,7 @@ import { getByAccountId, updatePartial } from '../repositories/subscription-repo
 import { hasProcessed, markProcessed } from '../repositories/webhook-event-repository.js'
 import { logPayment } from '../repositories/payment-history-repository.js'
 import { getClientIdForGupshupApp } from '../repositories/gupshup-app-lookup-repository.js'
+import { appendLeadEvent } from '../repositories/lead-event-repository.js'
 import { recordInboundMessage } from '../repositories/whatsapp-inbound-activity-repository.js'
 import { invalidateEntitlementsCache } from './entitlement-service.js'
 import { handleInboundLeadMessage } from './journey-reply-service.js'
@@ -80,6 +81,17 @@ async function resolveAndRecordInboundMessage(event: GupshupIncomingMessage): Pr
 
     const matchingLead = match.lead
     await recordInboundMessage(matchingLead.leadId)
+
+    // The agent turn deliberately does not run on this provider (see #11), but
+    // the timeline should not have a hole for the one client still on Gupshup.
+    await appendLeadEvent({
+      leadId: matchingLead.leadId,
+      clientId,
+      botId: matchingLead.botId,
+      type: 'message_in',
+      channel: 'whatsapp',
+      body: event.payload.payload.text ?? '',
+    })
 
     // The message is now more than a timestamp: if a journey is parked on this
     // lead's await_reply step, this is what advances it, and an opt-out is what

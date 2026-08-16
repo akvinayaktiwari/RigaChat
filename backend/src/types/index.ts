@@ -109,6 +109,83 @@ export interface Lead {
   createdAt: string
 }
 
+// -------------------------------------------------------------------------
+// Lead events: the append-only record of everything that happened to a lead.
+//
+// Before this existed, a WhatsApp conversation was stored nowhere. Inbound text
+// was passed to handleInboundLeadMessage as a Step Functions callback payload
+// and dropped; outbound wamids lived only in Step Functions execution history
+// (90 day retention, not queryable by lead); delivery statuses were a
+// console.log. On 2026-08-16 a journey ran end to end in production and the
+// dashboard could show none of it, because there was no data to show.
+//
+// An event log rather than a messages table, for two reasons. The client needs
+// to see what the AGENT did (journey steps, tool calls, handoffs) interleaved
+// with what was said, and a messages table cannot hold those. And a delivery
+// status is an update to an earlier message, which append-only handles by
+// adding a row rather than mutating one.
+//
+// No TTL. This is the audit record an enterprise buyer is actually buying.
+// -------------------------------------------------------------------------
+
+export type LeadEventType =
+  | 'lead_captured'
+  | 'journey_started'
+  | 'journey_step'
+  | 'message_out'
+  | 'message_status'
+  | 'message_in'
+  | 'tool_call'
+  | 'handoff'
+  | 'journey_ended'
+  | 'state_change'
+
+export type LeadEventChannel = 'whatsapp' | 'web_widget'
+
+export type MessageSendMode = 'template' | 'free_text'
+
+export type MessageDeliveryStatus = 'sent' | 'delivered' | 'read' | 'failed'
+
+export interface LeadEvent {
+  leadId: string
+  // Sort key, `${isoTimestamp}#${uuid}`. The ISO prefix makes a Query return
+  // rows in chronological order for free; the uuid suffix keeps two events in
+  // the same millisecond from colliding on the key.
+  ts: string
+  clientId: string
+  botId: string
+  type: LeadEventType
+  channel?: LeadEventChannel
+
+  // message_out / message_status. On message_out this is the id Meta returned;
+  // on message_status it is the id of the message being updated, which is what
+  // makes the two correlatable. Also the partition key of the wamid GSI, so a
+  // status webhook (which carries no leadId) can find the message it belongs to.
+  wamid?: string
+  mode?: MessageSendMode
+  templateName?: string
+  body?: string
+
+  // message_status
+  status?: MessageDeliveryStatus
+  // Meta's own failure detail, kept verbatim: it is the entire diagnostic value
+  // of a failed status, and summarising it is how a day gets lost.
+  errorDetail?: string
+
+  // journey_step / tool_call / handoff
+  bundleId?: string
+  stepId?: string
+  toolName?: string
+  reason?: string
+  result?: Record<string, unknown>
+}
+
+export interface AppendLeadEventInput extends Omit<LeadEvent, 'ts'> {
+  // Optional so callers normally let the repository stamp it; injectable so a
+  // test can assert ordering without sleeping.
+  occurredAt?: string
+}
+
 export interface KnowledgeBaseEntry {
   entryId: string
   botId: string

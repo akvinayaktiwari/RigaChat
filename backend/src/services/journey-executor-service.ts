@@ -4,6 +4,7 @@ import { isOptedOut } from '../repositories/whatsapp-inbound-activity-repository
 import { getAppointmentRequestsByBotId } from '../repositories/appointment-request-repository.js'
 import { AWAIT_REPLY_TIMEOUT_SECONDS } from './journey-compiler-service.js'
 import { readJourneyLead, toLeadRef } from './lead-resolution-service.js'
+import { appendLeadEvent } from '../repositories/lead-event-repository.js'
 import { resolveTemplateParams } from '../lib/journey-template-params.js'
 import { bookAppointment } from '../mcp/booking-mcp-server.js'
 import { scheduleReminder } from '../mcp/reminder-mcp-server.js'
@@ -71,11 +72,27 @@ async function handleSendMessage(event: JourneyExecutorEvent): Promise<Record<st
   // reads like a person. Outside the window Meta rejects free text outright
   // (error 131047), so the step's approved template is the only way through.
   if (await hasActiveWhatsAppSession(event.leadId)) {
-    const result = await sendWhatsAppMessageToLead(
-      event.clientId,
-      lead.phone,
-      event.messageHint ?? DEFAULT_SEND_MESSAGE_TEXT
-    )
+    const body = event.messageHint ?? DEFAULT_SEND_MESSAGE_TEXT
+    const result = await sendWhatsAppMessageToLead(event.clientId, lead.phone, body)
+
+    // Recorded even when the send failed. "We tried and Meta refused" is the
+    // single most useful thing a client can see in the timeline, and it is
+    // invisible everywhere else: the Task output lives only in Step Functions
+    // history, which expires and is not queryable by lead.
+    await appendLeadEvent({
+      leadId: event.leadId,
+      clientId: event.clientId,
+      botId: event.botId,
+      type: 'message_out',
+      channel: 'whatsapp',
+      mode: 'free_text',
+      body,
+      bundleId: event.bundleId,
+      stepId: event.stepId,
+      ...(result.messageId ? { wamid: result.messageId } : {}),
+      ...(result.success ? {} : { errorDetail: result.error }),
+    })
+
     return { sent: result.success, ...result }
   }
 
@@ -91,6 +108,22 @@ async function handleSendMessage(event: JourneyExecutorEvent): Promise<Record<st
 
   const params = resolveTemplateParams(event.whatsappTemplateParams ?? [], lead)
   const result = await sendWhatsAppTemplateToLead(event.clientId, lead.phone, event.whatsappTemplateName, params)
+
+  await appendLeadEvent({
+    leadId: event.leadId,
+    clientId: event.clientId,
+    botId: event.botId,
+    type: 'message_out',
+    channel: 'whatsapp',
+    mode: 'template',
+    templateName: event.whatsappTemplateName,
+    body: event.messageHint ?? DEFAULT_SEND_MESSAGE_TEXT,
+    bundleId: event.bundleId,
+    stepId: event.stepId,
+    ...(result.messageId ? { wamid: result.messageId } : {}),
+    ...(result.success ? {} : { errorDetail: result.error }),
+  })
+
   return { sent: result.success, viaTemplate: event.whatsappTemplateName, ...result }
 }
 
@@ -128,26 +161,60 @@ async function handleToolCall(event: JourneyExecutorEvent): Promise<Record<strin
     ...(event.leadParentId ? { leadParentId: event.leadParentId } : {}),
   }
 
+  const record = async (result: Record<string, unknown>): Promise<Record<string, unknown>> => {
+    // The result is recorded verbatim rather than summarised: a booking carries
+    // its calComBookingUid and a failure carries its reason, and both are what
+    // a human reads when asking "did the agent actually do the thing".
+    await appendLeadEvent({
+      leadId: event.leadId,
+      clientId: event.clientId,
+      botId: event.botId,
+      type: 'tool_call',
+      bundleId: event.bundleId,
+      stepId: event.stepId,
+      toolName: event.toolName,
+      result,
+    })
+    return result
+  }
+
   switch (event.toolName) {
     case 'booking': {
       const timeZone = event.toolInput?.timeZone
-      return {
+      return record({
         ...(await bookAppointment({
           ...shared,
           requestedAt: requireStringField(event.toolInput, 'requestedAt'),
           ...(typeof timeZone === 'string' ? { timeZone } : {}),
         })),
-      }
+      })
     }
     case 'reminder':
-      return { ...(await scheduleReminder({ ...shared, remindAt: requireStringField(event.toolInput, 'remindAt') })) }
+      return record({ ...(await scheduleReminder({ ...shared, remindAt: requireStringField(event.toolInput, 'remindAt') })) })
     case 'quotation':
-      return { ...(await getQuotation(shared)) }
+      return record({ ...(await getQuotation(shared)) })
     case 'brochure':
-      return { ...(await sendBrochure(shared)) }
+      return record({ ...(await sendBrochure(shared)) })
     default:
       throw new Error(`tool_call has unknown toolName "${event.toolName}"`)
   }
+}
+
+// Only for the operations that produce no message of their own. send_message,
+// tool_call and human_handoff already write richer events, so a generic step row
+// for them would double every entry in the timeline. This is what puts "waiting
+// for a reply" and "checking for a booking" on the client's screen, which is
+// most of what makes an agent look like it is working rather than idle.
+async function recordStep(event: JourneyExecutorEvent): Promise<void> {
+  await appendLeadEvent({
+    leadId: event.leadId,
+    clientId: event.clientId,
+    botId: event.botId,
+    type: 'journey_step',
+    bundleId: event.bundleId,
+    stepId: event.stepId,
+    body: event.operation,
+  })
 }
 
 async function handleHumanHandoff(event: JourneyExecutorEvent): Promise<{ handedOff: true }> {
@@ -156,6 +223,16 @@ async function handleHumanHandoff(event: JourneyExecutorEvent): Promise<{ handed
   // not building a notification feature nobody asked for as a side effect
   // of this pass. A future implementation would persist this and/or notify
   // the client's team.
+  await appendLeadEvent({
+    leadId: event.leadId,
+    clientId: event.clientId,
+    botId: event.botId,
+    type: 'handoff',
+    bundleId: event.bundleId,
+    stepId: event.stepId,
+    ...(event.reason ? { reason: event.reason } : {}),
+  })
+
   console.log(
     `[journey-executor] human_handoff: bot=${event.botId} bundle=${event.bundleId} lead=${event.leadId} step=${event.stepId} reason="${event.reason ?? ''}"`
   )
@@ -246,8 +323,10 @@ export async function executeJourneyStep(event: JourneyExecutorEvent): Promise<R
     case 'human_handoff':
       return handleHumanHandoff(event)
     case 'await_reply':
+      await recordStep(event)
       return handleAwaitReply(event)
     case 'wait_and_recheck_check':
+      await recordStep(event)
       return { ...(await handleWaitAndRecheckCheck(event)) }
   }
 }

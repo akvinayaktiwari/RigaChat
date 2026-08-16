@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid'
 import { DeleteCommand, GetCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
-import { dynamoClient } from './dynamo-client.js'
+import { dynamoClient, getTableName } from './dynamo-client.js'
 import type {
   CreateVoiceAgentInput,
   IndexingJob,
@@ -9,44 +9,19 @@ import type {
   VoiceKnowledgeBaseEntry,
 } from '../types/index.js'
 
-const TABLE_NAME_ENV_VAR = 'DYNAMODB_TABLE_VOICE_AGENTS'
-const CALL_LOGS_TABLE_NAME_ENV_VAR = 'DYNAMODB_TABLE_VOICE_CALL_LOGS'
-const VOICE_KB_TABLE_NAME_ENV_VAR = 'DYNAMODB_TABLE_VOICE_KB'
-
+// Resolved through the shared map in lib/table-names.ts rather than three
+// dedicated env-var readers. Same names, same values; see that file for why the
+// 30 DYNAMODB_TABLE_* variables became code (the Lambda's 4KB env ceiling).
 function getVoiceAgentsTableName(): string {
-  const tableName = process.env[TABLE_NAME_ENV_VAR]
-
-  if (!tableName) {
-    throw new Error(
-      `Missing required environment variable ${TABLE_NAME_ENV_VAR}. Set it in your .env file before starting the server.`
-    )
-  }
-
-  return tableName
+  return getTableName('voice_agents')
 }
 
 function getVoiceCallLogsTableName(): string {
-  const tableName = process.env[CALL_LOGS_TABLE_NAME_ENV_VAR]
-
-  if (!tableName) {
-    throw new Error(
-      `Missing required environment variable ${CALL_LOGS_TABLE_NAME_ENV_VAR}. Set it in your .env file before starting the server.`
-    )
-  }
-
-  return tableName
+  return getTableName('voice_call_logs')
 }
 
 function getVoiceKBTableName(): string {
-  const tableName = process.env[VOICE_KB_TABLE_NAME_ENV_VAR]
-
-  if (!tableName) {
-    throw new Error(
-      `Missing required environment variable ${VOICE_KB_TABLE_NAME_ENV_VAR}. Set it in your .env file before starting the server.`
-    )
-  }
-
-  return tableName
+  return getTableName('voice_kb')
 }
 
 export async function createVoiceAgent(input: CreateVoiceAgentInput): Promise<VoiceAgent> {
