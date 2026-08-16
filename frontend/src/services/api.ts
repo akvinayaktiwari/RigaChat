@@ -50,6 +50,7 @@ import type {
   VoiceKnowledgeBaseEntry,
   VoiceUsageSummary,
   WhatsAppConnection,
+  BotWhatsAppStatus,
 } from '../types/index'
 
 const BASE_URL = import.meta.env.VITE_API_URL
@@ -130,6 +131,21 @@ export function getMyBots(): Promise<ApiResponse<BotConfig[]>> {
 
 export function getBotById(botId: string): Promise<ApiResponse<BotConfig>> {
   return apiClient<BotConfig>(`/api/bots/${botId}`)
+}
+
+// The WhatsApp channel for one chatbot. Bot-scoped, not agent-scoped: the
+// Agent identity layer is deliberately not surfaced here (see the naming
+// collision in TODOS.md).
+export function getBotWhatsAppStatus(botId: string): Promise<ApiResponse<BotWhatsAppStatus>> {
+  return apiClient<BotWhatsAppStatus>(`/api/bots/${botId}/whatsapp`)
+}
+
+export function enableBotWhatsApp(botId: string): Promise<ApiResponse<BotWhatsAppStatus>> {
+  return apiClient<BotWhatsAppStatus>(`/api/bots/${botId}/whatsapp`, 'POST')
+}
+
+export function disableBotWhatsApp(botId: string): Promise<ApiResponse<BotWhatsAppStatus>> {
+  return apiClient<BotWhatsAppStatus>(`/api/bots/${botId}/whatsapp`, 'DELETE')
 }
 
 export function updateBot(

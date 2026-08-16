@@ -15,6 +15,12 @@ import {
 } from '../services/bot-service.js'
 import { generateAndPrewarmSuggestions, getKbContentForBot } from '../services/suggestion-service.js'
 import { EntitlementError, toEntitlementErrorResponse } from '../services/entitlement-service.js'
+import {
+  disableWhatsAppForBot,
+  enableWhatsAppForBot,
+  getBotWhatsAppStatus,
+  type BotWhatsAppStatus,
+} from '../services/agent-service.js'
 import type { ApiResponse, BotConfig, PrewarmResult } from '../types/index.js'
 
 interface AuthEnv {
@@ -297,5 +303,54 @@ botRoutes.post('/:botId/resync', requireAuth, async (c) => {
       return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
     }
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+// The WhatsApp channel for one chatbot. Bot-scoped rather than agent-scoped
+// because that is what the screen is about; agent-service resolves the owning
+// Agent behind this.
+botRoutes.get('/:botId/whatsapp', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const botId = c.req.param('botId')
+  try {
+    const status = await getBotWhatsAppStatus(botId, clientId)
+    return c.json<ApiResponse<BotWhatsAppStatus>>({ success: true, data: status }, 200)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Bot not found') {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+botRoutes.post('/:botId/whatsapp', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const botId = c.req.param('botId')
+  try {
+    const status = await enableWhatsAppForBot(botId, clientId)
+    return c.json<ApiResponse<BotWhatsAppStatus>>({ success: true, data: status }, 200)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Bot not found') {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
+    }
+    // Everything else here is a precondition the client can act on: no Agent, no
+    // chatbot on the Agent, WhatsApp not connected, or the number already claimed
+    // by another Agent. 409 so the UI shows the reason rather than a generic
+    // failure.
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 409)
+  }
+})
+
+botRoutes.delete('/:botId/whatsapp', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const botId = c.req.param('botId')
+  try {
+    const status = await disableWhatsAppForBot(botId, clientId)
+    return c.json<ApiResponse<BotWhatsAppStatus>>({ success: true, data: status }, 200)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Bot not found') {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 409)
   }
 })

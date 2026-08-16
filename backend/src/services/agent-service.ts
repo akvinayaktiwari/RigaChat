@@ -214,3 +214,95 @@ export async function unbindWhatsAppFromAgent(agentId: string, clientId: string)
 
   return updated
 }
+
+// -------------------------------------------------------------------------
+// Bot-scoped view of the WhatsApp channel, for the "Also available on WhatsApp"
+// toggle on the bot detail page.
+//
+// Deliberately keyed by botId rather than agentId. The screen is about a
+// chatbot, the product story is "make this chatbot a WhatsApp bot", and the
+// Agent is an identity layer the client has never been shown. Exposing agentId
+// to the UI here would put a fourth meaning of "agent" in front of them (see
+// the naming-collision TODO). The indirection stays server-side.
+// -------------------------------------------------------------------------
+
+export interface BotWhatsAppStatus {
+  // false when the client has not connected WhatsApp at all -- the toggle is
+  // hidden rather than shown broken.
+  connectionAvailable: boolean
+  enabled: boolean
+  // Present only when a connection exists. This is the DISPLAY number, the one
+  // a human dials. Never phoneNumberId, which is Meta's internal resource id and
+  // cannot form a wa.me link.
+  displayPhoneNumber?: string
+  // Set when this bot's Agent cannot take the channel, so the UI can explain
+  // instead of failing on click.
+  blockedReason?: string
+}
+
+async function getAgentOwningBot(botId: string, clientId: string): Promise<Agent | null> {
+  const binding = await getAgentForResource(botId)
+  if (!binding || binding.clientId !== clientId) return null
+
+  const agents = await getAgents(clientId)
+  return agents.find((candidate) => candidate.agentId === binding.agentId) ?? null
+}
+
+export async function getBotWhatsAppStatus(botId: string, clientId: string): Promise<BotWhatsAppStatus> {
+  const bot = await getBotById(botId, clientId)
+  if (!bot) {
+    throw new Error('Bot not found')
+  }
+
+  const client = await getClientById(clientId)
+  const connection = client?.metaDirectWhatsAppConnection
+  if (!connection?.connected) {
+    return { connectionAvailable: false, enabled: false }
+  }
+
+  const agent = await getAgentOwningBot(botId, clientId)
+  if (!agent) {
+    return {
+      connectionAvailable: true,
+      enabled: false,
+      displayPhoneNumber: connection.displayPhoneNumber,
+      blockedReason: 'This chatbot is not part of an Agent yet.',
+    }
+  }
+
+  // Enabled means THIS bot's Agent holds the number. Another Agent holding it is
+  // reported as blocked rather than off, so the client is told why the toggle
+  // will not work instead of watching it fail.
+  const boundHere = agent.channels.whatsapp?.resourceId === connection.phoneNumberId
+  const ownerOfNumber = await getAgentForResource(connection.phoneNumberId)
+  const takenByAnother = !boundHere && ownerOfNumber !== null && ownerOfNumber.agentId !== agent.agentId
+
+  return {
+    connectionAvailable: true,
+    enabled: boundHere,
+    displayPhoneNumber: connection.displayPhoneNumber,
+    ...(takenByAnother
+      ? { blockedReason: 'This WhatsApp number is already answering for another Agent.' }
+      : {}),
+  }
+}
+
+export async function enableWhatsAppForBot(botId: string, clientId: string): Promise<BotWhatsAppStatus> {
+  const agent = await getAgentOwningBot(botId, clientId)
+  if (!agent) {
+    throw new Error('This chatbot is not part of an Agent yet.')
+  }
+
+  await bindWhatsAppToAgent(agent.agentId, clientId)
+  return getBotWhatsAppStatus(botId, clientId)
+}
+
+export async function disableWhatsAppForBot(botId: string, clientId: string): Promise<BotWhatsAppStatus> {
+  const agent = await getAgentOwningBot(botId, clientId)
+  if (!agent) {
+    throw new Error('This chatbot is not part of an Agent yet.')
+  }
+
+  await unbindWhatsAppFromAgent(agent.agentId, clientId)
+  return getBotWhatsAppStatus(botId, clientId)
+}
