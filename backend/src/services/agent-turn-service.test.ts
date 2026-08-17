@@ -189,3 +189,55 @@ describe('composition', () => {
     vi.useRealTimers()
   })
 })
+
+// The kill switch is the rollback plan for the whole "agent can answer" epic.
+// If it does not actually stop composition, there is no way to stop a
+// misbehaving agent short of a deploy while it talks to real leads.
+describe('scriptedOnly', () => {
+  const scriptedAgent: Agent = { ...agent, scriptedOnly: true }
+
+  it('does not compose and does not send', async () => {
+    const outcome = await runAgentTurn(turnInput({ agent: scriptedAgent }))
+
+    expect(outcome).toEqual({ status: 'skipped', reason: 'scripted_only' })
+    expect(generateChatCompletion).not.toHaveBeenCalled()
+    expect(sendWhatsAppMessageToLead).not.toHaveBeenCalled()
+  })
+
+  // Before the OpenAI call AND before the retrieval, because a switched-off
+  // agent should not be spending either.
+  it('short-circuits before retrieval, not after', async () => {
+    await runAgentTurn(turnInput({ agent: scriptedAgent }))
+
+    expect(retrieveAgentContext).not.toHaveBeenCalled()
+    expect(getBotById).not.toHaveBeenCalled()
+  })
+
+  // "Scripted", not "silent". The caller only sets composedReply on
+  // 'composed_for_journey', so a skip leaves it undefined and the parked
+  // journey still resumes and sends its own authored line.
+  it('leaves a parked journey to send its scripted line', async () => {
+    getPendingReply.mockResolvedValueOnce({ leadId: 'lead-1', taskToken: 'tok' })
+
+    const outcome = await runAgentTurn(turnInput({ agent: scriptedAgent }))
+
+    expect(outcome.status).toBe('skipped')
+    expect(outcome).not.toHaveProperty('text')
+  })
+
+  it('composes as normal when the flag is absent', async () => {
+    const outcome = await runAgentTurn(turnInput({ agent }))
+
+    expect(outcome.status).not.toBe('skipped')
+    expect(generateChatCompletion).toHaveBeenCalled()
+  })
+
+  // Explicit false has to behave like absent, or turning the switch back off
+  // would leave the Agent mute.
+  it('composes again once the flag is turned back off', async () => {
+    const outcome = await runAgentTurn(turnInput({ agent: { ...agent, scriptedOnly: false } }))
+
+    expect(outcome.status).not.toBe('skipped')
+    expect(generateChatCompletion).toHaveBeenCalled()
+  })
+})
