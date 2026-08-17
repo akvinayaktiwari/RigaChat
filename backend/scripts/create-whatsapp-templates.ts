@@ -1,4 +1,4 @@
-// Creates the six WhatsApp message templates defined in
+// Creates the WhatsApp message templates defined in
 // src/lib/whatsapp-templates.ts on a WABA, and reports what Meta did with
 // each one.
 //

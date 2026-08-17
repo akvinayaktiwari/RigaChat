@@ -148,7 +148,12 @@ export const WHATSAPP_TEMPLATES: WhatsAppTemplateDefinition[] = [
       { type: 'QUICK_REPLY', text: 'Confirm' },
       { type: 'QUICK_REPLY', text: 'Reschedule' },
     ],
-    sentBy: 'appointment-service.ts / lead_reminder ScheduledAction',
+    // NOT SENT BY ANYTHING YET. It previously claimed the lead_reminder
+    // ScheduledAction, which as of 2026-08-16 sends lead_handoff_alert_1 to
+    // the CLIENT instead -- a reminder is "look at this lead", not a message
+    // to the lead about a visit. Approved and waiting for the appointment
+    // reminder path that will send it.
+    sentBy: 'Nothing yet -- reserved for the appointment reminder path.',
   },
   {
     name: 'agent_handoff_1',
@@ -156,6 +161,87 @@ export const WHATSAPP_TEMPLATES: WhatsAppTemplateDefinition[] = [
     body: "Hi {{1}}, {{2}} from our team will call you shortly about your enquiry.\n\nIf now isn't a good time, reply with a time that suits you.",
     bodyExample: ['Ravi', 'Priya'],
     sentBy: 'journey-templates/real-estate-lead-qualification.ts step "hand_to_agent"',
+  },
+  {
+    // The other half of hand_to_agent. agent_handoff_1 above tells the LEAD a
+    // human is coming; this one tells the human. Both fire from the same step,
+    // and shipping only the lead-facing half is what made the handoff a
+    // promise nobody was told to keep.
+    //
+    // Also sent for the lead_reminder ScheduledAction, which is the same
+    // capability -- "a person needs to look at this lead now" -- reached by a
+    // timer instead of by an exhausted journey. {{3}} carries the difference.
+    name: 'lead_handoff_alert_1',
+    category: 'UTILITY',
+    // Business-initiated to the client's notificationNumber, so it can never
+    // ride an open session window: the client may not have messaged us in
+    // days. UTILITY is honest here -- it reports on a transaction already in
+    // progress rather than promoting anything.
+    header: 'A lead needs you',
+    footer: 'Sent by Vyostra AI',
+    // The deep link is a BODY variable, not a URL button, because a LeadRef
+    // needs query params (?source=chat&botId=...) and Meta only allows a
+    // button's variable as a trailing path suffix. A static "Open inbox"
+    // button like lead_notification_1's would land the client on the list and
+    // make them hunt for the lead the message just named.
+    //
+    // {{4}} is a FLATTENED transcript summary. Template parameters cannot
+    // contain newlines, tabs, or 4+ consecutive spaces -- Meta rejects the
+    // send, not the template, so this would pass review and fail in
+    // production. The send site joins turns with a middot for that reason.
+    //
+    // The closing line is load-bearing: Meta rejects a body ending in a
+    // variable (error_subcode 2388299), and the link is the last real content.
+    body:
+      'Your AI agent has stopped and handed this lead over.\n\n' +
+      'Name: {{1}}\n' +
+      'Phone: {{2}}\n' +
+      'Reason: {{3}}\n\n' +
+      'Recent messages: {{4}}\n\n' +
+      'Open the lead: {{5}}\n\n' +
+      'Reply to the lead from your Vyostra inbox to take over.',
+    bodyExample: [
+      'Ravi Kumar',
+      '+91 98765 43210',
+      'No booking after 3 follow-ups',
+      'Lead: I just want to know about pricing \u00b7 Agent: I do not have that information right now. Would you like to speak with our team?',
+      'https://vyostra.com/dashboard/leads/5383cb15-1f28-4eda-9914-834a90c0facd?source=chat&botId=b1f2',
+    ],
+    sentBy: 'notification-service.ts sendHandoffAlert (hand_to_agent + lead_reminder)',
+  },
+  {
+    // The fallback for the one above, and the reason it exists is scheduling
+    // rather than design: lead_handoff_alert_1 sat PENDING for a day while
+    // every other template on this WABA cleared in minutes, blocking the whole
+    // handoff feature behind a queue nobody can hurry.
+    //
+    // It is the same message with the two things that plausibly pushed _1 into
+    // human review removed: five body variables becomes three, and the deep
+    // link stops being a URL-valued PARAMETER. What replaces it is a STATIC URL
+    // button, which is exactly the shape lead_notification_1 above already got
+    // approved on this same WABA -- so this is a pattern with evidence behind
+    // it, not a guess.
+    //
+    // The cost is real and worth stating: the human gets the lead's name and
+    // the reason, but lands on the inbox and has to find that lead themselves
+    // rather than arriving at it. Prefer _1 whenever it is approved; see
+    // notification-service.ts HANDOFF_ALERT_TEMPLATE for the switch.
+    name: 'lead_handoff_alert_2',
+    category: 'UTILITY',
+    header: 'A lead needs you',
+    footer: 'Sent by Vyostra AI',
+    // Same rule as site_visit_reminder_1: the closing sentence is required, not
+    // decorative. Meta rejects a body ending in a variable (error_subcode
+    // 2388299).
+    body:
+      'Your AI agent has stopped and handed this lead over.\n\n' +
+      'Name: {{1}}\n' +
+      'Phone: {{2}}\n' +
+      'Reason: {{3}}\n\n' +
+      'Open your Vyostra inbox to read the conversation and take over.',
+    bodyExample: ['Ravi Kumar', '+91 98765 43210', 'No booking after 3 follow-ups'],
+    buttons: [{ type: 'URL', text: 'Open inbox', url: 'https://vyostra.com/dashboard/leads' }],
+    sentBy: 'notification-service.ts sendHandoffAlert, when _1 is not yet approved',
   },
 ]
 

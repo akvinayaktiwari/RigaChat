@@ -87,12 +87,12 @@ export const handler = async (
   }
 
   if ('source' in event && event.source === 'aws.events' && event['detail-type'] === 'scheduled-action') {
-    const { clientId, actionType, leadId, botId } = event.detail ?? {}
+    const { clientId, actionType, leadId, botId, leadSource, leadParentId } = event.detail ?? {}
     if (!clientId || !actionType) {
       console.error('scheduled-action event missing clientId or actionType:', event.detail)
       return
     }
-    await executeScheduledAction(clientId, actionType, { leadId, botId })
+    await executeScheduledAction(clientId, actionType, { leadId, botId, leadSource, leadParentId })
     return
   }
 

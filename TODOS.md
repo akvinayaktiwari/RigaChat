@@ -173,15 +173,15 @@ Proposed shape, smallest honest version first:
   preference is not a "Scheduler". Lead reminders surface on the lead's own timeline where
   the name and context already exist. Nav goes 12 -> 10.
 
-Note (1) is partly blocked on the `lead_reminder` handler being real — see
-"Build the lead_reminder delivery path". Folding reminders into a lead timeline while
-they still deliver nothing just moves the honesty problem to a more prominent page. The
-row on `SchedulerPage` is badged "Not delivered yet" as of 2026-08-16 so the current
-surface at least does not lie.
+(1) was blocked on the `lead_reminder` handler being real — folding reminders into a lead
+timeline while they delivered nothing would only have moved the honesty problem to a more
+prominent page. Unblocked on 2026-08-16: the handler now sends through
+`notification-service.ts`, and the "Not delivered yet" badge came off `SchedulerPage` in the
+same change.
 
 **Effort:** S (3) / M (2) / L (1)
 **Priority:** P2 — but (3) is P1-shaped the day a client has two bots under one Agent
-**Depends on:** (1) depends on a real `lead_reminder` handler
+**Depends on:** Nothing outstanding
 
 ### [RESOLVED 2026-08-11] Frontend has no test runner — runner added; three libs still uncovered
 
@@ -606,31 +606,6 @@ several permissions. See `docs/META_APP_REVIEW_SUBMISSION.md` and
 **Effort:** M
 **Priority:** P2
 **Depends on:** None technically, but low urgency until an external MCP client actually exists
-
-### Build the lead_reminder delivery path
-
-**What:** `scheduler-service.ts`'s `executeScheduledAction()` handles `weekly_report` for real
-(`sendWeeklyReport`) and handles `lead_reminder` with a `console.log`. So the *scheduling* half is
-genuine end to end — `reminder-mcp-server.ts` creates a real EventBridge schedule for a real lead at
-a client-requested time, and it fires on time — and then nothing is delivered to anybody.
-
-**Why:** It is the one stub a user can see and act on. A reminder appears on the Scheduler page as a
-normal row with Edit and Cancel, so a client can cancel a follow-up believing they stopped a message
-that was never going to send. Badged "Not delivered yet" on 2026-08-16 so the surface stops lying,
-but a badge is not the fix.
-
-**Context:** The undesigned piece is the same one `send_message` has for non-WhatsApp channels: who
-gets reminded, and how. A reminder is plausibly *to the client* (their agent flagging a lead needing
-attention) rather than to the lead, which would make it the first thing in the product that notifies
-a client outside of WhatsApp — so it needs the notification-channel decision (email? dashboard
-inbox? WhatsApp to `notificationNumber`?) made once, deliberately, rather than picked here by
-default. Note `lead_reminder` is a `ScheduledActionType` fired without a Journey execution context,
-so it cannot reuse the journey executor's send path as-is.
-
-**Effort:** M
-**Priority:** P2
-**Depends on:** A notification-channel decision; blocks folding reminders into the lead timeline
-(see "The journey layer is four nav items for one idea")
 
 ### Build real quotation and brochure logic
 

@@ -9,7 +9,19 @@ import {
 } from '../repositories/scheduled-action-repository.js'
 import { sendWeeklyReport } from './whatsapp-service.js'
 import { resolveOwningAgentId } from './agent-service.js'
-import type { ScheduleCadence, ScheduledAction, ScheduledActionType } from '../types/index.js'
+import { sendHandoffAlert } from './notification-service.js'
+import { toLeadRef } from './lead-resolution-service.js'
+import type { LeadSource, ScheduleCadence, ScheduledAction, ScheduledActionType } from '../types/index.js'
+
+// What EventBridge hands back when a lead-scoped schedule fires. Every field is
+// optional because the payload is whatever createSchedule wrote at create time,
+// and schedules created before a field existed are still out there firing.
+export interface ScheduledActionContext {
+  leadId?: string
+  botId?: string
+  leadSource?: LeadSource
+  leadParentId?: string
+}
 
 export class ScheduleValidationError extends Error {
   constructor(message: string) {
@@ -56,6 +68,8 @@ interface CreateScheduledActionInput {
   // account-level ones (weekly_report). See ScheduledAction's own comment.
   leadId?: string
   botId?: string
+  leadSource?: LeadSource
+  leadParentId?: string
 }
 
 export async function createScheduledAction(input: CreateScheduledActionInput): Promise<ScheduledAction> {
@@ -67,6 +81,8 @@ export async function createScheduledAction(input: CreateScheduledActionInput): 
     actionType: input.actionType,
     leadId: input.leadId,
     botId: input.botId,
+    leadSource: input.leadSource,
+    leadParentId: input.leadParentId,
   })
 
   // Lead-scoped actions carry a botId; stamp the owning Agent when that bot is
@@ -82,6 +98,8 @@ export async function createScheduledAction(input: CreateScheduledActionInput): 
       cadence: input.cadence,
       leadId: input.leadId,
       botId: input.botId,
+      ...(input.leadSource ? { leadSource: input.leadSource } : {}),
+      ...(input.leadParentId ? { leadParentId: input.leadParentId } : {}),
       ...(agentId ? { agentId } : {}),
       enabled: true,
     })
@@ -136,22 +154,47 @@ export async function deleteScheduledAction(clientId: string, scheduleId: string
 export async function executeScheduledAction(
   clientId: string,
   actionType: ScheduledActionType,
-  context?: { leadId?: string; botId?: string }
+  context?: ScheduledActionContext
 ): Promise<void> {
   switch (actionType) {
     case 'weekly_report':
       await sendWeeklyReport(clientId)
       return
     case 'lead_reminder':
-      // STUB, same as journey-executor-service.ts's send-related stubs: no
-      // notification infra exists yet to actually remind anyone. The real,
-      // non-stub part of this feature is that a live EventBridge schedule
-      // got created for this specific lead at the client-requested time
-      // (backend/src/mcp/reminder-mcp-server.ts) -- what happens when it
-      // fires is the same undesigned piece as send_message.
-      console.log(
-        `[scheduler] STUB lead_reminder fired: client=${clientId} lead=${context?.leadId} bot=${context?.botId}`
-      )
+      await runLeadReminder(clientId, context)
       return
   }
+}
+
+// A lead_reminder and a hand_to_agent are the same thing to the person on the
+// other end -- "look at this lead now" -- so both go out through
+// notification-service rather than each growing its own send path. The trigger
+// is what distinguishes them in the message.
+//
+// The LeadRef comes from toLeadRef rather than being built here, which is what
+// makes a reminder on a form or Meta lead resolve to the right table. Its chat
+// fallback is also the compatibility path: a schedule created before
+// leadSource existed carries only leadId and botId, and lands on 'chat'
+// exactly as it always did.
+async function runLeadReminder(clientId: string, context?: ScheduledActionContext): Promise<void> {
+  if (!context?.leadId || !context.botId) {
+    console.log(`[scheduler] lead_reminder skipped: no lead context client=${clientId}`)
+    return
+  }
+
+  const result = await sendHandoffAlert({
+    leadRef: toLeadRef({
+      leadId: context.leadId,
+      botId: context.botId,
+      ...(context.leadSource ? { leadSource: context.leadSource } : {}),
+      ...(context.leadParentId ? { leadParentId: context.leadParentId } : {}),
+    }),
+    clientId,
+    reason: 'A reminder you set for this lead is due now.',
+    trigger: 'lead_reminder',
+  })
+
+  console.log(
+    `[scheduler] lead_reminder fired: client=${clientId} lead=${context.leadId} bot=${context.botId} notified=${result.notified}${result.skipReason ? ` skip=${result.skipReason}` : ''}`
+  )
 }

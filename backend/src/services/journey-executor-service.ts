@@ -4,6 +4,7 @@ import { isOptedOut } from '../repositories/whatsapp-inbound-activity-repository
 import { getAppointmentRequestsByBotId } from '../repositories/appointment-request-repository.js'
 import { AWAIT_REPLY_TIMEOUT_SECONDS } from './journey-compiler-service.js'
 import { readJourneyLead, toLeadRef } from './lead-resolution-service.js'
+import { sendHandoffAlert } from './notification-service.js'
 import { appendLeadEvent } from '../repositories/lead-event-repository.js'
 import { resolveTemplateParams } from '../lib/journey-template-params.js'
 import { bookAppointment } from '../mcp/booking-mcp-server.js'
@@ -222,12 +223,11 @@ async function recordStep(event: JourneyExecutorEvent): Promise<void> {
   })
 }
 
-async function handleHumanHandoff(event: JourneyExecutorEvent): Promise<{ handedOff: true }> {
-  // STUB-ish: no notification infra (email/SMS-to-agent alert) exists yet,
-  // so this is a structured log rather than a real alert -- deliberately
-  // not building a notification feature nobody asked for as a side effect
-  // of this pass. A future implementation would persist this and/or notify
-  // the client's team.
+async function handleHumanHandoff(event: JourneyExecutorEvent): Promise<{ handedOff: true; notified: boolean }> {
+  // The event is written FIRST and unconditionally. It is the durable record
+  // that the agent stopped, and it has to survive a notification that never
+  // lands -- otherwise a client with no WhatsApp connection would have a lead
+  // silently abandoned with nothing in the timeline to show for it.
   await appendLeadEvent({
     leadId: event.leadId,
     clientId: event.clientId,
@@ -238,10 +238,20 @@ async function handleHumanHandoff(event: JourneyExecutorEvent): Promise<{ handed
     ...(event.reason ? { reason: event.reason } : {}),
   })
 
+  // Non-fatal by construction (see notification-service.ts): the journey has
+  // already stopped talking to the lead by this point, so failing the
+  // execution over an undelivered alert would strand them twice.
+  const alert = await sendHandoffAlert({
+    leadRef: toLeadRef(event),
+    clientId: event.clientId,
+    reason: event.reason ?? 'The agent handed this lead to a human.',
+    trigger: 'hand_to_agent',
+  })
+
   console.log(
-    `[journey-executor] human_handoff: bot=${event.botId} bundle=${event.bundleId} lead=${event.leadId} step=${event.stepId} reason="${event.reason ?? ''}"`
+    `[journey-executor] human_handoff: bot=${event.botId} bundle=${event.bundleId} lead=${event.leadId} step=${event.stepId} reason="${event.reason ?? ''}" notified=${alert.notified}${alert.skipReason ? ` skip=${alert.skipReason}` : ''}`
   )
-  return { handedOff: true }
+  return { handedOff: true, notified: alert.notified }
 }
 
 // Increments a durable, atomic counter (see journey-execution-repository.ts)
