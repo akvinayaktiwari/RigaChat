@@ -117,6 +117,10 @@ async function waitForEvent(
 
 let bundleId = ''
 let leadId = ''
+// Whether THIS run published the bundle. Cleanup deletes only what it created:
+// unpublishing a client's live journey because a test borrowed it would be a
+// far worse outcome than a leaked test bundle.
+let armedByThisRun = false
 
 test.describe('the full WhatsApp loop, end to end', () => {
   test.skip(!enabled, 'set JOURNEY_E2E=1 — this writes a permanent lead to a real CRM')
@@ -144,13 +148,29 @@ test.describe('the full WhatsApp loop, end to end', () => {
     // A journey has to be published and owning its trigger before a lead is
     // captured. Ignition is a point read on journey_trigger_claims at capture
     // time, so arming afterwards would be a no-op that looks like a bug.
-    const cloned = await api<{ bundleId: string }>('POST', `/api/journeys/from-template/${templateId}`, { botId })
-    expect(cloned.success, `cloning the template failed: ${cloned.error ?? ''}`).toBe(true)
-    bundleId = cloned.data?.bundleId ?? ''
-    expect(bundleId, 'clone returned no bundleId').not.toBe('')
+    //
+    // If the bot ALREADY has a published journey, use it rather than publishing
+    // a second one. Exactly one bundle may own a trigger -- that is what stops
+    // a lead getting two sets of outreach -- so a bot in real use will always
+    // reject a test's own publish. Borrowing the live journey is also the more
+    // honest test: it exercises what is actually running for this bot.
+    const existing = await api<{ bundleId: string; status: string }[]>('GET', `/api/journeys/${botId}`)
+    const live = (existing.data ?? []).find((bundle) => bundle.status === 'published')
 
-    const published = await api('POST', `/api/journeys/${botId}/${bundleId}/publish`, {})
-    expect(published.success, `publishing failed: ${published.error ?? ''}`).toBe(true)
+    if (live) {
+      bundleId = live.bundleId
+      console.log(`  using the journey already published on this bot: ${bundleId}`)
+    } else {
+      const cloned = await api<{ bundleId: string }>('POST', `/api/journeys/from-template/${templateId}`, { botId })
+      expect(cloned.success, `cloning the template failed: ${cloned.error ?? ''}`).toBe(true)
+      bundleId = cloned.data?.bundleId ?? ''
+      expect(bundleId, 'clone returned no bundleId').not.toBe('')
+
+      const published = await api('POST', `/api/journeys/${botId}/${bundleId}/publish`, {})
+      expect(published.success, `publishing failed: ${published.error ?? ''}`).toBe(true)
+      armedByThisRun = true
+      console.log(`  published a journey for this run: ${bundleId}`)
+    }
 
     // --- CAPTURE --------------------------------------------------------
     await openWidget(page, botId)
@@ -169,17 +189,24 @@ test.describe('the full WhatsApp loop, end to end', () => {
     )
 
     // --- TURN ONE: the lead asks something the KB can answer -------------
-    await sendInboundMessage(webhook, {
-      fromWaId,
-      text: 'What amenities does the property have?',
-      phoneNumberId,
-      wabaId,
-    })
+    const QUESTION = 'What amenities does the property have?'
+    // The answer has to be ABOUT amenities. A journey's authored line ("Would
+    // you like to see the property in person?") is a perfectly good message and
+    // a completely useless answer, and counting outbound messages cannot tell
+    // the two apart -- which is how the first green run of this spec passed
+    // while the agent never consulted the knowledge base at all.
+    const ANSWERS_THE_QUESTION = /amenit|gym|pool|club|garden|park|facilit|security|lift|court/i
+
+    await sendInboundMessage(webhook, { fromWaId, text: QUESTION, phoneNumberId, wabaId })
 
     const afterFirst = await waitForEvent(
       leadId,
-      (events) => events.filter((event) => event.type === 'message_out').length >= 2,
-      'the agent never answered the first question. FIRST check the 24h session window: this spec forges the ' +
+      (events) =>
+        events.some((event) => event.type === 'message_out' && ANSWERS_THE_QUESTION.test(event.body ?? '')),
+      'no outbound message actually ANSWERED the question. If a message went out but was the journey’s ' +
+        'authored line instead, the published journey was compiled before the agent could compose: its state ' +
+        'machine threads no lastResult, so composedReply never reaches send_message and messageHint always ' +
+        'wins. Republish the bundle to recompile it. Otherwise check the 24h session window: this spec forges the ' +
         'inbound webhook, which opens the window in OUR records (whatsapp_inbound_activity) but NOT on Meta’s ' +
         'side — so a free-text reply is rejected with error 131047 unless a real message was sent from ' +
         'LEAD_PHONE to the business number within the last 24h. See e2e/README.md. If the window is genuinely ' +
@@ -189,6 +216,13 @@ test.describe('the full WhatsApp loop, end to end', () => {
       afterFirst.some((event) => event.type === 'message_in' && /amenities/i.test(event.body ?? '')),
       'the inbound message never reached the timeline'
     ).toBe(true)
+
+    // Stated as its own assertion so a failure reads as "the agent did not
+    // answer" rather than "a wait timed out".
+    expect(
+      afterFirst.find((event) => event.type === 'message_out' && ANSWERS_THE_QUESTION.test(event.body ?? ''))?.body,
+      'no outbound message was grounded in the knowledge base'
+    ).toBeTruthy()
 
     // --- TURN TWO: the reply the journey is parked on --------------------
     await sendInboundMessage(webhook, { fromWaId, text: 'Saturday works for me', phoneNumberId, wabaId })
@@ -244,9 +278,11 @@ test.describe('the full WhatsApp loop, end to end', () => {
   // leaves its bundle published keeps owning the trigger, and the NEXT run
   // cannot claim it. One bad run would otherwise poison every run after it.
   test.afterAll(async () => {
-    if (bundleId) {
+    if (bundleId && armedByThisRun) {
       const deleted = await api('DELETE', `/api/journeys/${botId}/${bundleId}`)
       console.log(deleted.success ? `  cleaned up bundle ${bundleId}` : `  ⚠ bundle ${bundleId} NOT deleted`)
+    } else if (bundleId) {
+      console.log(`  left bundle ${bundleId} published — it was already live before this run`)
     }
 
     // Deleting the bundle releases the trigger claim, but NOT a callback token
