@@ -105,6 +105,23 @@ as the manual pre-release check.
 **This writes a permanent lead into a real CRM**, same as the capture spec, and
 refuses to run without `JOURNEY_E2E=1`.
 
+#### Prerequisite: open the 24h session window first
+
+**Send one real WhatsApp message from `LEAD_PHONE` to the business number
+before running.** This is not optional and it is the most likely way a run
+fails.
+
+The spec forges the inbound webhook, which makes *our* records think the window
+is open -- `recordInboundMessage` writes `whatsapp_inbound_activity`, and
+`hasActiveWhatsAppSession` reads exactly that. Meta has no such record. So the
+agent decides it may reply with free text, and Meta then rejects the send with
+error 131047 (no open customer-service window).
+
+Forging that half is not possible and should not be: the session window is a
+Meta policy control, and a test that could bypass it would be testing a system
+nobody runs. One real message from the handset opens a genuine 24h window, and
+everything inside it then behaves exactly as production does.
+
 ```bash
 cd e2e
 JOURNEY_E2E=1 \

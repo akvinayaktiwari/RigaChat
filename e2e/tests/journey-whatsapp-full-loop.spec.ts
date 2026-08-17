@@ -179,7 +179,11 @@ test.describe('the full WhatsApp loop, end to end', () => {
     const afterFirst = await waitForEvent(
       leadId,
       (events) => events.filter((event) => event.type === 'message_out').length >= 2,
-      'the agent never answered the first question — check the Agent binding and the KB namespace'
+      'the agent never answered the first question. FIRST check the 24h session window: this spec forges the ' +
+        'inbound webhook, which opens the window in OUR records (whatsapp_inbound_activity) but NOT on Meta’s ' +
+        'side — so a free-text reply is rejected with error 131047 unless a real message was sent from ' +
+        'LEAD_PHONE to the business number within the last 24h. See e2e/README.md. If the window is genuinely ' +
+        'open, then check the Agent binding and the KB namespace'
     )
     expect(
       afterFirst.some((event) => event.type === 'message_in' && /amenities/i.test(event.body ?? '')),
