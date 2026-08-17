@@ -4,11 +4,13 @@ const createAgentRecord = vi.fn()
 const deleteAgentRecord = vi.fn()
 const getAgentById = vi.fn()
 const getAgentsByClientId = vi.fn()
+const updateAgentRecord = vi.fn()
 vi.mock('../repositories/agent-repository.js', () => ({
   createAgent: createAgentRecord,
   deleteAgent: deleteAgentRecord,
   getAgentById,
   getAgentsByClientId,
+  updateAgent: updateAgentRecord,
 }))
 
 const claimAgentBinding = vi.fn()
@@ -24,7 +26,7 @@ vi.mock('../repositories/bot-repository.js', () => ({ getBotById }))
 const getVoiceAgentById = vi.fn()
 vi.mock('../repositories/voice-repository.js', () => ({ getVoiceAgentById }))
 
-const { createAgent, deleteAgent, getAgent } = await import('./agent-service.js')
+const { createAgent, deleteAgent, getAgent, setAgentScriptedOnly } = await import('./agent-service.js')
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -118,5 +120,35 @@ describe('deleteAgent', () => {
     expect(removeAgentBinding).toHaveBeenCalledWith('bot-1')
     expect(removeAgentBinding).toHaveBeenCalledWith('voice-1')
     expect(deleteAgentRecord).toHaveBeenCalledWith('a', 'client-1')
+  })
+})
+
+describe('setAgentScriptedOnly', () => {
+  it('writes the flag on an Agent the caller owns', async () => {
+    getAgentById.mockResolvedValueOnce({ agentId: 'agent-1', clientId: 'client-1', name: 'A', channels: {} })
+    updateAgentRecord.mockResolvedValueOnce({ agentId: 'agent-1', scriptedOnly: true })
+
+    const result = await setAgentScriptedOnly('agent-1', 'client-1', true)
+
+    expect(updateAgentRecord).toHaveBeenCalledWith('agent-1', 'client-1', { scriptedOnly: true })
+    expect(result.scriptedOnly).toBe(true)
+  })
+
+  it('turns the flag back off', async () => {
+    getAgentById.mockResolvedValueOnce({ agentId: 'agent-1', clientId: 'client-1', name: 'A', channels: {} })
+    updateAgentRecord.mockResolvedValueOnce({ agentId: 'agent-1', scriptedOnly: false })
+
+    await setAgentScriptedOnly('agent-1', 'client-1', false)
+
+    expect(updateAgentRecord).toHaveBeenCalledWith('agent-1', 'client-1', { scriptedOnly: false })
+  })
+
+  // A safety control that one tenant could apply to another's Agent would be a
+  // denial-of-service dressed as a feature.
+  it('refuses an Agent the caller does not own, and writes nothing', async () => {
+    getAgentById.mockResolvedValueOnce(null)
+
+    await expect(setAgentScriptedOnly('agent-1', 'someone-else', true)).rejects.toThrow('Agent not found')
+    expect(updateAgentRecord).not.toHaveBeenCalled()
   })
 })
