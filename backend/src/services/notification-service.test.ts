@@ -49,7 +49,7 @@ describe('sendHandoffAlert', () => {
     expect(result).toEqual({ notified: true })
     const [clientId, templateName, params] = sendWhatsAppTemplateToClientNumber.mock.calls[0]
     expect(clientId).toBe('client-1')
-    expect(templateName).toBe('lead_handoff_alert_1')
+    expect(templateName, 'the richer template is preferred').toBe('lead_handoff_alert_1')
     expect(params[0]).toBe('Ravi Kumar')
     expect(params[1]).toBe('+919876543210')
     expect(params[2]).toBe('No booking after 3 follow-ups')
@@ -61,7 +61,9 @@ describe('sendHandoffAlert', () => {
   // not a crash, and has to be distinguishable in the log from one who never
   // connected WhatsApp at all.
   it('reports a missing notificationNumber as its own skip rather than throwing', async () => {
-    sendWhatsAppTemplateToClientNumber.mockResolvedValueOnce({
+    // Not mockResolvedValueOnce: a missing notificationNumber is a property of
+    // the CLIENT, so every template in the preference order hits it.
+    sendWhatsAppTemplateToClientNumber.mockResolvedValue({
       success: false,
       error: 'Client has no notificationNumber configured',
       retryable: false,
@@ -74,11 +76,17 @@ describe('sendHandoffAlert', () => {
   })
 
   it('reports a failed send without throwing', async () => {
-    sendWhatsAppTemplateToClientNumber.mockResolvedValueOnce({ success: false, error: 'Template not approved', retryable: false })
+    sendWhatsAppTemplateToClientNumber.mockResolvedValue({
+      success: false,
+      error: 'Template not approved',
+      retryable: false,
+    })
 
     const result = await sendHandoffAlert(baseInput)
 
     expect(result).toEqual({ notified: false, skipReason: 'send_failed', error: 'Template not approved' })
+    // Both templates were tried before giving up.
+    expect(sendWhatsAppTemplateToClientNumber).toHaveBeenCalledTimes(2)
   })
 
   // AC4: the journey has already stopped talking to the lead by the time this
@@ -161,5 +169,48 @@ describe('leadDetailUrl', () => {
 describe('flattenTemplateParam', () => {
   it('collapses every run of whitespace Meta would reject', () => {
     expect(flattenTemplateParam('  a\n\nb\t c    d  ')).toBe('a b c d')
+  })
+})
+
+// lead_handoff_alert_1 sat in Meta's review queue for a day while every other
+// template on the WABA cleared in minutes. _2 is the simpler shape that is
+// likely to clear, and the fall-through is what stops the feature waiting on a
+// queue nobody controls -- and what lets _1 take over the moment it approves,
+// with no deploy.
+describe('handoff template fall-through', () => {
+  it('sends the simpler template when the preferred one cannot send', async () => {
+    sendWhatsAppTemplateToClientNumber
+      .mockResolvedValueOnce({ success: false, error: 'Template name does not exist', retryable: false })
+      .mockResolvedValueOnce({ success: true, messageId: 'wamid.2' })
+
+    const result = await sendHandoffAlert(baseInput)
+
+    expect(result).toEqual({ notified: true })
+    expect(sendWhatsAppTemplateToClientNumber.mock.calls[1][1]).toBe('lead_handoff_alert_2')
+  })
+
+  // Three params, not five. Sending _1's five against _2 would fail on
+  // parameter count, which is the obvious way a fall-through like this breaks.
+  it('sends the simpler template its own three parameters', async () => {
+    sendWhatsAppTemplateToClientNumber
+      .mockResolvedValueOnce({ success: false, error: 'nope', retryable: false })
+      .mockResolvedValueOnce({ success: true, messageId: 'wamid.2' })
+
+    await sendHandoffAlert(baseInput)
+
+    const [, , params] = sendWhatsAppTemplateToClientNumber.mock.calls[1]
+    expect(params).toEqual(['Ravi Kumar', '+919876543210', 'No booking after 3 follow-ups'])
+  })
+
+  // A retryable failure is Meta being down, not this template being unusable.
+  // Trying the next one would fail identically and log a second error for one
+  // outage.
+  it('does not fall through when the failure was transient', async () => {
+    sendWhatsAppTemplateToClientNumber.mockResolvedValue({ success: false, error: '503', retryable: true })
+
+    const result = await sendHandoffAlert(baseInput)
+
+    expect(result.notified).toBe(false)
+    expect(sendWhatsAppTemplateToClientNumber).toHaveBeenCalledTimes(1)
   })
 })

@@ -18,8 +18,24 @@ import { readJourneyLead } from './lead-resolution-service.js'
 import { sendWhatsAppTemplateToClientNumber } from './whatsapp-service.js'
 import { templateLanguageOf } from '../lib/whatsapp-templates.js'
 import type { LeadEvent, LeadRef } from '../types/index.js'
+import type { WhatsAppSendResult } from '../lib/whatsapp-provider.js'
 
-export const HANDOFF_ALERT_TEMPLATE = 'lead_handoff_alert_1'
+// Tried in order, first success wins.
+//
+// Not a constant to flip by hand, because that would need a deploy on the day
+// Meta happens to approve _1 -- and the whole reason _2 exists is that nobody
+// can predict that day. Preferring _1 and falling through means the richer
+// message starts being sent the moment it is approved, with no release.
+//
+// The fall-through fires on any NON-RETRYABLE failure rather than on a parsed
+// "template not approved" error, because the provider keeps only Meta's error
+// STRING and not its code (meta-whatsapp-provider.ts interpretSendResponse), and
+// matching prose is how this would quietly stop working after a Meta copy edit.
+// The cost of the looser rule is one extra API call on a genuine failure --
+// against a handoff that fires days into a journey, that is nothing.
+export const HANDOFF_ALERT_TEMPLATES = ['lead_handoff_alert_1', 'lead_handoff_alert_2'] as const
+
+export type HandoffAlertTemplate = (typeof HANDOFF_ALERT_TEMPLATES)[number]
 
 // How many of the most recent events to fold into the summary line. Enough to
 // show why the agent gave up, short enough to stay inside a template
@@ -102,31 +118,47 @@ export async function sendHandoffAlert(input: HandoffAlertInput): Promise<Handof
     // and reason are the parts that make the message actionable.
     const events = await getLeadEvents(input.leadRef.leadId).catch(() => [] as LeadEvent[])
 
-    const result = await sendWhatsAppTemplateToClientNumber(
-      input.clientId,
-      HANDOFF_ALERT_TEMPLATE,
-      [
-        flattenTemplateParam(lead.name || 'Unnamed lead'),
-        flattenTemplateParam(lead.phone || 'Not on file'),
-        flattenTemplateParam(input.reason) || 'No reason recorded',
-        summarizeRecentMessages(events),
-        leadDetailUrl(input.leadRef),
-      ],
-      templateLanguageOf(HANDOFF_ALERT_TEMPLATE)
-    )
+    const name = flattenTemplateParam(lead.name || 'Unnamed lead')
+    const phone = flattenTemplateParam(lead.phone || 'Not on file')
+    const reason = flattenTemplateParam(input.reason) || 'No reason recorded'
 
-    if (result.success) return { notified: true }
+    // _2 is deliberately the same first three values, so the human gets the
+    // same identifying facts either way. What it loses is the transcript and
+    // the deep link -- it lands them on the inbox instead of on the lead.
+    const paramsFor: Record<HandoffAlertTemplate, string[]> = {
+      lead_handoff_alert_1: [name, phone, reason, summarizeRecentMessages(events), leadDetailUrl(input.leadRef)],
+      lead_handoff_alert_2: [name, phone, reason],
+    }
 
-    const skipReason = result.error?.includes('notificationNumber')
+    let result: WhatsAppSendResult | undefined
+    for (const template of HANDOFF_ALERT_TEMPLATES) {
+      result = await sendWhatsAppTemplateToClientNumber(
+        input.clientId,
+        template,
+        paramsFor[template],
+        templateLanguageOf(template)
+      )
+
+      if (result.success) return { notified: true }
+
+      // A retryable failure is Meta being unavailable, not this template being
+      // unusable. Trying the next one would just fail the same way and muddy
+      // the log with a second error for one outage.
+      if (result.retryable) break
+
+      console.log(`[notification] ${template} did not send (${result.error ?? 'no detail'}); trying the next template`)
+    }
+
+    const skipReason = result?.error?.includes('notificationNumber')
       ? 'no_notification_number'
-      : result.error?.includes('No active WhatsApp connection')
+      : result?.error?.includes('No active WhatsApp connection')
         ? 'no_active_connection'
         : 'send_failed'
 
     console.log(
-      `[notification] handoff alert not delivered: reason=${skipReason} trigger=${input.trigger} client=${input.clientId} lead=${input.leadRef.leadId} error="${result.error ?? ''}"`
+      `[notification] handoff alert not delivered: reason=${skipReason} trigger=${input.trigger} client=${input.clientId} lead=${input.leadRef.leadId} error="${result?.error ?? ''}"`
     )
-    return { notified: false, skipReason, ...(result.error ? { error: result.error } : {}) }
+    return { notified: false, skipReason, ...(result?.error ? { error: result.error } : {}) }
   } catch (error) {
     // The catch-all that makes the promise in this file's header true: no
     // failure mode reaches the journey execution or the scheduler.
