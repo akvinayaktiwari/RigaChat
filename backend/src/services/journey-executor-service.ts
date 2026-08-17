@@ -64,7 +64,7 @@ async function handleSendMessage(event: JourneyExecutorEvent): Promise<Record<st
   // form or Meta lead resolved to null and every send reported no_phone_number
   // for a lead whose phone was on file. The event already carries leadSource
   // and leadParentId for exactly this.
-  const lead = await readJourneyLead(toLeadRef(event))
+  const lead = await readJourneyLead(toLeadRef(event), event.clientId)
   if (!lead?.phone) {
     return { sent: false, reason: 'no_phone_number', message: 'Lead has no phone number on file.' }
   }

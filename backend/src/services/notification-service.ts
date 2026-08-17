@@ -106,7 +106,7 @@ export function leadDetailUrl(leadRef: LeadRef): string {
 
 export async function sendHandoffAlert(input: HandoffAlertInput): Promise<HandoffAlertResult> {
   try {
-    const lead = await readJourneyLead(input.leadRef)
+    const lead = await readJourneyLead(input.leadRef, input.clientId)
     if (!lead) {
       console.log(
         `[notification] handoff alert skipped: lead_not_found client=${input.clientId} lead=${input.leadRef.leadId}`

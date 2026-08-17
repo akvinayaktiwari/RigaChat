@@ -43,7 +43,7 @@ export async function bookAppointment(input: BookAppointmentInput): Promise<Appo
   // Same fix as journey-executor-service: getLeadById reads the chat leads
   // table only, so a form or Meta lead came back null and was booked as
   // "Lead" with no attendee email -- which Cal.com can reject outright.
-  const lead = await readJourneyLead(toLeadRef(input))
+  const lead = await readJourneyLead(toLeadRef(input), input.clientId)
 
   let result: Awaited<ReturnType<typeof bookViaCalCom>>
   try {
