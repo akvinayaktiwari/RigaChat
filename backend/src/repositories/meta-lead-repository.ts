@@ -28,12 +28,19 @@ export async function createMetaLead(data: Omit<MetaLead, 'leadId' | 'createdAt'
 // Point read on the base table's real key. pageId is the partition key and
 // leadId the sort key (see the GSI comment below), so a Meta lead cannot be
 // fetched by leadId alone -- which is why LeadRef carries the pageId.
-export async function getMetaLeadById(pageId: string, leadId: string): Promise<MetaLead | null> {
+// Keyed by clientId, NOT pageId. The base table's partition key is clientId and
+// its range key is leadId -- pageId is only an attribute, and a Key built from
+// it is rejected outright by DynamoDB ("provided key element does not match the
+// schema"). That is not a lookup that returns nothing; it throws, which is why
+// every Meta lead's detail page failed to open while the list beside it worked:
+// the list reads the clientId-createdAt GSI and was always addressing the table
+// correctly.
+export async function getMetaLeadById(clientId: string, leadId: string): Promise<MetaLead | null> {
   try {
     const result = await dynamoClient.send(
       new GetCommand({
         TableName: LEADS_TABLE_NAME(),
-        Key: { pageId, leadId },
+        Key: { clientId, leadId },
       })
     )
     return (result.Item as MetaLead | undefined) ?? null

@@ -152,7 +152,7 @@ function labelCustomFields(
 // read the same row twice per page load to assemble one object.
 type SourceRecord = Omit<UnifiedLeadDetail, 'leadRef' | 'state'>
 
-async function readSourceRecord(leadRef: LeadRef): Promise<SourceRecord | null> {
+async function readSourceRecord(leadRef: LeadRef, clientId: string): Promise<SourceRecord | null> {
   switch (leadRef.source) {
     case 'chat': {
       const lead = await getLeadById(leadRef.botId, leadRef.leadId)
@@ -172,7 +172,7 @@ async function readSourceRecord(leadRef: LeadRef): Promise<SourceRecord | null> 
       }
     }
     case 'meta': {
-      const lead = await getMetaLeadById(leadRef.pageId, leadRef.leadId)
+      const lead = await getMetaLeadById(clientId, leadRef.leadId)
       if (!lead) return null
       return {
         ...normalizeMetaLead(lead),
@@ -187,7 +187,7 @@ export async function getUnifiedLeadDetail(
   leadRef: LeadRef,
   clientId: string
 ): Promise<UnifiedLeadDetail> {
-  const [record, state] = await Promise.all([readSourceRecord(leadRef), getLeadState(leadRef.leadId)])
+  const [record, state] = await Promise.all([readSourceRecord(leadRef, clientId), getLeadState(leadRef.leadId)])
 
   // 404 either way (missing vs. owned by someone else) -- don't reveal
   // existence to a non-owner. Mirrors lead-service.ts's getLeadDetail.
@@ -204,7 +204,7 @@ export async function getUnifiedLeadDetail(
 // same read the journey layer uses, so a lead that cannot be resolved here
 // cannot be acted on there either.
 async function assertLeadOwnedByClient(leadRef: LeadRef, clientId: string): Promise<void> {
-  const lead = await readJourneyLead(leadRef)
+  const lead = await readJourneyLead(leadRef, clientId)
   // 404 either way (missing vs. owned by someone else) -- don't reveal
   // existence to a non-owner. Mirrors lead-service.ts's getLeadDetail.
   if (!lead || lead.clientId !== clientId) {
@@ -253,7 +253,7 @@ export async function addLeadNoteForClient(
 const MAX_TIMELINE_EVENTS = 500
 
 export async function getLeadTimeline(leadRef: LeadRef, clientId: string): Promise<LeadEvent[]> {
-  const record = await readSourceRecord(leadRef)
+  const record = await readSourceRecord(leadRef, clientId)
 
   // 404 either way, so a non-owner cannot distinguish "does not exist" from
   // "not yours".

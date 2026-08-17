@@ -50,7 +50,7 @@ describe('readJourneyLead — one shape across three tables', () => {
       sourceUrl: 'https://example.com',
     })
 
-    await expect(readJourneyLead({ source: 'chat', botId: 'bot-1', leadId: 'lead-1' })).resolves.toMatchObject({
+    await expect(readJourneyLead({ source: 'chat', botId: 'bot-1', leadId: 'lead-1' }, 'client-1')).resolves.toMatchObject({
       leadId: 'lead-1',
       source: 'chat',
       name: 'Asha',
@@ -62,7 +62,7 @@ describe('readJourneyLead — one shape across three tables', () => {
   // The case that was structurally broken before this service existed: a Meta
   // lead lives in meta_leads under a pageId and has no botId at all, so the
   // journey layer's getLeadById(botId, leadId) always returned null for it.
-  it('reads a Meta lead by its pageId, which has no botId anywhere', async () => {
+  it('reads a Meta lead by clientId, which is the meta_leads partition key', async () => {
     getMetaLeadById.mockResolvedValue({
       leadId: 'lead-2',
       clientId: 'client-1',
@@ -70,12 +70,16 @@ describe('readJourneyLead — one shape across three tables', () => {
       phone: '+919812345678',
     })
 
-    await expect(readJourneyLead({ source: 'meta', pageId: 'page-9', leadId: 'lead-2' })).resolves.toMatchObject({
+    await expect(readJourneyLead({ source: 'meta', pageId: 'page-9', leadId: 'lead-2' }, 'client-1')).resolves.toMatchObject({
       leadId: 'lead-2',
       source: 'meta',
       phone: '+919812345678',
     })
-    expect(getMetaLeadById).toHaveBeenCalledWith('page-9', 'lead-2')
+    // pageId is a discriminator on the LeadRef, NOT an address: meta_leads is
+    // partitioned by clientId. Keying by pageId is rejected by DynamoDB rather
+    // than returning nothing, which is what broke every Meta lead detail page
+    // while this test -- asserting the same wrong shape -- stayed green.
+    expect(getMetaLeadById).toHaveBeenCalledWith('client-1', 'lead-2')
   })
 
   it('extracts contact fields out of a form lead’s customFields blob', async () => {
@@ -92,7 +96,7 @@ describe('readJourneyLead — one shape across three tables', () => {
       sourceUrl: 'https://example.com/contact',
     })
 
-    await expect(readJourneyLead({ source: 'form', formId: 'form-1', leadId: 'lead-3' })).resolves.toMatchObject({
+    await expect(readJourneyLead({ source: 'form', formId: 'form-1', leadId: 'lead-3' }, 'client-1')).resolves.toMatchObject({
       source: 'form',
       name: 'Meera',
       phone: '+919000000000',
@@ -110,14 +114,14 @@ describe('readJourneyLead — one shape across three tables', () => {
       sourceUrl: 'https://example.com',
     })
 
-    const lead = await readJourneyLead({ source: 'form', formId: 'form-1', leadId: 'lead-4' })
+    const lead = await readJourneyLead({ source: 'form', formId: 'form-1', leadId: 'lead-4' }, 'client-1')
     expect(lead).toMatchObject({ leadId: 'lead-4', source: 'form' })
     expect(lead?.phone).toBeUndefined()
   })
 
   it('returns null for a lead that does not exist', async () => {
     getLeadById.mockResolvedValue(null)
-    await expect(readJourneyLead({ source: 'chat', botId: 'bot-1', leadId: 'nope' })).resolves.toBeNull()
+    await expect(readJourneyLead({ source: 'chat', botId: 'bot-1', leadId: 'nope' }, 'client-1')).resolves.toBeNull()
   })
 })
 

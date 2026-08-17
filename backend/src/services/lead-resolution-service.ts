@@ -167,14 +167,18 @@ export function toLeadRef(parts: {
   return { source: 'chat', botId: parts.botId, leadId: parts.leadId }
 }
 
-export async function readJourneyLead(leadRef: LeadRef): Promise<JourneyLead | null> {
+// clientId is required because the three lead tables are keyed three different
+// ways and meta_leads is partitioned by clientId -- the LeadRef alone cannot
+// address it. Every caller already holds it (from auth, or from the journey
+// event), so this asks for nothing new.
+export async function readJourneyLead(leadRef: LeadRef, clientId: string): Promise<JourneyLead | null> {
   switch (leadRef.source) {
     case 'chat': {
       const lead = await getLeadById(leadRef.botId, leadRef.leadId)
       return lead ? normalizeChatLead(lead) : null
     }
     case 'meta': {
-      const lead = await getMetaLeadById(leadRef.pageId, leadRef.leadId)
+      const lead = await getMetaLeadById(clientId, leadRef.leadId)
       return lead ? normalizeMetaLead(lead) : null
     }
     case 'form': {

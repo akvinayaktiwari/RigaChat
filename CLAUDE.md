@@ -125,6 +125,7 @@ interface KnowledgeBaseEntry {
 - clients — partition key: clientId
 - bots — partition key: clientId, sort key: botId
 - leads — partition key: botId, sort key: createdAt
+- meta_leads — partition key: clientId, sort key: leadId, GSI clientId-createdAt-index (NOT partitioned by pageId — pageId is an attribute and a discriminator on LeadRef, never an address)
 - conversations — partition key: botId, sort key: conversationId
 - knowledge_base — partition key: botId, sort key: entryId
 - journeys — partition key: botId, sort key: bundleId
