@@ -238,6 +238,52 @@ describe('executeJourneyStep', () => {
       expect(sendWhatsAppMessageToLead).toHaveBeenCalledWith('client-1', '+15551234567', 'Hi, checking in!')
       expect(result).toMatchObject({ sent: true, messageId: 'msg-1' })
     })
+
+    // D12's precedence: the agent's grounded answer to what the lead just said
+    // beats the step's authored line. Without this the lead gets a script in
+    // reply to a question, which is the behaviour the whole epic set out to fix.
+    it('prefers the agent’s composed reply over the step’s authored hint', async () => {
+      getLeadById.mockResolvedValueOnce({ leadId: 'lead-1', phone: '+15551234567' })
+      hasActiveWhatsAppSession.mockResolvedValueOnce(true)
+      sendWhatsAppMessageToLead.mockResolvedValueOnce({ success: true, messageId: 'msg-2' })
+
+      await executeJourneyStep({
+        ...baseContext,
+        channel: 'whatsapp',
+        operation: 'send_message',
+        stepId: 'greet',
+        messageHint: 'Hi, checking in!',
+        lastResult: { replied: true, message: 'what are the amenities?', composedReply: 'There is a gym and a pool.' },
+      })
+
+      expect(sendWhatsAppMessageToLead).toHaveBeenCalledWith(
+        'client-1',
+        '+15551234567',
+        'There is a gym and a pool.'
+      )
+    })
+
+    // Epic A's definition of done #5: a journey published BEFORE the agent could
+    // compose must run unchanged, without republishing. Its already-compiled
+    // state machine passes no lastResult.composedReply, so the send has to fall
+    // straight back to the authored line -- this is that event, exactly as an
+    // old execution still emits it.
+    it('falls back to the authored hint for a journey compiled before composition existed', async () => {
+      getLeadById.mockResolvedValueOnce({ leadId: 'lead-1', phone: '+15551234567' })
+      hasActiveWhatsAppSession.mockResolvedValueOnce(true)
+      sendWhatsAppMessageToLead.mockResolvedValueOnce({ success: true, messageId: 'msg-3' })
+
+      await executeJourneyStep({
+        ...baseContext,
+        channel: 'whatsapp',
+        operation: 'send_message',
+        stepId: 'greet',
+        messageHint: 'Hi, checking in!',
+        lastResult: { replied: true, message: 'ok' },
+      })
+
+      expect(sendWhatsAppMessageToLead).toHaveBeenCalledWith('client-1', '+15551234567', 'Hi, checking in!')
+    })
   })
 
   describe('tool_call', () => {

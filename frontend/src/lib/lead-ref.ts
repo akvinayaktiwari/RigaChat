@@ -9,8 +9,28 @@ import type { LeadRef } from '../types/index'
 // /dashboard/leads/:leadId?botId=... link (bookmarked, or in an old email)
 // still resolves — see parseLeadRef's chat fallback.
 
+// For the DETAIL PATH only: leadId is deliberately absent because
+// leadDetailPath below puts it in the path segment, and repeating it in the
+// query would be two sources of truth for the same value in one URL.
+//
+// Do NOT reach for this when calling an API. Every /api/leads/* endpoint takes
+// the whole ref in query params, leadId included, and parses it with a
+// validator that returns null without one -- a 400 that reads as "a valid
+// leadRef is required" rather than "you forgot leadId". Use leadRefToQuery.
 export function leadRefToSearch(ref: LeadRef): string {
   const params = new URLSearchParams({ source: ref.source })
+  if (ref.source === 'chat') params.set('botId', ref.botId)
+  if (ref.source === 'form') params.set('formId', ref.formId)
+  if (ref.source === 'meta') params.set('pageId', ref.pageId)
+  return params.toString()
+}
+
+// For API CALLS: the complete ref, leadId included. The two functions exist
+// separately because their one difference is invisible at the call site --
+// /api/leads/events shipped using the path-shaped one and returned 400 for
+// every lead, which no type could have caught since both return a string.
+export function leadRefToQuery(ref: LeadRef): string {
+  const params = new URLSearchParams({ source: ref.source, leadId: ref.leadId })
   if (ref.source === 'chat') params.set('botId', ref.botId)
   if (ref.source === 'form') params.set('formId', ref.formId)
   if (ref.source === 'meta') params.set('pageId', ref.pageId)

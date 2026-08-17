@@ -53,7 +53,7 @@ import type {
   BotWhatsAppStatus,
   LeadEvent,
 } from '../types/index'
-import { leadRefToSearch } from '../lib/lead-ref'
+import { leadRefToQuery } from '../lib/lead-ref'
 
 const BASE_URL = import.meta.env.VITE_API_URL
 
@@ -203,17 +203,14 @@ export function getLeadInbox(): Promise<ApiResponse<UnifiedLead[]>> {
 
 // The whole LeadRef travels in the query string because this is a GET reached
 // by opening a link — see lib/lead-ref.ts for the URL shape.
-// The lead's timeline. Same LeadRef-in-query-params shape as the detail call.
+// The lead's timeline. Same LeadRef-in-query-params shape as the detail call --
+// leadRefToQuery, NOT leadRefToSearch, which omits leadId for the detail path.
 export function getLeadEvents(leadRef: LeadRef): Promise<ApiResponse<LeadEvent[]>> {
-  return apiClient<LeadEvent[]>(`/api/leads/events?${leadRefToSearch(leadRef)}`)
+  return apiClient<LeadEvent[]>(`/api/leads/events?${leadRefToQuery(leadRef)}`)
 }
 
 export function getUnifiedLeadDetail(leadRef: LeadRef): Promise<ApiResponse<UnifiedLeadDetail>> {
-  const params = new URLSearchParams({ source: leadRef.source, leadId: leadRef.leadId })
-  if (leadRef.source === 'chat') params.set('botId', leadRef.botId)
-  if (leadRef.source === 'form') params.set('formId', leadRef.formId)
-  if (leadRef.source === 'meta') params.set('pageId', leadRef.pageId)
-  return apiClient<UnifiedLeadDetail>(`/api/leads/detail?${params.toString()}`)
+  return apiClient<UnifiedLeadDetail>(`/api/leads/detail?${leadRefToQuery(leadRef)}`)
 }
 
 // The leadRef goes in the body because it names the source table AND its parent

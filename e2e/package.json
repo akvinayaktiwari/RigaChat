@@ -6,7 +6,8 @@
   "scripts": {
     "test": "node --env-file=../backend/.env ./node_modules/.bin/playwright test",
     "test:headed": "node --env-file=../backend/.env ./node_modules/.bin/playwright test --headed",
-    "test:prod": "playwright test tests/journey-lead-capture.spec.ts"
+    "test:prod": "playwright test tests/journey-lead-capture.spec.ts",
+    "test:loop": "node --env-file=../backend/.env ./node_modules/.bin/playwright test tests/journey-whatsapp-full-loop.spec.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",

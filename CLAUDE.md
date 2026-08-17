@@ -60,6 +60,14 @@ GET  /api/journeys/:botId/:bundleId      -> fetch one JourneyBundle (auth requir
 PATCH /api/journeys/:botId/:bundleId     -> update a JourneyBundle (auth required)
 DELETE /api/journeys/:botId/:bundleId    -> delete a JourneyBundle (auth required)
 POST /api/journeys/:botId/:bundleId/publish -> compile + mark published, no live infra provisioned yet (auth required)
+POST /api/agents                         -> create a cross-channel Agent (auth required)
+GET  /api/agents                         -> list the caller's Agents (auth required)
+GET  /api/agents/:agentId                -> fetch one Agent (auth required)
+DELETE /api/agents/:agentId              -> delete an Agent (auth required)
+PATCH /api/agents/:agentId/scripted-only -> kill switch: true stops the agent composing replies and returns it to
+                                            its journeys' authored lines, with no deploy. Its own route rather than a
+                                            generic PATCH because `channels` is claim-guarded and must only change
+                                            through the bind/unbind paths (auth required)
 POST /api/scheduler                      -> create a ScheduledAction (EventBridge Scheduler) (auth required)
 GET  /api/scheduler                      -> list the caller's ScheduledActions (auth required)
 PATCH /api/scheduler/:scheduleId         -> update a ScheduledAction's cadence (auth required)

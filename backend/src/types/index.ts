@@ -870,6 +870,19 @@ export interface Agent {
   // Optional per-channel bindings. An Agent may have one, two, or three; a
   // channel is present only once wired in.
   channels: Partial<Record<AgentChannel, AgentChannelBinding>>
+  // The kill switch for composed replies: true puts this Agent back to the
+  // scripted behaviour it had before it could answer questions. Its journeys
+  // still run and still send their authored messageHint lines; what stops is
+  // the model writing words of its own.
+  //
+  // Optional and defaulting to OFF (i.e. composition on), because every Agent
+  // that exists today composes and a required field would have flipped them
+  // all to scripted on deploy.
+  //
+  // This exists so a client whose agent says something wrong can be stopped in
+  // seconds from the dashboard. The alternative is a code deploy, which is not
+  // a rollback plan when a live agent is talking to real leads.
+  scriptedOnly?: boolean
   createdAt: string
   updatedAt: string
 }

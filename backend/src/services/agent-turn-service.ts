@@ -42,7 +42,7 @@ const COMPOSE_FALLBACK =
 export type TurnOutcome =
   | { status: 'sent'; text: string }
   | { status: 'composed_for_journey'; text: string }
-  | { status: 'skipped'; reason: 'opted_out' | 'no_phone' | 'empty_message' | 'bot_missing' }
+  | { status: 'skipped'; reason: 'opted_out' | 'no_phone' | 'empty_message' | 'bot_missing' | 'scripted_only' }
 
 export interface AgentTurnInput {
   agent: Agent
@@ -78,6 +78,21 @@ export async function runAgentTurn(input: AgentTurnInput): Promise<TurnOutcome> 
   const text = message.trim()
   if (text.length === 0) {
     return { status: 'skipped', reason: 'empty_message' }
+  }
+
+  // The kill switch, checked before the OpenAI call for the same reason opt-out
+  // is: an Agent that has been switched back to scripted must not spend a
+  // completion, and must not be able to say anything of its own.
+  //
+  // Skipping here is precisely "fully scripted", not "silent". The caller only
+  // sets composedReply on 'composed_for_journey', so a skip leaves it undefined
+  // and handleInboundLeadMessage still resumes the parked journey -- whose next
+  // send_message then sends its authored messageHint. With no journey parked
+  // nothing is sent at all, which is exactly what this Agent did before it
+  // could compose.
+  if (agent.scriptedOnly) {
+    console.log(`[agent-turn] agent ${agent.agentId} is scripted-only; not composing for lead ${lead.leadId}`)
+    return { status: 'skipped', reason: 'scripted_only' }
   }
 
   // Checked before anything else, including before spending an OpenAI call. A

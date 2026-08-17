@@ -199,6 +199,19 @@ export async function bindWhatsAppToAgent(agentId: string, clientId: string): Pr
   }
 }
 
+// The kill switch, settable at runtime -- the whole point is that stopping a
+// misbehaving agent does not wait for a deploy. Ownership is checked the same
+// way every other mutation here checks it, so one client cannot silence
+// another's agent.
+export async function setAgentScriptedOnly(
+  agentId: string,
+  clientId: string,
+  scriptedOnly: boolean
+): Promise<Agent> {
+  await getOwnedAgent(agentId, clientId)
+  return updateAgentRecord(agentId, clientId, { scriptedOnly })
+}
+
 export async function unbindWhatsAppFromAgent(agentId: string, clientId: string): Promise<Agent> {
   const agent = await getOwnedAgent(agentId, clientId)
   const resourceId = agent.channels.whatsapp?.resourceId

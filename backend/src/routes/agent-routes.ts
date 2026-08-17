@@ -1,7 +1,13 @@
 import { Hono } from 'hono'
 import { requireAuth } from '../lib/cognito.js'
 import { AgentBindingConflictError } from '../repositories/agent-binding-lookup-repository.js'
-import { createAgent, deleteAgent, getAgent, getAgents } from '../services/agent-service.js'
+import {
+  createAgent,
+  deleteAgent,
+  getAgent,
+  getAgents,
+  setAgentScriptedOnly,
+} from '../services/agent-service.js'
 import type { Agent, AgentChannel, AgentChannelBinding, ApiResponse } from '../types/index.js'
 
 interface AuthEnv {
@@ -63,6 +69,32 @@ agentRoutes.get('/:agentId', requireAuth, async (c) => {
   const agentId = c.req.param('agentId')
   try {
     const agent = await getAgent(agentId, clientId)
+    return c.json<ApiResponse<Agent>>({ success: true, data: agent }, 200)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Agent not found') {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+// The kill switch. Its own route rather than a general PATCH on the Agent,
+// because `channels` is claim-guarded and must only ever change through
+// bindWhatsAppToAgent/unbind -- a generic PATCH would be a way to write it
+// without touching agent_binding_lookup.
+agentRoutes.patch('/:agentId/scripted-only', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const agentId = c.req.param('agentId')
+  const body = await c.req.json<{ scriptedOnly?: unknown }>().catch(() => ({ scriptedOnly: undefined }))
+
+  // Explicitly typed rather than truthy: this is a safety control, and
+  // `{"scriptedOnly":"false"}` must not read as true.
+  if (typeof body.scriptedOnly !== 'boolean') {
+    return c.json<ApiResponse<null>>({ success: false, error: 'scriptedOnly must be true or false' }, 400)
+  }
+
+  try {
+    const agent = await setAgentScriptedOnly(agentId, clientId, body.scriptedOnly)
     return c.json<ApiResponse<Agent>>({ success: true, data: agent }, 200)
   } catch (error) {
     if (error instanceof Error && error.message === 'Agent not found') {

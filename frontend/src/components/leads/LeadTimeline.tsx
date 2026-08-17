@@ -141,7 +141,7 @@ export interface LeadTimelineProps {
 export default function LeadTimeline({ events, loading, error }: LeadTimelineProps) {
   if (loading) {
     return (
-      <div className="space-y-3" aria-busy="true">
+      <div className="space-y-3" aria-busy="true" data-testid="lead-timeline" data-state="loading">
         {[0, 1, 2].map((i) => (
           <div key={i} className="h-12 bg-gray-100 rounded-xl animate-pulse" />
         ))}
@@ -155,13 +155,19 @@ export default function LeadTimeline({ events, loading, error }: LeadTimelinePro
   // idle when it may be working fine.
   if (error) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+      <div
+        className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        data-testid="lead-timeline"
+        data-state="error"
+      >
+        {error}
+      </div>
     )
   }
 
   if (events.length === 0) {
     return (
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-gray-500" data-testid="lead-timeline" data-state="empty">
         Nothing has happened on this lead yet. Messages, journey steps and handoffs will appear here.
       </p>
     )
@@ -179,8 +185,12 @@ export default function LeadTimeline({ events, loading, error }: LeadTimelinePro
 
   const visible = events.filter((event) => event.type !== 'message_status')
 
+  // data-state carries which of the four branches rendered. The e2e spec
+  // asserts on it so a run that finds an error card fails with "error" instead
+  // of "the timeline never appeared", which is the same distinction the error
+  // branch above exists to preserve for the client.
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="lead-timeline" data-state="ready">
       {visible.map((event) => {
         const key = `${event.leadId}-${event.ts}`
         const isMessage = event.type === 'message_in' || event.type === 'message_out'
