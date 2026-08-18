@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
 import { createJourneyBundle, getJourneyBundle, publishJourneyBundle, updateJourneyBundle } from '../services/api'
 import { useToast } from '../components/Toast/Toast'
+import JourneyGraph from '../components/journey/JourneyGraph'
 import type {
   AgentConfig,
   JourneyBundle,
@@ -556,6 +557,9 @@ export default function JourneyBuilderPage() {
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [existing, setExisting] = useState<JourneyBundle | null>(null)
+  // Which node the map has highlighted. Purely a view concern today; the
+  // inspector will take ownership of it.
+  const [selectedStepId, setSelectedStepId] = useState<string | null>(null)
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -858,6 +862,30 @@ export default function JourneyBuilderPage() {
         </div>
       </div>
 
+      {/* The journey drawn as the graph it actually is. Additive for now: the
+          step list below is still the way to edit, so nothing is lost while the
+          inspector is being built. Selecting a node scrolls to its card. */}
+      <div className="bg-white rounded-2xl border border-black/5 p-6 mb-4">
+        <div className="flex items-baseline gap-3 mb-4">
+          <h2 className="font-bold text-gray-900" style={JAKARTA_FONT}>
+            Journey map
+          </h2>
+          <p className="text-sm text-gray-500">What this agent will actually do, in order.</p>
+        </div>
+
+        <JourneyGraph
+          steps={steps}
+          startStepId={steps[0]?.stepId ?? ''}
+          selectedStepId={selectedStepId}
+          onSelect={(stepId) => {
+            setSelectedStepId(stepId)
+            document
+              .getElementById(`step-card-${stepId}`)
+              ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }}
+        />
+      </div>
+
       <div className="bg-white rounded-2xl border border-black/5 p-6 mb-4">
         <h2 className="font-bold text-gray-900 mb-4" style={JAKARTA_FONT}>
           Steps
@@ -868,8 +896,8 @@ export default function JourneyBuilderPage() {
         ) : (
           <div className="space-y-3 mb-4">
             {steps.map((step, index) => (
+              <div key={step.stepId} id={`step-card-${step.stepId}`}>
               <StepEditor
-                key={step.stepId}
                 step={step}
                 index={index}
                 steps={steps}
@@ -881,6 +909,7 @@ export default function JourneyBuilderPage() {
                 canMoveUp={index > 0}
                 canMoveDown={index < steps.length - 1}
               />
+              </div>
             ))}
           </div>
         )}
