@@ -70,23 +70,23 @@ function Detail({ step }: { step: JourneyStep }) {
       return step.messageHint ? (
         <p className="text-[12.5px] text-gray-500 leading-snug line-clamp-2">“{step.messageHint}”</p>
       ) : (
-        <p className="text-[12.5px] text-gray-400 leading-snug italic">The agent writes this itself</p>
+        <p className="text-[12.5px] text-gray-400 leading-snug italic line-clamp-2">The agent writes this itself</p>
       )
     case 'wait':
       return (
-        <p className="text-[12.5px] text-gray-500 leading-snug">
+        <p className="text-[12.5px] text-gray-500 leading-snug line-clamp-2">
           {step.waitDays} {step.waitDays === 1 ? 'day' : 'days'}
         </p>
       )
     case 'await_reply':
       return (
-        <p className="text-[12.5px] text-gray-500 leading-snug">
+        <p className="text-[12.5px] text-gray-500 leading-snug line-clamp-2">
           {step.promptHint ? step.promptHint : 'Pauses until the lead answers'}
         </p>
       )
     case 'tool_call':
       return step.toolName ? (
-        <p className="text-[12.5px] text-gray-500 leading-snug">
+        <p className="text-[12.5px] text-gray-500 leading-snug line-clamp-2">
           <Mono>{step.toolName}</Mono>
         </p>
       ) : (
@@ -94,7 +94,7 @@ function Detail({ step }: { step: JourneyStep }) {
       )
     case 'human_handoff':
       return (
-        <p className="text-[12.5px] text-gray-500 leading-snug">
+        <p className="text-[12.5px] text-gray-500 leading-snug line-clamp-2">
           {step.reason ? step.reason : 'Ends the journey and alerts a human'}
         </p>
       )
@@ -122,18 +122,26 @@ export default function JourneyNode({ step, selected, onSelect }: JourneyNodePro
         transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2
         ${border} ${selected ? 'shadow-[0_0_0_2px_var(--color-violet-600,#7C3AED)]' : 'hover:border-violet-300'}`}
     >
+      {/* Clips the CONTENT rather than the button, so the loop's REPEAT badge
+          (deliberately positioned outside the card) survives. Heights come from
+          an estimate in journey-graph.ts, so this is the guarantee that an
+          underestimate truncates instead of spilling past the border. */}
+      <div className="flex flex-col gap-1.5 flex-1 min-h-0 overflow-hidden">
       <KindRow step={step} />
 
-      <div style={JAKARTA_FONT} className="font-bold text-[14.5px] leading-snug tracking-[-0.01em] text-gray-900">
+      <div
+        style={JAKARTA_FONT}
+        className="font-bold text-[14.5px] leading-snug tracking-[-0.01em] text-gray-900 line-clamp-3"
+      >
         {step.type === 'condition' ? conditionSentence(step) : step.name}
       </div>
 
       {step.type === 'wait_and_recheck' ? (
         <>
-          <p className="text-[12.5px] text-gray-500 leading-snug">
+          <p className="text-[12.5px] text-gray-500 leading-snug line-clamp-1">
             Every {step.waitDays} {step.waitDays === 1 ? 'day' : 'days'}, up to {step.maxIterations} times
           </p>
-          <p className="text-[12.5px] text-gray-500 leading-snug">
+          <p className="text-[12.5px] text-gray-500 leading-snug line-clamp-1 min-w-0">
             Checks <Mono>{step.recheckField}</Mono>
           </p>
         </>
@@ -142,11 +150,12 @@ export default function JourneyNode({ step, selected, onSelect }: JourneyNodePro
       )}
 
       {rails && (
-        <div className="flex gap-2 mt-auto pt-2.5">
+        <div className="flex gap-2 mt-auto pt-2.5 shrink-0">
           <Rail label={rails[0]} />
           <Rail label={rails[1]} />
         </div>
       )}
+      </div>
 
       {isLoop && (
         <span

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { edgesOf, layout, NODE_SIZE, reachableFrom } from './journey-graph'
+import { edgesOf, layout, nodeHeight, NODE_SIZE, reachableFrom } from './journey-graph'
 import type { JourneyStep } from '../types/index'
 
 function msg(stepId: string, next?: string): JourneyStep {
@@ -202,3 +202,56 @@ describe('layout', () => {
     expect(result.unreachable).toHaveLength(0)
   })
 })
+
+// The overflow seen on screen: a node reserved a FIXED height, so a two-line
+// title plus a two-line reason rendered its last line outside the card border.
+describe('nodes reserve the height their content needs', () => {
+  // Verbatim from the shipped real-estate template's final step, which is what
+  // overflowed.
+  const longHandoff: JourneyStep = {
+    stepId: 'h',
+    name: 'Hand to a human instead of following up again',
+    type: 'human_handoff',
+    reason: 'Lead did not book a site visit after qualification, a nudge, and a wait.',
+  }
+
+  const shortHandoff: JourneyStep = { stepId: 'h2', name: 'Done', type: 'human_handoff' }
+
+  it('gives a wrapping title and reason more room than the minimum', () => {
+    expect(nodeHeight(longHandoff)).toBeGreaterThan(NODE_SIZE.human_handoff.h)
+  })
+
+  it('gives a short node the minimum, not more', () => {
+    expect(nodeHeight(shortHandoff)).toBe(NODE_SIZE.human_handoff.h)
+  })
+
+  it('grows with the amount of text', () => {
+    const longer: JourneyStep = { ...longHandoff, reason: `${longHandoff.reason} ${'and more '.repeat(12)}` }
+
+    expect(nodeHeight(longer)).toBeGreaterThanOrEqual(nodeHeight(longHandoff))
+  })
+
+  it('never returns less than the type minimum', () => {
+    const steps: JourneyStep[] = [
+      msg('a', 'x'),
+      { stepId: 'b', name: 'y', type: 'wait', waitDays: 1 },
+      fork('c', 'a', 'b'),
+      loop('d', 'a', 'b'),
+      reply('e', 'a', 'b'),
+      shortHandoff,
+    ]
+
+    for (const step of steps) {
+      expect(nodeHeight(step)).toBeGreaterThanOrEqual(NODE_SIZE[step.type].h)
+    }
+  })
+
+  it('feeds the taller height through to layout', () => {
+    const laid = layout([msg('a', 'h'), longHandoff], 'a')
+    const handoffNode = laid.nodes.find((n) => n.stepId === 'h')
+
+    expect(handoffNode?.h).toBe(nodeHeight(longHandoff))
+    expect(handoffNode?.h).toBeGreaterThan(NODE_SIZE.human_handoff.h)
+  })
+})
+

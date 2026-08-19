@@ -75,6 +75,10 @@ const FORK_SIZE = { w: 272, h: 144 }
 const LOOP_SIZE = { w: 288, h: 176 }
 const STANDARD_SIZE = { w: 248, h: 112 }
 
+// Minimums. Real height is computed per node by nodeHeight() below, because a
+// fixed height silently overflows: a two-line title plus a two-line reason
+// needs ~127px and the standard card reserved 112, so the last line rendered
+// outside the card border.
 export const NODE_SIZE: Record<JourneyStep['type'], { w: number; h: number }> = {
   send_message: STANDARD_SIZE,
   wait: STANDARD_SIZE,
@@ -83,6 +87,75 @@ export const NODE_SIZE: Record<JourneyStep['type'], { w: number; h: number }> = 
   condition: FORK_SIZE,
   await_reply: FORK_SIZE,
   wait_and_recheck: LOOP_SIZE,
+}
+
+
+// Vertical rhythm inside a node, in px. Kept next to the component's own
+// classes: JourneyNode uses px-4 py-3.5, a 15px kind row, 14.5px/1.375 title
+// and 12.5px/1.375 detail text.
+const PAD_Y = 28
+const KIND_ROW = 21
+const TITLE_LINE = 20
+const DETAIL_LINE = 17
+const RAILS = 38
+const GAP = 6
+
+// Rough characters-per-line for a given font size at a given box width. An
+// estimate, not a measurement -- dagre needs sizes BEFORE anything renders, so
+// there is nothing to measure yet. JourneyNode clamps and clips to whatever
+// this reserves, so an underestimate truncates rather than overflowing.
+function lineCount(text: string | undefined, width: number, pxPerChar: number, max = 3): number {
+  if (!text) return 0
+  const perLine = Math.max(1, Math.floor((width - 32) / pxPerChar))
+  return Math.min(max, Math.max(1, Math.ceil(text.length / perLine)))
+}
+
+function detailTextOf(step: JourneyStep): string | undefined {
+  switch (step.type) {
+    case 'send_message':
+      return step.messageHint ?? 'The agent writes this itself'
+    case 'wait':
+      return `${step.waitDays} days`
+    case 'await_reply':
+      return step.promptHint ?? 'Pauses until the lead answers'
+    case 'tool_call':
+      return step.toolName || 'No tool chosen yet'
+    case 'human_handoff':
+      return step.reason ?? 'Ends the journey and alerts a human'
+    case 'wait_and_recheck':
+      // Two fixed lines: cadence, then the field being checked.
+      return undefined
+    case 'condition':
+      return undefined
+  }
+}
+
+// The height this step's content actually needs.
+export function nodeHeight(step: JourneyStep): number {
+  const { w, h } = NODE_SIZE[step.type]
+  const title = step.type === 'condition' ? conditionText(step) : step.name
+
+  let height = PAD_Y + KIND_ROW + GAP
+  height += lineCount(title, w, 7.4, 3) * TITLE_LINE
+
+  if (step.type === 'wait_and_recheck') {
+    height += 2 * DETAIL_LINE
+  } else {
+    height += lineCount(detailTextOf(step), w, 6.3, 2) * DETAIL_LINE
+  }
+
+  if (step.type === 'condition' || step.type === 'await_reply' || step.type === 'wait_and_recheck') {
+    height += RAILS
+  }
+
+  return Math.max(h, height)
+}
+
+// Mirrors conditionSentence() in components/journey/node-kind.ts. Duplicated
+// rather than imported so this pure layout module keeps no dependency on the
+// component layer; only its LENGTH matters here.
+function conditionText(step: Extract<JourneyStep, { type: 'condition' }>): string {
+  return step.value ? `Is ${step.field} ${step.operator} ${step.value}?` : `Is ${step.field} set?`
 }
 
 export const BRANCH_GAP = 64
@@ -220,8 +293,7 @@ export function layout(steps: JourneyStep[], startStepId: string): JourneyLayout
   // layouts of an unchanged journey produce identical coordinates -- a node
   // that jumps on every keystroke is unusable.
   for (const step of steps) {
-    const size = NODE_SIZE[step.type]
-    g.setNode(step.stepId, { width: size.w, height: size.h })
+    g.setNode(step.stepId, { width: NODE_SIZE[step.type].w, height: nodeHeight(step) })
   }
 
   // Back-edges are excluded: they are drawn as the loop node's own rail, and
