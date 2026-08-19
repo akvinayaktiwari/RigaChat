@@ -159,7 +159,24 @@ describe('the layout cannot overflow its container', () => {
     const classes = grid?.className ?? ''
 
     expect(classes).toMatch(/grid-cols-\[minmax\(0,1fr\)_minmax\(0,1fr\)\]/)
-    expect(classes).not.toMatch(/xl:grid-cols-2\b/)
+    expect(classes).not.toMatch(/grid-cols-2\b/)
+  })
+
+  // Two columns is decided by how much room this grid HAS, not by how wide the
+  // window is. The dashboard sidebar is 256px and vanishes below lg, so a
+  // viewport breakpoint gets it wrong in both directions: a 1150px screen has
+  // 846px of room and was getting one column, while a 1030px screen with no
+  // sidebar has more room and also got one.
+  it('switches on container width, not viewport width', () => {
+    const { container } = render(<PlanBuilder plan={DEFAULT_PLAN} onChange={vi.fn()} />)
+
+    const cq = container.querySelector('.\\@container')
+    expect(cq).toBeTruthy()
+
+    const grid = container.querySelector('[class*="grid-cols"]')
+    expect(grid?.className).toContain('@min-[820px]:')
+    // A viewport variant here would silently reintroduce the bug.
+    expect(grid?.className).not.toMatch(/\b(sm|md|lg|xl|2xl):grid-cols/)
   })
 
   it('lets both sections shrink below their content width', () => {

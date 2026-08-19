@@ -213,13 +213,22 @@ export default function PlanBuilder({ plan, onChange }: PlanBuilderProps) {
         </p>
       </div>
 
-      {/* minmax(0,1fr), never a bare 1fr. A grid track sizes to min-content by
+      {/* TWO COLUMNS ON CONTAINER WIDTH, NOT VIEWPORT WIDTH.
+          The dashboard sidebar is 256px and disappears below lg, so the space
+          actually available to this grid JUMPS by 256px at that breakpoint. A
+          viewport breakpoint cannot express that: xl (1280px) meant a 1150px
+          screen got one column even though it had 846px to work with, while a
+          1030px screen with no sidebar got one column despite having more room.
+          The container query asks the only question that matters -- is there
+          space for two 400px columns.
+
+          minmax(0,1fr), never a bare 1fr: a grid track sizes to min-content by
           default, and <textarea>/<input> carry an intrinsic minimum width that
-          w-full does not override -- so a bare grid-cols-2 lets the fields push
-          the track wider than the container and the whole page scrolls
-          sideways. The min-w-0 on each section is the same guard one level
-          down. */}
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-5 items-start">
+          w-full cannot override, so a bare grid-cols-2 lets the fields push the
+          track past the container and the page scrolls sideways. The min-w-0 on
+          each section is the same guard one level down. */}
+      <div className="@container">
+        <div className="grid grid-cols-1 @min-[820px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-5 items-start">
         {/* ---------------- Conversation guide ---------------- */}
         <section className="min-w-0">
           <SectionHead
@@ -465,6 +474,7 @@ export default function PlanBuilder({ plan, onChange }: PlanBuilderProps) {
             })}
           </div>
         </section>
+        </div>
       </div>
     </div>
   )
