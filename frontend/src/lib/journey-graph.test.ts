@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { edgesOf, layout, nodeHeight, NODE_SIZE, reachableFrom } from './journey-graph'
+import { edgesOf, layout, nodeHeight, NODE_SIZE, reachableFrom, uniformHeights } from './journey-graph'
 import type { JourneyStep } from '../types/index'
 
 function msg(stepId: string, next?: string): JourneyStep {
@@ -252,6 +252,47 @@ describe('nodes reserve the height their content needs', () => {
 
     expect(handoffNode?.h).toBe(nodeHeight(longHandoff))
     expect(handoffNode?.h).toBeGreaterThan(NODE_SIZE.human_handoff.h)
+  })
+})
+
+// "Ragged" was peers of the same kind sitting at different heights. Uniform
+// per TYPE fixes that without flattening the silhouettes the graph uses to
+// tell a loop from a message.
+describe('cards of the same kind share a height', () => {
+  const shortMsg: JourneyStep = msg('m1', 'm2')
+  const longMsg: JourneyStep = {
+    stepId: 'm2',
+    name: 'A considerably longer step name that is going to wrap onto more than one line',
+    type: 'send_message',
+    messageHint: 'And a message hint long enough to wrap across two full lines of the card as well.',
+  }
+
+  it('gives every card of a type the same height', () => {
+    const laid = layout([shortMsg, longMsg], 'm1')
+    const sends = laid.nodes.filter((n) => ['m1', 'm2'].includes(n.stepId))
+
+    expect(new Set(sends.map((n) => n.h)).size).toBe(1)
+  })
+
+  it('sizes that shared height to the tallest card of the type', () => {
+    const laid = layout([shortMsg, longMsg], 'm1')
+
+    expect(laid.nodes[0].h).toBe(nodeHeight(longMsg))
+  })
+
+  it('keeps the type silhouettes distinct rather than flattening everything', () => {
+    const steps: JourneyStep[] = [msg('a', 'b'), loop('b', 'c', 'c'), msg('c')]
+    const heights = uniformHeights(steps)
+
+    expect(heights.wait_and_recheck).toBeGreaterThan(heights.send_message)
+  })
+
+  it('never drops a type below its minimum', () => {
+    const heights = uniformHeights([msg('a')])
+
+    for (const key of Object.keys(NODE_SIZE) as Array<JourneyStep['type']>) {
+      expect(heights[key]).toBeGreaterThanOrEqual(NODE_SIZE[key].h)
+    }
   })
 })
 

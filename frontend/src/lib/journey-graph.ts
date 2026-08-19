@@ -151,6 +151,29 @@ export function nodeHeight(step: JourneyStep): number {
   return Math.max(h, height)
 }
 
+
+// One height per STEP TYPE, sized to the tallest card of that type in this
+// journey.
+//
+// Uniform within a type rather than across all of them: the design tells a
+// loop from a message by silhouette, so forcing every node to one height would
+// erase the distinction the graph depends on. Uniform per type keeps peers
+// aligned -- which is what "ragged" actually meant -- while a loop stays
+// visibly a loop.
+//
+// Bounded by construction: lineCount() caps titles at 3 lines and details at
+// 2, so one pathologically long name cannot inflate every card in its class.
+export function uniformHeights(steps: JourneyStep[]): Record<JourneyStep['type'], number> {
+  const heights = { ...NODE_SIZE } as unknown as Record<JourneyStep['type'], number>
+  for (const key of Object.keys(NODE_SIZE) as Array<JourneyStep['type']>) {
+    heights[key] = NODE_SIZE[key].h
+  }
+  for (const step of steps) {
+    heights[step.type] = Math.max(heights[step.type], nodeHeight(step))
+  }
+  return heights
+}
+
 // Mirrors conditionSentence() in components/journey/node-kind.ts. Duplicated
 // rather than imported so this pure layout module keeps no dependency on the
 // component layer; only its LENGTH matters here.
@@ -292,8 +315,10 @@ export function layout(steps: JourneyStep[], startStepId: string): JourneyLayout
   // deterministic given the same insertion order, which is what makes repeated
   // layouts of an unchanged journey produce identical coordinates -- a node
   // that jumps on every keystroke is unusable.
+  // Every card of a given type gets the same height, so peers line up.
+  const heights = uniformHeights(steps)
   for (const step of steps) {
-    g.setNode(step.stepId, { width: NODE_SIZE[step.type].w, height: nodeHeight(step) })
+    g.setNode(step.stepId, { width: NODE_SIZE[step.type].w, height: heights[step.type] })
   }
 
   // Back-edges are excluded: they are drawn as the loop node's own rail, and
