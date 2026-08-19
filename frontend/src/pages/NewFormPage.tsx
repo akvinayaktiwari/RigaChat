@@ -4,6 +4,7 @@ import { ArrowLeft, GripVertical, Loader2, Plus, Trash2, X } from 'lucide-react'
 import { createForm } from '../services/api'
 import { Toggle } from '../components/Toggle'
 import type { FormField } from '../types/index'
+import Dropdown from '../components/Dropdown/Dropdown'
 
 type FieldType = FormField['type']
 
@@ -215,17 +216,14 @@ export default function NewFormPage() {
                           placeholder='Field label, e.g. "Full Name"'
                           className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
                         />
-                        <select
+                        <Dropdown
                           value={field.type}
-                          onChange={(e) => updateField(field.tempId, 'type', e.target.value as FieldType)}
-                          className="w-40 px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        >
-                          {FIELD_TYPE_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(v) => updateField(field.tempId, 'type', v as FieldType)}
+                          ariaLabel="Field type"
+                          variant="inline"
+                          className="w-40"
+                          options={FIELD_TYPE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                        />
                       </div>
 
                       {field.type === 'options' && (
@@ -318,6 +316,11 @@ export default function NewFormPage() {
                       {field.required && <span className="text-red-500 ml-0.5">*</span>}
                     </label>
                     {field.type === 'options' ? (
+                      // Deliberately a native select. This is a PREVIEW of the
+                      // form a visitor sees on the client's own website, which is
+                      // rendered by the separately-deployed widget, not by this
+                      // dashboard. Styling it like dashboard chrome would make
+                      // the preview less accurate, not more consistent.
                       <select className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white" disabled>
                         <option>Select an option</option>
                         {field.options.map((option) => (

@@ -6,6 +6,7 @@ import {
   setOverrides,
   toggleInternal,
 } from '../../services/adminApi'
+import Dropdown from '../Dropdown/Dropdown'
 import type {
   AdminAccountSummary,
   AdminSubscription,
@@ -219,13 +220,12 @@ export function AdminActionModal({ account, action, token, currentOverrides, onC
         {action === 'change_plan' && (
           <div className="mb-4">
             <label className={labelClasses}>Plan</label>
-            <select value={newPlan} onChange={(e) => setNewPlan(e.target.value as PlanTier)} className={inputClasses}>
-              {PLAN_OPTIONS.map((plan) => (
-                <option key={plan} value={plan}>
-                  {plan}
-                </option>
-              ))}
-            </select>
+            <Dropdown
+              value={newPlan}
+              onChange={(v) => setNewPlan(v as PlanTier)}
+              ariaLabel="Plan"
+              options={PLAN_OPTIONS.map((plan) => ({ value: plan, label: plan }))}
+            />
           </div>
         )}
 

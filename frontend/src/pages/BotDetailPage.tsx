@@ -15,6 +15,7 @@ import {
 import { toWhatsAppNumber } from '../lib/phone'
 import IndexingProgressCard from '../components/IndexingProgressCard'
 import type { BotConfig, BotStatus, BotWhatsAppStatus, IndexingJob } from '../types/index'
+import Dropdown from '../components/Dropdown/Dropdown'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -521,17 +522,12 @@ export default function BotDetailPage() {
 
               <div>
                 <label className={labelClasses}>Widget Trigger</label>
-                <select
+                <Dropdown
                   value={bot.widgetTrigger}
-                  onChange={(e) => setBot({ ...bot, widgetTrigger: e.target.value as BotConfig['widgetTrigger'] })}
-                  className={`${inputClasses} cursor-pointer`}
-                >
-                  {WIDGET_TRIGGER_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => setBot({ ...bot, widgetTrigger: v as BotConfig['widgetTrigger'] })}
+                  ariaLabel="Widget trigger"
+                  options={WIDGET_TRIGGER_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                />
               </div>
 
               <div>

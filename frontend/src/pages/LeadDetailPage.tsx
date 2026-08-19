@@ -30,6 +30,7 @@ import {
 } from '../lib/lead-display'
 import type { LeadEvent, LeadOutcome, LeadStatePatch, LeadStatus, UnifiedLeadDetail } from '../types/index'
 import LeadTimeline from '../components/leads/LeadTimeline'
+import Dropdown from '../components/Dropdown/Dropdown'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -123,7 +124,7 @@ function LoadingSkeleton() {
   )
 }
 
-const SELECT_CLASSES =
+const FIELD_CLASSES =
   'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-white cursor-pointer outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors disabled:opacity-50'
 
 export default function LeadDetailPage() {
@@ -371,41 +372,31 @@ export default function LeadDetailPage() {
             <label className="text-xs text-gray-400 block mb-1.5" htmlFor="lead-status">
               Status
             </label>
-            <select
+            <Dropdown<LeadStatus>
               id="lead-status"
               value={status}
               disabled={saving}
-              onChange={(e) => applyPatch({ status: e.target.value as LeadStatus })}
-              className={SELECT_CLASSES}
-            >
-              {STATUS_ORDER.map((option) => (
-                <option key={option} value={option}>
-                  {STATUS_LABELS[option]}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => applyPatch({ status: v })}
+              ariaLabel="Lead status"
+              options={STATUS_ORDER.map((o) => ({ value: o, label: STATUS_LABELS[o] }))}
+            />
 
             {status === 'closed' && (
               <>
                 <label className="text-xs text-gray-400 block mb-1.5 mt-4" htmlFor="lead-outcome">
                   Outcome
                 </label>
-                <select
+                <Dropdown
                   id="lead-outcome"
                   value={lead.state?.outcome ?? ''}
                   disabled={saving}
-                  onChange={(e) =>
-                    applyPatch({ outcome: e.target.value ? (e.target.value as LeadOutcome) : null })
-                  }
-                  className={SELECT_CLASSES}
-                >
-                  <option value="">Not recorded</option>
-                  {OUTCOME_ORDER.map((option) => (
-                    <option key={option} value={option}>
-                      {OUTCOME_LABELS[option]}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => applyPatch({ outcome: v ? (v as LeadOutcome) : null })}
+                  ariaLabel="Lead outcome"
+                  options={[
+                    { value: '', label: 'Not recorded' },
+                    ...OUTCOME_ORDER.map((o) => ({ value: o, label: OUTCOME_LABELS[o] })),
+                  ]}
+                />
               </>
             )}
 
@@ -418,7 +409,7 @@ export default function LeadDetailPage() {
               value={toLocalInputValue(lead.state?.nextActionAt)}
               disabled={saving}
               onChange={(e) => applyPatch({ nextActionAt: fromLocalInputValue(e.target.value) })}
-              className={SELECT_CLASSES}
+              className={FIELD_CLASSES}
             />
             <p className="text-xs text-gray-400 mt-2">
               Leads with an overdue next action are pinned to the top of your inbox.

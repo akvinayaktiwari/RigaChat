@@ -12,6 +12,7 @@ import {
 import IndexingProgressCard from '../components/IndexingProgressCard'
 import { useIndexingStatus } from '../hooks/useIndexingStatus'
 import type { BotConfig, VoiceAgent, VoiceAgentVoice, VoiceUsageSummary } from '../types/index'
+import Dropdown from '../components/Dropdown/Dropdown'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -355,18 +356,15 @@ export default function VoiceAgentDetailPage() {
 
               <div>
                 <label className={labelClasses}>Link to existing agent (optional)</label>
-                <select
-                  value={formData.botId}
-                  onChange={(e) => update('botId', e.target.value)}
-                  className={`${inputClasses} cursor-pointer`}
-                >
-                  <option value="">None — use only this agent's own knowledge base</option>
-                  {bots.map((bot) => (
-                    <option key={bot.botId} value={bot.botId}>
-                      {bot.name}
-                    </option>
-                  ))}
-                </select>
+                <Dropdown
+                  value={formData.botId ?? ''}
+                  onChange={(v) => update('botId', v)}
+                  ariaLabel="Chatbot knowledge base"
+                  options={[
+                    { value: '', label: 'None', description: "Use only this agent's own knowledge base" },
+                    ...bots.map((bot) => ({ value: bot.botId, label: bot.name })),
+                  ]}
+                />
                 <p className={hintClasses}>
                   Also search this agent's knowledge base when answering voice calls, in addition to this agent's
                   own indexed content.
@@ -375,17 +373,12 @@ export default function VoiceAgentDetailPage() {
 
               <div>
                 <label className={labelClasses}>Voice</label>
-                <select
+                <Dropdown
                   value={formData.voice}
-                  onChange={(e) => update('voice', e.target.value as VoiceAgentVoice)}
-                  className={`${inputClasses} cursor-pointer`}
-                >
-                  {VOICE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => update('voice', v as VoiceAgentVoice)}
+                  ariaLabel="Voice"
+                  options={VOICE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                />
               </div>
 
               <div>
@@ -409,34 +402,29 @@ export default function VoiceAgentDetailPage() {
 
               <div>
                 <label className={labelClasses}>Widget Position</label>
-                <select
+                <Dropdown
                   value={formData.widgetPosition}
-                  onChange={(e) => update('widgetPosition', e.target.value as VoiceAgent['widgetPosition'])}
-                  className={`${inputClasses} cursor-pointer`}
-                >
-                  {WIDGET_POSITION_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => update('widgetPosition', v as VoiceAgent['widgetPosition'])}
+                  ariaLabel="Widget position"
+                  options={WIDGET_POSITION_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                />
               </div>
 
               <div>
                 <label className={labelClasses}>Max Session Duration</label>
-                <select
-                  value={formData.maxSessionDuration}
-                  onChange={(e) =>
-                    update('maxSessionDuration', Number(e.target.value) as VoiceAgent['maxSessionDuration'])
+                {/* Dropdown values are strings; this one is a number, so it is
+                    converted at the boundary rather than widening the component. */}
+                <Dropdown
+                  value={String(formData.maxSessionDuration)}
+                  onChange={(v) =>
+                    update('maxSessionDuration', Number(v) as VoiceAgent['maxSessionDuration'])
                   }
-                  className={`${inputClasses} cursor-pointer`}
-                >
-                  {SESSION_DURATION_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  ariaLabel="Max session duration"
+                  options={SESSION_DURATION_OPTIONS.map((o) => ({
+                    value: String(o.value),
+                    label: o.label,
+                  }))}
+                />
               </div>
 
               <div className="flex items-center justify-between pt-2">

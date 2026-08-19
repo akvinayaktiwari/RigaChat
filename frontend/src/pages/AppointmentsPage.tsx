@@ -3,6 +3,7 @@ import { Calendar } from 'lucide-react'
 import { getAppointmentRequests, getMyBots } from '../services/api'
 import { formatRelativeDate } from '../lib/date'
 import type { AppointmentRequest, BotConfig } from '../types/index'
+import Dropdown from '../components/Dropdown/Dropdown'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -89,18 +90,16 @@ export default function AppointmentsPage() {
         </div>
 
         {bots.length > 1 && (
-          <select
+          <Dropdown
             value={selectedBotId}
-            onChange={(e) => setSelectedBotId(e.target.value)}
-            className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-          >
-            <option value="all">All agents</option>
-            {bots.map((bot) => (
-              <option key={bot.botId} value={bot.botId}>
-                {bot.name}
-              </option>
-            ))}
-          </select>
+            onChange={setSelectedBotId}
+            ariaLabel="Filter by agent"
+            variant="inline"
+            options={[
+              { value: 'all', label: 'All agents' },
+              ...bots.map((bot) => ({ value: bot.botId, label: bot.name })),
+            ]}
+          />
         )}
       </div>
 
