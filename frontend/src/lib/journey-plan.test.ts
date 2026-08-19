@@ -288,3 +288,77 @@ describe('inferring a plan from an existing journey', () => {
     expect(validationErrors(planToSteps(result.plan))).toEqual([])
   })
 })
+
+// The bug this whole section exists to prevent.
+//
+// journey-executor-service.ts:81 resolves a send as
+//   composedReply ?? messageHint ?? DEFAULT
+// and composedReply only exists when the agent is answering an INBOUND message.
+// The opening greet has no inbound message to answer, so messageHint is
+// delivered to a real person verbatim. An earlier version of this generator put
+// "Greet them warmly and ask about budget range" in there, which a lead would
+// have received as their first message from the business.
+describe('generated copy is what the lead actually receives', () => {
+  it('sends the plan\'s greeting, not an instruction about greeting', () => {
+    const p = plan()
+    const greet = planToSteps(p).find((s) => s.stepId === 'plan-greet')
+
+    expect(greet && 'messageHint' in greet && greet.messageHint).toBe(p.messages.greet)
+  })
+
+  it('never emits an instruction-shaped message', () => {
+    // The tell is second-person imperatives aimed at the agent.
+    const instructionShaped = /^(Greet|Acknowledge|Confirm|Thank|Ask|Offer) (them|him|her|the lead|what)/i
+    for (const [label, p] of PERMUTATIONS) {
+      for (const step of planToSteps(p)) {
+        if (step.type !== 'send_message' || !step.messageHint) continue
+        expect(`${label}: ${step.messageHint}`).not.toMatch(instructionShaped)
+      }
+    }
+  })
+
+  it('carries every edited message through to the journey', () => {
+    const p = plan({
+      messages: { greet: 'Namaste!', offer: 'Visit karna chahenge?', confirm: 'Confirmed hai.' },
+    })
+    const hints = planToSteps(p)
+      .filter((s): s is Extract<JourneyStep, { type: 'send_message' }> => s.type === 'send_message')
+      .map((s) => s.messageHint)
+
+    expect(hints).toContain('Namaste!')
+    expect(hints).toContain('Visit karna chahenge?')
+    expect(hints).toContain('Confirmed hai.')
+  })
+
+  it('sends the nudge wording the operator wrote', () => {
+    const p = plan({ followUp: { waitDays: 1, maxNudges: 1, nudgeMessage: 'Still looking?' } })
+    const nudge = planToSteps(p).find((s) => s.stepId === 'plan-nudge')
+
+    expect(nudge && 'messageHint' in nudge && nudge.messageHint).toBe('Still looking?')
+  })
+})
+
+describe('inference keeps a live journey\'s real words', () => {
+  // Defaulting these would silently rewrite the messages a client is already
+  // sending to leads, the first time they opened and saved the journey.
+  it('carries existing copy across instead of substituting defaults', () => {
+    const steps: JourneyStep[] = [
+      { stepId: 'a', name: 'a', type: 'send_message', messageHint: 'Hello from the client', next: 'b' },
+      { stepId: 'b', name: 'b', type: 'send_message', messageHint: 'Come and see it' },
+    ]
+    const agent: AgentConfig = {
+      personaId: 'p1',
+      name: 'A',
+      systemPrompt: 'x',
+      mcpToolbox: [],
+      channelConfig: {},
+    }
+
+    const result = journeyToPlan({ steps }, agent)
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.plan.messages.greet).toBe('Hello from the client')
+    expect(result.plan.messages.confirm).toBe('Come and see it')
+  })
+})

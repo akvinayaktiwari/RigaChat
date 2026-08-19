@@ -8,8 +8,12 @@
 
 import { useState } from 'react'
 import { Plus, X } from 'lucide-react'
-import type { JourneyPlan } from '../../lib/journey-plan'
+import type { JourneyPlan, TimelineEntry } from '../../lib/journey-plan'
 import { planDurationDays, planTimeline } from '../../lib/journey-plan'
+
+// The pieces of copy a timeline line can open. Derived from TimelineEntry so a
+// new editable line cannot be added without this following it.
+type MessageKey = NonNullable<TimelineEntry['edits']>
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -168,6 +172,22 @@ function SectionHead({ dot, title, sub }: { dot: string; title: string; sub: str
 export default function PlanBuilder({ plan, onChange }: PlanBuilderProps) {
   const set = <K extends keyof JourneyPlan>(key: K, value: JourneyPlan[K]) =>
     onChange({ ...plan, [key]: value })
+
+  // Which timeline line is opened for editing. Only one at a time: this is a
+  // reading surface first, and several open textareas would bury the sequence
+  // the operator came here to check.
+  const [openMessage, setOpenMessage] = useState<MessageKey | null>(null)
+
+  // The nudge lives under followUp because WhatsApp's 24h rule owns it, while
+  // the rest are plain copy. Both are edited the same way here, because that
+  // distinction is ours and not the operator's.
+  const messageValue = (key: MessageKey): string =>
+    key === 'nudge' ? plan.followUp.nudgeMessage : plan.messages[key]
+
+  const setMessage = (key: MessageKey, text: string) => {
+    if (key === 'nudge') onChange({ ...plan, followUp: { ...plan.followUp, nudgeMessage: text } })
+    else onChange({ ...plan, messages: { ...plan.messages, [key]: text } })
+  }
 
   const timeline = planTimeline(plan)
   const days = planDurationDays(plan)
@@ -381,27 +401,58 @@ export default function PlanBuilder({ plan, onChange }: PlanBuilderProps) {
             )}
           </div>
 
-          {/* The timeline replaces reading a graph. */}
+          {/* The timeline replaces reading a graph, so it is also where the
+              words get changed. There is no step editor to go hunting for, and
+              an operator asking "where do I customize this?" is asking about a
+              specific line right here. */}
           <div className="border border-gray-200 rounded-2xl bg-gray-50 p-4">
             <div className={LABEL}>What will happen</div>
-            {timeline.map((entry, i) => (
-              <div
-                key={`${entry.when}-${i}`}
-                className="flex gap-3 text-[12.5px] text-gray-600 py-1.5 border-b border-gray-200 last:border-b-0 leading-snug"
-              >
-                <span className="font-mono text-[10.5px] text-gray-400 shrink-0 pt-0.5 w-20">
-                  {entry.when}
-                </span>
-                <span className="flex-1">
-                  {entry.what}
-                  {entry.needsTemplate && (
-                    <span className="ml-2 text-[10px] font-bold uppercase tracking-wider text-amber-700">
-                      template
+            {timeline.map((entry, i) => {
+              const key = entry.edits
+              const isOpen = key !== undefined && openMessage === key
+              return (
+                <div key={`${entry.when}-${i}`} className="border-b border-gray-200 last:border-b-0">
+                  <div className="flex gap-3 text-[12.5px] text-gray-600 py-1.5 leading-snug items-start">
+                    <span className="font-mono text-[10.5px] text-gray-400 shrink-0 pt-0.5 w-20">
+                      {entry.when}
                     </span>
+                    <span className="flex-1">
+                      {entry.what}
+                      {entry.needsTemplate && (
+                        <span className="ml-2 text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                          template
+                        </span>
+                      )}
+                    </span>
+                    {key && (
+                      <button
+                        type="button"
+                        onClick={() => setOpenMessage(isOpen ? null : key)}
+                        aria-expanded={isOpen}
+                        className="shrink-0 text-[11.5px] font-semibold text-violet-700 hover:text-violet-900 rounded px-1.5 py-0.5 hover:bg-violet-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-600"
+                      >
+                        {isOpen ? 'Done' : 'Edit words'}
+                      </button>
+                    )}
+                  </div>
+
+                  {isOpen && key && (
+                    <div className="pb-3 pl-[5.75rem] pr-1">
+                      <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">
+                        Sent to the lead, exactly as written
+                      </label>
+                      <textarea
+                        value={messageValue(key)}
+                        onChange={(e) => setMessage(key, e.target.value)}
+                        rows={3}
+                        autoFocus
+                        className="w-full text-[13.5px] text-gray-700 bg-white border border-gray-200 rounded-xl px-3 py-2 resize-y focus:outline-none focus:ring-2 focus:ring-violet-600"
+                      />
+                    </div>
                   )}
-                </span>
-              </div>
-            ))}
+                </div>
+              )
+            })}
           </div>
         </section>
       </div>

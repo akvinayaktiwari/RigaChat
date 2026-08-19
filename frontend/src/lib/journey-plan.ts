@@ -46,6 +46,24 @@ export interface JourneyPlan {
   // prose in the prompt rather than a condition step.
   escalateWhen: string[]
 
+  // The actual words sent to the lead.
+  //
+  // NOT hints. journey-executor-service.ts:81 resolves a send as
+  // `composedReply ?? messageHint ?? DEFAULT`, and composedReply only exists
+  // when the agent is answering an inbound message. The opening greet has no
+  // inbound message to answer, so whatever sits here is delivered to a real
+  // person verbatim. Writing "Greet them warmly and ask about budget" here
+  // would send that sentence to the lead.
+  //
+  // So these are customer-facing copy with sensible defaults, and the operator
+  // edits them directly. That is also exactly the customization people ask for
+  // first: "on day 3 say this, in Hindi".
+  messages: {
+    greet: string
+    offer: string
+    confirm: string
+  }
+
   // --- Follow-up rules: what the system must enforce -------------------------
   followUp: {
     // Days of silence before the first nudge.
@@ -75,6 +93,14 @@ export const DEFAULT_PLAN: JourneyPlan = {
   learn: ['Budget range', 'Preferred area'],
   never: ['Invent prices', 'Promise availability', 'Give possession dates'],
   escalateWhen: ['They ask for a human', 'They start negotiating'],
+  messages: {
+    greet:
+      'Hi! Thanks for your interest. To point you to the right property, could you tell me your budget range and which area you are considering?',
+    offer:
+      'Thanks, that helps. Would you like to see one of these in person? Tell me a day that suits you and I will set it up.',
+    confirm:
+      'Your site visit is confirmed. I will send the location and a reminder before the day.',
+  },
   followUp: { waitDays: 1, maxNudges: 1, nudgeMessage: 'Just checking in — would a quick site visit help?' },
   booking: { enabled: true, recheckDays: 1, maxRechecks: 3 },
   handoff: { enabled: true, reason: 'Lead did not book after qualification and a nudge.' },
@@ -202,10 +228,9 @@ export function planToSteps(plan: JourneyPlan): JourneyStep[] {
     stepId: ID.greet,
     name: 'Greet and qualify',
     type: 'send_message',
-    messageHint:
-      plan.learn.length > 0
-        ? `Greet them warmly and ask about ${plan.learn.join(' and ').toLowerCase()}.`
-        : 'Greet them warmly and ask what they are looking for.',
+    // Sent verbatim. See JourneyPlan.messages for why this must be copy and not
+    // an instruction to the agent.
+    messageHint: plan.messages.greet,
     next: forward(ID.greet, ID.awaitQualify),
   })
 
@@ -222,7 +247,7 @@ export function planToSteps(plan: JourneyPlan): JourneyStep[] {
     stepId: ID.offer,
     name: 'Offer a site visit',
     type: 'send_message',
-    messageHint: 'Acknowledge what they told you, then offer a site visit and ask which day suits them.',
+    messageHint: plan.messages.offer,
     next: forward(ID.offer, ID.awaitDay),
   })
 
@@ -264,9 +289,7 @@ export function planToSteps(plan: JourneyPlan): JourneyStep[] {
     stepId: ID.confirm,
     name: wantsBooking ? 'Confirm the booked visit' : 'Sign off',
     type: 'send_message',
-    messageHint: wantsBooking
-      ? 'Confirm the visit, and say you will send the location and a reminder beforehand.'
-      : 'Thank them and say someone will follow up.',
+    messageHint: plan.messages.confirm,
   })
 
   if (plan.handoff.enabled) {
@@ -300,12 +323,17 @@ export interface TimelineEntry {
   // True for anything WhatsApp requires an approved template for, so the UI can
   // mark it without the operator needing to know the rule.
   needsTemplate?: boolean
+  // Which piece of copy this entry sends, when it sends one. The timeline is
+  // where an operator reads what will happen, so it is also where they should be
+  // able to change the words -- rather than hunting for a step editor that this
+  // design deliberately does not have.
+  edits?: 'greet' | 'offer' | 'confirm' | 'nudge'
 }
 
 export function planTimeline(plan: JourneyPlan): TimelineEntry[] {
   const out: TimelineEntry[] = []
-  out.push({ when: 'Day 0', what: `Greets and asks about ${plan.learn.join(', ').toLowerCase() || 'what they want'}` })
-  out.push({ when: 'Day 0', what: 'Offers a site visit once they answer' })
+  out.push({ when: 'Day 0', what: 'Greets and asks what they are looking for', edits: 'greet' })
+  out.push({ when: 'Day 0', what: 'Offers a site visit once they answer', edits: 'offer' })
 
   if (plan.followUp.maxNudges > 0) {
     const day = plan.followUp.waitDays
@@ -316,6 +344,7 @@ export function planTimeline(plan: JourneyPlan): TimelineEntry[] {
       // computed, not asked: the operator should never have to know the rule to
       // avoid breaking it.
       needsTemplate: day >= 1,
+      edits: 'nudge',
     })
   }
 
@@ -325,7 +354,7 @@ export function planTimeline(plan: JourneyPlan): TimelineEntry[] {
       when: `Day ${plan.followUp.waitDays}–${plan.followUp.waitDays + total}`,
       what: `Checks for a booking ${plan.booking.maxRechecks} times, every ${plan.booking.recheckDays === 1 ? 'day' : `${plan.booking.recheckDays} days`}`,
     })
-    out.push({ when: 'On booking', what: 'Confirms the visit and promises a reminder' })
+    out.push({ when: 'On booking', what: 'Confirms the visit and promises a reminder', edits: 'confirm' })
   }
 
   if (plan.handoff.enabled) {
@@ -368,6 +397,11 @@ export function journeyToPlan(
     }
   }
 
+  // Ordered outbound copy, so an existing journey's real words survive.
+  const sends = steps.filter(
+    (s): s is Extract<JourneyStep, { type: 'send_message' }> => s.type === 'send_message'
+  )
+
   const recheck = steps.find((s): s is Extract<JourneyStep, { type: 'wait_and_recheck' }> =>
     s.type === 'wait_and_recheck'
   )
@@ -396,6 +430,14 @@ export function journeyToPlan(
       learn: DEFAULT_PLAN.learn,
       never: DEFAULT_PLAN.never,
       escalateWhen: DEFAULT_PLAN.escalateWhen,
+      // Copy IS carried across, unlike the prose fields above. These are the
+      // literal words already being sent to leads, so defaulting them would
+      // silently rewrite a client's live messages the first time they save.
+      messages: {
+        greet: sends[0]?.messageHint ?? DEFAULT_PLAN.messages.greet,
+        offer: sends[1]?.messageHint ?? DEFAULT_PLAN.messages.offer,
+        confirm: sends[sends.length - 1]?.messageHint ?? DEFAULT_PLAN.messages.confirm,
+      },
       followUp: {
         waitDays: waitStep?.waitDays ?? recheck?.waitDays ?? DEFAULT_PLAN.followUp.waitDays,
         maxNudges: nudge ? 1 : 0,
