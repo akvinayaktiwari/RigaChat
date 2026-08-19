@@ -28,6 +28,11 @@
 
 import type { AgentConfig, JourneyDefinition, JourneyStep, McpCapability } from '../types/index'
 
+// Mirrors MAX_WAIT_AND_RECHECK_ITERATIONS in
+// backend/src/services/journey-compiler-service.ts:22. A plan above this
+// regenerates a journey the compiler rejects at publish.
+const MAX_RECHECK_ITERATIONS = 30
+
 export interface JourneyPlan {
   version: 1
 
@@ -61,7 +66,12 @@ export interface JourneyPlan {
   messages: {
     greet: string
     offer: string
+    // Sent when a booking actually happened.
     confirm: string
+    // Sent when the journey ends WITHOUT a booking. Separate from `confirm`
+    // because reusing it there told a lead "Your site visit is confirmed" when
+    // they had never booked anything.
+    signOff: string
   }
 
   // --- Follow-up rules: what the system must enforce -------------------------
@@ -100,6 +110,7 @@ export const DEFAULT_PLAN: JourneyPlan = {
       'Thanks, that helps. Would you like to see one of these in person? Tell me a day that suits you and I will set it up.',
     confirm:
       'Your site visit is confirmed. I will send the location and a reminder before the day.',
+    signOff: 'Thanks for your time. Someone from our team will follow up with you shortly.',
   },
   followUp: { waitDays: 1, maxNudges: 1, nudgeMessage: 'Just checking in — would a quick site visit help?' },
   booking: { enabled: true, recheckDays: 1, maxRechecks: 3 },
@@ -114,9 +125,12 @@ const ID = {
   awaitQualify: 'plan-await-qualify',
   offer: 'plan-offer',
   awaitDay: 'plan-await-day',
-  nudge: 'plan-nudge',
+  // One wait+send pair per nudge, numbered. maxNudges used to emit a single
+  // step while the timeline claimed "up to N times".
+  nudgeWait: (i: number) => `plan-nudge-wait-${i}`,
+  nudge: (i: number) => `plan-nudge-${i}`,
   recheck: 'plan-recheck',
-  confirm: 'plan-confirm',
+  close: 'plan-close',
   handoff: 'plan-handoff',
 } as const
 
@@ -187,32 +201,42 @@ export function planToAgent(plan: JourneyPlan, personaId: string): AgentConfig {
 //    the result. This also happens to be truer to the plan's own seam: choosing
 //    WHEN to book is judgment; the retry budget around it is enforcement.
 export function planToSteps(plan: JourneyPlan): JourneyStep[] {
-  const wantsNudge = plan.followUp.maxNudges > 0
+  const nudgeCount = Math.max(0, Math.floor(plan.followUp.maxNudges))
   const wantsBooking = plan.booking.enabled
 
   // The terminal every dead end resolves to. A journey must not leave an edge
   // empty: validateSteps rejects an await_reply missing either branch, and an
   // unreachable dead end would strand the lead.
-  const terminalId = plan.handoff.enabled ? ID.handoff : ID.confirm
+  const terminalId = plan.handoff.enabled ? ID.handoff : ID.close
 
-  // Declared in execution order first, so target resolution below can never
-  // produce a backward reference.
+  // Execution order, declared before anything is emitted, so target resolution
+  // can never produce a backward reference (journey-compiler-service.ts:117).
+  //
+  // Each nudge is a WAIT followed by a SEND. Previously waitDays was never
+  // emitted at all and maxNudges produced exactly one step, so the timeline
+  // promised "wait 3 days, nudge twice" while the journey nudged once, roughly
+  // 24 hours later, off the await_reply timeout.
+  const nudgeIds: string[] = []
+  for (let i = 0; i < nudgeCount; i += 1) {
+    nudgeIds.push(ID.nudgeWait(i), ID.nudge(i))
+  }
+
   const order: string[] = [
     ID.greet,
     ID.awaitQualify,
     ID.offer,
     ID.awaitDay,
-    ...(wantsNudge ? [ID.nudge] : []),
+    ...nudgeIds,
     ...(wantsBooking ? [ID.recheck] : []),
-    ID.confirm,
+    ID.close,
     ...(plan.handoff.enabled ? [ID.handoff] : []),
   ]
   const rank = new Map(order.map((id, i) => [id, i]))
 
-  // Resolves a preferred target, falling back forward until something valid and
-  // strictly later than `from` is found. Guarantees constraint 1 by construction
-  // rather than by careful hand-ordering that breaks the next time an option is
-  // added to the plan.
+  // Resolves a preferred target, falling forward until something valid and
+  // strictly later than `from` is found, so the forward-only rule holds by
+  // construction rather than by hand-ordering that breaks the next time a plan
+  // option is added.
   const forward = (from: string, ...preferred: string[]): string => {
     const fromRank = rank.get(from) ?? -1
     for (const candidate of preferred) {
@@ -222,14 +246,18 @@ export function planToSteps(plan: JourneyPlan): JourneyStep[] {
     return terminalId
   }
 
+  const firstNudge = nudgeCount > 0 ? ID.nudgeWait(0) : undefined
+  const quietTarget = (from: string) =>
+    firstNudge ? forward(from, firstNudge, ID.recheck) : forward(from, ID.recheck)
+
   const steps: JourneyStep[] = []
 
   steps.push({
     stepId: ID.greet,
     name: 'Greet and qualify',
     type: 'send_message',
-    // Sent verbatim. See JourneyPlan.messages for why this must be copy and not
-    // an instruction to the agent.
+    // Sent verbatim. See JourneyPlan.messages for why this is copy, not an
+    // instruction to the agent.
     messageHint: plan.messages.greet,
     next: forward(ID.greet, ID.awaitQualify),
   })
@@ -240,7 +268,7 @@ export function planToSteps(plan: JourneyPlan): JourneyStep[] {
     type: 'await_reply',
     promptHint: plan.learn.join(', '),
     next: forward(ID.awaitQualify, ID.offer),
-    onNoReply: forward(ID.awaitQualify, ID.nudge, ID.recheck),
+    onNoReply: quietTarget(ID.awaitQualify),
   })
 
   steps.push({
@@ -256,19 +284,30 @@ export function planToSteps(plan: JourneyPlan): JourneyStep[] {
     name: 'Wait for a day that suits them',
     type: 'await_reply',
     promptHint: 'a day that suits them for a site visit',
-    next: forward(ID.awaitDay, ID.recheck, ID.confirm),
-    onNoReply: forward(ID.awaitDay, ID.nudge, ID.recheck),
+    next: forward(ID.awaitDay, ID.recheck, ID.close),
+    onNoReply: quietTarget(ID.awaitDay),
   })
 
-  if (wantsNudge) {
+  for (let i = 0; i < nudgeCount; i += 1) {
+    const waitId = ID.nudgeWait(i)
+    const sendId = ID.nudge(i)
+
     steps.push({
-      stepId: ID.nudge,
-      name: 'Nudge when they go quiet',
+      stepId: waitId,
+      name: nudgeCount === 1 ? 'Wait before following up' : `Wait before follow-up ${i + 1}`,
+      type: 'wait',
+      waitDays: plan.followUp.waitDays,
+      next: forward(waitId, sendId),
+    })
+
+    // The last nudge chases the booking; earlier ones wait and nudge again.
+    const nextAfterSend = i + 1 < nudgeCount ? ID.nudgeWait(i + 1) : ID.recheck
+    steps.push({
+      stepId: sendId,
+      name: nudgeCount === 1 ? 'Nudge when they go quiet' : `Follow-up ${i + 1}`,
       type: 'send_message',
       messageHint: plan.followUp.nudgeMessage,
-      // Chase after nudging rather than giving up immediately, which is what
-      // makes maxRechecks the real follow-up budget.
-      next: forward(ID.nudge, ID.recheck),
+      next: forward(sendId, nextAfterSend, ID.recheck),
     })
   }
 
@@ -280,16 +319,18 @@ export function planToSteps(plan: JourneyPlan): JourneyStep[] {
       waitDays: plan.booking.recheckDays,
       maxIterations: plan.booking.maxRechecks,
       recheckField: 'appointment_booked',
-      onSatisfied: forward(ID.recheck, ID.confirm),
+      onSatisfied: forward(ID.recheck, ID.close),
       onExhausted: forward(ID.recheck, ID.handoff),
     })
   }
 
   steps.push({
-    stepId: ID.confirm,
+    stepId: ID.close,
     name: wantsBooking ? 'Confirm the booked visit' : 'Sign off',
     type: 'send_message',
-    messageHint: plan.messages.confirm,
+    // Distinct copy per outcome. Reusing `confirm` here told a lead their site
+    // visit was confirmed when no booking had happened at all.
+    messageHint: wantsBooking ? plan.messages.confirm : plan.messages.signOff,
   })
 
   if (plan.handoff.enabled) {
@@ -327,7 +368,7 @@ export interface TimelineEntry {
   // where an operator reads what will happen, so it is also where they should be
   // able to change the words -- rather than hunting for a step editor that this
   // design deliberately does not have.
-  edits?: 'greet' | 'offer' | 'confirm' | 'nudge'
+  edits?: 'greet' | 'offer' | 'confirm' | 'signOff' | 'nudge'
 }
 
 export function planTimeline(plan: JourneyPlan): TimelineEntry[] {
@@ -337,9 +378,13 @@ export function planTimeline(plan: JourneyPlan): TimelineEntry[] {
 
   if (plan.followUp.maxNudges > 0) {
     const day = plan.followUp.waitDays
+    const last = day * plan.followUp.maxNudges
     out.push({
-      when: `Day ${day}`,
-      what: `Nudges ${plan.followUp.maxNudges === 1 ? 'once' : `up to ${plan.followUp.maxNudges} times`} if they go quiet`,
+      when: plan.followUp.maxNudges === 1 ? `Day ${day}` : `Day ${day}–${last}`,
+      what:
+        plan.followUp.maxNudges === 1
+          ? 'Waits a day, then nudges once if they go quiet'
+          : `Nudges ${plan.followUp.maxNudges} times if they go quiet, every ${day === 1 ? 'day' : `${day} days`}`,
       // Past 24h of silence WhatsApp only allows an approved template. This is
       // computed, not asked: the operator should never have to know the rule to
       // avoid breaking it.
@@ -350,11 +395,14 @@ export function planTimeline(plan: JourneyPlan): TimelineEntry[] {
 
   if (plan.booking.enabled) {
     const total = plan.booking.recheckDays * plan.booking.maxRechecks
+    const startsAt = plan.followUp.waitDays * Math.max(0, plan.followUp.maxNudges)
     out.push({
-      when: `Day ${plan.followUp.waitDays}–${plan.followUp.waitDays + total}`,
+      when: `Day ${startsAt}–${startsAt + total}`,
       what: `Checks for a booking ${plan.booking.maxRechecks} times, every ${plan.booking.recheckDays === 1 ? 'day' : `${plan.booking.recheckDays} days`}`,
     })
     out.push({ when: 'On booking', what: 'Confirms the visit and promises a reminder', edits: 'confirm' })
+  } else {
+    out.push({ when: 'At the end', what: 'Signs off without a booking', edits: 'signOff' })
   }
 
   if (plan.handoff.enabled) {
@@ -365,8 +413,10 @@ export function planTimeline(plan: JourneyPlan): TimelineEntry[] {
 }
 
 export function planDurationDays(plan: JourneyPlan): number {
+  // Each nudge is now a real wait step, so N nudges genuinely take N*waitDays.
+  const nudging = plan.followUp.waitDays * Math.max(0, plan.followUp.maxNudges)
   const chase = plan.booking.enabled ? plan.booking.recheckDays * plan.booking.maxRechecks : 0
-  return (plan.followUp.maxNudges > 0 ? plan.followUp.waitDays : 0) + chase
+  return nudging + chase
 }
 
 // ---------------------------------------------------------------------------
@@ -380,6 +430,81 @@ export type PlanInference =
   // automation. The UI falls back to the step editor on this.
   | { ok: false; reason: string }
 
+
+// Is `regenerated` the same journey as `original`, ignoring step ids?
+//
+// THIS IS THE GUARD THE WHOLE INFERENCE PATH RESTS ON.
+//   journeyToPlan reads a saved journey into a plan; saving regenerates the
+//   journey FROM that plan. So inference must refuse anything it cannot
+//   reproduce, not merely anything it cannot parse. Refusing only on
+//   unparseable shapes meant an accepted-but-different journey was silently
+//   replaced by the canonical one the moment an operator opened it and hit
+//   save -- losing extra messages, wait steps, custom edges and tool calls.
+//
+// Ids are compared positionally rather than literally, because a journey
+// authored before the plan builder has its own ids ('greet') and the generator
+// mints its own ('plan-greet'). Same shape with different names is still the
+// same journey.
+function stepsReproduce(original: JourneyStep[], regenerated: JourneyStep[]): boolean {
+  if (original.length !== regenerated.length) return false
+
+  const idMap = new Map<string, string>()
+  for (let i = 0; i < original.length; i += 1) {
+    if (original[i].type !== regenerated[i].type) return false
+    idMap.set(original[i].stepId, regenerated[i].stepId)
+  }
+
+  // An edge matches when the original's target maps onto the regenerated one.
+  const edgeMatches = (from: string | undefined, to: string | undefined): boolean => {
+    if (!from && !to) return true
+    if (!from || !to) return false
+    return idMap.get(from) === to
+  }
+
+  for (let i = 0; i < original.length; i += 1) {
+    const a = original[i]
+    const b = regenerated[i]
+
+    switch (a.type) {
+      case 'send_message': {
+        const other = b as Extract<JourneyStep, { type: 'send_message' }>
+        if ((a.messageHint ?? '') !== (other.messageHint ?? '')) return false
+        if (!edgeMatches(a.next, other.next)) return false
+        break
+      }
+      case 'wait': {
+        const other = b as Extract<JourneyStep, { type: 'wait' }>
+        if (a.waitDays !== other.waitDays) return false
+        if (!edgeMatches(a.next, other.next)) return false
+        break
+      }
+      case 'await_reply': {
+        const other = b as Extract<JourneyStep, { type: 'await_reply' }>
+        if (!edgeMatches(a.next, other.next)) return false
+        if (!edgeMatches(a.onNoReply, other.onNoReply)) return false
+        break
+      }
+      case 'wait_and_recheck': {
+        const other = b as Extract<JourneyStep, { type: 'wait_and_recheck' }>
+        if (a.waitDays !== other.waitDays) return false
+        if (a.maxIterations !== other.maxIterations) return false
+        if (a.recheckField !== other.recheckField) return false
+        if (!edgeMatches(a.onSatisfied, other.onSatisfied)) return false
+        if (!edgeMatches(a.onExhausted, other.onExhausted)) return false
+        break
+      }
+      case 'tool_call':
+      case 'condition':
+        // The plan emits neither, so any occurrence is unreproducible.
+        return false
+      case 'human_handoff':
+        break
+    }
+  }
+
+  return true
+}
+
 export function journeyToPlan(
   journey: Pick<JourneyDefinition, 'steps'>,
   agent: AgentConfig
@@ -388,12 +513,22 @@ export function journeyToPlan(
 
   if (steps.length === 0) return { ok: false, reason: 'This journey has no steps yet.' }
 
-  // A condition step is the clearest signal of a shape the plan does not model:
-  // the plan has exactly one path with fallbacks, not operator-authored branches.
   if (steps.some((s) => s.type === 'condition')) {
     return {
       ok: false,
       reason: 'This journey branches on a condition, which the plan view cannot show without hiding a path.',
+    }
+  }
+
+  // The plan grants tools through the agent's toolbox and only ever grants
+  // booking, so any other capability would be silently revoked on the next
+  // save. The shipped real-estate template carries ['booking','reminder'],
+  // which is exactly this case.
+  const unsupportedTools = agent.mcpToolbox.filter((tool) => tool !== 'booking')
+  if (unsupportedTools.length > 0) {
+    return {
+      ok: false,
+      reason: `This agent uses ${unsupportedTools.join(' and ')}, which the plan view cannot describe without switching ${unsupportedTools.length === 1 ? 'it' : 'them'} off.`,
     }
   }
 
@@ -417,9 +552,7 @@ export function journeyToPlan(
   )
   const waitStep = steps.find((s): s is Extract<JourneyStep, { type: 'wait' }> => s.type === 'wait')
 
-  return {
-    ok: true,
-    plan: {
+  const candidate: JourneyPlan = {
       version: 1,
       goal: DEFAULT_PLAN.goal,
       agentName: agent.name,
@@ -437,6 +570,7 @@ export function journeyToPlan(
         greet: sends[0]?.messageHint ?? DEFAULT_PLAN.messages.greet,
         offer: sends[1]?.messageHint ?? DEFAULT_PLAN.messages.offer,
         confirm: sends[sends.length - 1]?.messageHint ?? DEFAULT_PLAN.messages.confirm,
+        signOff: DEFAULT_PLAN.messages.signOff,
       },
       followUp: {
         waitDays: waitStep?.waitDays ?? recheck?.waitDays ?? DEFAULT_PLAN.followUp.waitDays,
@@ -452,8 +586,21 @@ export function journeyToPlan(
         enabled: Boolean(handoffStep),
         reason: handoffStep?.reason ?? DEFAULT_PLAN.handoff.reason,
       },
-    },
   }
+
+  // THE GATE. Saving in plan mode regenerates the journey from this plan, so a
+  // plan that does not reproduce the journey it came from is a data-loss bug
+  // waiting for someone to press Save. Refusing sends the operator to the step
+  // editor instead, which edits their journey in place and changes nothing.
+  if (!stepsReproduce(steps, planToSteps(candidate))) {
+    return {
+      ok: false,
+      reason:
+        'This journey has a shape the plan view cannot rebuild exactly, so editing it as a plan would change it.',
+    }
+  }
+
+  return { ok: true, plan: candidate }
 }
 
 // Narrows a stored plan off a JourneyBundle.
@@ -480,16 +627,25 @@ export function parseStoredPlan(value: unknown): JourneyPlan | null {
     !messages ||
     typeof messages.greet !== 'string' ||
     typeof messages.offer !== 'string' ||
-    typeof messages.confirm !== 'string'
+    typeof messages.confirm !== 'string' ||
+    typeof messages.signOff !== 'string'
   ) {
     return null
   }
 
+  // Bounds, not just types. Plan-mode saves skip validateSteps because the
+  // generator is proven by tests -- which only holds if the plan feeding it is
+  // in range. A stored recheckDays of 0 or a fractional maxRechecks would
+  // regenerate a step the compiler rejects at publish. Mirrors MIN_WAIT_DAYS
+  // and MAX_WAIT_AND_RECHECK_ITERATIONS in journey-compiler-service.ts.
+  const wholeAtLeast = (v: unknown, min: number, max = Number.MAX_SAFE_INTEGER): boolean =>
+    typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max
+
   const followUp = p.followUp as Record<string, unknown> | undefined
   if (
     !followUp ||
-    typeof followUp.waitDays !== 'number' ||
-    typeof followUp.maxNudges !== 'number' ||
+    !wholeAtLeast(followUp.waitDays, 1) ||
+    !wholeAtLeast(followUp.maxNudges, 0) ||
     typeof followUp.nudgeMessage !== 'string'
   ) {
     return null
@@ -499,8 +655,8 @@ export function parseStoredPlan(value: unknown): JourneyPlan | null {
   if (
     !booking ||
     typeof booking.enabled !== 'boolean' ||
-    typeof booking.recheckDays !== 'number' ||
-    typeof booking.maxRechecks !== 'number'
+    !wholeAtLeast(booking.recheckDays, 1) ||
+    !wholeAtLeast(booking.maxRechecks, 1, MAX_RECHECK_ITERATIONS)
   ) {
     return null
   }
@@ -520,18 +676,31 @@ export function parseStoredPlan(value: unknown): JourneyPlan | null {
       greet: messages.greet,
       offer: messages.offer,
       confirm: messages.confirm,
+      signOff: messages.signOff,
     },
     followUp: {
-      waitDays: followUp.waitDays,
-      maxNudges: followUp.maxNudges,
+      waitDays: followUp.waitDays as number,
+      maxNudges: followUp.maxNudges as number,
       nudgeMessage: followUp.nudgeMessage,
     },
     booking: {
       enabled: booking.enabled,
-      recheckDays: booking.recheckDays,
-      maxRechecks: booking.maxRechecks,
+      recheckDays: booking.recheckDays as number,
+      maxRechecks: booking.maxRechecks as number,
     },
     handoff: { enabled: handoff.enabled, reason: handoff.reason },
   }
+}
+
+// Does a STORED plan still describe the journey saved alongside it?
+//
+// parseStoredPlan proves the shape is valid; it cannot prove the plan is still
+// the one this journey was built from. A bundle written by anything other than
+// the plan builder -- an API call, a restored backup, a future migration --
+// can carry a plan that disagrees with its own journey, and plan mode would
+// then overwrite the live journey with the stale plan's version on the next
+// save. Same gate as inference, applied to the stored value.
+export function storedPlanMatchesJourney(plan: JourneyPlan, steps: JourneyStep[]): boolean {
+  return stepsReproduce(steps, planToSteps(plan))
 }
 

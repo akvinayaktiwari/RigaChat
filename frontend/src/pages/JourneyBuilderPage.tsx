@@ -10,6 +10,7 @@ import {
   DEFAULT_PLAN,
   journeyToPlan,
   parseStoredPlan,
+  storedPlanMatchesJourney,
   planToAgent,
   planToJourney,
 } from '../lib/journey-plan'
@@ -603,8 +604,11 @@ export default function JourneyBuilderPage() {
         // into the agent's systemPrompt as prose and cannot be read back out of
         // it, so inference has to default them -- which used to mean reopening a
         // journey silently reset a client's guardrail list to ours.
+        // Valid shape AND still describes this journey. A stored plan that has
+        // drifted from its own journey would overwrite the live version on the
+        // next save, so a mismatch is treated exactly like no plan at all.
         const stored = parseStoredPlan(bundle.plan)
-        if (stored) {
+        if (stored && storedPlanMatchesJourney(stored, bundle.journey.steps)) {
           setPlan(stored)
           setPlanMode(true)
         } else {
