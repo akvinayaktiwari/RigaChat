@@ -312,10 +312,10 @@ export default function PlanBuilder({ plan, onChange }: PlanBuilderProps) {
                   <Stepper
                     value={plan.followUp.waitDays}
                     onChange={(waitDays) => set('followUp', { ...plan.followUp, waitDays })}
-                    min={1}
+                    min={0}
                     max={30}
-                    suffix={plan.followUp.waitDays === 1 ? 'day' : 'days'}
-                    label="Days before following up"
+                    suffix={plan.followUp.waitDays === 1 ? 'extra day' : 'extra days'}
+                    label="Extra days before following up"
                   />
                   then follow up
                   <Stepper
@@ -327,6 +327,11 @@ export default function PlanBuilder({ plan, onChange }: PlanBuilderProps) {
                     label="How many follow-ups"
                   />
                 </div>
+                <p className="text-[12px] text-gray-400 leading-relaxed">
+                  {plan.followUp.waitDays === 0
+                    ? 'Follows up as soon as WhatsApp\u2019s 24-hour reply window closes.'
+                    : `Follows up ${plan.followUp.waitDays} ${plan.followUp.waitDays === 1 ? 'day' : 'days'} after the 24-hour reply window closes.`}
+                </p>
               </div>
             ) : (
               <p className="text-[13px] text-gray-500 mt-2">
@@ -391,6 +396,22 @@ export default function PlanBuilder({ plan, onChange }: PlanBuilderProps) {
                 The assistant will not book anything. It can still qualify the lead.
               </p>
             )}
+          </div>
+
+          <div className={CARD}>
+            <div className="flex items-start justify-between gap-4">
+              <div className={LABEL + ' mb-0'}>Reminders</div>
+              <Switch
+                on={plan.reminders.enabled}
+                label="Let the assistant set follow-up reminders"
+                onToggle={() => set('reminders', { enabled: !plan.reminders.enabled })}
+              />
+            </div>
+            <p className="text-[13px] text-gray-500 mt-2">
+              {plan.reminders.enabled
+                ? 'The assistant can schedule its own follow-up for a lead.'
+                : 'The assistant will not schedule follow-ups for itself.'}
+            </p>
           </div>
 
           <div className={CARD}>

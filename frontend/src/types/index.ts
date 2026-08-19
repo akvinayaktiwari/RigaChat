@@ -584,6 +584,15 @@ interface JourneyStepBase {
 export interface SendMessageStep extends JourneyStepBase {
   type: 'send_message'
   messageHint?: string
+  // The approved WhatsApp template used when the 24h session window is CLOSED,
+  // which is the normal case for any step firing on a schedule rather than
+  // straight after a reply. Mirrors the backend SendMessageStep; without it a
+  // greet or nudge step cannot send at all outside the window.
+  //
+  // These were absent here while present on the wire, so anything that rebuilt
+  // a step from this type silently dropped them.
+  whatsappTemplateName?: string
+  whatsappTemplateParams?: string[]
   next?: string
 }
 

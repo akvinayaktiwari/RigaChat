@@ -75,8 +75,26 @@ export interface JourneyPlan {
   }
 
   // --- Follow-up rules: what the system must enforce -------------------------
+  // Approved WhatsApp templates, per outbound step that can fire outside the
+  // 24h session window. Carried on the plan because plan mode REBUILDS the
+  // steps, so anything not represented here is dropped -- and a greet with no
+  // template cannot send at all when the window is shut, which is the normal
+  // case for a step firing on lead capture.
+  whatsapp: {
+    greet?: { templateName: string; params: string[] }
+    nudge?: { templateName: string; params: string[] }
+  }
+
+  // Whether the assistant may set follow-up reminders for itself. Granted
+  // through the agent's toolbox exactly like booking.
+  reminders: {
+    enabled: boolean
+  }
+
   followUp: {
-    // Days of silence before the first nudge.
+    // Extra days to wait before nudging, ON TOP of the reply window closing.
+    // 0 means nudge as soon as the window closes, which is what a journey with
+    // no wait step does.
     waitDays: number
     // 0 disables nudging entirely.
     maxNudges: number
@@ -112,7 +130,9 @@ export const DEFAULT_PLAN: JourneyPlan = {
       'Your site visit is confirmed. I will send the location and a reminder before the day.',
     signOff: 'Thanks for your time. Someone from our team will follow up with you shortly.',
   },
-  followUp: { waitDays: 1, maxNudges: 1, nudgeMessage: 'Just checking in — would a quick site visit help?' },
+  whatsapp: {},
+  reminders: { enabled: false },
+  followUp: { waitDays: 0, maxNudges: 1, nudgeMessage: 'Just checking in — would a quick site visit help?' },
   booking: { enabled: true, recheckDays: 1, maxRechecks: 3 },
   handoff: { enabled: true, reason: 'Lead did not book after qualification and a nudge.' },
 }
@@ -174,6 +194,7 @@ export function buildSystemPrompt(plan: JourneyPlan): string {
 export function planToAgent(plan: JourneyPlan, personaId: string): AgentConfig {
   const mcpToolbox: McpCapability[] = []
   if (plan.booking.enabled) mcpToolbox.push('booking')
+  if (plan.reminders.enabled) mcpToolbox.push('reminder')
 
   return {
     personaId,
@@ -216,9 +237,14 @@ export function planToSteps(plan: JourneyPlan): JourneyStep[] {
   // emitted at all and maxNudges produced exactly one step, so the timeline
   // promised "wait 3 days, nudge twice" while the journey nudged once, roughly
   // 24 hours later, off the await_reply timeout.
+  // waitDays 0 means "nudge as soon as the reply window closes", so no wait
+  // step is emitted at all. That is what a journey with no wait step does, and
+  // representing it is what lets such a journey round-trip through the plan.
+  const extraWait = plan.followUp.waitDays > 0
   const nudgeIds: string[] = []
   for (let i = 0; i < nudgeCount; i += 1) {
-    nudgeIds.push(ID.nudgeWait(i), ID.nudge(i))
+    if (extraWait) nudgeIds.push(ID.nudgeWait(i))
+    nudgeIds.push(ID.nudge(i))
   }
 
   const order: string[] = [
@@ -246,7 +272,7 @@ export function planToSteps(plan: JourneyPlan): JourneyStep[] {
     return terminalId
   }
 
-  const firstNudge = nudgeCount > 0 ? ID.nudgeWait(0) : undefined
+  const firstNudge = nudgeCount > 0 ? (extraWait ? ID.nudgeWait(0) : ID.nudge(0)) : undefined
   const quietTarget = (from: string) =>
     firstNudge ? forward(from, firstNudge, ID.recheck) : forward(from, ID.recheck)
 
@@ -259,6 +285,14 @@ export function planToSteps(plan: JourneyPlan): JourneyStep[] {
     // Sent verbatim. See JourneyPlan.messages for why this is copy, not an
     // instruction to the agent.
     messageHint: plan.messages.greet,
+    // Fires on lead capture, so the session window is almost always shut and
+    // the template is the path that actually sends.
+    ...(plan.whatsapp.greet
+      ? {
+          whatsappTemplateName: plan.whatsapp.greet.templateName,
+          whatsappTemplateParams: plan.whatsapp.greet.params,
+        }
+      : {}),
     next: forward(ID.greet, ID.awaitQualify),
   })
 
@@ -289,24 +323,35 @@ export function planToSteps(plan: JourneyPlan): JourneyStep[] {
   })
 
   for (let i = 0; i < nudgeCount; i += 1) {
-    const waitId = ID.nudgeWait(i)
     const sendId = ID.nudge(i)
 
-    steps.push({
-      stepId: waitId,
-      name: nudgeCount === 1 ? 'Wait before following up' : `Wait before follow-up ${i + 1}`,
-      type: 'wait',
-      waitDays: plan.followUp.waitDays,
-      next: forward(waitId, sendId),
-    })
+    if (extraWait) {
+      const waitId = ID.nudgeWait(i)
+      steps.push({
+        stepId: waitId,
+        name: nudgeCount === 1 ? 'Wait before following up' : `Wait before follow-up ${i + 1}`,
+        type: 'wait',
+        waitDays: plan.followUp.waitDays,
+        next: forward(waitId, sendId),
+      })
+    }
 
     // The last nudge chases the booking; earlier ones wait and nudge again.
-    const nextAfterSend = i + 1 < nudgeCount ? ID.nudgeWait(i + 1) : ID.recheck
+    const nextAfterSend =
+      i + 1 < nudgeCount ? (extraWait ? ID.nudgeWait(i + 1) : ID.nudge(i + 1)) : ID.recheck
     steps.push({
       stepId: sendId,
       name: nudgeCount === 1 ? 'Nudge when they go quiet' : `Follow-up ${i + 1}`,
       type: 'send_message',
       messageHint: plan.followUp.nudgeMessage,
+      // Reached only after the window is shut, so without a template it could
+      // never send.
+      ...(plan.whatsapp.nudge
+        ? {
+            whatsappTemplateName: plan.whatsapp.nudge.templateName,
+            whatsappTemplateParams: plan.whatsapp.nudge.params,
+          }
+        : {}),
       next: forward(sendId, nextAfterSend, ID.recheck),
     })
   }
@@ -385,10 +430,11 @@ export function planTimeline(plan: JourneyPlan): TimelineEntry[] {
         plan.followUp.maxNudges === 1
           ? 'Waits a day, then nudges once if they go quiet'
           : `Nudges ${plan.followUp.maxNudges} times if they go quiet, every ${day === 1 ? 'day' : `${day} days`}`,
-      // Past 24h of silence WhatsApp only allows an approved template. This is
-      // computed, not asked: the operator should never have to know the rule to
-      // avoid breaking it.
-      needsTemplate: day >= 1,
+      // ALWAYS, not only when an extra wait is set. A nudge is reached from
+      // await_reply's no-reply edge, which by definition fires once the 24h
+      // window has closed -- so an approved template is required whether or
+      // not the operator added days on top.
+      needsTemplate: true,
       edits: 'nudge',
     })
   }
@@ -469,6 +515,16 @@ function stepsReproduce(original: JourneyStep[], regenerated: JourneyStep[]): bo
       case 'send_message': {
         const other = b as Extract<JourneyStep, { type: 'send_message' }>
         if ((a.messageHint ?? '') !== (other.messageHint ?? '')) return false
+        // Compared, because plan mode REBUILDS steps: a template the plan does
+        // not carry would be dropped, and a greet or nudge with no template
+        // cannot send once the 24h window is shut.
+        if ((a.whatsappTemplateName ?? '') !== (other.whatsappTemplateName ?? '')) return false
+        if (
+          JSON.stringify(a.whatsappTemplateParams ?? []) !==
+          JSON.stringify(other.whatsappTemplateParams ?? [])
+        ) {
+          return false
+        }
         if (!edgeMatches(a.next, other.next)) return false
         break
       }
@@ -520,11 +576,13 @@ export function journeyToPlan(
     }
   }
 
-  // The plan grants tools through the agent's toolbox and only ever grants
-  // booking, so any other capability would be silently revoked on the next
-  // save. The shipped real-estate template carries ['booking','reminder'],
-  // which is exactly this case.
-  const unsupportedTools = agent.mcpToolbox.filter((tool) => tool !== 'booking')
+  // The plan grants tools through the agent's toolbox, so a capability it
+  // cannot express would be silently revoked on the next save. booking and
+  // reminder are both expressible; quotation and brochure are backend stubs
+  // with no plan control, so a journey using one is refused rather than
+  // quietly stripped of it.
+  const EXPRESSIBLE: McpCapability[] = ['booking', 'reminder']
+  const unsupportedTools = agent.mcpToolbox.filter((tool) => !EXPRESSIBLE.includes(tool))
   if (unsupportedTools.length > 0) {
     return {
       ok: false,
@@ -552,6 +610,7 @@ export function journeyToPlan(
   )
   const waitStep = steps.find((s): s is Extract<JourneyStep, { type: 'wait' }> => s.type === 'wait')
 
+  const greetStep = sends[0]
   const candidate: JourneyPlan = {
       version: 1,
       goal: DEFAULT_PLAN.goal,
@@ -572,8 +631,30 @@ export function journeyToPlan(
         confirm: sends[sends.length - 1]?.messageHint ?? DEFAULT_PLAN.messages.confirm,
         signOff: DEFAULT_PLAN.messages.signOff,
       },
+      whatsapp: {
+        ...(greetStep?.whatsappTemplateName
+          ? {
+              greet: {
+                templateName: greetStep.whatsappTemplateName,
+                params: greetStep.whatsappTemplateParams ?? [],
+              },
+            }
+          : {}),
+        ...(nudge?.whatsappTemplateName
+          ? {
+              nudge: {
+                templateName: nudge.whatsappTemplateName,
+                params: nudge.whatsappTemplateParams ?? [],
+              },
+            }
+          : {}),
+      },
+      reminders: { enabled: agent.mcpToolbox.includes('reminder') },
       followUp: {
-        waitDays: waitStep?.waitDays ?? recheck?.waitDays ?? DEFAULT_PLAN.followUp.waitDays,
+        // No wait step means no EXTRA wait: the nudge fires when the reply
+        // window closes. Defaulting to 1 here invented a delay the journey
+        // did not have, which then failed the reproduce gate.
+        waitDays: waitStep?.waitDays ?? 0,
         maxNudges: nudge ? 1 : 0,
         nudgeMessage: nudge?.messageHint ?? DEFAULT_PLAN.followUp.nudgeMessage,
       },
@@ -644,7 +725,7 @@ export function parseStoredPlan(value: unknown): JourneyPlan | null {
   const followUp = p.followUp as Record<string, unknown> | undefined
   if (
     !followUp ||
-    !wholeAtLeast(followUp.waitDays, 1) ||
+    !wholeAtLeast(followUp.waitDays, 0) ||
     !wholeAtLeast(followUp.maxNudges, 0) ||
     typeof followUp.nudgeMessage !== 'string'
   ) {
@@ -663,6 +744,29 @@ export function parseStoredPlan(value: unknown): JourneyPlan | null {
 
   const handoff = p.handoff as Record<string, unknown> | undefined
   if (!handoff || typeof handoff.enabled !== 'boolean' || typeof handoff.reason !== 'string') return null
+
+  const reminders = p.reminders as Record<string, unknown> | undefined
+  if (!reminders || typeof reminders.enabled !== 'boolean') return null
+
+  // Each entry is optional, but a malformed one is rejected outright: a step
+  // rebuilt with a broken template name would fail to send outside the 24h
+  // window, which is silent and only visible as leads never hearing from you.
+  const readTemplate = (
+    value: unknown
+  ): { ok: true; value?: { templateName: string; params: string[] } } | { ok: false } => {
+    if (value === undefined) return { ok: true }
+    if (typeof value !== 'object' || value === null) return { ok: false }
+    const t = value as Record<string, unknown>
+    if (typeof t.templateName !== 'string' || t.templateName.length === 0) return { ok: false }
+    if (!Array.isArray(t.params) || !t.params.every((x) => typeof x === 'string')) return { ok: false }
+    return { ok: true, value: { templateName: t.templateName, params: t.params as string[] } }
+  }
+
+  const whatsapp = (p.whatsapp ?? {}) as Record<string, unknown>
+  if (typeof whatsapp !== 'object' || whatsapp === null) return null
+  const greetTemplate = readTemplate(whatsapp.greet)
+  const nudgeTemplate = readTemplate(whatsapp.nudge)
+  if (!greetTemplate.ok || !nudgeTemplate.ok) return null
 
   return {
     version: 1,
@@ -689,6 +793,11 @@ export function parseStoredPlan(value: unknown): JourneyPlan | null {
       maxRechecks: booking.maxRechecks as number,
     },
     handoff: { enabled: handoff.enabled, reason: handoff.reason },
+    reminders: { enabled: reminders.enabled },
+    whatsapp: {
+      ...(greetTemplate.value ? { greet: greetTemplate.value } : {}),
+      ...(nudgeTemplate.value ? { nudge: nudgeTemplate.value } : {}),
+    },
   }
 }
 

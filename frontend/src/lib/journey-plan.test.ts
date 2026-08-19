@@ -460,10 +460,20 @@ describe('inference refuses anything it cannot reproduce', () => {
   it('refuses an agent whose toolbox the plan cannot regrant', () => {
     const steps = planToSteps(plan())
 
-    const result = journeyToPlan({ steps }, agent(['booking', 'reminder']))
+    // booking and reminder are both expressible now; brochure is a backend
+    // stub with no plan control, so accepting it would silently revoke it.
+    const result = journeyToPlan({ steps }, agent(['booking', 'brochure']))
 
     expect(result.ok).toBe(false)
-    expect(result.ok === false && result.reason).toMatch(/reminder/)
+    expect(result.ok === false && result.reason).toMatch(/brochure/)
+  })
+
+  it('accepts reminder, which the plan can regrant', () => {
+    const authored = { ...DEFAULT_PLAN, reminders: { enabled: true } }
+    const result = journeyToPlan({ steps: planToSteps(authored) }, agent(['booking', 'reminder']))
+
+    expect(result.ok).toBe(true)
+    expect(result.ok && result.plan.reminders.enabled).toBe(true)
   })
 
   it('accepts a journey the plan reproduces exactly', () => {
@@ -597,6 +607,160 @@ describe('the closing message matches the outcome', () => {
 
     expect(last && 'messageHint' in last && last.messageHint).toBe(p.messages.signOff)
     expect(last && 'messageHint' in last && last.messageHint).not.toMatch(/confirmed/i)
+  })
+})
+
+// THE JOURNEY THAT ACTUALLY EXISTS.
+//
+// Copied verbatim from
+// backend/src/lib/journey-templates/real-estate-lead-qualification.ts, which
+// is what every client's first journey is cloned from. If the plan cannot
+// round-trip THIS, the plan view is unreachable for real users and the whole
+// feature is theoretical.
+const SHIPPED_TEMPLATE_STEPS: JourneyStep[] = [
+  {
+    stepId: 'greet',
+    name: 'Greet and ask what they are looking for',
+    type: 'send_message',
+    messageHint:
+      'Hi! Thanks for your interest. To point you to the right property, could you tell me your budget range and which area you are considering?',
+    whatsappTemplateName: 'lead_welcome_qualify_1',
+    whatsappTemplateParams: ['{{lead.name}}', '{{lead.propertyInterest}}'],
+    next: 'await_qualification',
+  },
+  {
+    stepId: 'await_qualification',
+    name: 'Wait for them to tell us budget and area',
+    type: 'await_reply',
+    promptHint: 'budget range and preferred area',
+    next: 'offer_visit',
+    onNoReply: 'nudge',
+  },
+  {
+    stepId: 'offer_visit',
+    name: 'Acknowledge and offer a site visit',
+    type: 'send_message',
+    messageHint:
+      'Thanks, that helps. Would you like to see the property in person? Tell me a day that suits you and I will arrange a site visit.',
+    next: 'await_visit_time',
+  },
+  {
+    stepId: 'await_visit_time',
+    name: 'Wait for them to name a day',
+    type: 'await_reply',
+    promptHint: 'a day that suits them for a site visit',
+    next: 'wait_for_booking',
+    onNoReply: 'nudge',
+  },
+  {
+    stepId: 'nudge',
+    name: 'Nudge once when they go quiet',
+    type: 'send_message',
+    messageHint:
+      'Just checking in -- would a weekend site visit work for you? I can hold a slot and share the exact location and directions.',
+    whatsappTemplateName: 'lead_followup_nudge_1',
+    whatsappTemplateParams: ['{{lead.name}}'],
+    next: 'wait_for_booking',
+  },
+  {
+    stepId: 'wait_for_booking',
+    name: 'Wait for a booking to be confirmed',
+    type: 'wait_and_recheck',
+    waitDays: 1,
+    maxIterations: 3,
+    recheckField: 'appointment_booked',
+    onSatisfied: 'confirm_visit',
+    onExhausted: 'hand_to_agent',
+  },
+  {
+    stepId: 'confirm_visit',
+    name: 'Confirm the booked visit',
+    type: 'send_message',
+    messageHint:
+      'Your site visit is confirmed. I will send the location and a reminder before it. Looking forward to showing you around!',
+  },
+  {
+    stepId: 'hand_to_agent',
+    name: 'Hand to a human instead of following up again',
+    type: 'human_handoff',
+    reason: 'Lead did not book a site visit after qualification, a nudge, and a wait.',
+  },
+]
+
+const SHIPPED_TEMPLATE_AGENT: AgentConfig = {
+  personaId: 'persona-1',
+  name: 'Site visit assistant',
+  systemPrompt: 'You are a helpful assistant for a real estate business.',
+  toneDescription: 'Warm, direct, and brief. Never pushy.',
+  mcpToolbox: ['booking', 'reminder'],
+  channelConfig: {},
+}
+
+describe('the shipped real-estate template', () => {
+  it('is accepted by the plan view', () => {
+    const result = journeyToPlan({ steps: SHIPPED_TEMPLATE_STEPS }, SHIPPED_TEMPLATE_AGENT)
+
+    expect(result.ok).toBe(true)
+  })
+
+  it('keeps the reminder capability through a save', () => {
+    const result = journeyToPlan({ steps: SHIPPED_TEMPLATE_STEPS }, SHIPPED_TEMPLATE_AGENT)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    expect(planToAgent(result.plan, 'p1').mcpToolbox).toEqual(
+      expect.arrayContaining(['booking', 'reminder'])
+    )
+  })
+
+  // Without these the greet and nudge cannot send at all once the 24h window
+  // is shut, which is the normal case for both of them.
+  it('keeps both approved WhatsApp templates through a save', () => {
+    const result = journeyToPlan({ steps: SHIPPED_TEMPLATE_STEPS }, SHIPPED_TEMPLATE_AGENT)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    const rebuilt = planToSteps(result.plan)
+    const sends = rebuilt.filter(
+      (s): s is Extract<JourneyStep, { type: 'send_message' }> => s.type === 'send_message'
+    )
+
+    expect(sends[0].whatsappTemplateName).toBe('lead_welcome_qualify_1')
+    expect(sends[0].whatsappTemplateParams).toEqual(['{{lead.name}}', '{{lead.propertyInterest}}'])
+    expect(sends.find((s) => s.whatsappTemplateName === 'lead_followup_nudge_1')).toBeTruthy()
+  })
+
+  it('rebuilds the same journey it read, step for step', () => {
+    const result = journeyToPlan({ steps: SHIPPED_TEMPLATE_STEPS }, SHIPPED_TEMPLATE_AGENT)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    const rebuilt = planToSteps(result.plan)
+
+    expect(rebuilt.map((s) => s.type)).toEqual(SHIPPED_TEMPLATE_STEPS.map((s) => s.type))
+    expect(rebuilt.map((s) => (s as { messageHint?: string }).messageHint)).toEqual(
+      SHIPPED_TEMPLATE_STEPS.map((s) => (s as { messageHint?: string }).messageHint)
+    )
+  })
+
+  it('still refuses a capability the plan cannot express', () => {
+    const result = journeyToPlan(
+      { steps: SHIPPED_TEMPLATE_STEPS },
+      { ...SHIPPED_TEMPLATE_AGENT, mcpToolbox: ['booking', 'brochure'] }
+    )
+
+    expect(result.ok).toBe(false)
+    expect(result.ok === false && result.reason).toMatch(/brochure/)
+  })
+
+  it('refuses if a template would be dropped', () => {
+    // Same journey, but the plan cannot carry a template on the OFFER step, so
+    // rebuilding would silently lose it.
+    const withExtraTemplate = SHIPPED_TEMPLATE_STEPS.map((s) =>
+      s.stepId === 'offer_visit' ? { ...s, whatsappTemplateName: 'offer_1' } : s
+    )
+
+    expect(journeyToPlan({ steps: withExtraTemplate }, SHIPPED_TEMPLATE_AGENT).ok).toBe(false)
   })
 })
 
