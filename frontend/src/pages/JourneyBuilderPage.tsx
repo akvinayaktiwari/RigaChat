@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
 import { createJourneyBundle, getJourneyBundle, publishJourneyBundle, updateJourneyBundle } from '../services/api'
 import { useToast } from '../components/Toast/Toast'
+import { Modal } from '../components/Modal/Modal'
 import type {
   AgentConfig,
   JourneyBundle,
@@ -556,6 +557,9 @@ export default function JourneyBuilderPage() {
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [existing, setExisting] = useState<JourneyBundle | null>(null)
+  // Gates the Save path on a PUBLISHED bundle. See requestSave() below for why
+  // Save needs a confirmation and Publish does not.
+  const [confirmUnpublish, setConfirmUnpublish] = useState(false)
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -676,6 +680,10 @@ export default function JourneyBuilderPage() {
         return null
       }
 
+      // Captured BEFORE the call, because a successful update always comes back
+      // as 'draft' -- the response can never tell us what we just gave up.
+      const wasPublished = existing?.status === 'published'
+
       const res = await updateJourneyBundle(botId, bundleId as string, {
         name,
         description: description || undefined,
@@ -684,7 +692,12 @@ export default function JourneyBuilderPage() {
       })
       if (res.success && res.data) {
         setExisting(res.data)
-        toast.show('Journey saved', 'success')
+        toast.show(
+          wasPublished
+            ? 'Saved as draft. This journey is no longer handling new leads.'
+            : 'Journey saved',
+          wasPublished ? 'warning' : 'success'
+        )
         return res.data
       }
       setError(res.error ?? 'Failed to save journey')
@@ -695,6 +708,30 @@ export default function JourneyBuilderPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  // What the Save button actually calls.
+  //
+  // Saving a PUBLISHED bundle is destructive in a way nothing on screen used to
+  // admit: updateJourneyBundle (backend journey-service.ts) drops the bundle to
+  // 'draft' AND releases its trigger claim, so new leads stop igniting into it
+  // until someone publishes again. Conversations already running are unaffected
+  // -- they finish on the version they started on.
+  //
+  // Publish does NOT go through here on purpose. handlePublish() saves and then
+  // immediately re-claims the trigger, so the journey is never off duty for
+  // longer than that round trip, and a confirmation there would be noise.
+  function requestSave() {
+    if (existing?.status === 'published') {
+      setConfirmUnpublish(true)
+      return
+    }
+    void handleSave()
+  }
+
+  async function confirmSaveAsDraft() {
+    setConfirmUnpublish(false)
+    await handleSave()
   }
 
   async function handlePublish() {
@@ -909,7 +946,7 @@ export default function JourneyBuilderPage() {
         </button>
         <button
           type="button"
-          onClick={handleSave}
+          onClick={requestSave}
           disabled={saving || publishing}
           className={`px-4 py-2.5 text-sm ${secondaryButtonClasses} disabled:opacity-50`}
         >
@@ -924,6 +961,52 @@ export default function JourneyBuilderPage() {
           {publishing ? 'Publishing…' : 'Publish'}
         </button>
       </div>
+
+      <Modal
+        isOpen={confirmUnpublish}
+        onClose={() => setConfirmUnpublish(false)}
+        title="Saving will take this journey off duty"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
+            <p className="text-sm font-semibold text-amber-800 mb-1" style={JAKARTA_FONT}>
+              New leads will stop entering
+            </p>
+            <p className="text-sm text-amber-900/80 leading-relaxed">
+              Saving returns “{name || 'this journey'}” to draft and releases the{' '}
+              <strong>{TRIGGER_LABELS[triggerType]}</strong> trigger. Nothing will pick up new
+              leads until you publish it again.
+            </p>
+          </div>
+
+          <div className="rounded-xl bg-gray-50 border border-gray-200 p-4">
+            <p className="text-sm font-semibold text-gray-800 mb-1" style={JAKARTA_FONT}>
+              Conversations already running are safe
+            </p>
+            <p className="text-sm text-gray-600 leading-relaxed">
+              Leads mid-journey finish on the version they started on.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => setConfirmUnpublish(false)}
+              className="text-gray-600 font-medium px-4 py-2.5 rounded-xl text-sm hover:bg-gray-100 transition-colors"
+            >
+              Keep it live
+            </button>
+            <button
+              type="button"
+              onClick={confirmSaveAsDraft}
+              className="px-4 py-2.5 text-sm bg-amber-600 text-white font-semibold rounded-xl hover:bg-amber-700 transition-colors"
+            >
+              Save as draft
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
