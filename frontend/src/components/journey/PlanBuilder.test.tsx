@@ -144,3 +144,39 @@ describe('the timeline that replaces reading a graph', () => {
     expect(screen.getByText(/About 4 days end to end/)).toBeTruthy()
   })
 })
+
+// jsdom does no layout, so this cannot catch overflow by measuring. What it CAN
+// pin is the CSS contract that prevents it: a grid track defaults to
+// min-content, and <textarea>/<input> carry an intrinsic minimum width that
+// w-full does not override. A bare `grid-cols-2` therefore lets the fields push
+// the track wider than the container and the whole page scrolls sideways --
+// which is exactly what happened.
+describe('the layout cannot overflow its container', () => {
+  it('sizes grid tracks with minmax(0,1fr), never a bare fraction', () => {
+    const { container } = render(<PlanBuilder plan={DEFAULT_PLAN} onChange={vi.fn()} />)
+
+    const grid = container.querySelector('[class*="grid-cols"]')
+    const classes = grid?.className ?? ''
+
+    expect(classes).toMatch(/grid-cols-\[minmax\(0,1fr\)_minmax\(0,1fr\)\]/)
+    expect(classes).not.toMatch(/xl:grid-cols-2\b/)
+  })
+
+  it('lets both sections shrink below their content width', () => {
+    const { container } = render(<PlanBuilder plan={DEFAULT_PLAN} onChange={vi.fn()} />)
+
+    const sections = Array.from(container.querySelectorAll('section'))
+    expect(sections).toHaveLength(2)
+    for (const section of sections) {
+      expect(section.className).toContain('min-w-0')
+    }
+  })
+
+  it('lets a long pinned message shrink rather than widen the page', () => {
+    render(<PlanBuilder plan={DEFAULT_PLAN} onChange={vi.fn()} />)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit words' })[0])
+
+    const editor = screen.getByRole('textbox', { name: /Sent to the lead/i })
+    expect(editor.className).toContain('min-w-0')
+  })
+})

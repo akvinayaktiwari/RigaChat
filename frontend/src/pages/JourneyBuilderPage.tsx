@@ -315,7 +315,7 @@ function StepEditor({
 
         {step.type === 'wait_and_recheck' && (
           <>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
               <div>
                 <label className={labelClasses}>Wait days (per try)</label>
                 <input
@@ -409,7 +409,7 @@ function StepEditor({
 
         {step.type === 'condition' && (
           <>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
               <div>
                 <label className={labelClasses}>Field</label>
                 <Dropdown

@@ -213,9 +213,15 @@ export default function PlanBuilder({ plan, onChange }: PlanBuilderProps) {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+      {/* minmax(0,1fr), never a bare 1fr. A grid track sizes to min-content by
+          default, and <textarea>/<input> carry an intrinsic minimum width that
+          w-full does not override -- so a bare grid-cols-2 lets the fields push
+          the track wider than the container and the whole page scrolls
+          sideways. The min-w-0 on each section is the same guard one level
+          down. */}
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-5 items-start">
         {/* ---------------- Conversation guide ---------------- */}
-        <section>
+        <section className="min-w-0">
           <SectionHead
             dot="bg-violet-600"
             title="Conversation guide"
@@ -271,7 +277,7 @@ export default function PlanBuilder({ plan, onChange }: PlanBuilderProps) {
         </section>
 
         {/* ---------------- Follow-up rules ---------------- */}
-        <section>
+        <section className="min-w-0">
           <SectionHead
             dot="bg-amber-500"
             title="Follow-up rules"
@@ -336,7 +342,7 @@ export default function PlanBuilder({ plan, onChange }: PlanBuilderProps) {
                 onChange={(e) => set('followUp', { ...plan.followUp, nudgeMessage: e.target.value })}
                 rows={2}
                 placeholder="Your follow-up message"
-                className="w-full text-[13.5px] text-gray-700 bg-white border border-amber-200 rounded-xl px-3 py-2 resize-y focus:outline-none focus:ring-2 focus:ring-amber-400"
+                className="w-full min-w-0 text-[13.5px] text-gray-700 bg-white border border-amber-200 rounded-xl px-3 py-2 resize-y focus:outline-none focus:ring-2 focus:ring-amber-400"
               />
             </div>
           )}
@@ -437,16 +443,20 @@ export default function PlanBuilder({ plan, onChange }: PlanBuilderProps) {
                   </div>
 
                   {isOpen && key && (
-                    <div className="pb-3 pl-[5.75rem] pr-1">
-                      <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">
+                    <div className="pb-3 pl-[5.75rem] pr-1 min-w-0">
+                      <label
+                        htmlFor={`plan-message-${key}`}
+                        className="block text-[11px] font-semibold text-gray-500 mb-1.5"
+                      >
                         Sent to the lead, exactly as written
                       </label>
                       <textarea
+                        id={`plan-message-${key}`}
                         value={messageValue(key)}
                         onChange={(e) => setMessage(key, e.target.value)}
                         rows={3}
                         autoFocus
-                        className="w-full text-[13.5px] text-gray-700 bg-white border border-gray-200 rounded-xl px-3 py-2 resize-y focus:outline-none focus:ring-2 focus:ring-violet-600"
+                        className="w-full min-w-0 text-[13.5px] text-gray-700 bg-white border border-gray-200 rounded-xl px-3 py-2 resize-y focus:outline-none focus:ring-2 focus:ring-violet-600"
                       />
                     </div>
                   )}
