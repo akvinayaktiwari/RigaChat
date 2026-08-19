@@ -4,6 +4,7 @@ import { ArrowLeft, BookOpen, Check, Globe, Info, Loader2, Lock, Mail, Volume2 }
 import { createVoiceAgent } from '../services/api'
 import { useSubscription } from '../hooks/useSubscription'
 import type { VoiceAgentVoice } from '../types/index'
+import Dropdown from '../components/Dropdown/Dropdown'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -437,34 +438,27 @@ export default function NewVoiceAgentPage() {
 
             <div>
               <label className={labelClasses}>Widget Position</label>
-              <select
+              <Dropdown
                 value={formData.widgetPosition}
-                onChange={(e) => update('widgetPosition', e.target.value as FormData['widgetPosition'])}
-                className={inputClasses}
-              >
-                {WIDGET_POSITION_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => update('widgetPosition', v as FormData['widgetPosition'])}
+                ariaLabel="Widget position"
+                options={WIDGET_POSITION_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+              />
             </div>
 
             <div>
               <label className={labelClasses}>Max Session Duration</label>
-              <select
-                value={formData.maxSessionDuration}
-                onChange={(e) =>
-                  update('maxSessionDuration', Number(e.target.value) as FormData['maxSessionDuration'])
+              <Dropdown
+                value={String(formData.maxSessionDuration)}
+                onChange={(v) =>
+                  update('maxSessionDuration', Number(v) as FormData['maxSessionDuration'])
                 }
-                className={inputClasses}
-              >
-                {SESSION_DURATION_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                ariaLabel="Max session duration"
+                options={SESSION_DURATION_OPTIONS.map((o) => ({
+                  value: String(o.value),
+                  label: o.label,
+                }))}
+              />
               <div className="mt-3 bg-violet-50 border border-violet-100 rounded-xl p-4 text-sm text-violet-700">
                 Longer sessions increase API usage costs. 10 minutes is recommended for most use cases.
               </div>

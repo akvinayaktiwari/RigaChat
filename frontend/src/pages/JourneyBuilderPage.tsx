@@ -3,7 +3,19 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
 import { createJourneyBundle, getJourneyBundle, publishJourneyBundle, updateJourneyBundle } from '../services/api'
 import { useToast } from '../components/Toast/Toast'
+import JourneyGraph from '../components/journey/JourneyGraph'
+import PlanBuilder from '../components/journey/PlanBuilder'
+import Dropdown from '../components/Dropdown/Dropdown'
 import { Modal } from '../components/Modal/Modal'
+import {
+  DEFAULT_PLAN,
+  journeyToPlan,
+  parseStoredPlan,
+  storedPlanMatchesJourney,
+  planToAgent,
+  planToJourney,
+} from '../lib/journey-plan'
+import type { JourneyPlan } from '../lib/journey-plan'
 import type {
   AgentConfig,
   JourneyBundle,
@@ -171,19 +183,19 @@ function NextStepSelect({ steps, currentIndex, value, onChange, required, label 
   return (
     <div>
       <label className={labelClasses}>{label}</label>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className={inputClasses}>
-        {!required && <option value="">— End journey —</option>}
-        {required && value === '' && (
-          <option value="" disabled>
-            Choose a step…
-          </option>
-        )}
-        {laterSteps.map(({ step, i }) => (
-          <option key={step.stepId} value={step.stepId}>
-            Step {i + 1}: {step.name}
-          </option>
-        ))}
-      </select>
+      <Dropdown
+        value={value}
+        onChange={onChange}
+        ariaLabel={label}
+        placeholder={required ? 'Choose a step…' : '— End journey —'}
+        options={[
+          ...(required ? [] : [{ value: '', label: 'End journey' }]),
+          ...laterSteps.map(({ step, i }) => ({
+            value: step.stepId,
+            label: `Step ${i + 1}: ${step.name}`,
+          })),
+        ]}
+      />
     </div>
   )
 }
@@ -306,7 +318,7 @@ function StepEditor({
 
         {step.type === 'wait_and_recheck' && (
           <>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
               <div>
                 <label className={labelClasses}>Wait days (per try)</label>
                 <input
@@ -331,15 +343,16 @@ function StepEditor({
             </div>
             <div>
               <label className={labelClasses}>Check whether…</label>
-              <select
+              <Dropdown
                 value={step.recheckField}
-                onChange={(e) => onChange({ recheckField: e.target.value as StepPatch['recheckField'] })}
-                className={inputClasses}
-              >
-                <option value="replied">Lead replied</option>
-                <option value="lead_score">Lead score is set</option>
-                <option value="appointment_booked">Appointment is booked</option>
-              </select>
+                onChange={(v) => onChange({ recheckField: v as StepPatch['recheckField'] })}
+                ariaLabel="What to recheck"
+                options={[
+                  { value: 'replied', label: 'Lead replied' },
+                  { value: 'lead_score', label: 'Lead score is set' },
+                  { value: 'appointment_booked', label: 'Appointment is booked' },
+                ]}
+              />
             </div>
             <NextStepSelect
               steps={steps}
@@ -399,29 +412,31 @@ function StepEditor({
 
         {step.type === 'condition' && (
           <>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
               <div>
                 <label className={labelClasses}>Field</label>
-                <select
+                <Dropdown
                   value={step.field}
-                  onChange={(e) => onChange({ field: e.target.value as StepPatch['field'] })}
-                  className={inputClasses}
-                >
-                  <option value="replied">Replied</option>
-                  <option value="lead_score">Lead score</option>
-                  <option value="appointment_booked">Appointment booked</option>
-                </select>
+                  onChange={(v) => onChange({ field: v as StepPatch['field'] })}
+                  ariaLabel="Field to check"
+                  options={[
+                    { value: 'replied', label: 'Replied' },
+                    { value: 'lead_score', label: 'Lead score' },
+                    { value: 'appointment_booked', label: 'Appointment booked' },
+                  ]}
+                />
               </div>
               <div>
                 <label className={labelClasses}>Operator</label>
-                <select
+                <Dropdown
                   value={step.operator}
-                  onChange={(e) => onChange({ operator: e.target.value as StepPatch['operator'] })}
-                  className={inputClasses}
-                >
-                  <option value="equals">Equals</option>
-                  <option value="not_equals">Not equals</option>
-                </select>
+                  onChange={(v) => onChange({ operator: v as StepPatch['operator'] })}
+                  ariaLabel="Comparison"
+                  options={[
+                    { value: 'equals', label: 'Equals' },
+                    { value: 'not_equals', label: 'Not equals' },
+                  ]}
+                />
               </div>
             </div>
             <div>
@@ -459,26 +474,16 @@ function StepEditor({
               {mcpToolbox.length === 0 ? (
                 <p className="text-xs text-amber-600">Enable a tool in the Agent section above first.</p>
               ) : (
-                <select
+                <Dropdown
                   value={step.toolName}
-                  // Every option value below is either '' (the disabled
-                  // placeholder) or a member of mcpToolbox, which is
+                  // Every option value is a member of mcpToolbox, which is
                   // McpCapability[] -- so the narrow is exhaustive by
                   // construction, not an assumption about user input.
-                  onChange={(e) =>
-                    onChange({ toolName: e.target.value as McpCapability | '', toolInput: undefined })
-                  }
-                  className={inputClasses}
-                >
-                  <option value="" disabled>
-                    Choose a tool…
-                  </option>
-                  {mcpToolbox.map((tool) => (
-                    <option key={tool} value={tool}>
-                      {TOOL_LABELS[tool]}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => onChange({ toolName: v as McpCapability | '', toolInput: undefined })}
+                  ariaLabel="Tool to call"
+                  placeholder="Choose a tool…"
+                  options={mcpToolbox.map((tool) => ({ value: tool, label: TOOL_LABELS[tool] }))}
+                />
               )}
             </div>
 
@@ -557,8 +562,20 @@ export default function JourneyBuilderPage() {
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [existing, setExisting] = useState<JourneyBundle | null>(null)
-  // Gates the Save path on a PUBLISHED bundle. See requestSave() below for why
-  // Save needs a confirmation and Publish does not.
+  // Which node the map has highlighted. Purely a view concern today; the
+  // inspector will take ownership of it.
+  const [selectedStepId, setSelectedStepId] = useState<string | null>(null)
+
+  // The plan is the source of truth whenever we have one: the steps below are
+  // regenerated from it on save. `planMode` is false only for a journey whose
+  // shape a plan cannot represent honestly (see journeyToPlan), in which case
+  // the step editor stays as the fallback rather than mangling their journey.
+  const [plan, setPlan] = useState<JourneyPlan>(DEFAULT_PLAN)
+  const [planMode, setPlanMode] = useState(true)
+  const [planRefusal, setPlanRefusal] = useState<string | null>(null)
+  const [view, setView] = useState<'plan' | 'map' | 'steps'>('plan')
+  // Gates the Save path on a PUBLISHED bundle. See requestSave() for why Save
+  // needs a confirmation and Publish does not.
   const [confirmUnpublish, setConfirmUnpublish] = useState(false)
 
   const [name, setName] = useState('')
@@ -586,6 +603,33 @@ export default function JourneyBuilderPage() {
         setSystemPrompt(bundle.agent.systemPrompt)
         setToneDescription(bundle.agent.toneDescription ?? '')
         setMcpToolbox(bundle.agent.mcpToolbox)
+
+        // A stored plan wins. goal / learn / never / escalateWhen are folded
+        // into the agent's systemPrompt as prose and cannot be read back out of
+        // it, so inference has to default them -- which used to mean reopening a
+        // journey silently reset a client's guardrail list to ours.
+        // Valid shape AND still describes this journey. A stored plan that has
+        // drifted from its own journey would overwrite the live version on the
+        // next save, so a mismatch is treated exactly like no plan at all.
+        const stored = parseStoredPlan(bundle.plan)
+        if (stored && storedPlanMatchesJourney(stored, bundle.journey.steps)) {
+          setPlan(stored)
+          setPlanMode(true)
+        } else {
+          // No stored plan: authored before this field existed, or written by
+          // something other than the builder. Infer one. A refusal is a feature:
+          // guessing at a shape the plan cannot express would silently drop a
+          // path from a client's live automation.
+          const inferred = journeyToPlan(bundle.journey, bundle.agent)
+          if (inferred.ok) {
+            setPlan(inferred.plan)
+            setPlanMode(true)
+          } else {
+            setPlanMode(false)
+            setPlanRefusal(inferred.reason)
+            setView('steps')
+          }
+        }
       } else {
         toast.show(res.error ?? 'Failed to load journey', 'error')
       }
@@ -619,10 +663,6 @@ export default function JourneyBuilderPage() {
     })
   }
 
-  function toggleTool(toolName: McpCapability) {
-    setMcpToolbox((prev) => (prev.includes(toolName) ? prev.filter((t) => t !== toolName) : [...prev, toolName]))
-  }
-
   async function handleSave(): Promise<JourneyBundle | null> {
     setError(null)
 
@@ -630,37 +670,60 @@ export default function JourneyBuilderPage() {
       setError('Give this journey a name')
       return null
     }
-    if (!agentName.trim() || !systemPrompt.trim()) {
+    if (planMode) {
+      if (!plan.agentName.trim()) {
+        setError('Give the assistant a name')
+        return null
+      }
+      if (!plan.goal.trim()) {
+        setError('Say what this assistant should achieve')
+        return null
+      }
+    } else if (!agentName.trim() || !systemPrompt.trim()) {
       setError('The agent needs a name and a system prompt')
       return null
     }
-    if (steps.length === 0) {
-      setError('Add at least one step before saving')
-      return null
-    }
-    const stepError = validateSteps(steps)
-    if (stepError) {
-      setError(stepError)
-      return null
+    if (!planMode) {
+      if (steps.length === 0) {
+        setError('Add at least one step before saving')
+        return null
+      }
+      const stepError = validateSteps(steps)
+      if (stepError) {
+        setError(stepError)
+        return null
+      }
     }
 
     setSaving(true)
 
-    const journey: Omit<JourneyDefinition, 'botId' | 'clientId'> = {
-      journeyId: existing?.journey.journeyId ?? crypto.randomUUID(),
-      name,
-      triggerType,
-      startStepId: steps[0].stepId,
-      steps,
-    }
-    const agent: AgentConfig = {
-      personaId: existing?.agent.personaId ?? crypto.randomUUID(),
-      name: agentName,
-      systemPrompt,
-      toneDescription: toneDescription || undefined,
-      mcpToolbox,
-      channelConfig: existing?.agent.channelConfig ?? {},
-    }
+    const journeyId = existing?.journey.journeyId ?? crypto.randomUUID()
+    const personaId = existing?.agent.personaId ?? crypto.randomUUID()
+
+    // In plan mode the steps and the prompt are BUILT, not read off the form.
+    // journey-plan.test.ts asserts every plan permutation compiles cleanly
+    // against the real forward-reference and save-validation rules, which is
+    // why validateSteps is skipped above.
+    const journey: Omit<JourneyDefinition, 'botId' | 'clientId'> = planMode
+      ? planToJourney(plan, journeyId, triggerType, name)
+      : {
+          journeyId,
+          name,
+          triggerType,
+          startStepId: steps[0].stepId,
+          steps,
+        }
+
+    const agent: AgentConfig = planMode
+      ? { ...planToAgent(plan, personaId), channelConfig: existing?.agent.channelConfig ?? {} }
+      : {
+          personaId,
+          name: agentName,
+          systemPrompt,
+          toneDescription: toneDescription || undefined,
+          mcpToolbox,
+          channelConfig: existing?.agent.channelConfig ?? {},
+        }
 
     try {
       if (isNew) {
@@ -670,6 +733,7 @@ export default function JourneyBuilderPage() {
           description: description || undefined,
           journey,
           agent,
+          ...(planMode ? { plan } : {}),
         })
         if (res.success && res.data) {
           toast.show('Journey created', 'success')
@@ -680,16 +744,17 @@ export default function JourneyBuilderPage() {
         return null
       }
 
-      // Captured BEFORE the call, because a successful update always comes back
-      // as 'draft' -- the response can never tell us what we just gave up.
-      const wasPublished = existing?.status === 'published'
-
       const res = await updateJourneyBundle(botId, bundleId as string, {
         name,
         description: description || undefined,
         journey,
         agent,
+        ...(planMode ? { plan } : {}),
       })
+      // Captured BEFORE the call: a successful update always comes back as
+      // 'draft', so the response can never tell us what we just gave up.
+      const wasPublished = existing?.status === 'published'
+
       if (res.success && res.data) {
         setExisting(res.data)
         toast.show(
@@ -712,8 +777,8 @@ export default function JourneyBuilderPage() {
 
   // What the Save button actually calls.
   //
-  // Saving a PUBLISHED bundle is destructive in a way nothing on screen used to
-  // admit: updateJourneyBundle (backend journey-service.ts) drops the bundle to
+  // Saving a PUBLISHED bundle is destructive in a way nothing on screen admits:
+  // updateJourneyBundle (backend journey-service.ts:232) drops the bundle to
   // 'draft' AND releases its trigger claim, so new leads stop igniting into it
   // until someone publishes again. Conversations already running are unaffected
   // -- they finish on the version they started on.
@@ -765,9 +830,20 @@ export default function JourneyBuilderPage() {
       </div>
     )
   }
+  const previewSteps = planMode ? planToJourney(plan, 'preview', triggerType, name).steps : steps
+
+  const VIEWS: Array<{ id: 'plan' | 'map' | 'steps'; label: string }> = planMode
+    ? [
+        { id: 'plan', label: 'Plan' },
+        { id: 'map', label: 'Journey map' },
+      ]
+    : [
+        { id: 'steps', label: 'Steps' },
+        { id: 'map', label: 'Journey map' },
+      ]
 
   return (
-    <div className="max-w-3xl pb-10">
+    <div className="pb-10">
       <button
         type="button"
         onClick={() => navigate('/dashboard/journeys')}
@@ -776,174 +852,27 @@ export default function JourneyBuilderPage() {
         <ArrowLeft size={16} /> Back to Journeys
       </button>
 
-      <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
-        <h1 className="font-extrabold text-2xl text-gray-900" style={JAKARTA_FONT}>
-          {isNew ? 'New Journey' : name || 'Edit Journey'}
-        </h1>
+      <div className="flex items-center gap-4 flex-wrap mb-5">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Name this journey"
+          style={JAKARTA_FONT}
+          className="font-extrabold text-2xl text-gray-900 bg-transparent border-0 p-0 focus:outline-none placeholder:text-gray-300 flex-1 min-w-[16rem] max-w-[36rem] truncate"
+        />
         {existing && (
           <span
-            className={`inline-flex border text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+            className={`inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2.5 py-1 rounded-full ${
               existing.status === 'published'
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                : 'bg-gray-100 text-gray-600 border-gray-200'
+                ? 'bg-emerald-50 text-emerald-700'
+                : 'bg-slate-100 text-slate-500'
             }`}
           >
-            {existing.status === 'published' ? 'Published' : 'Draft'}
+            <span className="w-1.5 h-1.5 rounded-full bg-current" aria-hidden="true" />
+            {existing.status === 'published' ? 'Live' : 'Draft'}
           </span>
         )}
-      </div>
-
-      {error && (
-        <div className="bg-red-50 border border-red-100 text-red-700 text-sm rounded-xl p-4 mb-6">{error}</div>
-      )}
-
-      <div className="bg-white rounded-2xl border border-black/5 p-6 mb-4">
-        <h2 className="font-bold text-gray-900 mb-4" style={JAKARTA_FONT}>
-          Basics
-        </h2>
-        <div className="space-y-4">
-          <div>
-            <label className={labelClasses}>Name</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className={inputClasses}
-              placeholder="e.g. Site visit follow-up"
-            />
-          </div>
-          <div>
-            <label className={labelClasses}>Description (optional)</label>
-            <input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className={inputClasses}
-              placeholder="What this journey does"
-            />
-          </div>
-          <div>
-            <label className={labelClasses}>Trigger</label>
-            <select
-              value={triggerType}
-              onChange={(e) => setTriggerType(e.target.value as JourneyTriggerType)}
-              className={inputClasses}
-            >
-              {(Object.entries(TRIGGER_LABELS) as [JourneyTriggerType, string][]).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl border border-black/5 p-6 mb-4">
-        <h2 className="font-bold text-gray-900 mb-4" style={JAKARTA_FONT}>
-          Agent
-        </h2>
-        <div className="space-y-4">
-          <div>
-            <label className={labelClasses}>Agent name</label>
-            <input
-              value={agentName}
-              onChange={(e) => setAgentName(e.target.value)}
-              className={inputClasses}
-              placeholder="e.g. Site Visit Booker"
-            />
-          </div>
-          <div>
-            <label className={labelClasses}>System prompt</label>
-            <textarea
-              value={systemPrompt}
-              onChange={(e) => setSystemPrompt(e.target.value)}
-              rows={4}
-              className={inputClasses}
-              placeholder="How should this agent talk to leads?"
-            />
-          </div>
-          <div>
-            <label className={labelClasses}>Tone (optional)</label>
-            <input
-              value={toneDescription}
-              onChange={(e) => setToneDescription(e.target.value)}
-              className={inputClasses}
-              placeholder="e.g. Warm, concise, professional"
-            />
-          </div>
-          <div>
-            <label className={labelClasses}>Tools this agent can use</label>
-            <div className="space-y-2">
-              {TOOLBOX_OPTIONS.map((tool) => (
-                <label
-                  key={tool.toolName}
-                  className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={mcpToolbox.includes(tool.toolName)}
-                    onChange={() => toggleTool(tool.toolName)}
-                    className="mt-0.5"
-                  />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{tool.label}</p>
-                    <p className="text-xs text-gray-500">{tool.description}</p>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl border border-black/5 p-6 mb-4">
-        <h2 className="font-bold text-gray-900 mb-4" style={JAKARTA_FONT}>
-          Steps
-        </h2>
-
-        {steps.length === 0 ? (
-          <p className="text-sm text-gray-500 mb-4">No steps yet — add the first one below.</p>
-        ) : (
-          <div className="space-y-3 mb-4">
-            {steps.map((step, index) => (
-              <StepEditor
-                key={step.stepId}
-                step={step}
-                index={index}
-                steps={steps}
-                mcpToolbox={mcpToolbox}
-                onChange={(patch) => updateStep(index, patch)}
-                onRemove={() => removeStep(index)}
-                onMoveUp={() => moveStep(index, -1)}
-                onMoveDown={() => moveStep(index, 1)}
-                canMoveUp={index > 0}
-                canMoveDown={index < steps.length - 1}
-              />
-            ))}
-          </div>
-        )}
-
-        <div className="flex flex-wrap gap-2">
-          {STEP_TYPE_OPTIONS.map((opt) => (
-            <button
-              key={opt.type}
-              type="button"
-              onClick={() => addStep(opt.type)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs rounded-xl border border-gray-200 text-gray-600 hover:border-violet-300 hover:text-violet-700 hover:bg-violet-50 transition-colors"
-            >
-              <Plus size={14} /> {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex items-center justify-end gap-3">
-        <button
-          type="button"
-          onClick={() => navigate('/dashboard/journeys')}
-          className="text-gray-600 font-medium px-4 py-2.5 rounded-xl text-sm hover:bg-gray-100 transition-colors"
-        >
-          Cancel
-        </button>
+        <div className="flex-1" />
         <button
           type="button"
           onClick={requestSave}
@@ -961,6 +890,72 @@ export default function JourneyBuilderPage() {
           {publishing ? 'Publishing…' : 'Publish'}
         </button>
       </div>
+
+      <div className="flex items-center gap-4 flex-wrap mb-5">
+        <div className="flex gap-1 p-1 bg-gray-100 rounded-xl w-fit" role="tablist">
+          {VIEWS.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              role="tab"
+              aria-selected={view === v.id}
+              onClick={() => setView(v.id)}
+              className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                view === v.id ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+
+        <label className="text-sm text-gray-500 flex items-center gap-2">
+          Runs
+          <Dropdown<JourneyTriggerType>
+            value={triggerType}
+            onChange={setTriggerType}
+            ariaLabel="When this journey runs"
+            variant="inline"
+            options={(Object.entries(TRIGGER_LABELS) as [JourneyTriggerType, string][]).map(
+              ([value, label]) => ({ value, label })
+            )}
+          />
+        </label>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-100 text-red-700 text-sm rounded-xl p-4 mb-5">{error}</div>
+      )}
+
+      {/* An existing journey whose shape a plan cannot represent. Saying so is
+          the honest move: silently flattening it would drop a path from a
+          client's live automation. */}
+      {planRefusal && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 text-sm rounded-xl p-4 mb-5">
+          <b className="font-semibold" style={JAKARTA_FONT}>
+            This journey is edited as steps
+          </b>
+          <p className="mt-1 leading-relaxed">{planRefusal} Nothing is lost, and it keeps working exactly as it does now.</p>
+        </div>
+      )}
+
+      {view === 'plan' && planMode && <PlanBuilder plan={plan} onChange={setPlan} />}
+
+      {view === 'map' && (
+        <div>
+          <p className="text-sm text-gray-500 mb-3">
+            {planMode
+              ? 'Generated from your plan. Read only, so the plan stays the single source of truth.'
+              : 'What this journey does, in order.'}
+          </p>
+          <JourneyGraph
+            steps={previewSteps}
+            startStepId={previewSteps[0]?.stepId ?? ''}
+            selectedStepId={selectedStepId}
+            onSelect={setSelectedStepId}
+          />
+        </div>
+      )}
 
       <Modal
         isOpen={confirmUnpublish}
@@ -1007,6 +1002,40 @@ export default function JourneyBuilderPage() {
           </div>
         </div>
       </Modal>
+
+      {view === 'steps' && !planMode && (
+        <div className="bg-white rounded-2xl border border-black/5 p-6">
+          <div className="space-y-3 mb-4">
+            {steps.map((step, index) => (
+              <StepEditor
+                key={step.stepId}
+                step={step}
+                index={index}
+                steps={steps}
+                mcpToolbox={mcpToolbox}
+                onChange={(patch) => updateStep(index, patch)}
+                onRemove={() => removeStep(index)}
+                onMoveUp={() => moveStep(index, -1)}
+                onMoveDown={() => moveStep(index, 1)}
+                canMoveUp={index > 0}
+                canMoveDown={index < steps.length - 1}
+              />
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {STEP_TYPE_OPTIONS.map((opt) => (
+              <button
+                key={opt.type}
+                type="button"
+                onClick={() => addStep(opt.type)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs rounded-xl border border-gray-200 text-gray-600 hover:border-violet-300 hover:text-violet-700 hover:bg-violet-50 transition-colors"
+              >
+                <Plus size={14} /> {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

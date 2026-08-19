@@ -1,5 +1,6 @@
 import { Loader2, Share2 } from 'lucide-react'
 import type { CalComEventType } from '../../types/index'
+import Dropdown from '../Dropdown/Dropdown'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -127,20 +128,19 @@ export default function IntegrationsSection({
                   {calComEventTypes.length === 0 ? (
                     <p className="text-sm text-gray-500">No event types found on your Cal.com account yet.</p>
                   ) : (
-                    <select
-                      value={calComDefaultEventTypeId ?? ''}
-                      onChange={(e) => onSelectCalComEventType(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                    >
-                      <option value="" disabled>
-                        Choose which event type agents book…
-                      </option>
-                      {calComEventTypes.map((et) => (
-                        <option key={et.id} value={et.id}>
-                          {et.title} ({et.lengthInMinutes}min)
-                        </option>
-                      ))}
-                    </select>
+                    // Cal.com event type ids are numbers; converted at the
+                    // boundary rather than widening Dropdown's value type.
+                    <Dropdown
+                      value={calComDefaultEventTypeId != null ? String(calComDefaultEventTypeId) : ''}
+                      onChange={(v) => onSelectCalComEventType(Number(v))}
+                      ariaLabel="Default Cal.com event type"
+                      placeholder="Choose which event type agents book…"
+                      options={calComEventTypes.map((et) => ({
+                        value: String(et.id),
+                        label: et.title,
+                        description: `${et.lengthInMinutes} min`,
+                      }))}
+                    />
                   )}
                   <p className="text-xs text-gray-400 mt-2">
                     Your booking agent creates real, confirmed slots against this event type.

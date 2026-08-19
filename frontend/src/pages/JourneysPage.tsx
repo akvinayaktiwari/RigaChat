@@ -11,6 +11,7 @@ import {
 } from '../services/api'
 import { useToast } from '../components/Toast/Toast'
 import type { BotConfig, JourneyBundle, JourneyTemplate } from '../types/index'
+import Dropdown from '../components/Dropdown/Dropdown'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -223,17 +224,13 @@ export default function JourneysPage() {
 
         <div className="flex items-center gap-3">
           {bots.length > 1 && (
-            <select
+            <Dropdown
               value={selectedBotId}
-              onChange={(e) => setSelectedBotId(e.target.value)}
-              className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-            >
-              {bots.map((bot) => (
-                <option key={bot.botId} value={bot.botId}>
-                  {bot.name}
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedBotId}
+              ariaLabel="Agent"
+              variant="inline"
+              options={bots.map((bot) => ({ value: bot.botId, label: bot.name }))}
+            />
           )}
           {/* Only offered once they already have journeys -- with none, the
               empty state below shows the templates directly, so a button that

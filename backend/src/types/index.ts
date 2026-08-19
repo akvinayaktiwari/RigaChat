@@ -948,6 +948,56 @@ export type JourneyBundleStatus = 'draft' | 'published'
 // etc.) is one editable unit, not a decoupled Journey/Agent composition.
 // This is what gets stored, listed, and cloned when a client picks a
 // template from the prebuilt library.
+// The sales plan an operator authored, from which `journey` and `agent` were
+// generated. Stored, not executed.
+//
+// WHY IT HAS TO BE STORED
+//   Most of a plan round-trips through the generated steps -- timings, retry
+//   budgets, message copy can all be read back off the journey. Four fields
+//   cannot, because they leave no trace in the steps at all: goal, learn, never
+//   and escalateWhen are folded into the agent's systemPrompt as prose and
+//   cannot be parsed back out of it without guessing.
+//
+//   Before this field existed those four silently reset to defaults on every
+//   load. That is not merely lost typing: `never` IS the agent's guardrail
+//   list, so opening a journey and saving it would quietly rewrite a client's
+//   safety rules back to ours.
+//
+// AUTHORING STATE, NOT TRUTH
+//   `journey` and `agent` remain what actually executes. This is the input they
+//   were compiled from. They can drift if a bundle is written by anything other
+//   than the plan builder, which is why the builder falls back to inferring a
+//   plan from the steps when this is absent, and refuses when the shape cannot
+//   be represented.
+export interface JourneyPlan {
+  version: 1
+  goal: string
+  agentName: string
+  tone?: string
+  learn: string[]
+  never: string[]
+  escalateWhen: string[]
+  messages: {
+    greet: string
+    offer: string
+    confirm: string
+  }
+  followUp: {
+    waitDays: number
+    maxNudges: number
+    nudgeMessage: string
+  }
+  booking: {
+    enabled: boolean
+    recheckDays: number
+    maxRechecks: number
+  }
+  handoff: {
+    enabled: boolean
+    reason: string
+  }
+}
+
 export interface JourneyBundle {
   bundleId: string
   botId: string
@@ -966,6 +1016,10 @@ export interface JourneyBundle {
   sourceTemplateId?: string
   journey: JourneyDefinition
   agent: AgentConfig
+  // Optional and additive, like agentId above: a bundle authored before the
+  // plan builder, or by any other path, simply has none and the builder infers
+  // one from the steps instead.
+  plan?: JourneyPlan
   status: JourneyBundleStatus
   // The mutable state machine, created on first publish and updated on every
   // republish. Absent until a bundle has been published at least once.

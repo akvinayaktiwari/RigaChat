@@ -6,6 +6,7 @@ import { getLeadInbox, updateLeadState } from '../services/api'
 import FilterBar from '../components/FilterBar/FilterBar'
 import type { FilterChip } from '../components/FilterBar/FilterBar'
 import { useToast } from '../components/Toast/Toast'
+import Dropdown from '../components/Dropdown/Dropdown'
 import { describeApiError } from '../lib/api-error'
 import { exportInboxCsv } from '../lib/csv'
 import { leadDetailPath } from '../lib/lead-ref'
@@ -138,19 +139,17 @@ function StatusSelect({
 }) {
   const status = leadStatus(lead)
   return (
-    <select
+    <Dropdown<LeadStatus>
       value={status}
       disabled={saving}
-      onChange={(e) => onChange(e.target.value as LeadStatus)}
-      aria-label={`Status for ${lead.name ?? 'this lead'}`}
-      className={`text-xs font-medium px-2.5 py-1.5 rounded-full border cursor-pointer outline-none disabled:opacity-50 focus:ring-2 focus:ring-violet-100 ${STATUS_BADGE_CLASSES[status]} ${className}`}
-    >
-      {STATUS_ORDER.map((option) => (
-        <option key={option} value={option}>
-          {STATUS_LABELS[option]}
-        </option>
-      ))}
-    </select>
+      onChange={onChange}
+      ariaLabel={`Status for ${lead.name ?? 'this lead'}`}
+      variant="inline"
+      // Keeps the status badge looking like a badge. Inheriting the form-field
+      // chrome would turn a coloured pill in a table row into a white box.
+      triggerClassName={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-full border cursor-pointer outline-none disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-violet-600 ${STATUS_BADGE_CLASSES[status]} ${className}`}
+      options={STATUS_ORDER.map((option) => ({ value: option, label: STATUS_LABELS[option] }))}
+    />
   )
 }
 
@@ -327,41 +326,31 @@ export default function LeadsPage() {
           chips={chips}
           onClearAll={handleClearFilters}
         >
-          <select
+          <Dropdown<SourceFilter>
             value={sourceFilter}
-            onChange={(e) => setSourceFilter(e.target.value as SourceFilter)}
-            className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 bg-white cursor-pointer min-w-40 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors"
-          >
-            {SOURCE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            onChange={setSourceFilter}
+            ariaLabel="Filter by source"
+            variant="inline"
+            className="min-w-40"
+            options={SOURCE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+          />
 
-          <select
+          <Dropdown<StatusFilter>
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-            className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 bg-white cursor-pointer min-w-40 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors"
-          >
-            {STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            onChange={setStatusFilter}
+            ariaLabel="Filter by status"
+            variant="inline"
+            className="min-w-40"
+            options={STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+          />
 
-          <select
+          <Dropdown<DateRange>
             value={dateRange}
-            onChange={(e) => setDateRange(e.target.value as DateRange)}
-            className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 bg-white cursor-pointer outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors"
-          >
-            {DATE_RANGE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            onChange={setDateRange}
+            ariaLabel="Filter by date"
+            variant="inline"
+            options={DATE_RANGE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+          />
         </FilterBar>
       </div>
 

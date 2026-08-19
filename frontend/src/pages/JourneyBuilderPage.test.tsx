@@ -67,7 +67,7 @@ async function renderBuilder(status: 'draft' | 'published') {
     </MemoryRouter>
   )
 
-  await screen.findByDisplayValue('Real estate lead qualification')
+  await screen.findAllByDisplayValue('Real estate lead qualification')
 }
 
 beforeEach(() => {
