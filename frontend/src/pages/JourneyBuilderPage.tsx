@@ -5,6 +5,7 @@ import { createJourneyBundle, getJourneyBundle, publishJourneyBundle, updateJour
 import { useToast } from '../components/Toast/Toast'
 import JourneyGraph from '../components/journey/JourneyGraph'
 import PlanBuilder from '../components/journey/PlanBuilder'
+import Dropdown from '../components/Dropdown/Dropdown'
 import {
   DEFAULT_PLAN,
   journeyToPlan,
@@ -179,19 +180,19 @@ function NextStepSelect({ steps, currentIndex, value, onChange, required, label 
   return (
     <div>
       <label className={labelClasses}>{label}</label>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className={inputClasses}>
-        {!required && <option value="">— End journey —</option>}
-        {required && value === '' && (
-          <option value="" disabled>
-            Choose a step…
-          </option>
-        )}
-        {laterSteps.map(({ step, i }) => (
-          <option key={step.stepId} value={step.stepId}>
-            Step {i + 1}: {step.name}
-          </option>
-        ))}
-      </select>
+      <Dropdown
+        value={value}
+        onChange={onChange}
+        ariaLabel={label}
+        placeholder={required ? 'Choose a step…' : '— End journey —'}
+        options={[
+          ...(required ? [] : [{ value: '', label: 'End journey' }]),
+          ...laterSteps.map(({ step, i }) => ({
+            value: step.stepId,
+            label: `Step ${i + 1}: ${step.name}`,
+          })),
+        ]}
+      />
     </div>
   )
 }
@@ -339,15 +340,16 @@ function StepEditor({
             </div>
             <div>
               <label className={labelClasses}>Check whether…</label>
-              <select
+              <Dropdown
                 value={step.recheckField}
-                onChange={(e) => onChange({ recheckField: e.target.value as StepPatch['recheckField'] })}
-                className={inputClasses}
-              >
-                <option value="replied">Lead replied</option>
-                <option value="lead_score">Lead score is set</option>
-                <option value="appointment_booked">Appointment is booked</option>
-              </select>
+                onChange={(v) => onChange({ recheckField: v as StepPatch['recheckField'] })}
+                ariaLabel="What to recheck"
+                options={[
+                  { value: 'replied', label: 'Lead replied' },
+                  { value: 'lead_score', label: 'Lead score is set' },
+                  { value: 'appointment_booked', label: 'Appointment is booked' },
+                ]}
+              />
             </div>
             <NextStepSelect
               steps={steps}
@@ -410,26 +412,28 @@ function StepEditor({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelClasses}>Field</label>
-                <select
+                <Dropdown
                   value={step.field}
-                  onChange={(e) => onChange({ field: e.target.value as StepPatch['field'] })}
-                  className={inputClasses}
-                >
-                  <option value="replied">Replied</option>
-                  <option value="lead_score">Lead score</option>
-                  <option value="appointment_booked">Appointment booked</option>
-                </select>
+                  onChange={(v) => onChange({ field: v as StepPatch['field'] })}
+                  ariaLabel="Field to check"
+                  options={[
+                    { value: 'replied', label: 'Replied' },
+                    { value: 'lead_score', label: 'Lead score' },
+                    { value: 'appointment_booked', label: 'Appointment booked' },
+                  ]}
+                />
               </div>
               <div>
                 <label className={labelClasses}>Operator</label>
-                <select
+                <Dropdown
                   value={step.operator}
-                  onChange={(e) => onChange({ operator: e.target.value as StepPatch['operator'] })}
-                  className={inputClasses}
-                >
-                  <option value="equals">Equals</option>
-                  <option value="not_equals">Not equals</option>
-                </select>
+                  onChange={(v) => onChange({ operator: v as StepPatch['operator'] })}
+                  ariaLabel="Comparison"
+                  options={[
+                    { value: 'equals', label: 'Equals' },
+                    { value: 'not_equals', label: 'Not equals' },
+                  ]}
+                />
               </div>
             </div>
             <div>
@@ -467,26 +471,16 @@ function StepEditor({
               {mcpToolbox.length === 0 ? (
                 <p className="text-xs text-amber-600">Enable a tool in the Agent section above first.</p>
               ) : (
-                <select
+                <Dropdown
                   value={step.toolName}
-                  // Every option value below is either '' (the disabled
-                  // placeholder) or a member of mcpToolbox, which is
+                  // Every option value is a member of mcpToolbox, which is
                   // McpCapability[] -- so the narrow is exhaustive by
                   // construction, not an assumption about user input.
-                  onChange={(e) =>
-                    onChange({ toolName: e.target.value as McpCapability | '', toolInput: undefined })
-                  }
-                  className={inputClasses}
-                >
-                  <option value="" disabled>
-                    Choose a tool…
-                  </option>
-                  {mcpToolbox.map((tool) => (
-                    <option key={tool} value={tool}>
-                      {TOOL_LABELS[tool]}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => onChange({ toolName: v as McpCapability | '', toolInput: undefined })}
+                  ariaLabel="Tool to call"
+                  placeholder="Choose a tool…"
+                  options={mcpToolbox.map((tool) => ({ value: tool, label: TOOL_LABELS[tool] }))}
+                />
               )}
             </div>
 
@@ -809,7 +803,7 @@ export default function JourneyBuilderPage() {
           onChange={(e) => setName(e.target.value)}
           placeholder="Name this journey"
           style={JAKARTA_FONT}
-          className="font-extrabold text-2xl text-gray-900 bg-transparent border-0 p-0 focus:outline-none placeholder:text-gray-300 min-w-[16rem]"
+          className="font-extrabold text-2xl text-gray-900 bg-transparent border-0 p-0 focus:outline-none placeholder:text-gray-300 flex-1 min-w-[16rem] max-w-[36rem] truncate"
         />
         {existing && (
           <span
@@ -862,17 +856,15 @@ export default function JourneyBuilderPage() {
 
         <label className="text-sm text-gray-500 flex items-center gap-2">
           Runs
-          <select
+          <Dropdown<JourneyTriggerType>
             value={triggerType}
-            onChange={(e) => setTriggerType(e.target.value as JourneyTriggerType)}
-            className="text-sm text-gray-900 bg-white border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-600"
-          >
-            {(Object.entries(TRIGGER_LABELS) as [JourneyTriggerType, string][]).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
+            onChange={setTriggerType}
+            ariaLabel="When this journey runs"
+            variant="inline"
+            options={(Object.entries(TRIGGER_LABELS) as [JourneyTriggerType, string][]).map(
+              ([value, label]) => ({ value, label })
+            )}
+          />
         </label>
       </div>
 
