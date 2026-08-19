@@ -14,6 +14,7 @@ import {
   updateJourneyBundle,
 } from '../services/journey-service.js'
 import type {
+  JourneyPlan,
   AgentConfig,
   ApiResponse,
   JourneyBundle,
@@ -39,6 +40,10 @@ interface CreateJourneyBundleBody {
   description?: string
   journey?: Omit<JourneyDefinition, 'botId' | 'clientId'>
   agent?: AgentConfig
+  // Authoring state the plan builder round-trips. Not trusted for anything:
+  // journey and agent are still what gets validated, compiled and executed, so
+  // a plan that disagrees with them changes nothing about what the agent does.
+  plan?: JourneyPlan
 }
 
 // The journey and agent come from our own library, so the client supplies only
@@ -53,6 +58,7 @@ interface UpdateJourneyBundleBody {
   description?: string
   journey?: Omit<JourneyDefinition, 'botId' | 'clientId'>
   agent?: AgentConfig
+  plan?: JourneyPlan
 }
 
 function errorMessage(error: unknown): string {
@@ -80,6 +86,7 @@ journeyRoutes.post('/', requireAuth, async (c) => {
       description: body.description,
       journey: body.journey,
       agent: body.agent,
+      plan: body.plan,
     })
     return c.json<ApiResponse<JourneyBundle>>({ success: true, data: bundle }, 201)
   } catch (error) {
@@ -178,6 +185,7 @@ journeyRoutes.patch('/:botId/:bundleId', requireAuth, async (c) => {
       description: body.description,
       journey: body.journey,
       agent: body.agent,
+      plan: body.plan,
     })
     return c.json<ApiResponse<JourneyBundle>>({ success: true, data: bundle }, 200)
   } catch (error) {

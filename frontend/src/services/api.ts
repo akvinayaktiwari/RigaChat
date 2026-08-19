@@ -54,6 +54,7 @@ import type {
   LeadEvent,
 } from '../types/index'
 import { leadRefToQuery } from '../lib/lead-ref'
+import type { JourneyPlan } from '../lib/journey-plan'
 
 const BASE_URL = import.meta.env.VITE_API_URL
 
@@ -705,6 +706,10 @@ export interface CreateJourneyBundleInput {
   description?: string
   journey: Omit<JourneyDefinition, 'botId' | 'clientId'>
   agent: AgentConfig
+  // What the operator authored, which `journey` and `agent` were generated
+  // from. Sent so it can be reopened; the server still validates and compiles
+  // the journey, so a plan is never trusted to describe what runs.
+  plan?: JourneyPlan
 }
 
 export function createJourneyBundle(data: CreateJourneyBundleInput): Promise<ApiResponse<JourneyBundle>> {
@@ -716,6 +721,7 @@ export interface UpdateJourneyBundleInput {
   description?: string
   journey?: Omit<JourneyDefinition, 'botId' | 'clientId'>
   agent?: AgentConfig
+  plan?: JourneyPlan
 }
 
 export function updateJourneyBundle(

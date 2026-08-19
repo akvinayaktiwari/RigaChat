@@ -67,6 +67,7 @@ export async function updateJourneyBundle(
       | 'description'
       | 'journey'
       | 'agent'
+      | 'plan'
       | 'status'
       | 'compiledStateMachineArn'
       | 'compiledStateMachineVersionArn'

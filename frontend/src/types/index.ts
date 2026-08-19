@@ -702,6 +702,12 @@ export interface JourneyBundle {
   sourceTemplateId?: string
   journey: JourneyDefinition
   agent: AgentConfig
+  // The sales plan this was generated from. Optional and additive: a bundle
+  // authored before the plan builder simply has none, and the builder infers
+  // one from the steps instead. Typed as unknown here and narrowed by
+  // lib/journey-plan.ts, which owns the shape -- a second copy of that
+  // interface would drift from the compiler that actually uses it.
+  plan?: unknown
   status: JourneyBundleStatus
   compiledStateMachineArn?: string
   createdAt: string

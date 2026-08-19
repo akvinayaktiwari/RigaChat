@@ -9,6 +9,7 @@ import Dropdown from '../components/Dropdown/Dropdown'
 import {
   DEFAULT_PLAN,
   journeyToPlan,
+  parseStoredPlan,
   planToAgent,
   planToJourney,
 } from '../lib/journey-plan'
@@ -598,17 +599,28 @@ export default function JourneyBuilderPage() {
         setToneDescription(bundle.agent.toneDescription ?? '')
         setMcpToolbox(bundle.agent.mcpToolbox)
 
-        // Give an existing bundle a plan to start from. A refusal is a feature:
-        // guessing at a shape the plan cannot express would silently drop a path
-        // from a client's live automation.
-        const inferred = journeyToPlan(bundle.journey, bundle.agent)
-        if (inferred.ok) {
-          setPlan(inferred.plan)
+        // A stored plan wins. goal / learn / never / escalateWhen are folded
+        // into the agent's systemPrompt as prose and cannot be read back out of
+        // it, so inference has to default them -- which used to mean reopening a
+        // journey silently reset a client's guardrail list to ours.
+        const stored = parseStoredPlan(bundle.plan)
+        if (stored) {
+          setPlan(stored)
           setPlanMode(true)
         } else {
-          setPlanMode(false)
-          setPlanRefusal(inferred.reason)
-          setView('steps')
+          // No stored plan: authored before this field existed, or written by
+          // something other than the builder. Infer one. A refusal is a feature:
+          // guessing at a shape the plan cannot express would silently drop a
+          // path from a client's live automation.
+          const inferred = journeyToPlan(bundle.journey, bundle.agent)
+          if (inferred.ok) {
+            setPlan(inferred.plan)
+            setPlanMode(true)
+          } else {
+            setPlanMode(false)
+            setPlanRefusal(inferred.reason)
+            setView('steps')
+          }
         }
       } else {
         toast.show(res.error ?? 'Failed to load journey', 'error')
@@ -713,6 +725,7 @@ export default function JourneyBuilderPage() {
           description: description || undefined,
           journey,
           agent,
+          ...(planMode ? { plan } : {}),
         })
         if (res.success && res.data) {
           toast.show('Journey created', 'success')
@@ -728,6 +741,7 @@ export default function JourneyBuilderPage() {
         description: description || undefined,
         journey,
         agent,
+        ...(planMode ? { plan } : {}),
       })
       if (res.success && res.data) {
         setExisting(res.data)

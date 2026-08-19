@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildSystemPrompt,
+  parseStoredPlan,
   DEFAULT_PLAN,
   journeyToPlan,
   planDurationDays,
@@ -362,3 +363,69 @@ describe('inference keeps a live journey\'s real words', () => {
     expect(result.plan.messages.confirm).toBe('Come and see it')
   })
 })
+
+// The bug this field exists to fix.
+//
+// goal / learn / never / escalateWhen are folded into the agent's systemPrompt
+// as prose and cannot be parsed back out of it. Before the plan was stored,
+// every load rebuilt them from defaults -- so opening a journey and saving it
+// silently rewrote a client's guardrail list (`never` feeds the prompt) back to
+// ours, with no warning and no way to notice.
+describe('a stored plan survives a round trip', () => {
+  it('keeps the four fields inference cannot recover', () => {
+    const authored = plan({
+      goal: 'Get them to visit the Gurgaon site.',
+      learn: ['Budget', 'Timeline to move', 'Loan pre-approval'],
+      never: ['Quote rental yields', 'Discuss legal disputes'],
+      escalateWhen: ['They mention a lawyer'],
+    })
+
+    const restored = parseStoredPlan(JSON.parse(JSON.stringify(authored)))
+
+    expect(restored).not.toBeNull()
+    expect(restored?.goal).toBe(authored.goal)
+    expect(restored?.learn).toEqual(authored.learn)
+    expect(restored?.never).toEqual(authored.never)
+    expect(restored?.escalateWhen).toEqual(authored.escalateWhen)
+  })
+
+  it('round-trips the whole plan unchanged', () => {
+    const authored = plan()
+    expect(parseStoredPlan(JSON.parse(JSON.stringify(authored)))).toEqual(authored)
+  })
+
+  it("keeps a client's custom limits in the regenerated prompt", () => {
+    const authored = plan({ never: ['Quote rental yields'] })
+    const restored = parseStoredPlan(JSON.parse(JSON.stringify(authored)))
+
+    expect(buildSystemPrompt(restored!)).toContain('Quote rental yields')
+  })
+})
+
+describe('a stored plan that cannot be trusted', () => {
+  // The field is client-authored JSON that DynamoDB stored verbatim; nothing on
+  // the server checks its shape. A failed narrow must mean "fall back to
+  // inference", never a crash on a missing property.
+  it.each([
+    ['absent', undefined],
+    ['null', null],
+    ['a string', 'not a plan'],
+    ['a number', 42],
+    ['an empty object', {}],
+    ['a future version', { ...DEFAULT_PLAN, version: 2 }],
+    ['missing learn', { ...DEFAULT_PLAN, learn: undefined }],
+    ['learn holding non-strings', { ...DEFAULT_PLAN, learn: [1, 2] }],
+    ['missing messages', { ...DEFAULT_PLAN, messages: undefined }],
+    ['a partial messages block', { ...DEFAULT_PLAN, messages: { greet: 'hi' } }],
+    ['followUp with a string count', { ...DEFAULT_PLAN, followUp: { ...DEFAULT_PLAN.followUp, maxNudges: '2' } }],
+    ['handoff missing reason', { ...DEFAULT_PLAN, handoff: { enabled: true } }],
+  ])('returns null for %s', (_label, value) => {
+    expect(parseStoredPlan(value)).toBeNull()
+  })
+
+  it('accepts a plan with no tone, which is genuinely optional', () => {
+    const { tone: _tone, ...noTone } = plan()
+    expect(parseStoredPlan(noTone)).not.toBeNull()
+  })
+})
+

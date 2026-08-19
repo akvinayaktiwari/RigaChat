@@ -16,7 +16,8 @@ import {
   releaseJourneyTrigger,
   triggerClaimKey,
 } from '../repositories/journey-trigger-claim-repository.js'
-import type { AgentConfig, JourneyBundle, JourneyDefinition, JourneyTemplate } from '../types/index.js'
+import type {
+  JourneyPlan, AgentConfig, JourneyBundle, JourneyDefinition, JourneyTemplate } from '../types/index.js'
 
 export class JourneyValidationError extends Error {
   constructor(message: string) {
@@ -73,6 +74,10 @@ export interface CreateJourneyBundleInput {
   description?: string
   journey: Omit<JourneyDefinition, 'botId' | 'clientId'>
   agent: AgentConfig
+  // Authoring state only. Stored so the plan builder can reopen what was
+  // authored; `journey` and `agent` are still what executes, and are still
+  // validated and compiled below regardless of what this says.
+  plan?: JourneyPlan
   // Set ONLY by createJourneyBundleFromTemplate() below, never from a client
   // request body -- it records provenance, so letting a caller assert it would
   // let any client claim their hand-written bundle came from a platform
@@ -122,6 +127,7 @@ export async function createJourneyBundle(input: CreateJourneyBundleInput): Prom
     sourceTemplateId: input.sourceTemplateId,
     journey,
     agent: input.agent,
+    ...(input.plan ? { plan: input.plan } : {}),
     status: 'draft',
   })
 }
@@ -197,6 +203,7 @@ interface UpdateJourneyBundleInput {
   description?: string
   journey?: Omit<JourneyDefinition, 'botId' | 'clientId'>
   agent?: AgentConfig
+  plan?: JourneyPlan
 }
 
 export async function updateJourneyBundle(
@@ -249,6 +256,7 @@ export async function updateJourneyBundle(
     ...(updates.description !== undefined ? { description: updates.description } : {}),
     journey: nextJourney,
     agent: nextAgent,
+    ...(updates.plan !== undefined ? { plan: updates.plan } : {}),
     // Any edit invalidates a previously published state machine's shape --
     // publishing again is a separate, explicit action (publishJourneyBundle
     // below), not an implicit side effect of saving edits.

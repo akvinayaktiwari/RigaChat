@@ -455,3 +455,83 @@ export function journeyToPlan(
     },
   }
 }
+
+// Narrows a stored plan off a JourneyBundle.
+//
+// The field is `unknown` on the wire because it is client-authored JSON that
+// DynamoDB stored verbatim -- nothing on the server validates its shape, so
+// trusting it here would let an old or hand-edited record crash the builder
+// with a missing property. A failed narrow is not an error: it simply means
+// "no usable plan", and the caller falls back to inferring one from the steps,
+// which is the same path a bundle authored before this field takes.
+export function parseStoredPlan(value: unknown): JourneyPlan | null {
+  if (typeof value !== 'object' || value === null) return null
+  const p = value as Record<string, unknown>
+
+  if (p.version !== 1) return null
+  if (typeof p.goal !== 'string' || typeof p.agentName !== 'string') return null
+
+  const isStringArray = (v: unknown): v is string[] =>
+    Array.isArray(v) && v.every((x) => typeof x === 'string')
+  if (!isStringArray(p.learn) || !isStringArray(p.never) || !isStringArray(p.escalateWhen)) return null
+
+  const messages = p.messages as Record<string, unknown> | undefined
+  if (
+    !messages ||
+    typeof messages.greet !== 'string' ||
+    typeof messages.offer !== 'string' ||
+    typeof messages.confirm !== 'string'
+  ) {
+    return null
+  }
+
+  const followUp = p.followUp as Record<string, unknown> | undefined
+  if (
+    !followUp ||
+    typeof followUp.waitDays !== 'number' ||
+    typeof followUp.maxNudges !== 'number' ||
+    typeof followUp.nudgeMessage !== 'string'
+  ) {
+    return null
+  }
+
+  const booking = p.booking as Record<string, unknown> | undefined
+  if (
+    !booking ||
+    typeof booking.enabled !== 'boolean' ||
+    typeof booking.recheckDays !== 'number' ||
+    typeof booking.maxRechecks !== 'number'
+  ) {
+    return null
+  }
+
+  const handoff = p.handoff as Record<string, unknown> | undefined
+  if (!handoff || typeof handoff.enabled !== 'boolean' || typeof handoff.reason !== 'string') return null
+
+  return {
+    version: 1,
+    goal: p.goal,
+    agentName: p.agentName,
+    ...(typeof p.tone === 'string' ? { tone: p.tone } : {}),
+    learn: p.learn,
+    never: p.never,
+    escalateWhen: p.escalateWhen,
+    messages: {
+      greet: messages.greet,
+      offer: messages.offer,
+      confirm: messages.confirm,
+    },
+    followUp: {
+      waitDays: followUp.waitDays,
+      maxNudges: followUp.maxNudges,
+      nudgeMessage: followUp.nudgeMessage,
+    },
+    booking: {
+      enabled: booking.enabled,
+      recheckDays: booking.recheckDays,
+      maxRechecks: booking.maxRechecks,
+    },
+    handoff: { enabled: handoff.enabled, reason: handoff.reason },
+  }
+}
+
