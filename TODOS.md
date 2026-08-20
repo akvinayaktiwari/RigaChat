@@ -551,6 +551,30 @@ Still genuinely open from the original text, and NOT covered by the compiler: jo
 **Priority:** resolved
 **Depends on:** None
 
+### Two multi-bot clients have no Agent — backfill skipped them on purpose
+
+**What:** `backfill-agents.ts` wrapped 3 of the 5 clients that own bots into an
+Agent. The other 2 own more than one bot each, and the script refuses to guess
+which bot pairs with which voice agent (`backfill-agents.ts:50`), so it skipped
+them. Someone has to decide the pairing and create those Agents, either through
+`POST /api/agents` or a one-off script.
+
+**Why:** Until a client's resources are bound to an Agent, journeys and
+scheduled actions for that client stamp no `agentId`, so anything keyed on
+Agent identity does not see them. It is not breakage — the per-channel records
+still work exactly as before, since the Agent layer is additive — but that
+client is invisible to the cross-channel view.
+
+**Context:** Verified 2026-08-21 by scanning `bots` and `agent_binding_lookup`
+against account 291685935704: 31 bots across 5 clients, 3 clients with exactly
+one bot (all bound), 2 with several (none bound). The skip is the script
+behaving correctly, not a bug — guessing a pairing would silently bind the
+wrong bot to a client's Agent, which is worse than leaving it undone.
+
+**Effort:** S (a decision per client, then one API call each)
+**Priority:** P2
+**Depends on:** someone who knows which bot is which for those two clients
+
 ### Design request-authenticity / abuse-prevention for /api/chat before agents get real-world-action tool-calling
 
 **What:** `/api/chat` is public/unauthenticated by design (per CLAUDE.md's API routes spec). That's fine today because the endpoint only does RAG-retrieval + OpenAI chat. Once a bounded MCP-tool-calling agent sits behind it (per the Agents/Journeys architecture) with real-world side effects — booking appointments, sending confirmations — a spoofed or scripted request could trigger those actions without ever going through a real user conversation.
@@ -683,26 +707,45 @@ Still genuinely open from the original text, and NOT covered by the compiler: jo
 **Priority:** P2
 **Depends on:** Agent umbrella identity (this branch's build) shipped; client answer on shared-vs-divergent knowledge
 
-### Provision the agent/journey infra — run scripts/provision-agent-journey.sh
+### [RESOLVED 2026-08-06, verified 2026-08-21] Provision the agent/journey infra
 
-> **READ BEFORE RUNNING THE SCRIPT (checked 2026-08-20).** The script is still the
-> right way to create the tables, roles and ARNs. Its ENV-VAR half is now wrong.
+**Resolved.** The script was run on 2026-08-06 at 18:04 UTC. The TODO's "at that
+point **none** of it existed" was a snapshot taken BEFORE that run and never
+updated, which is why this sat as an open P1 for two weeks. Verified against
+account 291685935704 / ap-south-1 on 2026-08-21:
+
+- **All 10 DynamoDB tables exist** — journeys, journey_executions,
+  journey_trigger_claims, journey_pending_replies, scheduled_actions,
+  appointment_requests, agents, agent_binding_lookup, gupshup_app_lookup,
+  whatsapp_inbound_activity.
+- **Both IAM roles exist**, created 2026-08-06T18:04, each carrying its
+  `InvokeRigaChatApi` policy: `RigaChatSchedulerExecutionRole` and
+  `RigaChatJourneyStateMachineRole`. (Note the PascalCase — looking them up as
+  `rigachat-scheduler-execution-role` returns "not found", which reads
+  identically to genuinely absent.)
+- **The Lambda role can drive both**: `JourneySchedulerPolicy` and
+  `JourneyStateMachinePolicy` are attached to `rigachat-api-role-4c9qsico`.
+- **All four ARN env vars are set** on the Lambdas and point at exactly those
+  roles.
+- **The backfill ran.** See the backfill note below.
+
+> **DO NOT RE-RUN THE SCRIPT.** It is idempotent for tables and roles, but its
+> env-var step is not idempotent in EFFECT: it sets 10 `DYNAMODB_TABLE_*`
+> variables that nothing has read since 2026-08-16, when names moved into
+> `lib/table-names.ts`. Measured 2026-08-21, `rigachat-api` carries **0** of
+> them and sits at **2347/4096 bytes** — which is exactly the documented 3597
+> minus the 1250 that cleanup reclaimed. Re-running adds roughly 500 bytes of
+> dead configuration back, giving up ~40% of the reclaimed headroom for
+> nothing and walking back toward the ceiling that already blocked adding a
+> table once.
 >
-> It sets 9 `DYNAMODB_TABLE_*` variables (`AGENTS`, `AGENT_BINDING_LOOKUP`,
-> `APPOINTMENT_REQUESTS`, `GUPSHUP_APP_LOOKUP`, `JOURNEYS`, `JOURNEY_EXECUTIONS`,
-> `JOURNEY_PENDING_REPLIES`, `JOURNEY_TRIGGER_CLAIMS`, `SCHEDULED_ACTIONS`,
-> `WHATSAPP_INBOUND_ACTIVITY`). **Nothing reads them any more** -- zero references
-> in `backend/src`. Table names moved into `lib/table-names.ts` on 2026-08-16
-> precisely because 30 such variables were eating 1250 of the Lambda's 4096-byte
-> env budget, and `rigachat-api` was at 3597/4096. Setting them again puts that
-> bloat back and walks toward the same ceiling that already blocked adding a table
-> once.
->
-> So: run the script for tables/roles/ARNs, then strip the `DYNAMODB_TABLE_*`
-> entries it added. The three ARNs below are still genuinely required -- those are
-> read at import time and still throw when unset. `DYNAMODB_TABLE_PREFIX` is the
-> only table-related variable the code reads now, and only if you point the stack
-> at a separate set of tables.
+> If the script is ever needed for a NEW stack, strip the `DYNAMODB_TABLE_*`
+> block from step 4/4 first. The four ARNs it sets are still genuinely
+> required: `lib/eventbridge-scheduler.ts` and
+> `services/journey-compiler-service.ts` both throw at import time when theirs
+> are unset.
+
+**Original description, kept for the reasoning:**
 
 **What:** `scripts/provision-agent-journey.sh` does the whole thing in one run: creates all 8 DynamoDB tables, creates the EventBridge Scheduler execution role, grants the Lambda roles scheduler access, and sets all 11 env vars on all three Lambdas. It is idempotent (skips anything that already exists). Verified against account 291685935704 / ap-south-1 on 2026-08-06 — at that point **none** of it existed.
 
@@ -726,9 +769,23 @@ Original note, still accurate for the backfill half:
 
 **Context:** Same class of deploy-time infra step as the scheduler ARNs (`SCHEDULER_TARGET_LAMBDA_ARN` / `SCHEDULER_EXECUTION_ROLE_ARN`) already tracked in this file — table creation and env-var sync are not done by any code in this repo. The backfill is idempotent (skips already-bound resources) and conservative (skips any client with >1 bot or >1 voice agent rather than guessing a pairing), so it is safe to run and re-run. Run it manually from `backend/`: `TS_NODE_TRANSPILE_ONLY=true node --env-file=.env --loader ts-node/esm scripts/backfill-agents.ts`.
 
-**Effort:** S (table creation + env-var sync + one backfill run)
-**Priority:** P1
-**Depends on:** the `feature/agent-journey-scheduler` branch merged/deployed
+**Backfill verified 2026-08-21.** `agents` holds 3 rows and
+`agent_binding_lookup` holds 4, stamped 2026-08-06 18:16-18:56 (the WhatsApp
+binding on Wonderise Assistance came later, 2026-08-16, from the Epic A/B
+work). The counts reconcile with the script's own conservatism rather than
+indicating an under-run: 31 bots span 5 clients, 3 of which have exactly one
+bot and all 3 got an Agent; the other 2 have more than one bot and were
+skipped deliberately (`backfill-agents.ts:50` refuses to guess a pairing).
+
+**The one thing genuinely left**, and it is small: those 2 multi-bot clients
+have no Agent. That needs a human to say which bot pairs with which voice
+agent — the script will not guess, correctly. Until then their journeys and
+scheduled actions stamp no `agentId`. Tracked as its own item rather than
+holding this one open.
+
+**Effort:** S (done)
+**Priority:** resolved
+**Depends on:** nothing
 
 ### [RESOLVED 2026-08-20] When merging feature/agent-journey-scheduler, the blog commit is already on main
 
