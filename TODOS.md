@@ -535,7 +535,7 @@ several permissions. See `docs/META_APP_REVIEW_SUBMISSION.md` and
 **Priority:** P2
 **Depends on:** PR #1 (WhatsApp Meta Direct provider + Embedded Signup) shipped and proven first.
 
-### Design the Journey step-list data model + Step Functions compiler
+### [RESOLVED 2026-08-20] Design the Journey step-list data model + Step Functions compiler
 
 **What:** A dedicated design pass for how a client's step-list Journey (trigger → action → wait → condition → action, per the "no graph builder" UX decided in the Agent Scheduler & Journey Flow architecture session) gets stored in DynamoDB and compiled into a real AWS Step Functions Amazon States Language definition at runtime. Must include two guardrails surfaced during that session's outside-voice review: (1) the compiler must reject/forbid unbounded or tight-interval polling patterns (e.g. "check every 5 minutes for 90 days") in favor of a single long Wait state for "wait until X" semantics — realistic Journey shapes land around 200-500 Step Functions execution-history events, nowhere near the 25,000 ceiling, but a naive polling-loop compile pattern could approach it; (2) the Agent config schema must separate channel-specific fields (e.g. WhatsApp's pre-approved message-template requirement, which doesn't apply to the web widget) from channel-agnostic fields (tone, tool palette, qualification logic) from day one, so adding a channel later means adding a config block, not restructuring the fused Journey+Agent+toolbox bundle.
 
@@ -543,9 +543,13 @@ several permissions. See `docs/META_APP_REVIEW_SUBMISSION.md` and
 
 **Context:** Builds on the approved `agents-schedulers-journeys` design (2026-07-26) and the Agent Scheduler & Journey Flow session (2026-07-29, `plan-eng-review`) that resolved that doc's Open Question #7 (the visual Journey builder was never named as its own deliverable). Still-open from the original design and not resolved by this TODO: Journey-edit-while-in-flight semantics (what happens to a lead's in-progress execution when the client edits the Journey), and the translation from raw Step Functions execution state into the client-facing "where is my lead right now" timeline view.
 
-**Effort:** L
-**Priority:** P1
-**Depends on:** None, but blocks any Journey builder UI work
+**Resolved:** Shipped. `backend/src/services/journey-compiler-service.ts` (391 lines) compiles a JourneyDefinition to Amazon States Language, and `journeys` is in `lib/table-names.ts`. Both guardrails from the design session are enforced in code: the compiler rejects backward references outright (`assertForwardReference`, line 117 -- "use a wait_and_recheck step to express try again, not a loop"), and channel-specific config is separated onto `AgentChannelConfig` rather than fused into the journey.
+
+Still genuinely open from the original text, and NOT covered by the compiler: journey-edit-while-in-flight semantics. Partially answered since -- editing a published bundle releases its trigger claim and in-flight executions finish on the version they started on (`journey-service.ts:232`) -- and the UI now warns before that happens. The client-facing "where is my lead right now" timeline is served by `lead_events` + `GET /api/leads/events`.
+
+**Effort:** L (done)
+**Priority:** resolved
+**Depends on:** None
 
 ### Design request-authenticity / abuse-prevention for /api/chat before agents get real-world-action tool-calling
 
@@ -681,6 +685,25 @@ several permissions. See `docs/META_APP_REVIEW_SUBMISSION.md` and
 
 ### Provision the agent/journey infra — run scripts/provision-agent-journey.sh
 
+> **READ BEFORE RUNNING THE SCRIPT (checked 2026-08-20).** The script is still the
+> right way to create the tables, roles and ARNs. Its ENV-VAR half is now wrong.
+>
+> It sets 9 `DYNAMODB_TABLE_*` variables (`AGENTS`, `AGENT_BINDING_LOOKUP`,
+> `APPOINTMENT_REQUESTS`, `GUPSHUP_APP_LOOKUP`, `JOURNEYS`, `JOURNEY_EXECUTIONS`,
+> `JOURNEY_PENDING_REPLIES`, `JOURNEY_TRIGGER_CLAIMS`, `SCHEDULED_ACTIONS`,
+> `WHATSAPP_INBOUND_ACTIVITY`). **Nothing reads them any more** -- zero references
+> in `backend/src`. Table names moved into `lib/table-names.ts` on 2026-08-16
+> precisely because 30 such variables were eating 1250 of the Lambda's 4096-byte
+> env budget, and `rigachat-api` was at 3597/4096. Setting them again puts that
+> bloat back and walks toward the same ceiling that already blocked adding a table
+> once.
+>
+> So: run the script for tables/roles/ARNs, then strip the `DYNAMODB_TABLE_*`
+> entries it added. The three ARNs below are still genuinely required -- those are
+> read at import time and still throw when unset. `DYNAMODB_TABLE_PREFIX` is the
+> only table-related variable the code reads now, and only if you point the stack
+> at a separate set of tables.
+
 **What:** `scripts/provision-agent-journey.sh` does the whole thing in one run: creates all 8 DynamoDB tables, creates the EventBridge Scheduler execution role, grants the Lambda roles scheduler access, and sets all 11 env vars on all three Lambdas. It is idempotent (skips anything that already exists). Verified against account 291685935704 / ap-south-1 on 2026-08-06 — at that point **none** of it existed.
 
 Run it, then `backend/scripts/backfill-agents.ts` (see the old note below).
@@ -697,7 +720,7 @@ Do NOT add these as GitHub secrets: `ci.yml`'s env-var step merges a hardcoded a
 
 Original note, still accurate for the backfill half:
 
-**What:** The additive Agent umbrella (branch `feature/agent-journey-scheduler`) is code-complete and tested, but two things must happen at deploy before it works in production: (1) create the two new DynamoDB tables in AWS — `agents` (partition key `clientId`, sort key `agentId`) and `agent_binding_lookup` (partition key `resourceId`) — and add `DYNAMODB_TABLE_AGENTS` and `DYNAMODB_TABLE_AGENT_BINDING_LOOKUP` to every deployed Lambda's environment via the same CI/CD env-var-sync path the other tables use; (2) run `backend/scripts/backfill-agents.ts` once the tables exist, to wrap the existing client's chatbot + voice agent into one Agent.
+**What:** The additive Agent umbrella (the code is on `main` -- `agent-repository.ts`, `agent-routes.ts`, and both tables in `lib/table-names.ts`; the old `feature/agent-journey-scheduler` branch was superseded and deleted on 2026-08-20) is code-complete and tested, but two things must happen at deploy before it works in production: (1) create the two new DynamoDB tables in AWS — `agents` (partition key `clientId`, sort key `agentId`) and `agent_binding_lookup` (partition key `resourceId`). ~~and add `DYNAMODB_TABLE_AGENTS` / `DYNAMODB_TABLE_AGENT_BINDING_LOOKUP` to every Lambda~~ — **no longer true, see the box above**: names come from `lib/table-names.ts` since 2026-08-16 and those variables are dead; (2) run `backend/scripts/backfill-agents.ts` once the tables exist, to wrap the existing client's chatbot + voice agent into one Agent.
 
 **Why:** The repositories call `getTableName('agents')` / `getTableName('agent_binding_lookup')` at module load, so once anything imports agent-repository in production (the `/api/agents` routes do), a missing table env var throws on cold start. Nothing imports them yet in a hot path, but the Agent routes are live in the bundle. The backfill is what makes the existing client's bot + voice agent actually resolve to one Agent (so journeys/scheduler start stamping `agentId`); without it, the identity layer exists but no real data is wrapped in it yet.
 
@@ -707,7 +730,7 @@ Original note, still accurate for the backfill half:
 **Priority:** P1
 **Depends on:** the `feature/agent-journey-scheduler` branch merged/deployed
 
-### When merging feature/agent-journey-scheduler, the blog commit is already on main
+### [RESOLVED 2026-08-20] When merging feature/agent-journey-scheduler, the blog commit is already on main
 
 **What:** The blog section (`ee2c2ce` on this branch — `/blog`, `/blog/:slug`, the prerender step, the pilgrimage-towns post) was cherry-picked onto `main` ahead of the rest of this branch, on 2026-08-02, as `ee0e77f` + a follow-up fix `808668a`. Both are pushed to `origin/main`. So when this branch is eventually merged, its blog commit is a duplicate of work main already has — do not treat the blog as new, unmerged work, and do not re-apply it.
 
@@ -717,9 +740,13 @@ Original note, still accurate for the backfill half:
 
 Verified 2026-08-02 via `git merge-tree --write-tree main feature/agent-journey-scheduler`: the add/add on `meta.ts` is the only blog-related conflict. That same dry run also reported conflicts in `CLAUDE.md`, `TODOS.md`, `backend/index.ts`, and `backend/vitest.config.ts` — those are ordinary divergence between this branch and main, nothing to do with the blog, and are resolved normally. Re-run that command before merging for the current picture.
 
-**Effort:** S for the blog conflict specifically (one file, known resolution); the branch merge overall is larger
-**Priority:** P1
-**Depends on:** nothing — read this before merging `feature/agent-journey-scheduler`
+**Resolved:** There is no merge left to do. Measured 2026-08-20: `feature/agent-journey-scheduler` was **155 commits behind main and 0 ahead** -- every commit on it had already reached main by other routes, so the add/add conflict on `meta.ts` can never arise. The branch was deleted (local and remote) the same day.
+
+Worth keeping from the original note: main's version of that post carries `{ value: '7', label: 'Towns screened' }`, and 7 is the correct number -- the screening table only has data for seven towns. The `9` came from the source PDF's cover, which overcounts its own table.
+
+**Effort:** S (done)
+**Priority:** resolved
+**Depends on:** nothing
 ### [RESOLVED 2026-08-05] contact_messages table + SES sender provisioned
 
 **What:** All three manual AWS steps for the contact form are done and verified live against account `291685935704` / `ap-south-1`:
@@ -735,10 +762,10 @@ End-to-end verified the same day against real infra: a submission wrote a real r
 - **Do not add these as GitHub secrets.** `ci.yml`'s "Update Lambda environment variables" step merges a *hardcoded allowlist* (`WHATSAPP_*`, `REDIS_PROVIDER`, `UPSTASH_*`, `SQS_CRAWLER_QUEUE_URL`) onto whatever the function already has. No DynamoDB table name is in that list — every existing one lives directly on the Lambda and survives deploys only because of that `jq '. + {...}'` merge. A new GH secret would be silently ignored unless `ci.yml` is edited too. This applies to the pending Agent tables as well.
 - **The SES sandbox (`ProductionAccessEnabled: false`) is not a blocker.** Sandbox restricts *destinations* to verified identities, and `vyostra.com` is verified with DKIM `SUCCESS` — so a `support@vyostra.com` destination works today. Production access is only needed if the notification address ever moves off a verified domain.
 
-**Still open:** the branch itself. `/api/contact` stays 404 in production until `feature/contact-form` merges to `main` — infra is ready, code is not deployed.
+**Nothing still open.** `feature/contact-form` merged; `backend/src/routes/contact-routes.ts` is on `main` and `/api/contact` has been live in production since 2026-08-05.
 
 **Effort:** S (done)
-**Priority:** P1
+**Priority:** resolved
 **Depends on:** nothing further
 
 ### Editing a knowledge base entry doesn't invalidate the 7-day answer cache
