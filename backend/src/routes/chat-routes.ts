@@ -8,6 +8,13 @@ import {
   streamMessage,
 } from '../services/chat-service.js'
 import { EntitlementError, toEntitlementErrorResponse } from '../services/entitlement-service.js'
+import { rateLimit } from '../lib/rate-limit.js'
+import {
+  CHAT_MESSAGE_RATE_LIMIT_MAX,
+  CHAT_MESSAGE_RATE_LIMIT_SECONDS,
+  CHAT_START_RATE_LIMIT_MAX,
+  CHAT_START_RATE_LIMIT_SECONDS,
+} from '../config/entitlements-config.js'
 import type { ApiResponse } from '../types/index.js'
 
 export const chatRoutes = new Hono()
@@ -27,7 +34,22 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-chatRoutes.post('/start', async (c) => {
+// Unauthenticated by design -- anonymous visitors on a client's own site have
+// no session to present. The per-IP ceiling is what stands in for one.
+//
+// /start is the tighter of the two because it is the unbounded operation: each
+// call creates a new conversation, and MESSAGE_CEILING_PER_CONVERSATION only
+// caps spend WITHIN one. Without this, start -> N messages -> start loops
+// forever on a client's OpenAI quota.
+chatRoutes.post(
+  '/start',
+  rateLimit({
+    bucket: 'start',
+    max: CHAT_START_RATE_LIMIT_MAX,
+    windowSeconds: CHAT_START_RATE_LIMIT_SECONDS,
+    message: 'Too many chats started from this network. Please try again in a few minutes.',
+  }),
+  async (c) => {
   const body = await c.req.json<StartConversationBody>()
 
   if (!body.botId || !body.sourceUrl) {
@@ -49,7 +71,15 @@ chatRoutes.post('/start', async (c) => {
   }
 })
 
-chatRoutes.post('/message', async (c) => {
+chatRoutes.post(
+  '/message',
+  rateLimit({
+    bucket: 'message',
+    max: CHAT_MESSAGE_RATE_LIMIT_MAX,
+    windowSeconds: CHAT_MESSAGE_RATE_LIMIT_SECONDS,
+    message: 'You are sending messages too quickly. Please wait a moment.',
+  }),
+  async (c) => {
   const body = await c.req.json<SendMessageBody>()
 
   if (!body.botId || !body.conversationId || !body.message) {

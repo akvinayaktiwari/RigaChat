@@ -145,3 +145,19 @@ export async function tryAcquireContactAttempt(ip: string, email: string): Promi
   const key = `contact:ratelimit:${ip}:${email}`
   return await redis.setNX(key, '1', CONTACT_RATE_LIMIT_SECONDS)
 }
+
+// Fixed-window counter for the public chat endpoints. Returns the count after
+// this request, or null when Redis is unreachable -- the caller treats null as
+// "allow", because a cache outage must not take every client's widget offline.
+export async function incrementChatRate(
+  bucket: 'start' | 'message',
+  ip: string,
+  windowSeconds: number
+): Promise<number | null> {
+  const redis = getRedisProvider()
+  // The window is part of the key, so a window rolls over by moving to a new
+  // key rather than needing a reset.
+  const window = Math.floor(Date.now() / 1000 / windowSeconds)
+  return await redis.incr(`chat:rl:${bucket}:${ip}:${window}`, windowSeconds)
+}
+

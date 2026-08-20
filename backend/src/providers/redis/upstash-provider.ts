@@ -55,6 +55,20 @@ export class UpstashRedisProvider implements RedisProvider {
     }
   }
 
+  async incr(key: string, ttlSeconds: number): Promise<number | null> {
+    try {
+      const count = await this.client.incr(key)
+      // Only the first caller in a window sets the TTL. Doing it every time
+      // would slide the window forward on each request, so a steady stream of
+      // traffic would keep resetting the expiry and the limit would never fire.
+      if (count === 1) await this.client.expire(key, ttlSeconds)
+      return count
+    } catch (err) {
+      console.error('Redis INCR error:', err)
+      return null
+    }
+  }
+
   getProviderName(): RedisProviderName {
     return 'upstash'
   }

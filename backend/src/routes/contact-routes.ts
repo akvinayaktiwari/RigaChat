@@ -1,7 +1,6 @@
 import { Hono } from 'hono'
+import { getClientIp } from '../lib/client-ip.js'
 import type { Context } from 'hono'
-import { getConnInfo as getLambdaConnInfo } from 'hono/aws-lambda'
-import { getConnInfo as getNodeConnInfo } from '@hono/node-server/conninfo'
 import { ContactError, submitContactMessage } from '../services/contact-service.js'
 import type { ApiResponse, SubmitContactMessageInput, SubmitContactMessageResult } from '../types/index.js'
 
@@ -11,13 +10,6 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-// Same dual-runtime handling as auth-routes.ts's getClientIp — see the long
-// comment there for why getConnInfo can't be called unconditionally.
-function getClientIp(c: Context): string {
-  const hasLambdaEvent = Boolean((c.env as { requestContext?: unknown } | undefined)?.requestContext)
-  const address = hasLambdaEvent ? getLambdaConnInfo(c).remote.address : getNodeConnInfo(c).remote.address
-  return address ?? 'unknown'
-}
 
 function contactErrorStatus(code: ContactError['code']): 400 | 429 {
   switch (code) {

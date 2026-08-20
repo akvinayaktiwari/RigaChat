@@ -58,3 +58,31 @@ export const QUICK_SIGNUP_RATE_LIMIT_SECONDS = 60
 // hammering the endpoint, short enough that a person fixing a typo in their
 // own message and resubmitting is not blocked.
 export const CONTACT_RATE_LIMIT_SECONDS = 60
+
+// ---------------------------------------------------------------------------
+// Public chat abuse limits
+// ---------------------------------------------------------------------------
+//
+// /api/chat is unauthenticated by design -- the widget serves anonymous
+// visitors on a client's own website, so there is no session to require. The
+// gap that leaves is not theoretical: botIds are public (GET
+// /api/bots/:id/config needs no auth), and while
+// MESSAGE_CEILING_PER_CONVERSATION bounds spend WITHIN one conversation,
+// nothing bounded the NUMBER of conversations. A script could loop
+// start -> N messages -> start and burn a client's OpenAI quota while reading
+// their whole knowledge base back.
+//
+// CORS does not help here. Widget routes are origin '*' because they are
+// embedded on arbitrary customer domains, and CORS is a browser courtesy
+// anyway -- it is not sent or honoured by a script.
+//
+// Chosen to be invisible to humans and fatal to scripts. A real visitor opens
+// one conversation and sends a handful of messages; these ceilings are an
+// order of magnitude above that, so a shared office NAT stays comfortable
+// while a scripted loop hits the wall in seconds.
+export const CHAT_START_RATE_LIMIT_MAX = 10
+export const CHAT_START_RATE_LIMIT_SECONDS = 300
+
+export const CHAT_MESSAGE_RATE_LIMIT_MAX = 60
+export const CHAT_MESSAGE_RATE_LIMIT_SECONDS = 60
+

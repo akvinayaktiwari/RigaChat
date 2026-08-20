@@ -1,7 +1,6 @@
 import { Hono } from 'hono'
+import { getClientIp } from '../lib/client-ip.js'
 import type { Context } from 'hono'
-import { getConnInfo as getLambdaConnInfo } from 'hono/aws-lambda'
-import { getConnInfo as getNodeConnInfo } from '@hono/node-server/conninfo'
 import {
   confirmForgotPassword,
   ConfirmForgotPasswordError,
@@ -53,19 +52,6 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-// This app runs under two different runtimes sharing the same Hono `app`
-// (index.ts): hono/aws-lambda's handle() in the real deployed Lambda (Function
-// URL event, API Gateway v2 shape — c.env.requestContext is populated) and
-// @hono/node-server's serve() for local dev (c.env is the raw Node
-// req/res, no requestContext at all). hono/aws-lambda's getConnInfo reads
-// c.env.requestContext directly and throws if it's absent, so it can't be
-// called unconditionally — this picks whichever adapter matches the runtime
-// actually in use for this request.
-function getClientIp(c: Context): string {
-  const hasLambdaEvent = Boolean((c.env as { requestContext?: unknown } | undefined)?.requestContext)
-  const address = hasLambdaEvent ? getLambdaConnInfo(c).remote.address : getNodeConnInfo(c).remote.address
-  return address ?? 'unknown'
-}
 
 function quickSignupErrorStatus(code: QuickSignupErrorCode): 400 | 409 | 429 | 500 {
   switch (code) {

@@ -575,7 +575,7 @@ wrong bot to a client's Agent, which is worse than leaving it undone.
 **Priority:** P2
 **Depends on:** someone who knows which bot is which for those two clients
 
-### Design request-authenticity / abuse-prevention for /api/chat before agents get real-world-action tool-calling
+### [PARTLY RESOLVED 2026-08-21] Request-authenticity / abuse-prevention for /api/chat
 
 **What:** `/api/chat` is public/unauthenticated by design (per CLAUDE.md's API routes spec). That's fine today because the endpoint only does RAG-retrieval + OpenAI chat. Once a bounded MCP-tool-calling agent sits behind it (per the Agents/Journeys architecture) with real-world side effects — booking appointments, sending confirmations — a spoofed or scripted request could trigger those actions without ever going through a real user conversation.
 
@@ -583,9 +583,46 @@ wrong bot to a client's Agent, which is worse than leaving it undone.
 
 **Context:** Needs a real design decision, not a blanket auth requirement (the endpoint must stay public for the widget to work for anonymous site visitors) — likely some combination of rate limiting, bot-session binding (e.g. a widget-issued session token bound to the botId + origin), and/or scoping which MCP tools are reachable from an unauthenticated session vs. a verified one. Should land before any agent gets real-world-action tool-calling wired to a public endpoint, on whichever channel ships first.
 
-**Effort:** M
-**Priority:** P1
-**Depends on:** Should land before the Agents/Journeys pilot wires tool-calling into /api/chat or the WhatsApp webhook
+**Done 2026-08-21 — the live half.** The gap turned out not to be theoretical
+or future-tense. botIds are public (`GET /api/bots/:id/config` needs no auth),
+and while `MESSAGE_CEILING_PER_CONVERSATION` bounds spend WITHIN a
+conversation, nothing bounded the NUMBER of conversations. A script could loop
+`start -> N messages -> start` against any client's bot, burning their OpenAI
+quota and reading their knowledge base back. CORS is no defence: widget routes
+are `origin: '*'` because they load on arbitrary customer domains, and CORS is
+a browser courtesy a script neither sends nor honours.
+
+Shipped: per-IP fixed-window limits on both public chat endpoints
+(`lib/rate-limit.ts`), tight on `/start` because it is the unbounded operation
+and looser on `/message`. Needed a new `incr()` on the Redis provider --
+`setNX` is one-shot and can only answer "has this happened", not "how many
+times this window". **Fails open** by design: a Redis outage must not take
+every client's widget offline, and spend is still bounded by
+`MESSAGE_CEILING_PER_CONVERSATION`, which reads DynamoDB and needs no Redis.
+9 tests, with the fail-open path pinned hardest.
+
+**Still open, and both need design rather than code:**
+
+1. **Origin binding.** The TODO's "widget-issued session token bound to botId +
+   origin" is not implementable today: there is no per-bot allowed-domains
+   field on `BotConfig`, so there is nothing to bind an origin against. Adding
+   one is a product decision (what happens to a client who moves domain, or
+   embeds on several) before it is an engineering one. Rate limiting slows a
+   script; it does not stop a determined one from embedding someone else's
+   botId on their own page.
+
+2. **Tool scoping.** Still genuinely future-tense: no MCP tool is reachable
+   from `/api/chat` today. Tool calls run from `journey-executor-service` and
+   `appointment-service`, driven by Step Functions, never by `chat-service`.
+   The original condition -- "before any agent gets real-world-action
+   tool-calling wired to a public endpoint" -- has not been met yet, so this
+   must be revisited the day chat-service can call a tool.
+
+**Effort:** M (rate limiting done; origin binding is the remaining M)
+**Priority:** P2 — the live cost/exfiltration vector is closed; what is left is
+hardening that needs a data-model decision first
+**Depends on:** a per-bot allowed-domains decision for (1); nothing for (2)
+until tool-calling reaches a public endpoint
 
 ### [RESOLVED 2026-07-29] Real inbound WhatsApp message tracking — send_message session guard now works for real
 
