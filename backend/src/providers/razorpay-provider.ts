@@ -62,6 +62,29 @@ export function asRazorpayError(operation: string, error: unknown): Error {
   return new Error(`${operation}: ${String(error)}`)
 }
 
+export interface RazorpaySubscription {
+  id: string
+  status: string
+  paid_count: number
+  current_end: number | null
+  notes?: Record<string, string>
+}
+
+export interface RazorpayInvoice {
+  id: string
+  status: string
+  payment_id: string | null
+  short_url: string | null
+}
+
+export interface RazorpayPayment {
+  id: string
+  status: string
+  amount: number
+  currency: string
+  invoice_id: string | null
+}
+
 export class RazorpayProvider {
   async createSubscription(
     planId: string,
@@ -111,6 +134,36 @@ export class RazorpayProvider {
     }
 
     return crypto.timingSafeEqual(expectedBuffer, signatureBuffer)
+  }
+
+  // Read-only lookups used by scripts/reconcile-razorpay-subscription.ts to
+  // repair accounts whose webhook never arrived. Razorpay is the source of
+  // truth for what was actually paid, so reconciliation reads from here rather
+  // than trusting local state. These throw (unlike fetchInvoiceShortUrl below):
+  // a reconciliation that cannot read the real state must stop, not guess.
+  async fetchSubscription(subscriptionId: string): Promise<RazorpaySubscription> {
+    try {
+      return (await razorpayClient.subscriptions.fetch(subscriptionId)) as unknown as RazorpaySubscription
+    } catch (error) {
+      throw asRazorpayError(`Razorpay fetchSubscription(${subscriptionId}) failed`, error)
+    }
+  }
+
+  async fetchInvoicesForSubscription(subscriptionId: string): Promise<RazorpayInvoice[]> {
+    try {
+      const result = await razorpayClient.invoices.all({ subscription_id: subscriptionId })
+      return (result.items ?? []) as unknown as RazorpayInvoice[]
+    } catch (error) {
+      throw asRazorpayError(`Razorpay fetchInvoicesForSubscription(${subscriptionId}) failed`, error)
+    }
+  }
+
+  async fetchPayment(paymentId: string): Promise<RazorpayPayment> {
+    try {
+      return (await razorpayClient.payments.fetch(paymentId)) as unknown as RazorpayPayment
+    } catch (error) {
+      throw asRazorpayError(`Razorpay fetchPayment(${paymentId}) failed`, error)
+    }
   }
 
   // Returns null (never throws) on any lookup failure - this is called from
