@@ -90,21 +90,74 @@ export function setAuthToken(token: string | null): void {
   authToken = token
 }
 
+// Session recovery, registered by AuthProvider (hooks/useAuth.ts).
+//
+// Cognito issues a 60-minute ID token and a 5-day refresh token, but the
+// refresh token was discarded at sign-in and the ID token was never renewed.
+// useAuth only checks `exp` when restoring a session on page load, so a tab
+// left open past the hour kept sending a dead token forever: every request
+// 401'd, the user was never signed out or redirected, and the UI just showed
+// unexplained failures. Observed live on 2026-08-22 with a token eight hours
+// past expiry still in use.
+//
+// Kept as an injected handler rather than importing useAuth here, because
+// useAuth already imports this module -- wiring it the other way would be a
+// cycle.
+type TokenRefresher = () => Promise<string | null>
+
+let refreshHandler: TokenRefresher | null = null
+let inFlightRefresh: Promise<string | null> | null = null
+
+export function setTokenRefreshHandler(handler: TokenRefresher | null): void {
+  refreshHandler = handler
+}
+
+// One refresh at a time. A page typically fires several requests at once, so
+// without this the first expiry would trigger a burst of parallel refreshes,
+// each invalidating the last and most of them failing.
+async function refreshOnce(): Promise<string | null> {
+  if (!refreshHandler) return null
+
+  if (!inFlightRefresh) {
+    inFlightRefresh = refreshHandler().finally(() => {
+      inFlightRefresh = null
+    })
+  }
+
+  return await inFlightRefresh
+}
+
 export async function apiClient<T>(
   path: string,
   method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE' = 'GET',
   body?: unknown
 ): Promise<ApiResponse<T>> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (authToken) {
-    headers.Authorization = `Bearer ${authToken}`
+  const send = async (token: string | null): Promise<Response> => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
+    }
+
+    return await fetch(`${BASE_URL}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    })
   }
 
-  const response = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  })
+  let response = await send(authToken)
+
+  // A 401 on a request that carried a token means the token expired, not that
+  // the caller is anonymous -- so try once to renew it and replay. Requests
+  // sent without a token are genuinely unauthenticated and are left alone.
+  // Retried at most once: if the replay also 401s, the refresh token is gone
+  // too and refreshHandler signs the user out.
+  if (response.status === 401 && authToken) {
+    const renewed = await refreshOnce()
+    if (renewed) {
+      response = await send(renewed)
+    }
+  }
 
   // 204 No Content has no body to parse — response.json() throws on an
   // empty body, which would otherwise surface as a false-negative error

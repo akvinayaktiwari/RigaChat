@@ -1,6 +1,6 @@
 import { createContext, createElement, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { setAuthToken, syncMe } from '../services/api'
+import { setAuthToken, setTokenRefreshHandler, syncMe } from '../services/api'
 import { clearSubscriptionCache } from '../lib/subscription-cache'
 
 export interface AuthUser {
@@ -59,15 +59,35 @@ function decodeIdToken(idToken: string): IdTokenPayload {
 // is cleared when the tab closes and can't be read from other tabs.
 const SESSION_TOKEN_KEY = 'bb_token'
 const SESSION_USER_KEY = 'bb_user'
+// Cognito's refresh token, kept beside the ID token so an expiring session can
+// be renewed instead of silently breaking. Same sessionStorage scope as the
+// rest of the session: cleared when the tab closes, unreadable cross-tab.
+const SESSION_REFRESH_KEY = 'bb_refresh'
 
-function saveSession(token: string, user: AuthUser): void {
+// Routes that render for signed-out visitors. A session expiring while one of
+// these is open must not redirect -- the landing page in particular polls
+// subscription state during checkout, and bouncing mid-payment would be worse
+// than the stale session this whole mechanism exists to fix.
+//
+// '/' is matched exactly rather than by prefix, since every path starts with it.
+const PUBLIC_PATH_PREFIXES = ['/login', '/signup', '/auth/callback', '/blog', '/privacy-policy', '/terms-of-service']
+
+function isPublicPath(pathname: string): boolean {
+  return pathname === '/' || PUBLIC_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+}
+
+function saveSession(token: string, user: AuthUser, refreshToken?: string | null): void {
   sessionStorage.setItem(SESSION_TOKEN_KEY, token)
   sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(user))
+  if (refreshToken) {
+    sessionStorage.setItem(SESSION_REFRESH_KEY, refreshToken)
+  }
 }
 
 function clearSession(): void {
   sessionStorage.removeItem(SESSION_TOKEN_KEY)
   sessionStorage.removeItem(SESSION_USER_KEY)
+  sessionStorage.removeItem(SESSION_REFRESH_KEY)
   // The cached subscription was fetched with the token being dropped here, so
   // it dies with it. Without this, signing out and signing back in as a
   // different account in the same tab would paint the previous account's plan
@@ -85,6 +105,41 @@ async function parseCognitoError(response: Response): Promise<CognitoErrorBody> 
     return (await response.json()) as CognitoErrorBody
   } catch {
     return {}
+  }
+}
+
+// Exchanges the stored refresh token for a fresh ID token.
+//
+// InitiateAuth/REFRESH_TOKEN_AUTH is used for sessions from BOTH sign-in paths
+// (Hosted UI/Google and USER_PASSWORD_AUTH) -- refresh tokens are issued by the
+// pool, not by a particular flow. If that ever stops holding for the OAuth
+// path, this returns null and the caller signs the user out, which is the same
+// behaviour as having no refresh at all: honest, not silent.
+async function exchangeRefreshToken(refreshToken: string): Promise<string | null> {
+  try {
+    const response = await fetch(COGNITO_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-amz-json-1.1',
+        'X-Amz-Target': 'AWSCognitoIdentityProviderService.InitiateAuth',
+      },
+      body: JSON.stringify({
+        AuthFlow: 'REFRESH_TOKEN_AUTH',
+        ClientId: COGNITO_CLIENT_ID,
+        AuthParameters: { REFRESH_TOKEN: refreshToken },
+      }),
+    })
+
+    if (!response.ok) return null
+
+    const result = (await response.json()) as {
+      AuthenticationResult?: { IdToken?: string }
+    }
+    // Cognito does not reissue the refresh token here, so the stored one stays
+    // valid until its own 5-day expiry.
+    return result.AuthenticationResult?.IdToken ?? null
+  } catch {
+    return null
   }
 }
 
@@ -164,7 +219,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(`Token exchange failed with status ${response.status}`)
       }
 
-      const tokens = (await response.json()) as { id_token: string; access_token: string }
+      const tokens = (await response.json()) as {
+        id_token: string
+        access_token: string
+        refresh_token?: string
+      }
       const { sub, email, name } = decodeIdToken(tokens.id_token)
 
       setAuthToken(tokens.id_token)
@@ -187,7 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         token: tokens.id_token,
       })
-      saveSession(tokens.id_token, user)
+      saveSession(tokens.id_token, user, tokens.refresh_token)
 
       return true
     } catch (error) {
@@ -199,6 +258,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return false
     }
   }
+
+  // Give apiClient a way to recover an expired session. Registered here rather
+  // than at module scope because renewing has to update React state and
+  // sessionStorage, not just the token apiClient holds.
+  //
+  // Returning null makes apiClient give up and surface the 401. That is the
+  // correct end state for a refresh token that is missing, expired (5 days) or
+  // revoked: the session is genuinely over, so clear it and send the user to
+  // log in, rather than leaving a dead token in place as before.
+  useEffect(() => {
+    setTokenRefreshHandler(async () => {
+      const refreshToken = sessionStorage.getItem(SESSION_REFRESH_KEY)
+      const savedUserJson = sessionStorage.getItem(SESSION_USER_KEY)
+
+      if (refreshToken && savedUserJson) {
+        const idToken = await exchangeRefreshToken(refreshToken)
+        if (idToken) {
+          const user = JSON.parse(savedUserJson) as AuthUser
+          setAuthToken(idToken)
+          saveSession(idToken, user)
+          setState({ isAuthenticated: true, isLoading: false, user, token: idToken })
+          return idToken
+        }
+      }
+
+      setAuthToken(null)
+      clearSession()
+      setState({ isAuthenticated: false, isLoading: false, user: null, token: null })
+
+      // Guard against bouncing someone who is already on a public page -- an
+      // expired token can surface from a background poll on the landing page.
+      if (!isPublicPath(window.location.pathname)) {
+        window.location.href = '/login'
+      }
+      return null
+    })
+
+    return () => setTokenRefreshHandler(null)
+  }, [])
 
   function logout(): void {
     setAuthToken(null)
@@ -250,6 +348,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       AuthenticationResult: { IdToken: string; AccessToken: string; RefreshToken: string }
     }
     const idToken = result.AuthenticationResult.IdToken
+    const refreshToken = result.AuthenticationResult.RefreshToken
     const payload = decodeIdToken(idToken)
 
     setAuthToken(idToken)
@@ -272,7 +371,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       token: idToken,
     })
-    saveSession(idToken, user)
+    saveSession(idToken, user, refreshToken)
 
     return { token: idToken, user }
   }
