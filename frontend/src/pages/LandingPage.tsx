@@ -117,48 +117,59 @@ export default function LandingPage() {
         suggestedTier={signupModal?.mode === 'checkout' ? signupModal.tier : undefined}
       />
 
-      {tierCheckout.stage !== 'idle' && (
-        <div className="fixed bottom-6 right-6 z-50 max-w-sm w-full bg-white rounded-2xl shadow-2xl shadow-black/10 border border-gray-100 p-5">
-          {tierCheckout.stage === 'polling' && (
-            <div className="flex items-center gap-3">
-              <Loader2 size={20} className="text-violet-500 animate-spin shrink-0" />
-              <div>
-                <p className="font-semibold text-sm text-gray-900" style={JAKARTA_FONT}>
-                  Confirming your payment...
-                </p>
-                <p className="text-xs text-gray-500 mt-0.5">This usually takes a few seconds.</p>
-              </div>
+      {/* Bottom-LEFT, deliberately. The voice widget mounts itself at
+          position:fixed; bottom:24px; right:24px with z-index 999999
+          (public/voice-widget.js), so anything sharing that corner is covered
+          by it regardless of its own z-index -- and out-stacking the widget
+          would just hide the widget instead, trading one hidden element for
+          another. Both cards also share one container so that an error and a
+          status card can never land on top of each other. */}
+      {(tierCheckout.stage !== 'idle' || tierCheckout.errorMessage) && (
+        <div className="fixed bottom-6 left-6 z-50 flex flex-col gap-3 w-[calc(100vw-3rem)] max-w-sm">
+          {tierCheckout.stage !== 'idle' && (
+            <div className="bg-white rounded-2xl shadow-2xl shadow-black/10 border border-gray-100 p-5">
+              {tierCheckout.stage === 'polling' && (
+                <div className="flex items-center gap-3">
+                  <Loader2 size={20} className="text-violet-500 animate-spin shrink-0" />
+                  <div>
+                    <p className="font-semibold text-sm text-gray-900" style={JAKARTA_FONT}>
+                      Confirming your payment...
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">This usually takes a few seconds.</p>
+                  </div>
+                </div>
+              )}
+              {tierCheckout.stage === 'success' && (
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 size={20} className="text-emerald-500 shrink-0" />
+                  <div>
+                    <p className="font-semibold text-sm text-gray-900" style={JAKARTA_FONT}>
+                      You&apos;re all set!
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">Redirecting to your dashboard...</p>
+                  </div>
+                </div>
+              )}
+              {tierCheckout.stage === 'timeout' && (
+                <div className="flex items-start gap-3">
+                  <AlertTriangle size={20} className="text-amber-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-sm text-gray-900" style={JAKARTA_FONT}>
+                      Payment received
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">This can take a minute to reflect — refresh shortly.</p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
-          {tierCheckout.stage === 'success' && (
-            <div className="flex items-center gap-3">
-              <CheckCircle2 size={20} className="text-emerald-500 shrink-0" />
-              <div>
-                <p className="font-semibold text-sm text-gray-900" style={JAKARTA_FONT}>
-                  You&apos;re all set!
-                </p>
-                <p className="text-xs text-gray-500 mt-0.5">Redirecting to your dashboard...</p>
-              </div>
-            </div>
-          )}
-          {tierCheckout.stage === 'timeout' && (
-            <div className="flex items-start gap-3">
-              <AlertTriangle size={20} className="text-amber-500 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold text-sm text-gray-900" style={JAKARTA_FONT}>
-                  Payment received
-                </p>
-                <p className="text-xs text-gray-500 mt-0.5">This can take a minute to reflect — refresh shortly.</p>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
-      {tierCheckout.errorMessage && (
-        <div className="fixed bottom-6 right-6 z-50 max-w-sm w-full bg-amber-50 border border-amber-200 rounded-2xl shadow-lg p-4 text-sm text-amber-700 flex items-start gap-2">
-          <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-          {tierCheckout.errorMessage}
+          {tierCheckout.errorMessage && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl shadow-lg p-4 text-sm text-amber-700 flex items-start gap-2">
+              <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+              {tierCheckout.errorMessage}
+            </div>
+          )}
         </div>
       )}
     </div>
