@@ -33,6 +33,13 @@ export default defineConfig({
       // would otherwise fail at import with a message about .env, which reads
       // like a broken setup rather than a missing mock.
       OPENAI_API_KEY: 'test-openai-key',
+      // Same reason as OPENAI_API_KEY above: lib/pinecone.ts validates at
+      // module scope, and any test whose import graph reaches bot-service
+      // (webhook-service does) would otherwise fail at import rather than in a
+      // test, reading like a broken setup instead of a missing mock. A dummy
+      // key constructs the client but is never used -- no test makes a Pinecone
+      // call, and one would fail against this value anyway.
+      PINECONE_API_KEY: 'test-pinecone-key',
       COGNITO_USER_POOL_ID: 'test-pool-id',
       COGNITO_CLIENT_ID: 'test-client-id',
       JOURNEY_EXECUTOR_LAMBDA_ARN: 'arn:aws:lambda:ap-south-1:000000000000:function:test-journey-executor',
