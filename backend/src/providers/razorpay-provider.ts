@@ -158,6 +158,24 @@ export class RazorpayProvider {
     }
   }
 
+  // Cancels immediately (cancel_at_cycle_end = false). Used when releasing a
+  // stale pending_activation hold: the abandoned subscription's hosted
+  // checkout link (short_url) stays payable until the subscription is
+  // cancelled, so releasing the local lock without this would leave a second
+  // payable link alive alongside the new subscription -- a double-billing
+  // route, which is exactly what the lock was there to prevent.
+  async cancelSubscription(subscriptionId: string): Promise<{ id: string; status: string }> {
+    try {
+      const cancelled = (await razorpayClient.subscriptions.cancel(subscriptionId, false)) as unknown as {
+        id: string
+        status: string
+      }
+      return { id: cancelled.id, status: cancelled.status }
+    } catch (error) {
+      throw asRazorpayError(`Razorpay cancelSubscription(${subscriptionId}) failed`, error)
+    }
+  }
+
   async fetchPayment(paymentId: string): Promise<RazorpayPayment> {
     try {
       return (await razorpayClient.payments.fetch(paymentId)) as unknown as RazorpayPayment
