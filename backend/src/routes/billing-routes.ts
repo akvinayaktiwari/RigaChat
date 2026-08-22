@@ -55,6 +55,15 @@ billingRoutes.post('/subscribe', requireAuth, async (c) => {
     return c.json<ApiResponse<SubscribeResult>>({ success: true, data: result }, 200)
   } catch (error) {
     if (error instanceof BillingError) {
+      // Logged BEFORE returning. This branch used to return straight away, so
+      // the console.error below was unreachable for every BillingError --
+      // PROVIDER_ERROR included. A checkout could fail against Razorpay on
+      // every attempt and CloudWatch stayed completely silent, which is
+      // exactly how this bug stayed invisible. ALREADY_SUBSCRIBED is routine
+      // (the resume-pending-checkout path) so it logs at warn, not error.
+      const log = error.code === 'ALREADY_SUBSCRIBED' ? console.warn : console.error
+      log(`Billing subscribe failed [${error.code}] for client ${clientId}:`, error.message, error.details ?? '')
+
       return c.json<BillingErrorResponse>(
         { success: false, error: error.message, code: error.code, details: error.details },
         billingErrorStatus(error.code)

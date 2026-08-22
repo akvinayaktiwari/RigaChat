@@ -1,20 +1,85 @@
 import crypto from 'node:crypto'
 import { razorpayClient } from '../lib/razorpay.js'
 
+// The Razorpay SDK does NOT reject with an Error. normalizeError() in
+// razorpay/dist/api.js does, literally:
+//
+//   throw { statusCode: err.response.status, error: err.response.data.error }
+//
+// a plain object literal. So `error instanceof Error` is false for every
+// failure this SDK produces, and any `String(error)` fallback upstream
+// renders "[object Object]" -- discarding the `code` and `description`
+// Razorpay actually sent, which are the only fields that say WHY the call
+// failed. Normalising at this boundary is the provider's job: the SDK's
+// quirks stop here rather than leaking into billing-service.
+export interface RazorpayErrorBody {
+  code?: string
+  description?: string
+  reason?: string
+  step?: string
+  field?: string
+  source?: string
+}
+
+interface RazorpaySdkRejection {
+  statusCode?: number
+  error?: RazorpayErrorBody
+}
+
+export class RazorpayApiError extends Error {
+  readonly statusCode: number | null
+  readonly code: string | null
+  readonly description: string | null
+  readonly field: string | null
+
+  constructor(operation: string, rejection: RazorpaySdkRejection) {
+    const body = rejection.error ?? {}
+    const parts = [body.description ?? 'no description returned by Razorpay']
+    if (body.code) parts.push(`code=${body.code}`)
+    if (body.field) parts.push(`field=${body.field}`)
+    if (body.reason && body.reason !== 'NA') parts.push(`reason=${body.reason}`)
+    if (rejection.statusCode) parts.push(`http=${rejection.statusCode}`)
+
+    super(`${operation}: ${parts.join(' ')}`)
+    this.name = 'RazorpayApiError'
+    this.statusCode = rejection.statusCode ?? null
+    this.code = body.code ?? null
+    this.description = body.description ?? null
+    this.field = body.field ?? null
+  }
+}
+
+function isSdkRejection(value: unknown): value is RazorpaySdkRejection {
+  return typeof value === 'object' && value !== null && ('error' in value || 'statusCode' in value)
+}
+
+// Anything that is already an Error (a network failure, or normalizeError
+// itself throwing a TypeError when err.response is undefined) is rethrown
+// untouched -- only the SDK's plain-object rejections need rebuilding.
+export function asRazorpayError(operation: string, error: unknown): Error {
+  if (error instanceof Error) return error
+  if (isSdkRejection(error)) return new RazorpayApiError(operation, error)
+  return new Error(`${operation}: ${String(error)}`)
+}
+
 export class RazorpayProvider {
   async createSubscription(
     planId: string,
     notes: Record<string, string>
   ): Promise<{ id: string; status: string }> {
-    const subscription = await razorpayClient.subscriptions.create({
-      plan_id: planId,
-      total_count: 1200,
-      quantity: 1,
-      customer_notify: 1,
-      notes,
-    })
+    try {
+      const subscription = await razorpayClient.subscriptions.create({
+        plan_id: planId,
+        total_count: 1200,
+        quantity: 1,
+        customer_notify: 1,
+        notes,
+      })
 
-    return { id: subscription.id, status: subscription.status }
+      return { id: subscription.id, status: subscription.status }
+    } catch (error) {
+      throw asRazorpayError(`Razorpay createSubscription(plan_id=${planId}) failed`, error)
+    }
   }
 
   // Deliberately not using the Razorpay SDK's own Razorpay.validateWebhookSignature
