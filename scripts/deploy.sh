@@ -224,6 +224,19 @@ echo "==> Step 5: Building frontend..."
 cd frontend
 npm ci
 
+# Wipe dist before building. Without this, artifacts from an EARLIER build
+# survive into this one, and the pair uploaded at Step 8 can be mismatched:
+# on 2026-08-22 a local `npm run build` (using .env, VITE_API_URL=localhost)
+# ran before this script, and the deploy shipped that build's index.html
+# alongside this build's assets. Step 8 syncs with --delete, so index.html
+# pointed at a bundle that had just been deleted from the bucket. The site
+# survived only on CloudFront's cache: once it expired, every visitor would
+# have 404'd on the main bundle -- and the distribution's CustomErrorResponses
+# rewrite 404 to index.html with HTTP 200, so it would have rendered a blank
+# page with no error anywhere. Vite only cleans dist when outDir is inside
+# root, which is why this is explicit.
+rm -rf dist
+
 # Create temporary production env file for build
 # Must stay in sync with the "Build frontend" step of .github/workflows/ci.yml.
 # The two VITE_STAFF_* lines were missing before: useStaffAuth.ts reads
@@ -249,6 +262,25 @@ if [ ! -f frontend/dist/index.html ]; then
   echo "Build failed: frontend/dist/index.html not found."
   exit 1
 fi
+
+# Existence is not enough -- index.html has to reference assets that this build
+# actually produced. See the rm -rf dist comment above for the failure this
+# catches. Checked BEFORE any upload so a mismatch fails the deploy instead of
+# reaching S3, where --delete makes it a silent outage rather than an error.
+echo "==> Step 5b: Verifying build artifacts are self-consistent..."
+MISSING_ASSETS=""
+for REF in $(grep -oE '/assets/[A-Za-z0-9_.-]+\.(js|css)' frontend/dist/index.html | sort -u); do
+  if [ ! -f "frontend/dist${REF}" ]; then
+    MISSING_ASSETS="${MISSING_ASSETS}  ${REF}\n"
+  fi
+done
+if [ -n "$MISSING_ASSETS" ]; then
+  echo "Build is inconsistent: index.html references assets that do not exist:"
+  printf "%b" "$MISSING_ASSETS"
+  echo "Nothing has been uploaded. Re-run the deploy (dist is wiped at Step 5)."
+  exit 1
+fi
+echo "    index.html references only assets present in this build."
 
 echo "==> Step 6: Injecting BACKEND_URL into widget.js..."
 if [[ "$OSTYPE" == "darwin"* ]]; then
