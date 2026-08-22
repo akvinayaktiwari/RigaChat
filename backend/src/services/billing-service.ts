@@ -1,4 +1,5 @@
-import { getByAccountId, updatePartial } from '../repositories/subscription-repository.js'
+import { updatePartial } from '../repositories/subscription-repository.js'
+import { ensureTrialSubscription } from './client-service.js'
 import { getPaymentHistory as getPaymentHistoryFromRepo } from '../repositories/payment-history-repository.js'
 import { razorpayProvider } from '../providers/razorpay-provider.js'
 import type { PaymentRecord } from '../types/index.js'
@@ -50,14 +51,18 @@ export interface SubscribeResult {
 }
 
 export async function subscribeToTier(clientId: string, tier: BillableTier): Promise<SubscribeResult> {
-  const subscription = await getByAccountId(clientId)
+  // ensureTrialSubscription rather than a plain read: a signup whose trial-row
+  // write failed used to 500 here on every checkout attempt, permanently, and
+  // only a manual script could clear it. It now repairs itself on this path.
+  //
+  // The guard below still matters. updatePartial() is a DynamoDB UpdateCommand
+  // with no key-existence condition, so a missing row would be silently
+  // upserted as a partial Subscription lacking plan/addons/overrides/trial
+  // fields — a payment module must not create malformed billing state. Null
+  // now means something narrower than before: no client record exists at all,
+  // which repair cannot invent and a caller should not paper over.
+  const subscription = await ensureTrialSubscription(clientId)
 
-  // No subscription row means the trial-creation step at signup either hasn't
-  // run yet or failed silently (see client-service.ts's createTrialSubscription).
-  // updatePartial() below is a DynamoDB UpdateCommand with no key-existence
-  // condition, so without this guard a missing row would be silently upserted
-  // as a partial Subscription record missing plan/addons/overrides/trial
-  // fields — a payment module must not create malformed billing state.
   if (!subscription) {
     throw new BillingError('NO_SUBSCRIPTION_RECORD', `No subscription record found for account ${clientId}.`)
   }

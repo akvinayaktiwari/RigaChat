@@ -1,7 +1,7 @@
 import { createClient, getClientById, updateClient } from '../repositories/client-repository.js'
-import { create as createSubscription } from '../repositories/subscription-repository.js'
+import { create as createSubscription, getByAccountId } from '../repositories/subscription-repository.js'
 import { TRIAL } from '../config/entitlements-config.js'
-import type { ClientRecord } from '../types/index.js'
+import type { ClientRecord, Subscription } from '../types/index.js'
 
 interface UpsertClientInput {
   clientId: string
@@ -36,32 +36,108 @@ export async function upsertClient(input: UpsertClientInput): Promise<ClientReco
   }
 }
 
-// A missing subscriptions row is recoverable later via the backfill script;
-// a failed signup is not — so this swallows its own errors rather than
-// letting them fail the client creation that already succeeded above.
-async function createTrialSubscription(clientId: string): Promise<void> {
-  try {
-    const now = new Date()
-    const trialEndsAt = new Date(now.getTime() + TRIAL.durationDays * 24 * 60 * 60 * 1000)
+// The one place a trial row's shape is defined. ensureTrialSubscription()
+// below repairs signups that lost theirs, and it must reconstruct exactly what
+// signup would have written -- two copies of this object would drift.
+function buildTrialSubscription(
+  clientId: string,
+  startedAt: Date
+): Omit<Subscription, 'createdAt' | 'updatedAt'> {
+  const trialEndsAt = new Date(startedAt.getTime() + TRIAL.durationDays * 24 * 60 * 60 * 1000)
 
-    await createSubscription({
-      accountId: clientId,
-      status: 'trialing',
-      plan: 'free',
-      addons: {},
-      overrides: {},
-      isInternal: false,
-      trialStartedAt: now.toISOString(),
-      trialEndsAt: trialEndsAt.toISOString(),
-      currentPeriodStart: now.toISOString(),
-      currentPeriodEnd: null,
-      paymentProvider: null,
-      providerSubscriptionId: null,
-      providerCustomerId: null,
-    })
-  } catch (error) {
-    console.error(`Failed to create trial subscription for client ${clientId}:`, error)
+  return {
+    accountId: clientId,
+    status: 'trialing',
+    plan: 'free',
+    addons: {},
+    overrides: {},
+    isInternal: false,
+    trialStartedAt: startedAt.toISOString(),
+    trialEndsAt: trialEndsAt.toISOString(),
+    currentPeriodStart: startedAt.toISOString(),
+    currentPeriodEnd: null,
+    paymentProvider: null,
+    providerSubscriptionId: null,
+    providerCustomerId: null,
   }
+}
+
+const TRIAL_WRITE_ATTEMPTS = 3
+const TRIAL_WRITE_BACKOFF_MS = 100
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+// Still swallows, for the original reason: a failed subscription write must not
+// fail a signup whose client row already succeeded. What changed is that it no
+// longer fails QUIETLY.
+//
+// On 2026-08-22 four accounts were found with a clients row and no
+// subscriptions row, from signups on 8-9 July. The consequences ran for six
+// weeks unnoticed and in opposite directions: /api/billing/subscribe threw
+// NO_SUBSCRIPTION_RECORD and 500'd for those users on every checkout attempt
+// forever, while entitlement-service.ts's computeEntitlements() treats a null
+// subscription as buildFullTrialEntitlements() -- a trial with no trialEndsAt
+// to expire, so they also had unlimited access. Nothing surfaced either.
+//
+// So: retry first (a transient DynamoDB throttle or timeout is the likely
+// cause, and a second attempt costs ~100ms), and if it still fails, log under a
+// marker worth alerting on rather than a line that reads like routine noise.
+async function createTrialSubscription(clientId: string): Promise<void> {
+  const row = buildTrialSubscription(clientId, new Date())
+
+  for (let attempt = 1; attempt <= TRIAL_WRITE_ATTEMPTS; attempt++) {
+    try {
+      await createSubscription(row)
+      if (attempt > 1) {
+        console.warn(`[signup-integrity] trial subscription for ${clientId} succeeded on attempt ${attempt}`)
+      }
+      return
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+
+      if (attempt === TRIAL_WRITE_ATTEMPTS) {
+        console.error(
+          `[signup-integrity] ALERT: client ${clientId} was created with NO subscriptions row ` +
+            `after ${TRIAL_WRITE_ATTEMPTS} attempts. They will 500 on checkout and hold ` +
+            `unexpiring trial entitlements until repaired. Run ` +
+            `backend/scripts/repair-missing-trial-subscriptions.ts. Last error: ${message}`
+        )
+        return
+      }
+
+      console.warn(
+        `[signup-integrity] trial subscription write for ${clientId} failed on attempt ${attempt}, retrying: ${message}`
+      )
+      await delay(TRIAL_WRITE_BACKOFF_MS * attempt)
+    }
+  }
+}
+
+// Returns the account's subscription, creating the trial row signup should have
+// written if it is missing. Self-healing on the read path is what stops a lost
+// write from being permanent: retries above reduce how often it happens, this
+// makes it recoverable when it does.
+//
+// The trial window is backdated to the client's own createdAt, so repairing a
+// six-week-old account grants exactly the 14 days it was originally due --
+// already expired -- rather than a fresh trial as a reward for the bug.
+//
+// Returns null only when there is no client record at all, which is a genuinely
+// different situation (an unknown account) and stays the caller's decision.
+export async function ensureTrialSubscription(clientId: string): Promise<Subscription | null> {
+  const existing = await getByAccountId(clientId)
+  if (existing) return existing
+
+  const client = await getClientById(clientId)
+  if (!client) return null
+
+  console.warn(
+    `[signup-integrity] repairing missing subscriptions row for client ${clientId} on read`
+  )
+
+  return await createSubscription(buildTrialSubscription(clientId, new Date(client.createdAt)))
 }
 
 export async function getClient(clientId: string): Promise<ClientRecord> {
