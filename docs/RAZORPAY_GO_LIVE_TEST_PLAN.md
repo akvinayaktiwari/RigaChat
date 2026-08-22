@@ -1,314 +1,284 @@
-# Razorpay Go-Live Test Plan
+# Razorpay Go-Live Checklist
 
-> Generated 2026-07-26. Scope: flipping Razorpay from test-mode to live-mode
-> keys on `main` this week. Does NOT cover `feature/meta-ads-integration`
-> (Meta Lead Ads, WhatsApp agent/journeys pilot) — that work is unmerged and
-> unrelated to billing.
+> Rewritten 2026-08-22, replacing the 2026-07-26 plan. That version's P0 list
+> is now either fixed or superseded; what remains of it is folded in below.
 >
-> Everything below was verified by reading the actual code on `main`
-> (`backend/src/services/billing-service.ts`, `webhook-service.ts`,
-> `razorpay-provider.ts`, `lib/razorpay.ts`, `.env.example`,
-> `.github/workflows/deploy.yml`), not assumed.
+> Everything here was verified against the running system on 2026-08-22 — live
+> API calls, CloudWatch, DynamoDB and the deployed bundles — not inferred from
+> the code.
 
-## What's already built (main branch)
+**Current state: test mode works end to end. Live mode is entirely unverified.**
 
-- **Subscription checkout**: `POST /api/billing/subscribe` (auth required) →
-  `subscribeToTier()` creates a Razorpay Subscription (`total_count: 1200`,
-  monthly), sets local `Subscription.status = 'pending_activation'`, returns
-  a `razorpayKeyId` to the frontend.
-- **Frontend checkout**: `useTierCheckout.ts` opens Razorpay's hosted
-  checkout modal (`razorpay-checkout.ts`), then polls
-  `GET /api/billing/subscription` every 3s (10 attempts / 30s) waiting for
-  `status: 'active'`.
-- **Resume-pending-checkout**: a second `/subscribe` call while
-  `pending_activation` is still open returns `409 ALREADY_SUBSCRIBED` with
-  enough data (`providerSubscriptionId`, `razorpayKeyId`) for the frontend
-  to reopen the *same* Razorpay subscription rather than creating a
-  duplicate.
-- **Webhook**: `POST /api/webhooks/razorpay` — HMAC-SHA256 signature check
-  (`timingSafeEqual`, not `===`), idempotency via `x-razorpay-event-id` +
-  `webhook_events` table, `clientId` cross-checked against
-  `subscription.notes.clientId` before any write, payment logged to
-  `payment_history` on `subscription.charged`.
-- **Three billing tiers**: starter (₹1,999), growth (₹5,499), agency
-  (₹14,999) — `frontend/src/lib/pricingTiers.ts`. India-only real payment
-  flow (`region: 'intl'` routes to a mailto link, never touches Razorpay).
+---
 
-## P0 — must fix or verify before flipping to live keys
+## 1. Where things actually stand
 
-These aren't nice-to-haves. Each one either causes a silent money-handling
-bug or an outage risk specific to *this week's* cutover.
+### Verified working in test mode (2026-08-22, 14:51 UTC)
 
-### 1. `payment.failed` is an unmapped webhook event — failed renewals are invisible
+A real test-mode payment ran the whole path with no manual step:
 
-`webhook-service.ts`'s `RAZORPAY_STATUS_MAP` only has entries for
-`subscription.activated/charged/pending/halted/paused/resumed/cancelled/authenticated`.
-A bare `payment.failed` event (a recurring charge failing on an
-already-active subscription, before Razorpay's retry schedule eventually
-fires `subscription.pending`/`halted`) falls into the "unmapped event type,
-ignored" branch — `markProcessed()` runs, nothing else does.
-
-**Concrete failure scenario:** a client's card is charged and declines on
-renewal. Razorpay sends `payment.failed`. Your system does nothing.
-`AdminAccountsPage.tsx` still shows `active` (it just renders
-`account.status` — [AdminAccountsPage.tsx:158](../frontend/src/pages/admin/AdminAccountsPage.tsx#L158)).
-The client keeps full access with a card that isn't actually charging them,
-until/unless Razorpay's own retry schedule eventually sends
-`subscription.pending` or `halted` days later — and you have zero visibility
-into that gap.
-
-**Fix before go-live:** either map `payment.failed` explicitly (log it,
-surface it in the admin panel even if you don't change `status` yet), or at
-minimum add logging so a failed charge isn't completely silent. This is a
-few lines in `webhook-service.ts`, not a redesign.
-
-### 2. No invoice/receipt feature exists in the codebase
-
-Zero references to "invoice" anywhere in `backend/` or `frontend/`. If the
-expectation is that clients get a downloadable invoice or an email receipt,
-that doesn't exist yet — it's not a testing gap, it's missing scope.
-**Action needed this week:** confirm what you actually promised
-clients/pricing pages, and check your Razorpay dashboard settings — Razorpay
-can auto-generate and email invoices for subscriptions depending on account
-configuration, which may cover this without any code change. Verify that
-setting specifically; don't assume either way.
-
-### 3. Razorpay env vars are missing from `.env.example` and from `deploy.yml`'s automated merge
-
-`RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`,
-`RAZORPAY_PLAN_ID_STARTER/GROWTH/AGENCY` appear in zero places outside the
-source files that read them — not in `.env.example`, not in
-`.github/workflows/deploy.yml`'s env-merge step (confirmed: `grep -i
-razorpay .github/workflows/deploy.yml` returns nothing). That means these
-vars are set **manually in the AWS Lambda console**, outside the deploy
-pipeline, and nothing in CI/CD verifies they're correct or present.
-
-**Why this is P0, not a documentation nit:** `lib/razorpay.ts` throws at
-**module load time** — unconditionally, before any request is handled:
-
-```ts
-if (!keyId || !keySecret) {
-  throw new Error('Missing required environment variables RAZORPAY_KEY_ID and/or RAZORPAY_KEY_SECRET...')
-}
+```
+14:51:19  payment.authorized      delivered, signature verified
+14:51:22  payment.captured        delivered, signature verified
+14:51:32  subscription.charged    -> payment_history row written
+14:51:34  subscription.activated  -> status flipped to active
 ```
 
-Per `docs/DEPLOYMENT.md`, all three Lambdas (main, streaming, crawler) run
-the identical bundle and `index.ts` unconditionally imports the full route
-tree — the same failure mode already documented there for Zoho's env vars.
-**If you update `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` on the main Lambda
-but forget the streaming or crawler Lambda, that Lambda crashes at cold
-start entirely** — not just billing, the whole chatbot/leads/crawler
-pipeline on that Lambda goes down. This is a real outage risk for a
-same-week cutover done manually under time pressure.
+Account went `trialing/free` -> `active/starter` in **15 seconds**, inside the
+frontend's 30s polling window. `payment_history` has its first real rows.
 
-**Action needed:** before flipping keys, write down (a) the exact list of 3
-Lambda function names, (b) confirm all 4 Razorpay vars are set identically
-on all 3, (c) after flipping, hit a lightweight endpoint on each Lambda to
-confirm cold start succeeds (the existing deploy workflow already does a
-health check against `/api/bots/health-check/config` post-deploy — do the
-same manually post-cutover since this isn't going through `deploy.yml`).
+### Nothing in live mode has ever been exercised
 
-### 4. Webhook idempotency is read-then-write, not atomic (already tracked, now higher stakes)
+Not the keys, not the plan IDs, not the webhook, not the secret. Assume each is
+wrong until checked — three of them almost certainly are (see §2).
 
-`webhook-event-repository.ts`'s `hasProcessed()` (Get) /
-`markProcessed()` (Put) is not a conditional/atomic claim. Two near-
-simultaneous deliveries of the same event (Razorpay does retry on non-2xx,
-and webhook delivery can double-fire) could both pass `hasProcessed() ===
-false` before either writes. This is already flagged in `TODOS.md` as a
-cross-cutting issue affecting Razorpay. It was low-stakes while in test
-mode; it's real-money risk once live. Doesn't need to block this week's
-cutover if traffic is low, but should be the first fast-follow after go-live,
-not indefinitely deferred.
+---
 
-### 5. No failure/reconciliation runbook exists (you confirmed this — "no plan yet")
+## 2. Cutover checklist
 
-If a client is charged by Razorpay but the webhook fails to process (crash,
-timeout, bug), there's currently no way to notice except manually checking
-the Razorpay dashboard against your DynamoDB `subscriptions` table. Minimum
-viable runbook for this week:
+Do these in order. Steps 1–4 are all-or-nothing: a partial cutover leaves
+checkout broken in a way that looks like a code bug.
 
-1. **Where to look:** Razorpay dashboard → Payments (filter: last 24h,
-   status: captured) is the source of truth for what was actually charged.
-   Cross-reference against `payment_history` table entries for the same
-   window.
-2. **What "broken" looks like:** a payment in Razorpay's dashboard with no
-   matching `payment_history` row, or a `subscriptions` row stuck in
-   `pending_activation` more than a few minutes after a successful
-   Razorpay-side charge.
-3. **Manual fix path:** there's no admin action today to manually flip a
-   subscription to `active` — check `AdminAccountsPage.tsx` / the admin
-   routes for whatever override mechanism exists (`overrides` field on
-   `Subscription` suggests one does), and confirm it can be used as a
-   manual unstick lever before you need it under pressure.
+### Step 1 — Create live-mode Plans
 
-## Test plan — critical paths
+Live and test mode hold **separate Plan objects**. The current
+`RAZORPAY_PLAN_ID_*` values (`plan_TFl5GSmRUtfMdr`, `plan_TFl6Ni0ElGMJ53`,
+`plan_TFl7V2GGsEeYPV`) are **test-mode plans and do not exist in live mode**.
 
-Run all of these against **Razorpay test mode first**, then repeat the
-happy path once in live mode with a real low-value transaction before
-announcing the switch.
+Create Starter / Growth / Agency in live mode at the same prices
+(₹1,999 / ₹5,499 / ₹14,999, monthly) and record the new `plan_...` ids.
+
+Verify each resolves before going further:
+
+```bash
+curl -u "$LIVE_KEY_ID:$LIVE_KEY_SECRET" https://api.razorpay.com/v1/plans/<plan_id>
+```
+
+### Step 2 — Point the live webhook at the Lambda
+
+Live mode has its **own webhook with its own secret**. Check where it currently
+points: the test-mode one was aimed at `beepboop.drsyeta.in`, a retired domain,
+and had been silently swallowing every event for roughly a month (see §3).
+
+- **URL:** `https://vyostra.com/api/webhooks/razorpay`
+  (`/api/*` is routed to the Lambda — verified 2026-08-22. Prefer this over the
+  raw Function URL, which changes if the Lambda is replaced.)
+- **Events — all 8 mapped by `RAZORPAY_STATUS_MAP` in `webhook-service.ts`:**
+  `subscription.activated`, `subscription.charged`, `subscription.pending`,
+  `subscription.halted`, `subscription.paused`, `subscription.resumed`,
+  `subscription.cancelled`, `subscription.authenticated`
+- **Plus `payment.failed`**, handled explicitly for logging.
+- **Do NOT add the other `payment.*` events.** They carry no subscription
+  entity, so each one logs at ERROR and writes a dedup row for nothing.
+- **Secret is mandatory.** With no secret Razorpay sends no
+  `X-Razorpay-Signature` and every delivery is rejected.
+
+Razorpay's webhook create/edit/delete API is **Partner-only** — a standard
+account gets `404 no Route matched` on `PATCH` and `DELETE`. All of this is
+dashboard work. `GET /v1/webhooks` does work for verification.
+
+### Step 3 — Set the live env vars on ALL THREE Lambdas
+
+`rigachat-api`, `rigachat-api-streaming`, `rigachat-crawler`.
+
+| Var | Value |
+|---|---|
+| `RAZORPAY_KEY_ID` | `rzp_live_...` |
+| `RAZORPAY_KEY_SECRET` | live secret |
+| `RAZORPAY_WEBHOOK_SECRET` | the **live** webhook's secret from Step 2 |
+| `RAZORPAY_PLAN_ID_STARTER/GROWTH/AGENCY` | the **live** plan ids from Step 1 |
+
+**All three Lambdas, without exception.** `lib/razorpay.ts` reads the key at
+**module load** and throws if absent, and all three run the same bundle with
+`index.ts` importing the full route tree. Miss one and that Lambda crashes at
+cold start entirely — the whole chatbot/leads/crawler pipeline on it, not just
+billing.
+
+Use the script. `aws lambda update-function-configuration --environment`
+**replaces the entire variable map**, so a hand-rolled update silently deletes
+`OPENAI_API_KEY`, the Cognito ids, everything:
+
+```bash
+./scripts/set-razorpay-webhook-secret.sh <secret>   # read-modify-write, verifies var count
+```
+
+It only handles the webhook secret; apply the same read-modify-write pattern
+for the other five, or edit them in the AWS console.
+
+The env budget is tight (~2350 / 4096 bytes). These are replacements, not
+additions, so it does not move — but do not add new vars during cutover.
+
+### Step 4 — Verify before taking money
+
+```bash
+# every Lambda cold-starts (a missing var crashes on import, not on request)
+for f in rigachat-api rigachat-api-streaming rigachat-crawler; do
+  aws lambda invoke --function-name $f --payload '{}' /tmp/out-$f.json >/dev/null && echo "$f ok"
+done
+
+# routing + signature rejection still correct
+curl -s -X POST https://vyostra.com/api/webhooks/razorpay \
+  -H 'X-Razorpay-Signature: bogus' -d '{}'      # expect {"message":"Invalid signature"}
+```
+
+Then **one real low-value payment** — Starter, your own card — and confirm all
+three landed:
+
+1. `subscriptions` row -> `active`, `plan` matching the tier
+2. a new `payment_history` row with the right `paymentId` / `amount`
+3. `subscription.charged` + `subscription.activated` in CloudWatch
+
+Refund it in the Razorpay dashboard afterwards.
+
+**Do not skip the real payment.** Everything upstream of it can look correct
+while the webhook still fails — that is precisely what happened for a month in
+test mode.
+
+---
+
+## 3. Traps that cost real time on 2026-08-22
+
+Each of these was found the expensive way.
+
+### CloudFront rewrites 404 to 200, so failures look like successes
+
+The distribution's `CustomErrorResponses` map 403/404 onto `/index.html` with
+**HTTP 200**. Consequences seen:
+
+- The Razorpay webhook pointed at a retired domain served by the frontend
+  distribution. Razorpay POSTed, got **200 + HTML**, marked every event
+  delivered, and retried nothing. `payment_history` was empty for a month.
+- A deploy shipped an `index.html` referencing a bundle that `--delete` had just
+  removed. It would have 404'd -> 200 -> blank page, no error anywhere.
+
+Already documented for `fetch` at `frontend/src/services/api.ts:76`. The real
+fix is scoping `CustomErrorResponses` away from `/api/*`; until then, **assume a
+200 from any endpoint proves nothing unless the body is what you expect.**
+
+### Verifying a shared secret against itself proves nothing
+
+Signing a probe with the secret read *from the Lambda* and confirming the Lambda
+accepts it is circular — it only shows the Lambda agrees with itself. The
+dashboard secret can still differ, and did. **Only real provider traffic, or a
+payload signed with the secret read from the dashboard, tests the match.**
+Symptom of a mismatch: repeated `Razorpay webhook rejected: invalid or missing
+signature`.
+
+### Most test cards are not eligible for recurring payments
+
+`4111 1111 1111 1111` and `4100 2800 0000 1007` are refused with *"This card is
+not eligible for recurring payments"*. Use **`5104 0600 0000 0008`**.
+
+Check any card against the same endpoint Checkout uses — `recurring` in the
+response predicts the modal exactly:
+
+```
+https://api.razorpay.com/v1/payment/flows?key_id=<key>&iin=<first 6 digits>
+```
+
+Account-level eligibility: `GET /v1/preferences?key_id=...` -> `methods.recurring`.
+
+### Two CloudFront distributions serve the dashboard bucket
+
+`E2ZWB77M7V8J9X` (vyostra.com, live) and `E24Z9D4G4FY8PH`
+(beepboop.drsyeta.in, retired). `scripts/deploy.sh` resolves by alias — do not
+hardcode an id, or you will invalidate the wrong one and keep serving stale
+HTML while the script prints success.
+
+### `total_count: 1200` is correct
+
+100 years of monthly billing, Razorpay's documented maximum. Verified against
+the API. It is not the cause of a failing `createSubscription`. Note customers
+see an end date of 2126 on the checkout modal.
+
+---
+
+## 4. Repair tooling
+
+All dry-run by default; pass `--apply` to write.
+
+| Script | Use when |
+|---|---|
+| `backend/scripts/reconcile-razorpay-subscription.ts <clientId>` | Payment succeeded but the webhook never landed — writes status, plan, `currentPeriodEnd` and the `payment_history` row from Razorpay's own data. Skips payments already recorded, so it cannot double-record. |
+| `backend/scripts/repair-missing-trial-subscriptions.ts` | A client has no `subscriptions` row (checkout 500s with `NO_SUBSCRIPTION_RECORD`). **Do not use `backfill-subscriptions.ts` for this** — it writes `status: active` with the client's paid plan, granting a free upgrade and turning the 500 into a 409. |
+| `scripts/set-razorpay-webhook-secret.sh <secret>` | Rotating the webhook secret across all three Lambdas safely. |
+
+### Detecting a stranded payment
+
+Razorpay dashboard -> Payments (last 24h, captured) is the source of truth.
+A captured payment with no matching `payment_history` row means the webhook
+failed. `subscriptions` rows sitting in `pending_activation` more than a few
+minutes after a successful charge mean the same.
+
+Self-healing now covers some of this: a `pending_activation` hold older than 30
+minutes is verified against Razorpay on the next checkout attempt, and if it was
+in fact paid the row is corrected to `active`. It does **not** write the missing
+`payment_history` row — use the reconcile script for that.
+
+---
+
+## 5. Known-open, not blocking cutover
+
+**Razorpay webhook idempotency is still read-then-write.**
+`processRazorpayWebhook` uses `hasProcessed()` + `markProcessed()`, so two
+concurrent deliveries of the same event can both pass the read before either
+writes — a duplicate `payment_history` row. `claimWebhookEvent()` in
+`webhook-event-repository.ts` is the atomic, conditional version and already
+exists; the Razorpay path simply does not use it. **Small fix, real money once
+live — best fast-follow after cutover.**
+
+**`computeEntitlements()` fails open on a missing subscription row.**
+`entitlement-service.ts` returns `buildFullTrialEntitlements()` when the row is
+null — a trial with no `trialEndsAt`, so it never expires. Deliberate
+fail-open, but it grants access rather than denying it. Rows now self-heal
+(`ensureTrialSubscription`), so this should rarely trigger; worth a conscious
+decision rather than leaving it as an accident.
+
+**No automated alerting on billing failures.** Watch CloudWatch manually for the
+first 24–48h after cutover. Markers worth alerting on:
+`[signup-integrity]`, `Razorpay webhook rejected`, `Billing subscribe failed`.
+
+**Test-mode card tokens expire after 3 days**, so a recurring auto-debit can
+only be exercised within 3 days of the token being created.
+
+---
+
+## 6. Test matrix
+
+Run in test mode; repeat #1 once in live mode before announcing.
 
 | # | Path | Verify |
 |---|---|---|
-| 1 | New subscription, successful payment | `/subscribe` → Razorpay modal → test card success → webhook `subscription.activated`/`charged` fires → `subscriptions` row flips to `active` → frontend poll picks it up within 30s → entitlements unlock (`invalidateEntitlementsCache` actually clears stale cache) |
-| 2 | New subscription, declined card | Checkout modal shows Razorpay's own decline message → confirm what event Razorpay sends (`payment.failed`? nothing?) → confirm current code behavior matches finding #1 above |
-| 3 | User closes checkout modal mid-payment | `ondismiss` fires → `pendingCheckout` state set → clicking the same tier again resumes the *same* subscription (not a duplicate) → confirm in Razorpay dashboard only one subscription object was created |
-| 4 | Page refresh after modal dismissed, no local `pendingCheckout` state | Second `/subscribe` call → `409 ALREADY_SUBSCRIBED` with `providerSubscriptionId` + `razorpayKeyId` in `details` → frontend recovers and resumes correctly (`tier: null` path in `useTierCheckout.ts`) |
-| 5 | Duplicate webhook delivery (replay same event) | Second delivery hits `hasProcessed()` → short-circuits to `200 Already processed` → no duplicate `payment_history` row, no duplicate cache invalidation |
-| 6 | Recurring renewal charge succeeds | `subscription.charged` → `currentPeriodEnd` bumped, `payment_history` row added with correct `paymentId`/`amount`/`currency` |
-| 7 | Recurring renewal charge fails | See finding #1 — confirm actual Razorpay behavior and current code gap |
-| 8 | Subscription cancelled (via Razorpay dashboard or API) | `subscription.cancelled` → local status → `cancelled`, entitlements correctly downgraded, no crash if client re-subscribes after |
-| 9 | Webhook with invalid/missing signature | `400 Invalid signature`, event NOT marked processed, no state mutated — confirm this can't be used to spoof a fake "activated" event |
-| 10 | Webhook payload where `notes.clientId` doesn't match any local subscription's `providerSubscriptionId` | Cross-check guard in `webhook-service.ts` correctly no-ops instead of corrupting a different account's row |
-| 11 | Internal/staff account attempts to subscribe | `INTERNAL_ACCOUNT_NO_BILLING` 409, no Razorpay subscription created |
-| 12 | Region detection routes India correctly | `detectRegion()` timezone heuristic — verify a real India-based signup actually reaches Razorpay checkout, not the `intl` mailto path |
+| 1 | New subscription, payment succeeds | webhook fires -> row `active` -> frontend poll picks it up within 30s -> entitlements unlock |
+| 2 | Declined card | Razorpay shows its own message; `payment.failed` logged with payment id and error code |
+| 3 | Modal dismissed mid-payment | `ondismiss` -> clicking the same tier resumes the *same* subscription; only one subscription object in Razorpay |
+| 4 | Page refresh after dismissing | `409 ALREADY_SUBSCRIBED` carries `providerSubscriptionId` + `razorpayKeyId`; frontend resumes |
+| 5 | **Abandoned checkout, retried after 30 min** | hold released, old subscription cancelled at Razorpay, **new tier honoured** |
+| 6 | Duplicate webhook delivery | second delivery short-circuits; no duplicate `payment_history` row |
+| 7 | Renewal charge succeeds | `currentPeriodEnd` bumped, `payment_history` row added |
+| 8 | Subscription cancelled in dashboard | local status -> `cancelled`, entitlements downgraded, re-subscribe still works |
+| 9 | Invalid signature | `400`, event NOT marked processed, nothing mutated |
+| 10 | `notes.clientId` mismatching `providerSubscriptionId` | cross-check no-ops instead of corrupting another account |
+| 11 | Internal account subscribes | `409 INTERNAL_ACCOUNT_NO_BILLING`, no Razorpay subscription created |
+| 12 | India region detection | `detectRegion()` (`frontend/src/lib/pricingTiers.ts:61`) routes to checkout, not the `intl` mailto |
 
-## Live-mode cutover sequence (this week)
+Automated coverage exists for much of this: `billing-service.test.ts` (15),
+`client-service.test.ts` (8), `razorpay-provider.test.ts` (10),
+`webhook-service.test.ts` (10). The 2026-07-26 note that no backend test
+framework existed is obsolete — the suite is 548 tests.
 
-1. Confirm live-mode Razorpay Plan IDs exist for all 3 tiers (live and test
-   mode have separate Plan objects in Razorpay — the `RAZORPAY_PLAN_ID_*`
-   env vars must point to live-mode plan IDs, not the test-mode ones).
-2. Set all 4 `RAZORPAY_*` vars on **all 3 Lambdas** (main, streaming,
-   crawler) — see finding #3. Double-check, don't assume symmetry.
-3. Register the live-mode webhook URL + secret in Razorpay's dashboard
-   (live mode has its own separate webhook config from test mode) — set
-   `RAZORPAY_WEBHOOK_SECRET` to the live-mode secret, not the test one.
-4. Post-update, manually hit each Lambda to confirm cold start succeeds
-   (no crash from missing/malformed env vars).
-5. Run test #1 (happy path) with a real low-value live transaction —
-   ideally your own card, smallest tier, then immediately cancel/refund via
-   Razorpay dashboard.
-6. Watch Razorpay dashboard + CloudWatch logs closely for the first 24-48h
-   (per finding #5 — no automated alerting exists yet, so this is manual).
+---
 
-## Explicitly out of scope for this week
+## 7. Accounts that cannot check out
 
-- Automated test coverage for billing (no test framework exists in
-  `backend/` at all — tracked separately in `TODOS.md` as its own
-  initiative, not a same-week blocker).
-- The webhook idempotency atomicity fix (#4) — real but lower-probability;
-  fast-follow, not a go-live blocker.
-- Anything on `feature/meta-ads-integration` (Meta Lead Ads, WhatsApp
-  agent/journeys) — unrelated, unmerged.
+Both refusals are correct behaviour, and both cost debugging time by looking
+like bugs:
 
-## Update 2026-07-26: fixes shipped + invoicing resolved + E2E verified
+- **`isInternal: true`** -> `409 INTERNAL_ACCOUNT_NO_BILLING`, checked *before*
+  status. Currently `akvinayaktiwari@gmail.com` (one of two accounts on that
+  address) and `meta-reviewer@vyostra.com`.
+- **`status: active`** -> `409 ALREADY_SUBSCRIBED`.
 
-Branch `fix/razorpay-go-live-p0` (off `main`, not yet pushed/merged) closes
-findings #1 and #3, and adds the GST invoicing gap from finding #2.
-
-**Findings #1 and #3 fixed:**
-- `webhook-service.ts` now logs `payment.failed` explicitly (payment id,
-  Razorpay error code/description, resolved clientId if any) instead of
-  silently dropping it. Deliberately does not touch subscription `status` —
-  that stays driven by Razorpay's own lifecycle events, to avoid a race.
-- `.env.example` now documents all 4 `RAZORPAY_*` vars plus the previously
-  undocumented `DYNAMODB_TABLE_USAGE`, `DYNAMODB_TABLE_WEBHOOK_EVENTS`,
-  `DYNAMODB_TABLE_PAYMENT_HISTORY`.
-
-**Finding #2 (invoicing) resolved as: Razorpay issues the invoice, RigaChat
-links to it.** Decision, not a guess — confirmed against Razorpay's actual
-API docs before building: subscription charges carry a `payment.invoice_id`
-in the webhook payload when the account's Razorpay settings have GST
-details configured; `GET /v1/invoices/{id}` (`razorpayClient.invoices.fetch`)
-returns a `short_url` — Razorpay's hosted, customer-facing invoice/receipt
-page, tax-compliant per Razorpay's own account-level GST configuration.
-RigaChat does not generate or store tax data itself.
-- **Your action, not code**: add your GSTIN in the Razorpay Dashboard
-  account settings. Without it, Razorpay won't generate invoices and
-  `invoiceUrl` will just stay empty for every payment — the feature degrades
-  gracefully (list still shows, no crash), it just won't have invoice links
-  until that's configured.
-- Shipped: `webhook-service.ts` fetches and stores `invoiceUrl` per payment
-  (best-effort — a failed invoice lookup never blocks recording the
-  payment itself). New `GET /api/billing/payments` route, `Billing` page in
-  the client dashboard (nav entry added) showing date/amount/status/payment
-  ID/invoice link per charge.
-
-**E2E verified**, not just code-reviewed — ran a real local backend
-(`npm run dev`, real test-mode Razorpay keys, real dev DynamoDB tables) and
-POSTed correctly HMAC-signed webhook payloads covering all of these, all
-passing:
-invalid signature (400) · missing event-id header (400) ·
-`subscription.activated` (status → active) ·
-`subscription.charged` (payment_history row written, `currentPeriodEnd`
-bumped, `invoiceUrl` correctly null when no `invoice_id` present) ·
-duplicate event delivery (idempotent, no double-write) ·
-`payment.failed` (logged, subscription status untouched) ·
-subscription-id mismatch (ignored, no cross-account write) ·
-unknown clientId (ignored, no crash) · unmapped event type (ignored) ·
-`subscription.cancelled` (status → cancelled). Also verified
-`getPaymentHistory` returns rows newest-first with `invoiceUrl` intact.
-
-**Not yet E2E tested** (needs a real Cognito login, not just a script):
-the actual browser checkout flow (`/api/billing/subscribe` → Razorpay
-hosted checkout modal → activation), and the new Billing page rendering in
-a real browser. Recommend running `/qa` against a real signup + checkout
-before flipping to live keys.
-
-**New finding, not yet fixed — hygiene, not urgent**: local `backend/.env`
-has two different `RAZORPAY_WEBHOOK_SECRET=` lines (duplicate key, different
-values). Node's `--env-file` silently uses the *last* one — confirmed by
-testing, not assumed — so the server works, but this is confusing and worth
-cleaning up locally: delete the stale line and confirm the remaining value
-matches what's registered in Razorpay's dashboard for this webhook. Local
-file only — doesn't affect the deployed Lambdas, which get their env vars
-from the AWS Console directly, not from this file.
-
-Also corrected: the webhook route is `POST /api/webhooks/razorpay`, not
-`POST /webhooks/razorpay` as earlier in this doc — mounted under
-`/api/webhooks` in `routes/index.ts`.
-
-## Update 2026-07-26 (continued): live browser QA found a real billing bug
-
-Ran `/qa` against this branch: provisioned a real throwaway Cognito account
-(`admin-create-user` + `admin-set-user-password`, bypassing email
-verification), logged into the actual dashboard, and drove the real
-Upgrade-plan → Razorpay checkout flow in a browser. Confirmed real
-Razorpay API calls, correct price/terms in the checkout modal, correct
-"Test Mode" banner. The cross-origin Razorpay iframe couldn't be driven by
-the browser tool (a tooling limitation, not a RigaChat issue), so
-completing the card payment was simulated with a correctly-signed webhook
-for that exact real subscription — standing in for what Razorpay's servers
-send after a real card charge succeeds.
-
-**Found: `Subscription.plan` is never updated anywhere in the subscribe →
-activate flow.** After activation, `status` correctly flipped to `active`,
-but `plan` stayed `free` — confirmed directly in DynamoDB, not just a UI
-glitch. Since `entitlement-service.ts` computes limits via `PLANS[plan]`,
-**a customer who pays for Starter/Growth/Agency would keep free-tier limits
-(50 conversations/25 leads) indefinitely** despite being charged
-correctly and `status` showing active. This is a pre-existing bug on
-`main`, unrelated to this branch's other work — it surfaced now because
-this was the first time anyone walked the full subscribe → activate loop
-end-to-end instead of reviewing the webhook handler in isolation.
-
-**Fixed**: `billing-service.ts`'s `subscribeToTier()` already sends
-`{ clientId, tier }` as the Razorpay subscription's `notes` at creation
-time, and Razorpay echoes `notes` back on every webhook for that
-subscription — `webhook-service.ts` just never read `notes.tier` back out.
-Now sets `Subscription.plan` from it whenever present and a recognized
-billable tier.
-
-**Re-verified after the fix**, in the same real browser session: re-sent a
-signed `subscription.charged` webhook for the same real subscription,
-confirmed `plan` flipped `free` → `starter` in DynamoDB, then confirmed in
-the UI — Settings now shows "Starter / Active" with the correct 500
-conversations/50 leads limits (was 50/25 before the fix), and the Billing
-page correctly lists both payments (₹1,999.00, Paid, invoice column
-gracefully shows "—" since no GSTIN is configured yet).
-
-**No other bugs found.** Nav layout (desktop + mobile) verified clean with
-the new Billing entry — an initial apparent mobile regression turned out to
-be a testing artifact (resized viewport without navigating) rather than a
-real bug; a fresh navigation at 375px collapses to the mobile hamburger
-layout correctly, matching the rest of the app.
-
-Test account, DynamoDB rows, and the Razorpay test-mode subscription were
-all cleaned up after testing (Cognito user deleted, `subscriptions`/
-`clients`/`payment_history` rows deleted, Razorpay subscription cancelled
-via API). `webhook_events` rows from testing were left in place (90-day
-TTL, same as production behavior, no cleanup needed).
-
-**Given this finding, the recommendation changes**: this branch
-(`fix/razorpay-go-live-p0`) should land before flipping to live keys, not
-just be a nice-to-have. Going live without it means every paying customer
-this week would be silently under-entitled relative to what they paid for.
+**One email can map to two Cognito accounts** with opposite outcomes — signing
+in with the same address twice does not guarantee the same account. When
+checkout 409s, read `code` in the response body before assuming anything.
