@@ -275,10 +275,12 @@ Both refusals are correct behaviour, and both cost debugging time by looking
 like bugs:
 
 - **`isInternal: true`** -> `409 INTERNAL_ACCOUNT_NO_BILLING`, checked *before*
-  status. Currently `akvinayaktiwari@gmail.com` (one of two accounts on that
-  address) and `meta-reviewer@vyostra.com`.
+  status. As of 2026-08-22 this is the founder's own account and the Meta
+  app-review account. Query for them rather than hardcoding addresses here:
+  `aws dynamodb scan --table-name subscriptions --filter-expression isInternal=:t`
 - **`status: active`** -> `409 ALREADY_SUBSCRIBED`.
 
-**One email can map to two Cognito accounts** with opposite outcomes — signing
-in with the same address twice does not guarantee the same account. When
+**One email can map to two Cognito accounts** with opposite outcomes — one
+internal and one not, in at least one real case — so signing in with the same
+address twice does not guarantee the same account. When
 checkout 409s, read `code` in the response body before assuming anything.
