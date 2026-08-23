@@ -25,8 +25,14 @@ function daysRemaining(trialEndsAt: string): number {
   return Math.max(0, Math.ceil(ms / (24 * 60 * 60 * 1000)))
 }
 
+// Units are written plural ('agents', 'conversations/month'). A limit of exactly
+// 1 — Starter's agent cap, and the whole point of the row — otherwise renders as
+// "1 agents". Only the head noun is singularized, so 'conversations/month'
+// becomes 'conversation/month' and the suffix survives.
 function formatLimit(limit: number | null, unit: string): string {
-  return limit === null ? `Unlimited ${unit}` : `${limit} ${unit}`
+  if (limit === null) return `Unlimited ${unit}`
+  if (limit !== 1) return `${limit} ${unit}`
+  return `1 ${unit.replace(/^([a-z]+)s\b/, '$1')}`
 }
 
 function LimitRow({ label, value }: { label: string; value: string }) {
