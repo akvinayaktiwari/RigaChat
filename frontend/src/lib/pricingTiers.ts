@@ -4,6 +4,8 @@
 // only. If PLANS changes, update the feature bullets below to match — there
 // is no runtime link between the two, by design (this module doesn't touch
 // backend files).
+import type { PlanTier } from '../types/index'
+
 export type BillableTier = 'starter' | 'growth' | 'agency'
 
 // 'in' = India/Razorpay, the only region with a real payment flow behind it.
@@ -42,6 +44,26 @@ export const PRICING_TIERS: PricingTier[] = [
     features: ['Unlimited agents', 'Unlimited conversations', 'Unlimited CRM leads', 'Website knowledge base training'],
   },
 ]
+
+// Ladder position, used to compare an account's current plan against a
+// purchasable tier. 'free' is absent from PRICING_TIERS — nobody buys it — but
+// every account starts there, so it still has to be orderable against the
+// billable tiers.
+const TIER_RANK: Record<PlanTier, number> = { free: 0, starter: 1, growth: 2, agency: 3 }
+
+// True when `tier` sits strictly above the account's current plan. Same-tier is
+// deliberately false: re-buying the plan you already have is not an upgrade,
+// and billing-routes.ts 409s ALREADY_SUBSCRIBED on it anyway.
+export function isUpgradeFrom(current: PlanTier, tier: BillableTier): boolean {
+  return TIER_RANK[tier] > TIER_RANK[current]
+}
+
+// The next tier above the current plan, or undefined at the top of the ladder
+// (agency), where there is nothing left to sell. Relies on PRICING_TIERS being
+// in ascending price order, which it is.
+export function nextTierUp(current: PlanTier): BillableTier | undefined {
+  return PRICING_TIERS.find((t) => isUpgradeFrom(current, t.tier))?.tier
+}
 
 // Same formatting the old duplicated formatPrice() functions used for India
 // (₹ + en-IN grouping) — behavior-identical for region 'in', see the

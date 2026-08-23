@@ -1,4 +1,5 @@
 import { AlertTriangle, CheckCircle2, Clock, Sparkles, XCircle } from 'lucide-react'
+import { nextTierUp } from '../../lib/pricingTiers'
 import type { EntitlementFeatures, SubscriptionStatus, SubscriptionSummary } from '../../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -30,9 +31,9 @@ function formatLimit(limit: number | null, unit: string): string {
 
 function LimitRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-      <span className="text-sm text-gray-500">{label}</span>
-      <span className="text-sm font-semibold text-gray-900">{value}</span>
+    <div className="flex items-center justify-between gap-4 py-2 border-b border-gray-50 last:border-0">
+      <span className="text-sm text-gray-500 shrink-0">{label}</span>
+      <span className="text-sm font-semibold text-gray-900 text-right">{value}</span>
     </div>
   )
 }
@@ -44,7 +45,10 @@ function describeFeatures(features: EntitlementFeatures): { chat: string; crm: s
       : 'Not included',
     crm: features.crm.enabled ? formatLimit(features.crm.limits.leads, 'leads') : 'Not included',
     agents: features.agents.enabled ? formatLimit(features.agents.limits.max, 'agents') : 'Not included',
-    voice: features.voice.enabled ? formatLimit(features.voice.limits.minutes, 'minutes/month') : 'Voice: not included',
+    // Bare 'Not included' like its siblings: this string is the value in a row
+    // already labelled "Voice", and the old copy rendered as "Voice  Voice: not
+    // included".
+    voice: features.voice.enabled ? formatLimit(features.voice.limits.minutes, 'minutes/month') : 'Not included',
   }
 }
 
@@ -59,6 +63,10 @@ export default function SubscriptionSection({ subscription, onUpgradeClick }: Su
   const BadgeIcon = badge.icon
   const limits = describeFeatures(features)
   const chatLimit = features.chat.limits.conversations
+  // Nothing above agency, so the CTA would open a modal offering only plans the
+  // account already has. Hide it rather than render a dead end.
+  const canUpgrade = nextTierUp(plan) !== undefined
+  const trialDaysLeft = status === 'trialing' && trialEndsAt ? daysRemaining(trialEndsAt) : null
 
   // `usage` is absent on a cache hit: subscription-cache.ts stores entitlements
   // but never the counter, because a stale "47 of 100" reads as authoritative
@@ -73,18 +81,20 @@ export default function SubscriptionSection({ subscription, onUpgradeClick }: Su
 
   return (
     <div className="bg-white rounded-2xl border border-black/5 p-6 shadow-sm">
-      <div className="flex items-center justify-between pb-4 border-b border-gray-50 mb-6">
+      <div className="flex items-center justify-between gap-4 pb-4 border-b border-gray-50 mb-6">
         <h3 className="font-bold text-lg text-gray-900" style={JAKARTA_FONT}>
           Subscription
         </h3>
-        <button
-          type="button"
-          onClick={onUpgradeClick}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-violet-600 hover:text-violet-700 transition-colors"
-        >
-          <Sparkles size={14} />
-          Upgrade plan
-        </button>
+        {canUpgrade && (
+          <button
+            type="button"
+            onClick={onUpgradeClick}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-violet-600 hover:text-violet-700 transition-colors"
+          >
+            <Sparkles size={14} />
+            Upgrade plan
+          </button>
+        )}
       </div>
 
       <div className="flex items-center gap-3 mb-6">
@@ -99,10 +109,10 @@ export default function SubscriptionSection({ subscription, onUpgradeClick }: Su
         </span>
       </div>
 
-      {status === 'trialing' && trialEndsAt && (
+      {trialDaysLeft !== null && (
         <div className="mb-6 bg-violet-50 border border-violet-100 rounded-xl p-4 text-sm text-violet-700 flex items-center gap-2">
           <Clock size={16} className="shrink-0" />
-          {daysRemaining(trialEndsAt)} day{daysRemaining(trialEndsAt) === 1 ? '' : 's'} left in your trial
+          {trialDaysLeft} day{trialDaysLeft === 1 ? '' : 's'} left in your trial
         </div>
       )}
 
@@ -113,7 +123,7 @@ export default function SubscriptionSection({ subscription, onUpgradeClick }: Su
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
         <div>
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Limits</p>
           <LimitRow label="Chat" value={limits.chat} />
@@ -125,10 +135,7 @@ export default function SubscriptionSection({ subscription, onUpgradeClick }: Su
         {features.chat.enabled && (
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Usage this period</p>
-            <LimitRow
-              label="Conversations"
-              value={usageLabel}
-            />
+            <LimitRow label="Conversations" value={usageLabel} />
           </div>
         )}
       </div>

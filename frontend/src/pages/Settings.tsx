@@ -21,18 +21,8 @@ import {
   setCalComDefaultEventType,
   updateProfile,
 } from '../services/api'
-import type { CalComEventType, ClientRecord, Preferences, SubscriptionSummary } from '../types/index'
+import type { CalComEventType, ClientRecord, Preferences } from '../types/index'
 import { useSubscription } from '../hooks/useSubscription'
-import type { BillableTier } from '../lib/pricingTiers'
-
-// Suggests the next tier up from the account's current plan; agency has no
-// tier above it, so there's nothing sensible to suggest.
-const NEXT_TIER_UP: Record<SubscriptionSummary['plan'], BillableTier | undefined> = {
-  free: 'starter',
-  starter: 'growth',
-  growth: 'agency',
-  agency: undefined,
-}
 
 const PREFS_STORAGE_KEY = 'vyostra_prefs'
 // Pre-rename key. Read as a fallback so an existing session keeps its saved
@@ -282,7 +272,7 @@ export default function Settings() {
       <UpgradeModal
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
-        suggestedTier={NEXT_TIER_UP[subscription.plan]}
+        currentPlan={subscription.plan}
       />
     </div>
   )

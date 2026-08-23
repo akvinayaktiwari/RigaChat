@@ -175,7 +175,15 @@ export function useTierCheckout(onConfirmed?: () => void): UseTierCheckoutResult
     // matches, so we don't block on a guess; we resume the real existing
     // subscription regardless of which tier was clicked.
     if (pendingCheckout && (pendingCheckout.tier === null || pendingCheckout.tier === tier)) {
-      await openRazorpayCheckout(pendingCheckout.tier, pendingCheckout.subscriptionId, pendingCheckout.razorpayKeyId)
+      // Resuming still loads the Razorpay script and opens its popup, which is
+      // not instant. Without this the "Resume checkout" button looked inert on
+      // click, since only the fresh-subscribe path below set a busy state.
+      setSubmittingTier(tier)
+      try {
+        await openRazorpayCheckout(pendingCheckout.tier, pendingCheckout.subscriptionId, pendingCheckout.razorpayKeyId)
+      } finally {
+        setSubmittingTier(null)
+      }
       return
     }
 
