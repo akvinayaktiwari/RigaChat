@@ -7,7 +7,10 @@
 > API calls, CloudWatch, DynamoDB and the deployed bundles — not inferred from
 > the code.
 
-**Current state: test mode works end to end. Live mode is entirely unverified.**
+**Current state (2026-08-24): production runs Razorpay in TEST mode.**
+`RAZORPAY_KEY_ID` is `rzp_test_...` on all three Lambdas, so the `RAZORPAY_PLAN_ID_*`
+values are test-mode plans and **no real payment can be taken**. Test mode works
+end to end; live mode is entirely unverified.
 
 ---
 
@@ -76,6 +79,39 @@ and had been silently swallowing every event for roughly a month (see §3).
 Razorpay's webhook create/edit/delete API is **Partner-only** — a standard
 account gets `404 no Route matched` on `PATCH` and `DELETE`. All of this is
 dashboard work. `GET /v1/webhooks` does work for verification.
+
+#### Do not copy the test webhook's event list
+
+The **test** webhook currently subscribes **22** events (verified 2026-08-24) —
+it includes `payment.authorized`, `payment.captured`, and all six
+`payment.dispute.*` plus three `payment.downtime.*`. Only 9 of those matter.
+Mirroring it into live re-creates the noise this doc warns about two bullets up:
+every unmapped event logs at ERROR and writes a dedup row for nothing. Subscribe
+the 9 listed above and nothing else.
+
+#### Dashboard click path
+
+1. **Confirm live mode is actually open.** Dashboard → top-left mode switch. If
+   there is no **Live** option, or it prompts for KYC, stop — everything below
+   is blocked until activation completes. This is the one step with an external
+   dependency (Razorpay's review), so check it first.
+2. Switch to **Live** mode. Every screen below is mode-scoped; the single
+   easiest mistake here is editing the test webhook while believing it's live.
+3. **Settings → API Keys → Generate Live Key.** The secret is shown **once**.
+   That pair is `RAZORPAY_LIVE_KEY_ID` / `RAZORPAY_LIVE_KEY_SECRET`.
+4. **Settings → Webhooks → Add New Webhook.**
+   - URL: `https://vyostra.com/api/webhooks/razorpay`
+   - Secret: generate a strong one; this is `RAZORPAY_LIVE_WEBHOOK_SECRET`.
+     Record it now — like the API secret, it is not shown again.
+   - Tick exactly the 9 events listed above.
+5. Verify it registered, without trusting the UI:
+   ```bash
+   curl -s -u "$RAZORPAY_LIVE_KEY_ID:$RAZORPAY_LIVE_KEY_SECRET" \
+     https://api.razorpay.com/v1/webhooks
+   ```
+   Expect one item, `active: true`, the vyostra.com URL, 9 events.
+
+Then run `./scripts/razorpay-go-live.sh` (Step 3) — dry run first.
 
 ### Step 3 — Set the live env vars on ALL THREE Lambdas
 
