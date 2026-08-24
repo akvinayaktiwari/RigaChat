@@ -101,7 +101,26 @@ export const WHATSAPP_TEMPLATES: WhatsAppTemplateDefinition[] = [
     body: 'New lead from {{1}}\n\nName: {{2}}\nPhone: {{3}}\nInterest: {{4}}\n\nOpen your Vyostra inbox to reply.',
     bodyExample: ['Website chat', 'Ravi Kumar', '+91 98765 43210', '3 BHK in Wakad'],
     buttons: [{ type: 'URL', text: 'Open inbox', url: 'https://vyostra.com/dashboard/leads' }],
-    sentBy: 'whatsapp-service.ts sendLeadNotification',
+    sentBy: 'lead-notification-service.ts sendLeadNotification',
+  },
+  {
+    // Goes to the CLIENT's notificationNumber on a weekly schedule, so it is
+    // business-initiated by definition and can never rely on a session window.
+    // It shipped for months as a free-text send and therefore never once
+    // arrived -- same 131047 that killed lead_notification_1's path. See
+    // weekly-report-service.ts for the full account.
+    //
+    // UTILITY because it reports activity on the recipient's own account and
+    // asks nothing of them. Meta may still reclassify it to MARKETING on
+    // review, as it did to lead_welcome_qualify_1 -- that is a pricing change,
+    // not a breakage, and the send path does not care either way.
+    name: 'weekly_report_1',
+    category: 'UTILITY',
+    body:
+      'Your weekly Vyostra report\n\nNew leads this week: {{1}}\n- Chat widget: {{2}}\n- Forms: {{3}}\n\nOpen your dashboard for the details.',
+    bodyExample: ['7', '5', '2'],
+    buttons: [{ type: 'URL', text: 'Open dashboard', url: 'https://vyostra.com/dashboard/leads' }],
+    sentBy: 'weekly-report-service.ts sendWeeklyReport',
   },
   {
     name: 'lead_welcome_qualify_1',

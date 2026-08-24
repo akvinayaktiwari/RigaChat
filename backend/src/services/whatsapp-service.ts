@@ -15,7 +15,6 @@ import {
 import {
   clearActiveWhatsappProvider,
   getClientById,
-  getConnectedWhatsAppClients,
   removeClientMetaDirectWhatsAppConnection,
   removeClientWhatsAppConnection,
   updateClient,
@@ -25,13 +24,10 @@ import {
   setGupshupAppClientMapping,
 } from '../repositories/gupshup-app-lookup-repository.js'
 import { getLastInboundMessageAt } from '../repositories/whatsapp-inbound-activity-repository.js'
-import { getLeadsForClient as getChatLeadsForClient } from './lead-service.js'
-import { getLeadsForClient as getFormLeadsForClient } from './form-lead-service.js'
 import type { ClientRecord, MetaDirectWhatsAppConnection, WhatsAppConnection } from '../types/index.js'
 
 const MAX_RETRY_ATTEMPTS = 3
 const RETRY_DELAY_MS = 1000
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
 interface ConnectGupshupInput {
   apiKey: string
@@ -474,40 +470,11 @@ export async function hasActiveWhatsAppSession(leadId: string): Promise<boolean>
   return Date.now() - new Date(lastInboundAt).getTime() < WHATSAPP_SESSION_WINDOW_MS
 }
 
-export async function sendWeeklyReport(clientId: string): Promise<void> {
-  const client = await getClientById(clientId)
-  if (!client) return
-
-  const sender = await getActiveProviderAndCredentials(client)
-  if (!sender) return
-
-  const since = Date.now() - WEEK_MS
-  const [chatLeads, formLeads] = await Promise.all([
-    getChatLeadsForClient(clientId),
-    getFormLeadsForClient(clientId),
-  ])
-
-  const chatLeadCount = chatLeads.filter((lead) => new Date(lead.createdAt).getTime() >= since).length
-  const formLeadCount = formLeads.filter((lead) => new Date(lead.createdAt).getTime() >= since).length
-  const totalCount = chatLeadCount + formLeadCount
-
-  const message =
-    `Your weekly VyostraAI report\n\n` +
-    `New leads this week: ${totalCount}\n` +
-    `- Chat widget: ${chatLeadCount}\n` +
-    `- Forms: ${formLeadCount}`
-
-  await sendWithRetry(() => sender.provider.sendMessage(sender.notificationNumber, message, sender.credentials))
-}
-
-export async function sendWeeklyReportsForAllClients(): Promise<void> {
-  const clients = await getConnectedWhatsAppClients()
-
-  for (const client of clients) {
-    try {
-      await sendWeeklyReport(client.clientId)
-    } catch (error) {
-      console.error(`Weekly WhatsApp report failed for client ${client.clientId}:`, error)
-    }
-  }
-}
+// sendWeeklyReport / sendWeeklyReportsForAllClients moved to
+// weekly-report-service.ts. They sent FREE TEXT to the client's own
+// notificationNumber and so never delivered -- the same 131047 that killed the
+// lead-notification path. Building the digest also meant importing
+// lead-service here, which closed a lead-service -> lead-notification-service
+// -> whatsapp-service -> lead-service import cycle. Both problems go away by
+// keeping this file to transport. Do not reintroduce a free-text send to a
+// client's own number.

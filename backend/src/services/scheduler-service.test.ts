@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // module-load-time getTableName() check. Mocking the one import this test
 // doesn't exercise avoids growing vitest.config.ts's env var list every
 // time an unrelated service adds a new table dependency.
-vi.mock('./whatsapp-service.js', () => ({ sendWeeklyReport: vi.fn() }))
+vi.mock('./weekly-report-service.js', () => ({ sendWeeklyReport: vi.fn() }))
 
 // Same reasoning: scheduler-service.ts now imports agent-service.js
 // (resolveOwningAgentId, to stamp the owning Agent on lead-scoped actions),

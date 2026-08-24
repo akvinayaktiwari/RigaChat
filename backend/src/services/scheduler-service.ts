@@ -7,7 +7,7 @@ import {
   getScheduledActionsByClientId,
   updateScheduledAction as updateScheduledActionRepo,
 } from '../repositories/scheduled-action-repository.js'
-import { sendWeeklyReport } from './whatsapp-service.js'
+import { sendWeeklyReport } from './weekly-report-service.js'
 import { resolveOwningAgentId } from './agent-service.js'
 import { sendHandoffAlert } from './notification-service.js'
 import { toLeadRef } from './lead-resolution-service.js'
