@@ -99,11 +99,21 @@ Use the script. `aws lambda update-function-configuration --environment`
 `OPENAI_API_KEY`, the Cognito ids, everything:
 
 ```bash
-./scripts/set-razorpay-webhook-secret.sh <secret>   # read-modify-write, verifies var count
+export RAZORPAY_LIVE_KEY_ID=rzp_live_xxx
+export RAZORPAY_LIVE_KEY_SECRET=xxx
+export RAZORPAY_LIVE_WEBHOOK_SECRET=xxx        # the LIVE webhook's secret, from Step 2
+
+./scripts/razorpay-go-live.sh                  # dry run: finds/echoes plans, changes nothing
+./scripts/razorpay-go-live.sh --apply          # creates live plans + writes all three Lambdas
 ```
 
-It only handles the webhook secret; apply the same read-modify-write pattern
-for the other five, or edit them in the AWS console.
+`razorpay-go-live.sh` does Step 1 and Step 3 together: it read-modify-writes all
+six vars on all three functions, re-reads to confirm the key landed as
+`rzp_live_`, and fails if the variable count changed (a replaced map that lost
+`OPENAI_API_KEY` shows up as a count drop, not a silent success). It refuses a
+`rzp_test_` key, and refuses `--apply` without the live webhook secret — live
+keys plus a test webhook secret is the exact half-migration that rejects every
+delivery.
 
 The env budget is tight (~2350 / 4096 bytes). These are replacements, not
 additions, so it does not move — but do not add new vars during cutover.
