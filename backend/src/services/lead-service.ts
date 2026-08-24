@@ -5,7 +5,7 @@ import {
   getLeadsByClientId,
 } from '../repositories/lead-repository.js'
 import { markLeadCaptured } from '../repositories/conversation-repository.js'
-import { sendLeadNotification } from './whatsapp-service.js'
+import { sendLeadNotification } from './lead-notification-service.js'
 import { appendLeadEvent } from '../repositories/lead-event-repository.js'
 import { igniteJourneysForLead } from './journey-ignition-service.js'
 import { getBotConfig } from './bot-service.js'
@@ -90,21 +90,25 @@ export async function captureLead(bot: BotConfig, input: CreateLeadInput): Promi
       console.log(`[ignition] chat lead ${lead.leadId}: ${ignition.status}`, ignition)
     }
 
-    const contactLines = [
-      lead.name ? `Name: ${lead.name}` : null,
-      lead.phone ? `Phone: ${lead.phone}` : null,
-      lead.email ? `Email: ${lead.email}` : null,
-      `Source: ${lead.sourceUrl}`,
-    ].filter((line): line is string => line !== null)
-
     // Never fails lead capture (sendLeadNotification always resolves, never
     // throws) — but must be awaited, not truly fire-and-forget: AWS Lambda
     // freezes the execution environment as soon as the handler's response
     // promise resolves, so an un-awaited async call here would be aborted
     // mid-flight before the KMS decrypt / Gupshup request ever completed.
-    await sendLeadNotification(input.clientId, contactLines.join('\n')).catch(
-      (err) => console.error('WhatsApp notification error:', err)
-    )
+    const notification = await sendLeadNotification({
+      clientId: input.clientId,
+      leadId: lead.leadId,
+      botId: input.botId,
+      source: 'Website chat',
+      ...(lead.name ? { name: lead.name } : {}),
+      ...(lead.phone ? { phone: lead.phone } : {}),
+      interest: [lead.propertyInterest, lead.budgetRange, lead.email]
+        .filter((value): value is string => Boolean(value))
+        .join(' · '),
+    })
+    if (!notification.notified) {
+      console.error(`[lead-notification] chat lead ${lead.leadId} reached nobody:`, notification.error)
+    }
 
     return lead
   } catch (error) {

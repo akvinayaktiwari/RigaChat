@@ -783,6 +783,9 @@ export type LeadEventType =
   | 'message_out'
   | 'message_status'
   | 'message_in'
+  // An alert to the CLIENT about this lead, not a message to the lead. Renders
+  // as a system row, never as part of the conversation.
+  | 'notification_out'
   | 'tool_call'
   | 'handoff'
   | 'journey_ended'

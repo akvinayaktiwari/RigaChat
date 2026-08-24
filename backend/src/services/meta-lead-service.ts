@@ -5,7 +5,7 @@ import { MetaPageAlreadyConnectedError } from '../lib/meta-connect-errors.js'
 import { metaProvider } from '../providers/meta-provider.js'
 import type { MetaFieldDatum } from '../providers/meta-provider.js'
 import { getProvider, syncLeadToCRMWithRetry } from './crm-service.js'
-import { sendLeadNotification } from './whatsapp-service.js'
+import { sendLeadNotification } from './lead-notification-service.js'
 import { igniteJourneysForLead } from './journey-ignition-service.js'
 import { decrypt, encrypt } from '../lib/kms.js'
 import { getClientById, removeClientMetaConnection, updateClient } from '../repositories/client-repository.js'
@@ -329,22 +329,26 @@ async function processSingleLeadgenEvent(pageId: string, leadgenId: string): Pro
   // an un-awaited async call here could be aborted mid-flight once this
   // Lambda's response promise resolves, the same risk found in the
   // existing (unfixed) form-lead-service.ts CRM sync call.
-  const fieldsSummary = Object.entries({
-    ...(mapped.name && { Name: mapped.name }),
-    ...(mapped.phone && { Phone: mapped.phone }),
+  const interest = Object.entries({
     ...(mapped.email && { Email: mapped.email }),
     ...(mapped.propertyInterest && { 'Property Interest': mapped.propertyInterest }),
     ...(mapped.budgetRange && { 'Budget Range': mapped.budgetRange }),
   })
     .map(([label, value]) => `${label}: ${value}`)
-    .join('\n')
+    .join(' · ')
 
-  await sendLeadNotification(
+  const notification = await sendLeadNotification({
     clientId,
-    `${fieldsSummary}\nSource: Meta Lead Ads (${client.metaConnection.pageName})`
-  ).catch((error) => {
-    console.error('Meta lead WhatsApp notification error:', error)
+    leadId: metaLead.leadId,
+    botId: pageId,
+    source: `Meta Lead Ads (${client.metaConnection.pageName})`,
+    ...(mapped.name ? { name: mapped.name } : {}),
+    ...(mapped.phone ? { phone: mapped.phone } : {}),
+    interest,
   })
+  if (!notification.notified) {
+    console.error(`[lead-notification] meta lead ${metaLead.leadId} reached nobody:`, notification.error)
+  }
 
   await markProcessed(key, 'meta', 'leadgen')
   return { retryable: false }

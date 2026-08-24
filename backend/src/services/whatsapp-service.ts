@@ -331,34 +331,15 @@ export async function getMetaWhatsAppStatus(
   return { ...status, active: resolveActiveProvider(client) === 'meta_direct' }
 }
 
-export async function sendLeadNotification(clientId: string, leadSummary: string): Promise<void> {
-  try {
-    const client = await getClientById(clientId)
-    if (!client) return
+// sendLeadNotification used to live here and sent FREE TEXT to the client's
+// notificationNumber. It never once delivered: that number never messages the
+// business, so its 24h window is permanently closed and Meta failed every send
+// with 131047 -- asynchronously, via the status webhook, long after this
+// function had already logged `success: true` and returned. It now lives in
+// lead-notification-service.ts and sends the approved `lead_notification_1`
+// template. Do not reintroduce a free-text send to a client's own number.
 
-    const sender = await getActiveProviderAndCredentials(client)
-    if (!sender) {
-      console.log('WhatsApp notification skipped: no active connection')
-      return
-    }
-
-    console.log('WhatsApp notification sending to:', sender.notificationNumber)
-
-    const result = await sendWithRetry(() =>
-      sender.provider.sendMessage(
-        sender.notificationNumber,
-        `New lead captured!\n\n${leadSummary}`,
-        sender.credentials
-      )
-    )
-
-    console.log('WhatsApp notification result:', result)
-  } catch (error) {
-    console.error('WhatsApp lead notification failed:', error)
-  }
-}
-
-// Unlike sendLeadNotification/sendWeeklyReport above (which always send to
+// Unlike sendWeeklyReport below (which always sends to
 // the CLIENT's own notification number), this sends to an arbitrary LEAD's
 // phone number -- the real send primitive journey-executor-service.ts's
 // handleSendMessage() needs for a Journey's send_message step. Reuses the

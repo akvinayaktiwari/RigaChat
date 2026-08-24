@@ -6,7 +6,7 @@ import {
 } from '../repositories/form-lead-repository.js'
 import { getPublicConfig } from './form-service.js'
 import { syncFormLeadToCRM } from './crm-service.js'
-import { sendLeadNotification } from './whatsapp-service.js'
+import { sendLeadNotification } from './lead-notification-service.js'
 import type { CreateFormLeadInput, FormLead } from '../types/index.js'
 
 function parseFormLead(lead: FormLead): FormLead {
@@ -61,12 +61,29 @@ export async function captureFormLead(input: CreateFormLeadInput): Promise<FormL
   // freezes the execution environment as soon as the handler's response
   // promise resolves, so an un-awaited async call here would be aborted
   // mid-flight before the KMS decrypt / Gupshup request ever completed.
-  const fieldsSummary = Object.entries(parseCustomFields(input.customFields))
+  const fields = parseCustomFields(input.customFields)
+  const fieldsSummary = Object.entries(fields)
     .map(([key, value]) => `${key}: ${value}`)
-    .join('\n')
-  await sendLeadNotification(input.clientId, `${fieldsSummary}\nSource: ${input.sourceUrl}`).catch((err) => {
-    console.error('WhatsApp notification error:', err)
+    .join(' · ')
+
+  // A form has no fixed schema, so name/phone are best-effort: pick the first
+  // field whose id looks like one. A miss just shows "Not provided" against
+  // that row of the template -- the full answer set is still in `interest`.
+  const pick = (needle: string): string | undefined =>
+    Object.entries(fields).find(([key]) => key.toLowerCase().includes(needle))?.[1]
+
+  const notification = await sendLeadNotification({
+    clientId: input.clientId,
+    leadId: createdLead.leadId,
+    botId: input.formId,
+    source: 'Website form',
+    ...(pick('name') ? { name: pick('name') as string } : {}),
+    ...(pick('phone') ? { phone: pick('phone') as string } : {}),
+    interest: fieldsSummary,
   })
+  if (!notification.notified) {
+    console.error(`[lead-notification] form lead ${createdLead.leadId} reached nobody:`, notification.error)
+  }
 
   return createdLead
 }

@@ -38,6 +38,17 @@ vi.mock('../repositories/webhook-event-repository.js', () => ({
   releaseWebhookEventClaim,
 }))
 
+const sendLeadNotificationEmail = vi.fn()
+vi.mock('./lead-notification-service.js', async () => {
+  // notificationInputFromEvent is a pure mapper with its own coverage in
+  // lead-notification-service.test.ts, so the real one is kept here -- the
+  // point of these tests is what the status path decides, not how it maps.
+  const actual = await vi.importActual<typeof import('./lead-notification-service.js')>(
+    './lead-notification-service.js'
+  )
+  return { notificationInputFromEvent: actual.notificationInputFromEvent, sendLeadNotificationEmail }
+})
+
 const APP_SECRET = 'test-app-secret'
 
 const { processMetaWhatsAppWebhook } = await import('./meta-whatsapp-webhook-service.js')
@@ -64,6 +75,7 @@ const INBOUND_BODY = JSON.stringify({
 })
 
 beforeEach(() => {
+  sendLeadNotificationEmail.mockReset().mockResolvedValue({ notified: true, via: 'email' })
   process.env.META_APP_SECRET = APP_SECRET
   getConnectedWhatsAppClients.mockReset().mockResolvedValue([
     { clientId: 'client-1', metaDirectWhatsAppConnection: { phoneNumberId: 'phone-1' } },
@@ -241,6 +253,80 @@ describe('lead_events written from the webhook', () => {
     expect(appendLeadEvent).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'failed', errorDetail: expect.stringContaining('131047') })
     )
+  })
+
+  // The bug this whole path exists for: Meta ACCEPTS a lead alert (200 + a
+  // wamid, so the send call reports success) and only reports the failure here,
+  // asynchronously. If this webhook does not trigger the fallback, nothing does
+  // and the client is never told a lead came in.
+  it('emails the client when a lead alert is reported undelivered', async () => {
+    getEventByWamid.mockResolvedValue({
+      leadId: 'lead-9',
+      clientId: 'client-9',
+      botId: 'bot-9',
+      type: 'notification_out',
+      result: { source: 'Website chat', name: 'Ravi Kumar', phone: '+919876543210' },
+    })
+    const body = JSON.stringify({
+      object: 'whatsapp_business_account',
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                statuses: [
+                  { id: 'w1', status: 'failed', errors: [{ code: 131047, title: 'Re-engagement message' }] },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    })
+
+    await processMetaWhatsAppWebhook(body, sign(body))
+
+    expect(sendLeadNotificationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ leadId: 'lead-9', clientId: 'client-9', source: 'Website chat', name: 'Ravi Kumar' }),
+      expect.stringContaining('131047')
+    )
+  })
+
+  // A failed message to the LEAD is a different problem with a different
+  // remedy. Emailing the client every time one of those fails would turn a
+  // safety net into a noise generator.
+  it('does not email the client when the failed message was one sent to the lead', async () => {
+    getEventByWamid.mockResolvedValue({
+      leadId: 'lead-9',
+      clientId: 'client-9',
+      botId: 'bot-9',
+      type: 'message_out',
+    })
+    const body = JSON.stringify({
+      object: 'whatsapp_business_account',
+      entry: [{ changes: [{ value: { statuses: [{ id: 'w1', status: 'failed', errors: [{ code: 131026 }] }] } }] }],
+    })
+
+    await processMetaWhatsAppWebhook(body, sign(body))
+
+    expect(sendLeadNotificationEmail).not.toHaveBeenCalled()
+  })
+
+  it('does not email when a lead alert is delivered normally', async () => {
+    getEventByWamid.mockResolvedValue({
+      leadId: 'lead-9',
+      clientId: 'client-9',
+      botId: 'bot-9',
+      type: 'notification_out',
+    })
+    const body = JSON.stringify({
+      object: 'whatsapp_business_account',
+      entry: [{ changes: [{ value: { statuses: [{ id: 'w1', status: 'delivered' }] } }] }],
+    })
+
+    await processMetaWhatsAppWebhook(body, sign(body))
+
+    expect(sendLeadNotificationEmail).not.toHaveBeenCalled()
   })
 
   // Meta has added status values over time. Anything outside the four we model

@@ -16,6 +16,7 @@ import { normalizeChatLead } from './lead-resolution-service.js'
 import { recordInboundMessage } from '../repositories/whatsapp-inbound-activity-repository.js'
 import { logInboundMatch, matchLeadForInboundMessage } from './inbound-lead-match-service.js'
 import { handleInboundLeadMessage } from './journey-reply-service.js'
+import { notificationInputFromEvent, sendLeadNotificationEmail } from './lead-notification-service.js'
 import type { ClientRecord, Lead, MessageDeliveryStatus } from '../types/index.js'
 
 // Meta Cloud API webhook payloads. Only the parts we act on are typed; the
@@ -104,6 +105,21 @@ async function logStatuses(statuses: MetaStatus[]): Promise<void> {
       status: delivery,
       ...(reasons ? { errorDetail: reasons } : {}),
     })
+
+    // The fallback trigger that matters. A lead alert Meta ACCEPTED (200 + a
+    // wamid) and then failed to deliver is invisible everywhere else -- it is
+    // precisely how every lead notification silently died for months on the
+    // old free-text path. The send response cannot detect this; only this
+    // webhook can, so the email fallback has to fire from here.
+    //
+    // No double-send risk: a rejected send never gets a wamid, so it can never
+    // reach this branch, and its fallback already fired inline.
+    if (delivery === 'failed' && origin.type === 'notification_out') {
+      await sendLeadNotificationEmail(
+        notificationInputFromEvent(origin),
+        reasons || 'WhatsApp reported the lead alert as undelivered'
+      )
+    }
   }
 }
 

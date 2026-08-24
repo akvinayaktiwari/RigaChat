@@ -135,6 +135,13 @@ export type LeadEventType =
   | 'message_out'
   | 'message_status'
   | 'message_in'
+  // An alert to the CLIENT about this lead, not a message to the lead. Kept
+  // out of message_out on purpose: it carries a wamid and needs delivery
+  // tracking exactly like an outbound message, but it is not part of the
+  // conversation, and anything that summarises a transcript (see
+  // notification-service.ts summarizeRecentMessages) must not read it back as
+  // something the agent said to the lead.
+  | 'notification_out'
   | 'tool_call'
   | 'handoff'
   | 'journey_ended'

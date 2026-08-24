@@ -1,4 +1,4 @@
-import { AlertCircle, Bot, Check, CheckCheck, Clock, PhoneForwarded, Play, User, Wrench } from 'lucide-react'
+import { AlertCircle, BellRing, Bot, Check, CheckCheck, Clock, PhoneForwarded, Play, User, Wrench } from 'lucide-react'
 import type { LeadEvent, MessageDeliveryStatus } from '../../types/index'
 
 // -------------------------------------------------------------------------
@@ -114,6 +114,8 @@ function describeSystemEvent(event: LeadEvent): { icon: JSX.Element; label: stri
         icon: <PhoneForwarded size={13} />,
         label: `Handed to a human${event.reason ? `: ${event.reason}` : ''}`,
       }
+    case 'notification_out':
+      return { icon: <BellRing size={13} />, label: event.body ?? 'You were alerted about this lead' }
     case 'journey_ended':
       return { icon: <Bot size={13} />, label: 'Journey finished' }
     case 'state_change':
