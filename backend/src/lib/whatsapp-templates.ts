@@ -133,6 +133,35 @@ export const WHATSAPP_TEMPLATES: WhatsAppTemplateDefinition[] = [
     category: 'UTILITY',
     body: "Hi {{1}}, thanks for your interest in {{2}}.\n\nTo point you to the right property, could you tell me your budget range and which area you're considering?",
     bodyExample: ['Ravi', 'Skyline Residences'],
+    sentBy: 'Superseded by lead_welcome_qualify_2; kept as the approved fallback.',
+  },
+  {
+    // The interactive replacement for _1, and the single highest-leverage
+    // template here. _1 opens by asking a stranger to TYPE two things at once
+    // ("your budget range and which area"), which is the most friction a first
+    // message can carry.
+    //
+    // The point is not that buttons look nicer. A quick-reply tap is an
+    // INBOUND message: it opens the 24h customer-service window, and inside
+    // that window the agent can reply in free text with no template and no
+    // approval at all. So the first template's only real job is to earn ONE
+    // tap -- after that the conversation is unblocked. Asking for typed prose
+    // instead leaves the window shut and every later message stuck behind
+    // template review.
+    //
+    // Budget is the question worth asking first because it is the one a buyer
+    // can answer without thinking, and it is the one that actually routes them.
+    name: 'lead_welcome_qualify_2',
+    // MARKETING because Meta reclassified _1 that way on review despite the
+    // UTILITY submission. Submitting the truth avoids a pointless round trip.
+    category: 'MARKETING',
+    body: "Hi {{1}}, thanks for your interest in {{2}}.\n\nTo point you at the right homes, what budget are you working with?",
+    bodyExample: ['Ravi', 'Skyline Residences'],
+    buttons: [
+      { type: 'QUICK_REPLY', text: 'Under 50L' },
+      { type: 'QUICK_REPLY', text: '50L - 1Cr' },
+      { type: 'QUICK_REPLY', text: 'Above 1Cr' },
+    ],
     sentBy: 'journey-templates/real-estate-lead-qualification.ts step "greet"',
   },
   {
@@ -144,6 +173,23 @@ export const WHATSAPP_TEMPLATES: WhatsAppTemplateDefinition[] = [
     bodyExample: ['Ravi'],
     buttons: [
       { type: 'QUICK_REPLY', text: 'Yes, this weekend' },
+      { type: 'QUICK_REPLY', text: 'Not right now' },
+    ],
+    sentBy: 'Superseded by lead_followup_nudge_2; kept as the approved fallback.',
+  },
+  {
+    // _1 with the missing middle option. Its two buttons forced a lead who was
+    // interested but busy this weekend to pick "Not right now", which reads to
+    // the journey as a soft no and ends the sequence. "Next weekend" is the
+    // answer most of those people actually meant, and it keeps the lead alive.
+    // Three is Meta's hard maximum, so this is as forgiving as a template gets.
+    name: 'lead_followup_nudge_2',
+    category: 'MARKETING',
+    body: 'Hi {{1}}, just checking in — would a weekend site visit work for you?\n\nI can hold a slot and share the exact location and directions.',
+    bodyExample: ['Ravi'],
+    buttons: [
+      { type: 'QUICK_REPLY', text: 'Yes, this weekend' },
+      { type: 'QUICK_REPLY', text: 'Next weekend' },
       { type: 'QUICK_REPLY', text: 'Not right now' },
     ],
     sentBy: 'journey-templates/real-estate-lead-qualification.ts step "nudge"',
@@ -179,7 +225,29 @@ export const WHATSAPP_TEMPLATES: WhatsAppTemplateDefinition[] = [
     category: 'UTILITY',
     body: "Hi {{1}}, {{2}} from our team will call you shortly about your enquiry.\n\nIf now isn't a good time, reply with a time that suits you.",
     bodyExample: ['Ravi', 'Priya'],
-    sentBy: 'journey-templates/real-estate-lead-qualification.ts step "hand_to_agent"',
+    // NOT SENT BY ANYTHING. The hand_to_agent step sets no
+    // whatsappTemplateName, so this claimed a send site it never had. Left
+    // approved and available for the step that will name it.
+    sentBy: 'Nothing yet -- hand_to_agent names no template. Superseded by agent_handoff_2.',
+  },
+  {
+    // _1 ends with "reply with a time that suits you" -- an open-ended ask
+    // that a lead has to compose an answer to, at the exact moment they are
+    // being told someone will phone them. The three buckets below cover almost
+    // every real answer in one tap, and the tap tells the human when to call
+    // instead of leaving them to guess.
+    name: 'agent_handoff_2',
+    category: 'UTILITY',
+    body: 'Hi {{1}}, {{2}} from our team will call you shortly about your enquiry.\n\nWhen is a good time to reach you?',
+    bodyExample: ['Ravi', 'Priya'],
+    buttons: [
+      { type: 'QUICK_REPLY', text: 'Now is fine' },
+      { type: 'QUICK_REPLY', text: 'This evening' },
+      { type: 'QUICK_REPLY', text: 'Tomorrow' },
+    ],
+    // Ready for the hand_to_agent step to name it; the step currently names no
+    // template, so nothing sends this yet.
+    sentBy: 'Nothing yet -- reserved for the hand_to_agent step.',
   },
   {
     // The other half of hand_to_agent. agent_handoff_1 above tells the LEAD a
@@ -274,4 +342,76 @@ export function findTemplate(name: string): WhatsAppTemplateDefinition | undefin
 
 export function templateLanguageOf(name: string): string {
   return findTemplate(name)?.language ?? WHATSAPP_TEMPLATE_LANGUAGE
+}
+
+// Meta's button rules, enforced here rather than discovered at review time.
+// A rejected template is a 24-48h round trip, and a template whose buttons are
+// grouped wrong fails at CREATE with a generic "invalid combination" that says
+// nothing about which button was the problem.
+export const MAX_QUICK_REPLY_BUTTONS = 3
+export const MAX_CTA_BUTTONS = 2
+// Meta documents 25 in places and 20 in others; providers agree on 20 as the
+// value that is always accepted, so that is the one worth holding to.
+export const MAX_BUTTON_TEXT_LENGTH = 20
+
+// Quick replies are what make a template answerable in one tap, and a tap is an
+// INBOUND message -- it opens the 24h session window, which is what lets the
+// agent then talk freely. That is the whole reason to prefer them over asking a
+// lead to type. See lib/whatsapp-inbound.ts for the half that reads the tap.
+export function validateTemplate(template: WhatsAppTemplateDefinition): string[] {
+  const problems: string[] = []
+  const buttons = template.buttons ?? []
+
+  const quickReplies = buttons.filter((button) => button.type === 'QUICK_REPLY')
+  const ctas = buttons.filter((button) => button.type !== 'QUICK_REPLY')
+
+  if (quickReplies.length > MAX_QUICK_REPLY_BUTTONS) {
+    problems.push(`${template.name}: ${quickReplies.length} quick replies, max is ${MAX_QUICK_REPLY_BUTTONS}`)
+  }
+  if (ctas.length > MAX_CTA_BUTTONS) {
+    problems.push(`${template.name}: ${ctas.length} call-to-action buttons, max is ${MAX_CTA_BUTTONS}`)
+  }
+
+  for (const button of buttons) {
+    if (button.text.length > MAX_BUTTON_TEXT_LENGTH) {
+      problems.push(
+        `${template.name}: button "${button.text}" is ${button.text.length} chars, max is ${MAX_BUTTON_TEXT_LENGTH}`
+      )
+    }
+    // Meta rejects emoji in button labels outright.
+    if (/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(button.text)) {
+      problems.push(`${template.name}: button "${button.text}" contains an emoji, which Meta rejects`)
+    }
+    if (button.type === 'URL' && !button.url) {
+      problems.push(`${template.name}: URL button "${button.text}" has no url`)
+    }
+  }
+
+  // Meta requires quick replies and CTAs to be contiguous groups. Interleaving
+  // them fails at create time, so the registry order is load-bearing.
+  const order = buttons.map((button) => (button.type === 'QUICK_REPLY' ? 'q' : 'c')).join('')
+  if (/qcq|cqc/.test(order)) {
+    problems.push(`${template.name}: quick replies and CTA buttons must be grouped, not interleaved`)
+  }
+
+  // A body placeholder with no example is the single most common rejection.
+  const placeholders = new Set(template.body.match(/\{\{(\d+)\}\}/g) ?? [])
+  if (placeholders.size !== template.bodyExample.length) {
+    problems.push(
+      `${template.name}: ${placeholders.size} placeholder(s) but ${template.bodyExample.length} example value(s)`
+    )
+  }
+
+  // Meta rejects a body that starts or ends with a variable
+  // (error_subcode 2388299).
+  const trimmed = template.body.trim()
+  if (/^\{\{\d+\}\}/.test(trimmed) || /\{\{\d+\}\}$/.test(trimmed)) {
+    problems.push(`${template.name}: body starts or ends with a variable, which Meta rejects`)
+  }
+
+  return problems
+}
+
+export function validateAllTemplates(): string[] {
+  return WHATSAPP_TEMPLATES.flatMap(validateTemplate)
 }

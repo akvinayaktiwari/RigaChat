@@ -17,6 +17,7 @@ import { recordInboundMessage } from '../repositories/whatsapp-inbound-activity-
 import { logInboundMatch, matchLeadForInboundMessage } from './inbound-lead-match-service.js'
 import { handleInboundLeadMessage } from './journey-reply-service.js'
 import { notificationInputFromEvent, sendLeadNotificationEmail } from './lead-notification-service.js'
+import { extractMetaInboundText } from '../lib/whatsapp-inbound.js'
 import type { ClientRecord, Lead, MessageDeliveryStatus } from '../types/index.js'
 
 // Meta Cloud API webhook payloads. Only the parts we act on are typed; the
@@ -41,6 +42,14 @@ interface MetaInboundMessage {
   from?: string
   type?: string
   text?: { body?: string }
+  // A quick-reply tap on a TEMPLATE. Carries the visible label, not the body.
+  button?: { text?: string; payload?: string }
+  // A tap on an interactive button or list row.
+  interactive?: {
+    type?: string
+    button_reply?: { id?: string; title?: string }
+    list_reply?: { id?: string; title?: string; description?: string }
+  }
 }
 
 interface MetaChangeValue {
@@ -150,12 +159,15 @@ async function createInboundLead(
   message: MetaInboundMessage
 ): Promise<Lead | null> {
   const from = message.from
-  const body = message.text?.body?.trim()
+  // A button tap counts as introducing yourself: tapping "Yes, this weekend"
+  // on an ad template is a person answering. Only genuinely wordless payloads
+  // are refused below.
+  const { text: body, kind } = extractMetaInboundText(message)
 
-  // Reactions, system notices and status-only payloads are not a person
+  // Reactions, media, system notices and status-only payloads are not a person
   // introducing themselves, and must not mint a permanent CRM row.
-  if (!from || message.type !== 'text' || !body) {
-    console.log(`[wa-inbound] ignoring non-text inbound from ${from ?? 'unknown'} (type=${message.type ?? 'none'})`)
+  if (!from || kind === 'unsupported' || !body) {
+    console.log(`[wa-inbound] ignoring wordless inbound from ${from ?? 'unknown'} (type=${message.type ?? 'none'})`)
     return null
   }
 
@@ -235,6 +247,23 @@ async function recordInbound(phoneNumberId: string | undefined, message: MetaInb
       return
     }
 
+    // Resolved once, here, and used for the transcript, the agent turn and the
+    // journey resume alike. A quick-reply tap carries its label in
+    // `button.text`, not `text.body`, so reading the raw field would hand all
+    // three of them an empty string.
+    const inbound = extractMetaInboundText(message)
+
+    // A tap is a real reply and must open the 24h session window and wake a
+    // parked journey exactly like typed words do. Only a genuinely wordless
+    // payload (reaction, sticker, location) is dropped, and it is dropped
+    // BEFORE the lead lookup so it cannot mint a lead or a blank transcript row.
+    if (!inbound.text) {
+      console.log(
+        `[wa-inbound] ignoring wordless inbound from ${message.from ?? 'unknown'} (type=${message.type ?? 'none'})`
+      )
+      return
+    }
+
     const match = await matchLeadForInboundMessage(owner.clientId, message.from)
 
     // Nobody by that number yet. Before #10 the message was dropped here, which
@@ -254,7 +283,7 @@ async function recordInbound(phoneNumberId: string | undefined, message: MetaInb
       botId: lead.botId,
       type: 'message_in',
       channel: 'whatsapp',
-      body: message.text?.body ?? '',
+      body: inbound.text,
     })
 
     // The agent turn runs BEFORE the journey is resumed, and deliberately does
@@ -263,7 +292,7 @@ async function recordInbound(phoneNumberId: string | undefined, message: MetaInb
     // sends the agent's words. That ordering is what guarantees exactly one
     // message per inbound message (D12): letting both the handler and the woken
     // state machine send is the double-send this design exists to prevent.
-    const body = message.text?.body ?? ''
+    const body = inbound.text
     let composedReply: string | undefined
 
     const resolution = await resolveAgentForInboundMessage(phoneNumberId, owner.clientId, body)

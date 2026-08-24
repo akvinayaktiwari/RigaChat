@@ -10,7 +10,9 @@ export interface GupshupDeliveryEventPayload {
 export interface GupshupIncomingMessagePayload {
   id: string
   source: string
-  payload: { text?: string }
+  // `title`/`postbackText` carry a quick-reply tap's label; `type`
+  // discriminates it from typed text. See lib/whatsapp-inbound.ts.
+  payload: { text?: string; type?: string; title?: string; postbackText?: string }
 }
 
 export interface GupshupDeliveryEvent {

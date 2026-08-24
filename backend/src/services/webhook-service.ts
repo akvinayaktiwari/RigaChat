@@ -12,6 +12,7 @@ import { claimWebhookEvent, releaseWebhookEventClaim } from '../repositories/web
 import { logPayment } from '../repositories/payment-history-repository.js'
 import { getClientIdForGupshupApp } from '../repositories/gupshup-app-lookup-repository.js'
 import { appendLeadEvent } from '../repositories/lead-event-repository.js'
+import { extractGupshupInboundText } from '../lib/whatsapp-inbound.js'
 import { recordInboundMessage } from '../repositories/whatsapp-inbound-activity-repository.js'
 import { invalidateEntitlementsCache } from './entitlement-service.js'
 import { handleInboundLeadMessage } from './journey-reply-service.js'
@@ -82,6 +83,11 @@ async function resolveAndRecordInboundMessage(event: GupshupIncomingMessage): Pr
     const matchingLead = match.lead
     await recordInboundMessage(matchingLead.leadId)
 
+    // Same reason as the Meta path: Gupshup delivers a quick-reply tap with the
+    // label under `title`, not `text`, so reading `text` alone turns a real
+    // reply into an empty string.
+    const inbound = extractGupshupInboundText(event.payload.payload)
+
     // The agent turn deliberately does not run on this provider (see #11), but
     // the timeline should not have a hole for the one client still on Gupshup.
     await appendLeadEvent({
@@ -90,7 +96,7 @@ async function resolveAndRecordInboundMessage(event: GupshupIncomingMessage): Pr
       botId: matchingLead.botId,
       type: 'message_in',
       channel: 'whatsapp',
-      body: event.payload.payload.text ?? '',
+      body: inbound.text,
     })
 
     // The message is now more than a timestamp: if a journey is parked on this
@@ -98,7 +104,7 @@ async function resolveAndRecordInboundMessage(event: GupshupIncomingMessage): Pr
     // stops it. Still best-effort -- handleInboundLeadMessage never throws --
     // so a journey-layer problem cannot turn a received message into a 500 and
     // make Gupshup redeliver it.
-    const outcome = await handleInboundLeadMessage(matchingLead.leadId, event.payload.payload.text ?? '')
+    const outcome = await handleInboundLeadMessage(matchingLead.leadId, inbound.text)
     if (outcome.handled !== 'no_pending_journey') {
       console.log(`[journey-reply] lead ${matchingLead.leadId}: ${JSON.stringify(outcome)}`)
     } else if (match.candidateCount > 1) {

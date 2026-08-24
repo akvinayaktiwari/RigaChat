@@ -84,7 +84,7 @@ export const realEstateLeadQualification: JourneyTemplate = {
           'Hi! Thanks for your interest. To point you to the right property, could you tell me your budget range and which area you are considering?',
         // This step fires on lead_captured, so the session window is almost
         // always shut -- the template is the path that actually sends.
-        whatsappTemplateName: 'lead_welcome_qualify_1',
+        whatsappTemplateName: 'lead_welcome_qualify_2',
         whatsappTemplateParams: ['{{lead.name}}', '{{lead.propertyInterest}}'],
         next: 'await_qualification',
       },
@@ -120,7 +120,7 @@ export const realEstateLeadQualification: JourneyTemplate = {
           'Just checking in -- would a weekend site visit work for you? I can hold a slot and share the exact location and directions.',
         // Reached only after 24h of silence, so the window is shut by
         // definition. Without a template this step could never send at all.
-        whatsappTemplateName: 'lead_followup_nudge_1',
+        whatsappTemplateName: 'lead_followup_nudge_2',
         whatsappTemplateParams: ['{{lead.name}}'],
         next: 'wait_for_booking',
       },
