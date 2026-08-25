@@ -110,10 +110,13 @@ export const WHATSAPP_TEMPLATES: WhatsAppTemplateDefinition[] = [
     // arrived -- same 131047 that killed lead_notification_1's path. See
     // weekly-report-service.ts for the full account.
     //
-    // UTILITY because it reports activity on the recipient's own account and
-    // asks nothing of them. Meta may still reclassify it to MARKETING on
-    // review, as it did to lead_welcome_qualify_1 -- that is a pricing change,
-    // not a breakage, and the send path does not care either way.
+    // Submitted UTILITY because it reports activity on the recipient's own
+    // account and asks nothing of them. Meta RECLASSIFIED it to MARKETING
+    // immediately on create (observed 2026-08-25 on WABA 1353319399571291:
+    // requested UTILITY, came back MARKETING before review even finished),
+    // exactly as it did to lead_welcome_qualify_1. Left as UTILITY on the same
+    // reasoning used there: reclassification is not rejection, it costs nothing
+    // to ask, and the send path does not care. Budget MARKETING pricing for it.
     name: 'weekly_report_1',
     category: 'UTILITY',
     body:
