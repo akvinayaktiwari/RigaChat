@@ -18,7 +18,7 @@ import {
   setPageClientMapping,
   updateMetaLeadSyncStatus,
 } from '../repositories/meta-lead-repository.js'
-import { hasProcessed, markProcessed } from '../repositories/webhook-event-repository.js'
+import { countWebhookAttempt, hasProcessed, markProcessed } from '../repositories/webhook-event-repository.js'
 import {
   createMetaDeletionRequest,
   getMetaDeletionRequest,
@@ -41,6 +41,24 @@ import crypto from 'crypto'
 function idempotencyKey(leadgenId: string): string {
   return `meta:${leadgenId}`
 }
+
+// Its own namespace, never the idempotency key above: a counter row that
+// hasProcessed() could see would make the next redelivery skip a lead still
+// waiting for its answers.
+function emptyFieldDataCounterKey(leadgenId: string): string {
+  return `meta:${leadgenId}:empty-field-data`
+}
+
+// How many deliveries an empty field_data may cost before the lead is accepted
+// as genuinely empty.
+//
+// Meta's field data is eventually consistent with its webhook: the notification
+// can arrive before the answers are readable. Retrying is therefore right, but
+// only briefly -- Meta redelivers immediately and then backs off over 36 hours,
+// and a lead that is STILL empty after three deliveries is not going to fill in.
+// Past that the choice is between a blank record and no record, and a blank one
+// at least tells the client a lead exists to go look up in Ads Manager.
+const MAX_EMPTY_FIELD_DATA_ATTEMPTS = 3
 
 interface MetaWebhookChange {
   field: string
@@ -286,6 +304,36 @@ async function processSingleLeadgenEvent(pageId: string, leadgenId: string): Pro
     return { retryable: true }
   }
 
+  // An empty field_data is Meta answering before the lead's answers have
+  // propagated, not a lead who submitted an empty form -- every Lead Ads form
+  // has at least one question, and a permissions failure comes back as an
+  // error rather than as an empty array.
+  //
+  // Persisting it as-is was the bug: a record with no name, phone or email,
+  // marked permanently processed, showing up in the CRM looking like real
+  // signal with no path to backfill it.
+  let fieldDataUnavailable = false
+  if (fieldData.length === 0) {
+    const attempt = await countWebhookAttempt(emptyFieldDataCounterKey(leadgenId), 'meta', 'leadgen')
+
+    if (attempt < MAX_EMPTY_FIELD_DATA_ATTEMPTS) {
+      // NOT marked processed, exactly like the fetch failure above -- this is
+      // the same "come back and try again" answer to Meta.
+      console.warn(
+        `Meta webhook: empty field_data for ${leadgenId} on attempt ${attempt}/${MAX_EMPTY_FIELD_DATA_ATTEMPTS}, asking Meta to redeliver`
+      )
+      return { retryable: true }
+    }
+
+    // Accepted rather than dropped: losing the lead entirely is worse than
+    // recording that one arrived. The marker below is what stops it reading as
+    // a normal lead whose buyer simply left every field blank.
+    console.error(
+      `Meta webhook: field_data still empty for ${leadgenId} after ${attempt} attempts, saving the lead without answers`
+    )
+    fieldDataUnavailable = true
+  }
+
   const mapped = mapMetaFieldData(fieldData)
   const sourceUrl = `https://www.facebook.com/${pageId}/`
 
@@ -298,7 +346,13 @@ async function processSingleLeadgenEvent(pageId: string, leadgenId: string): Pro
     email: mapped.email,
     propertyInterest: mapped.propertyInterest,
     budgetRange: mapped.budgetRange,
-    customFields: JSON.stringify(mapped.customFields),
+    customFields: JSON.stringify({
+      ...mapped.customFields,
+      // Read by a human in the CRM, not by code: it says "this lead is real,
+      // its answers are not here, go look it up in Ads Manager" rather than
+      // leaving a blank row that looks like a lead who typed nothing.
+      ...(fieldDataUnavailable ? { _fieldDataUnavailable: 'Meta returned no answers for this lead' } : {}),
+    }),
     sourceUrl,
   })
 
