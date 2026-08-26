@@ -64,7 +64,7 @@ vi.mock('../repositories/email-repository.js', () => ({
   sendEmail: async () => undefined,
 }))
 
-const { processMetaLeadWebhook } = await import('./meta-lead-service.js')
+const { processMetaLeadWebhook, mapMetaFieldData } = await import('./meta-lead-service.js')
 
 const payload = JSON.stringify({
   entry: [{ id: 'page-1', changes: [{ field: 'leadgen', value: { leadgen_id: 'lead-gen-1', page_id: 'page-1' } }] }],
@@ -141,5 +141,103 @@ describe('empty field_data from the Graph API', () => {
     const saved = createMetaLead.mock.calls[0][0]
     expect(saved.name).toBe('Ravi Kumar')
     expect(JSON.parse(saved.customFields)).not.toHaveProperty('_fieldDataUnavailable')
+  })
+})
+
+describe('mapMetaFieldData', () => {
+  // The reason this mapper was revisited. Indian real-estate forms very often
+  // ask for a "WhatsApp Number" rather than a phone number; the old chain
+  // tested key.includes('phone'), so whatsapp_number matched nothing and the
+  // lead was saved with an EMPTY phone -- the one field lead notifications,
+  // journey outreach and the WhatsApp agent are all addressed by.
+  it('maps a WhatsApp-labelled question onto phone', () => {
+    for (const key of ['whatsapp_number', 'WhatsApp Number', 'whats_app_no', 'wa_number', 'mobile_number']) {
+      expect(mapMetaFieldData([{ name: key, values: ['+919876543210'] }]).phone, key).toBe('+919876543210')
+    }
+  })
+
+  it('still maps the standard Meta keys', () => {
+    const mapped = mapMetaFieldData([
+      { name: 'full_name', values: ['Ravi Kumar'] },
+      { name: 'phone_number', values: ['+919876543210'] },
+      { name: 'email', values: ['ravi@example.com'] },
+    ])
+
+    expect(mapped).toMatchObject({ name: 'Ravi Kumar', phone: '+919876543210', email: 'ravi@example.com' })
+    expect(mapped.customFields).toEqual({})
+  })
+
+  // 'preferred_contact_time' is a common question and is not a phone number.
+  // A too-greedy phone rule would put a time of day in the field the agent
+  // sends WhatsApp messages to.
+  it('does not treat every "contact" question as a phone number', () => {
+    const mapped = mapMetaFieldData([{ name: 'preferred_contact_time', values: ['Evening'] }])
+
+    expect(mapped.phone).toBeUndefined()
+    expect(mapped.customFields).toEqual({ preferred_contact_time: 'Evening' })
+  })
+
+  // 'name' as a substring appears in company_name, project_name, society_name.
+  it('does not treat every "name" question as the lead name', () => {
+    const mapped = mapMetaFieldData([{ name: 'society_name', values: ['Skyline Residences'] }])
+
+    expect(mapped.name).toBeUndefined()
+    expect(mapped.customFields).toEqual({ society_name: 'Skyline Residences' })
+  })
+
+  it('composes a name from the split standard keys', () => {
+    const mapped = mapMetaFieldData([
+      { name: 'first_name', values: ['Ravi'] },
+      { name: 'last_name', values: ['Kumar'] },
+    ])
+
+    expect(mapped.name).toBe('Ravi Kumar')
+  })
+
+  it('prefers a whole-name question over the split keys', () => {
+    const mapped = mapMetaFieldData([
+      { name: 'full_name', values: ['Ravi Kumar'] },
+      { name: 'first_name', values: ['Ravi'] },
+    ])
+
+    expect(mapped.name).toBe('Ravi Kumar')
+  })
+
+  // The filed complaint: values[0] with the rest dropped and no trace.
+  it('keeps every answer to a multi-select question', () => {
+    const mapped = mapMetaFieldData([{ name: 'property_interest', values: ['2 BHK', '3 BHK'] }])
+
+    expect(mapped.propertyInterest).toBe('2 BHK, 3 BHK')
+  })
+
+  // A single-valued target still takes one value -- phonesMatch and the
+  // WhatsApp send both need ONE number, not a joined string -- but the extras
+  // are parked rather than lost.
+  it('parks the extras when a single-valued field carries several', () => {
+    const mapped = mapMetaFieldData([{ name: 'phone_number', values: ['+919876543210', '+919000000000'] }])
+
+    expect(mapped.phone).toBe('+919876543210')
+    expect(mapped.customFields).toEqual({ phone_number_additional: '+919000000000' })
+  })
+
+  it('keeps every answer to a multi-select custom question', () => {
+    const mapped = mapMetaFieldData([{ name: 'preferred_areas', values: ['Whitefield', 'Indiranagar'] }])
+
+    expect(mapped.customFields).toEqual({ preferred_areas: 'Whitefield, Indiranagar' })
+  })
+
+  // Precedence, which used to be emergent from if/else source order and is now
+  // stated: budget before property, so 'budget_for_property' is a budget.
+  it('resolves an ambiguous key by the documented precedence', () => {
+    expect(mapMetaFieldData([{ name: 'budget_for_property', values: ['1-2 Cr'] }]).budgetRange).toBe('1-2 Cr')
+    expect(mapMetaFieldData([{ name: 'email_or_phone', values: ['ravi@example.com'] }]).email).toBe(
+      'ravi@example.com'
+    )
+  })
+
+  it('survives a question with no answer at all', () => {
+    const mapped = mapMetaFieldData([{ name: 'phone_number', values: [] }])
+
+    expect(mapped.phone).toBe('')
   })
 })

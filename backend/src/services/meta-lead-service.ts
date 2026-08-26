@@ -90,24 +90,137 @@ interface MappedMetaFields {
   customFields: Record<string, string>
 }
 
-// Meta forms are authored in Ads Manager, not our form builder -- we never
-// see field types up front. Best-effort match on Meta's own field key names
-// (Meta standardizes common ones like full_name/email/phone_number).
-// Unmatched questions land in customFields, same fallback FormLead uses.
-function mapMetaFieldData(fieldData: MetaFieldDatum[]): MappedMetaFields {
+// Which normalized lead field a Meta question maps onto. `custom` is not a
+// field -- it is the "no rule matched" outcome, kept in the same vocabulary so
+// the resolver has one return type.
+type MappedFieldName = 'name' | 'phone' | 'email' | 'propertyInterest' | 'budgetRange'
+
+// Meta forms are authored in Ads Manager, not our form builder, so we never see
+// field types up front -- only a key per question. Meta standardizes the common
+// ones (full_name, email, phone_number) and slugifies everything else from the
+// question text the client typed.
+//
+// ORDER IS PRECEDENCE and is deliberate, because real question keys match more
+// than one rule ("email_or_phone", "budget_for_property"). It used to be an
+// if/else chain, where the precedence was real but invisible and unstated.
+// Anything matching two rules is logged (see resolveFieldName) so an ambiguous
+// form shows up in the log instead of being silently resolved by source order.
+//
+//   email  first: 'email' is the most specific token here and never appears in
+//          a question that is really asking for something else.
+//   phone  second, and the reason this list exists in its stated form. Indian
+//          real-estate forms very often ask for a "WhatsApp Number" rather than
+//          a phone number, which slugifies to whatsapp_number and matched NO
+//          rule under the old chain -- so the lead was saved with an empty
+//          phone and landed in customFields. That is the one field the product
+//          cannot work without: lead notifications, journey outreach and the
+//          whole WhatsApp agent are addressed by it.
+//   name   third; exact keys only, because 'name' as a substring appears in
+//          company_name, project_name and society_name.
+//   budget before property, because 'budget_for_property' is a budget question.
+const FIELD_RULES: { field: MappedFieldName; matches: (key: string) => boolean }[] = [
+  { field: 'email', matches: (key) => /e_?mail/.test(key) },
+  {
+    field: 'phone',
+    // 'contact' alone is deliberately NOT here: 'preferred_contact_time' is a
+    // common question and is not a phone number.
+    matches: (key) => /phone|whatsapp|whats_app|wa_?number|mobile|^cell$|cell_?(no|number)|contact_?(no|number)/.test(key),
+  },
+  { field: 'name', matches: (key) => key === 'full_name' || key === 'name' || key === 'your_name' },
+  { field: 'budgetRange', matches: (key) => /budget|price_?range/.test(key) },
+  { field: 'propertyInterest', matches: (key) => /propert|interest|project|configuration|bhk|unit_?type/.test(key) },
+]
+
+// Meta splits a name into two standard keys when the form asks that way. Neither
+// matches the name rule above (both would be ambiguous as a whole name), so they
+// are composed after the loop instead.
+const FIRST_NAME_KEYS = new Set(['first_name', 'given_name'])
+const LAST_NAME_KEYS = new Set(['last_name', 'family_name', 'surname'])
+
+// Meta slugifies question text inconsistently -- spaces, hyphens and camelCase
+// all appear. Normalizing first means a rule can be written once instead of
+// once per spelling Meta happens to emit.
+function normalizeFieldKey(name: string): string {
+  return name
+    .trim()
+    .replace(/([a-z])([A-Z])/g, '$1_$2')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+}
+
+function resolveFieldName(rawName: string): MappedFieldName | null {
+  const key = normalizeFieldKey(rawName)
+  const hits = FIELD_RULES.filter((rule) => rule.matches(key))
+
+  if (hits.length === 0) return null
+
+  // The complaint this answers: under the old if/else chain a key matching two
+  // rules was resolved by source order with nothing recorded, so a client whose
+  // form used an ambiguous label had no way to find out why their CRM column
+  // was wrong.
+  if (hits.length > 1) {
+    console.warn(
+      `[meta-lead] field "${rawName}" matched ${hits.length} rules (${hits.map((hit) => hit.field).join(', ')}); using "${hits[0].field}"`
+    )
+  }
+
+  return hits[0].field
+}
+
+// A lead has one phone number and one email, so these take the first value.
+// A lead can genuinely pick several areas of interest, so those keep all of
+// them. Either way nothing is discarded -- see the _additional note below.
+const SINGLE_VALUED: ReadonlySet<MappedFieldName> = new Set<MappedFieldName>(['name', 'phone', 'email'])
+
+export function mapMetaFieldData(fieldData: MetaFieldDatum[]): MappedMetaFields {
   const mapped: MappedMetaFields = { customFields: {} }
+  let firstName: string | undefined
+  let lastName: string | undefined
 
   for (const { name, values } of fieldData) {
-    const value = values[0] ?? ''
-    const key = name.toLowerCase()
+    const key = normalizeFieldKey(name)
 
-    if (key === 'full_name' || key === 'name') mapped.name = value
-    else if (key.includes('phone')) mapped.phone = value
-    else if (key.includes('email')) mapped.email = value
-    else if (key.includes('propert') || key.includes('interest')) mapped.propertyInterest = value
-    else if (key.includes('budget')) mapped.budgetRange = value
-    else mapped.customFields[name] = value
+    if (FIRST_NAME_KEYS.has(key)) {
+      firstName = values[0] ?? ''
+      continue
+    }
+    if (LAST_NAME_KEYS.has(key)) {
+      lastName = values[0] ?? ''
+      continue
+    }
+
+    const field = resolveFieldName(name)
+
+    if (!field) {
+      // Unmatched questions land in customFields, the same fallback FormLead
+      // uses. Joined rather than truncated: a multi-select custom question is
+      // the most likely place for several answers.
+      mapped.customFields[name] = values.join(', ')
+      continue
+    }
+
+    if (!SINGLE_VALUED.has(field)) {
+      mapped[field] = values.join(', ')
+      continue
+    }
+
+    mapped[field] = values[0] ?? ''
+
+    // The old code took values[0] and dropped the rest with no trace. A second
+    // phone number on a lead is unlikely, but "unlikely" is not a reason to
+    // lose a buyer's contact detail -- parking it keeps the normalized field
+    // usable (phonesMatch and the WhatsApp send both need ONE number) while
+    // still surfacing the extras to whoever reads the lead.
+    if (values.length > 1) {
+      console.warn(`[meta-lead] field "${name}" carried ${values.length} values; kept the first, parked the rest`)
+      mapped.customFields[`${name}_additional`] = values.slice(1).join(', ')
+    }
   }
+
+  // Only when the form used the split keys AND had no whole-name question.
+  const composed = [firstName, lastName].filter(Boolean).join(' ').trim()
+  if (composed && !mapped.name) mapped.name = composed
 
   return mapped
 }
