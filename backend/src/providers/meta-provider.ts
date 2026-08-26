@@ -28,6 +28,29 @@ const GRAPH_API_BASE = 'https://graph.facebook.com/v21.0'
 // the permission. The dashboard is the authority here, not the docs.
 // leads_retrieval requires Meta App Review before this scope works for any
 // Page outside the app's own test Pages/roles -- see design doc Dependencies.
+// pages_manage_ads is what Meta gates every leadgen FORM object behind -- both
+// /{page_id}/leadgen_forms and /{form_id}?fields=questions. Without it the
+// field mapper cannot read a form's declared question types and falls back to
+// its keyword and value-shape layers (lib/meta-field-mapping.ts), which is a
+// silent quality loss rather than a failure. Confirmed 2026-08-26 on Page
+// 1264267750092807: a valid token with the four scopes below answers
+// "(#200) Requires pages_manage_ads permission".
+//
+// It is deliberately NOT in the list below, and adding it here would not grant
+// it. Two reasons, in order of importance:
+//
+//   1. This app uses Facebook Login for Business. META_LOGIN_CONFIG_ID is set
+//      in production, so the consent screen is driven by the DASHBOARD
+//      configuration and this string is never sent -- the real lever is the
+//      config plus an App Review round, not this array.
+//   2. On the fallback path where it IS sent, asking for a permission the app's
+//      review submission does not offer breaks the consent screen outright,
+//      with Meta reporting "Facebook Login is currently unavailable for this
+//      app" and naming no cause. That failure is already on record here.
+//
+// So the order is: add it to the dashboard configuration, get it through App
+// Review, THEN add it here and have every connected Page reconnect -- an
+// issued token does not gain permissions retroactively.
 const META_OAUTH_SCOPES = [
   'pages_show_list',
   'pages_manage_metadata',
@@ -315,6 +338,55 @@ export class MetaProvider {
 
     if (!data.success) {
       throw new Error(`Failed to subscribe Page ${pageId} to leadgen webhook: ${data.error?.message ?? 'Unknown error'}`)
+    }
+  }
+
+  // Every lead form on a Page, WITH its questions, in one call.
+  //
+  // A form is created in Ads Manager when the client builds the ad, so this
+  // returns the schemas BEFORE a single lead has arrived -- verified against
+  // the live API on 2026-08-26 against a Page with zero real leads. That is
+  // what makes a connect-time prewarm possible, and it is also the only way to
+  // show a client their own questions in a mapping UI.
+  //
+  // Requires pages_manage_ads, which Meta gates every leadgen FORM object
+  // behind. Without it this answers "(#200) Requires pages_manage_ads
+  // permission" and the caller degrades to fetching nothing -- see the scope
+  // list at the top of this file.
+  //
+  // Returns [] on any failure, for the same reason fetchFormQuestions does:
+  // this must never be the thing that fails a Page connection.
+  async fetchPageLeadgenForms(
+    pageId: string,
+    pageAccessToken: string
+  ): Promise<{ formId: string; questions: MetaFormQuestion[] }[]> {
+    const params = new URLSearchParams({
+      access_token: pageAccessToken,
+      fields: 'id,questions{key,label,type}',
+      limit: '100',
+    })
+
+    try {
+      const response = await fetch(`${GRAPH_API_BASE}/${pageId}/leadgen_forms?${params.toString()}`)
+      const data = (await response.json()) as {
+        data?: { id?: string; questions?: MetaFormQuestion[] }[]
+        error?: { message?: string }
+      }
+
+      if (data.error) {
+        console.error(`Meta leadgen form list failed for page ${pageId}: ${data.error.message ?? 'Unknown error'}`)
+        return []
+      }
+
+      // Deliberately NOT paginated. A prewarm is best-effort and a Page with
+      // more than 100 forms would still get its 100 most recent; the per-lead
+      // fetch covers anything missed.
+      return (data.data ?? [])
+        .filter((form): form is { id: string; questions?: MetaFormQuestion[] } => Boolean(form.id))
+        .map((form) => ({ formId: form.id, questions: form.questions ?? [] }))
+    } catch (error) {
+      console.error(`Meta leadgen form list threw for page ${pageId}:`, error instanceof Error ? error.message : error)
+      return []
     }
   }
 
