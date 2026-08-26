@@ -1,5 +1,83 @@
 # TODOS
 
+## Mobile app — backend work, tracked in the vyostra-mobile repo
+
+The Android app ([vyostra-mobile](https://github.com/akvinayaktiwari/vyostra-mobile))
+needs backend work that lands **here**, not there. Roughly half of its phase 1 is
+RigaChat code. The tracker for all of it — both repos, ticked boxes — is
+`TODOS.md` in that repo; the design is `docs/SPEC.md` and `docs/BUILD-SPLIT.md`
+there. This section exists so nobody working in RigaChat is surprised by it.
+
+Status as of 2026-08-26: spec unparked, nothing started.
+
+### The push slice (mobile P1) — not started
+
+**What:** a `device_tokens` table (PK `clientId`, SK `deviceId`, no GSI),
+`repositories/device-token-repository.ts`, `providers/expo-push-provider.ts`,
+`services/push-notification-service.ts`, `routes/device-routes.ts`
+(`POST /api/devices`, `DELETE /api/devices/:deviceId`),
+`GET /api/clients/me/app-readiness` on `client-routes.ts`, and
+`scripts/provision-device-tokens.sh`. All additive — no existing route changes shape.
+
+**Why it matters to you even if you never touch the app:** it adds a third delivery
+channel to `sendLeadNotification()`. Anyone editing lead notification behaviour after
+this lands is editing the app's core feature.
+
+> ⚠️ **The hook is `sendLeadNotification()` (`lead-notification-service.ts:177`) and
+> `sendHandoffAlert()` (`notification-service.ts:107`). It is NOT `appendLeadEvent`.**
+> `appendLeadEvent` has 18 non-test call sites across 11 `LeadEventType` values, and
+> `lead-notification-service` writes its own `notification_out` event through it — a
+> hook there would fire a push about the push. The mobile spec said `appendLeadEvent`
+> until 2026-08-26; if you read that version, it is wrong.
+
+**Hard constraint:** the `rigachat-api` Lambda environment must still measure **3597
+bytes** after this deploys. `lib/table-names.ts` documents 3597/4096 and records the
+ceiling being hit on 2026-08-10. Expo Push needs no server credential, which is the
+entire reason it was chosen over direct FCM — a Firebase service-account JSON is
+~2.3KB and does not fit.
+
+**Effort:** M (~1.5 days)
+**Priority:** P1
+**Depends on:** None. Independently testable with curl before the app exists.
+
+### Server-side notification preferences (mobile P1.5) — not started
+
+**What:** a `notificationPreferences` field on the client record
+(`{push, whatsapp, email}`, absent = all true), read by `sendLeadNotification` before
+each channel; `GET /api/devices` for the linked-device list; a `MobileAppSection.tsx`
+in web Settings showing linked devices with a revoke button and the channel toggles.
+
+**Why:** two reasons, one of which is a live bug. First, once push ships, a handoff
+produces up to three alerts (WhatsApp + email fallback + push) and an ordinary lead
+two. Notification fatigue is the standard reason people mute an app. Preferences let
+a client turn a channel off instead. Second — **the existing web preference toggles
+are fake.** `Settings.tsx:41` loads `Preferences` from `sessionStorage` under
+`vyostra_prefs` and never sends them anywhere; there is no `preferences` field in
+`backend/src/types/index.ts`. `emailNotifications`, `desktopAlerts`, `weeklySummary`
+and `leadAssignmentAlerts` have been decorative the whole time. This work makes them
+real, which is worth doing on its own merits.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** the push slice, for the `device_tokens` table the device list reads.
+
+### `GET /api/leads/inbox` is unpaginated
+
+**What:** `getUnifiedInbox()` (`lead-inbox-service.ts:33-76`) fetches every chat lead,
+every form lead, up to `META_INBOX_LIMIT` Meta leads, every lead state and every form,
+then sorts the union in memory.
+
+**Why:** already imperfect on the web, where it is one load on a desktop connection.
+On a phone it is a multi-megabyte response on every app open, over mobile data, for a
+list where the user reads the first five rows. At a few hundred leads it is fine; at
+several thousand it is the thing that makes the app feel broken. **Pre-existing
+limitation that mobile exposes rather than causes** — worth fixing before the app
+reaches a client with a large lead history, not before the app ships.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None.
+
 ## Frontend
 
 ### The frontend talks to two different API hosts, and OAuth state cookies fall through the gap
