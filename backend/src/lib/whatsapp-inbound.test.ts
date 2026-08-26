@@ -93,6 +93,58 @@ describe('template registry validity', () => {
     expect(validateAllTemplates()).toEqual([])
   })
 
+  // Both directions, because Meta rejects each one and names neither the button
+  // nor the reason: a {{1}} url with no example, and an example on a static url.
+  it('catches a dynamic URL button with no example', () => {
+    const problems = validateTemplate({
+      name: 'test_dynamic_no_example',
+      category: 'UTILITY',
+      body: 'Open it.',
+      bodyExample: [],
+      buttons: [{ type: 'URL', text: 'Open', url: 'https://vyostra.com/l/{{1}}' }],
+      sentBy: 'test',
+    })
+
+    expect(problems).toContain('test_dynamic_no_example: dynamic URL button "Open" has no urlExample')
+  })
+
+  it('catches an example on a static URL button', () => {
+    const problems = validateTemplate({
+      name: 'test_static_with_example',
+      category: 'UTILITY',
+      body: 'Open it.',
+      bodyExample: [],
+      buttons: [
+        {
+          type: 'URL',
+          text: 'Open',
+          url: 'https://vyostra.com/dashboard/leads',
+          urlExample: 'https://vyostra.com/dashboard/leads',
+        },
+      ],
+      sentBy: 'test',
+    })
+
+    expect(problems).toContain('test_static_with_example: static URL button "Open" must not carry a urlExample')
+  })
+
+  // Accepted at create time and then wrong on every send, which is the worst
+  // shape of failure available here.
+  it('catches a URL variable that is not the trailing suffix', () => {
+    const problems = validateTemplate({
+      name: 'test_midstring_variable',
+      category: 'UTILITY',
+      body: 'Open it.',
+      bodyExample: [],
+      buttons: [
+        { type: 'URL', text: 'Open', url: 'https://vyostra.com/l/{{1}}/detail', urlExample: 'https://x.com/l/a/detail' },
+      ],
+      sentBy: 'test',
+    })
+
+    expect(problems.some((problem) => problem.includes('must end in {{1}}'))).toBe(true)
+  })
+
   it('every template names what sends it', () => {
     for (const template of WHATSAPP_TEMPLATES) {
       expect(template.sentBy.length).toBeGreaterThan(0)

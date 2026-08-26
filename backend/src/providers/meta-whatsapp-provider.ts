@@ -40,7 +40,7 @@ interface MetaTemplateComponent {
   format?: 'TEXT'
   text?: string
   example?: { body_text: string[][] }
-  buttons?: { type: string; text: string; url?: string }[]
+  buttons?: { type: string; text: string; url?: string; example?: string[] }[]
 }
 
 interface MetaTemplateCreateResponse {
@@ -80,6 +80,45 @@ export type TemplateCreateResult =
 // template outright without one -- see the comment on bodyExample in
 // whatsapp-templates.ts. body_text is an array OF arrays: one inner array per
 // example set, and we always send exactly one.
+// The SEND-side counterpart of buildComponents above. Different shape, different
+// API, deliberately not merged: create-time components describe a template's
+// STRUCTURE (lowercased 'BODY', example values), send-time components carry its
+// VALUES (lowercase 'body', parameters). Meta rejects each shape on the other's
+// endpoint.
+//
+// Returns a spreadable object rather than an array because `components` must be
+// OMITTED entirely when there is nothing to fill: Meta rejects a body component
+// carrying an empty parameters list, which is exactly the zero-placeholder case
+// (hello_world).
+function buildSendComponents(template: WhatsAppTemplateSend): { components?: unknown[] } {
+  const components: unknown[] = []
+
+  if (template.bodyParams.length > 0) {
+    components.push({
+      type: 'body',
+      parameters: template.bodyParams.map((text) => ({ type: 'text', text })),
+    })
+  }
+
+  // The value here is the SUFFIX appended to the approved url, never the whole
+  // URL: the template holds 'https://vyostra.com/l/{{1}}' and this fills {{1}}.
+  // Sending a full URL produces a link with the base repeated twice, which Meta
+  // accepts and the recipient cannot open.
+  //
+  // index is '0' because a template may carry more than one button and the
+  // parameter has to name which. Every template that uses this has exactly one.
+  if (template.urlButtonParam) {
+    components.push({
+      type: 'button',
+      sub_type: 'url',
+      index: '0',
+      parameters: [{ type: 'text', text: template.urlButtonParam }],
+    })
+  }
+
+  return components.length > 0 ? { components } : {}
+}
+
 function buildComponents(definition: WhatsAppTemplateDefinition): MetaTemplateComponent[] {
   const components: MetaTemplateComponent[] = []
 
@@ -101,9 +140,19 @@ function buildComponents(definition: WhatsAppTemplateDefinition): MetaTemplateCo
   if (definition.buttons && definition.buttons.length > 0) {
     components.push({
       type: 'BUTTONS',
-      buttons: definition.buttons.map((button) =>
-        button.url ? { type: button.type, text: button.text, url: button.url } : { type: button.type, text: button.text }
-      ),
+      // A dynamic URL button ({{1}} in the url) must ship a full example URL,
+      // exactly as a parameterised body must ship body_text. Meta wants it as
+      // an ARRAY even though only one value is ever meaningful.
+      buttons: definition.buttons.map((button) => {
+        if (!button.url) return { type: button.type, text: button.text }
+        const mapped: { type: string; text: string; url?: string; example?: string[] } = {
+          type: button.type,
+          text: button.text,
+          url: button.url,
+        }
+        if (button.urlExample) mapped.example = [button.urlExample]
+        return mapped
+      }),
     })
   }
 
@@ -374,16 +423,7 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
           // sent as an empty array: Meta rejects a body component carrying an
           // empty parameters list, which is exactly the zero-placeholder case
           // (hello_world).
-          ...(template.bodyParams.length > 0
-            ? {
-                components: [
-                  {
-                    type: 'body',
-                    parameters: template.bodyParams.map((text) => ({ type: 'text', text })),
-                  },
-                ],
-              }
-            : {}),
+          ...buildSendComponents(template),
         },
       })
       return await interpretSendResponse(response)

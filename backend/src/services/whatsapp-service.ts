@@ -374,7 +374,9 @@ export async function sendWhatsAppTemplateToLead(
   toNumber: string,
   templateName: string,
   bodyParams: string[] = [],
-  languageCode: string = WHATSAPP_TEMPLATE_LANGUAGE
+  languageCode: string = WHATSAPP_TEMPLATE_LANGUAGE,
+  // Only for templates with a dynamic URL button; see WhatsAppTemplateSend.
+  urlButtonParam?: string
 ): Promise<WhatsAppSendResult> {
   const client = await getClientById(clientId)
   if (!client) {
@@ -386,7 +388,12 @@ export async function sendWhatsAppTemplateToLead(
     return { success: false, error: 'No active WhatsApp connection for this client', retryable: false }
   }
 
-  const template: WhatsAppTemplateSend = { templateName, languageCode, bodyParams }
+  const template: WhatsAppTemplateSend = {
+    templateName,
+    languageCode,
+    bodyParams,
+    ...(urlButtonParam ? { urlButtonParam } : {}),
+  }
   return sendWithRetry(() => sender.provider.sendTemplate(toNumber, template, sender.credentials))
 }
 
@@ -409,7 +416,9 @@ export async function sendWhatsAppTemplateToClientNumber(
   clientId: string,
   templateName: string,
   bodyParams: string[] = [],
-  languageCode: string = WHATSAPP_TEMPLATE_LANGUAGE
+  languageCode: string = WHATSAPP_TEMPLATE_LANGUAGE,
+  // Only for templates with a dynamic URL button; see WhatsAppTemplateSend.
+  urlButtonParam?: string
 ): Promise<WhatsAppSendResult> {
   const client = await getClientById(clientId)
   if (!client) {
@@ -426,7 +435,12 @@ export async function sendWhatsAppTemplateToClientNumber(
     return { success: false, error: 'Client has no notificationNumber configured', retryable: false }
   }
 
-  const template: WhatsAppTemplateSend = { templateName, languageCode, bodyParams }
+  const template: WhatsAppTemplateSend = {
+    templateName,
+    languageCode,
+    bodyParams,
+    ...(urlButtonParam ? { urlButtonParam } : {}),
+  }
   return sendWithRetry(() => sender.provider.sendTemplate(notificationNumber, template, sender.credentials))
 }
 

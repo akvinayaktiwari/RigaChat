@@ -72,6 +72,54 @@ describe('MetaWhatsAppProvider.sendTemplate', () => {
     })
   })
 
+  it('sends a dynamic URL button as its own component alongside the body', async () => {
+    fetchMock.mockResolvedValueOnce(okResponse())
+    const template: WhatsAppTemplateSend = {
+      templateName: 'lead_handoff_alert_3',
+      languageCode: 'en',
+      bodyParams: ['Ravi Kumar', '+91 98765 43210', 'No booking after 3 follow-ups', 'Lead: pricing?'],
+      urlButtonParam: 'Y2hhdHxib3QtMXxsZWFkLTE',
+    }
+
+    await metaWhatsAppProvider.sendTemplate('919876543210', template, credentials)
+
+    const components = (sentBody().template as { components: unknown[] }).components
+    // A button parameter is a SEPARATE component, never a fifth body param:
+    // folding it in fails the send with a parameter count mismatch (132000).
+    expect(components).toHaveLength(2)
+    expect(components[1]).toEqual({
+      type: 'button',
+      sub_type: 'url',
+      index: '0',
+      parameters: [{ type: 'text', text: 'Y2hhdHxib3QtMXxsZWFkLTE' }],
+    })
+  })
+
+  it('omits the button component for a template that has no dynamic button', async () => {
+    fetchMock.mockResolvedValueOnce(okResponse())
+    const template: WhatsAppTemplateSend = {
+      templateName: 'lead_handoff_alert_2',
+      languageCode: 'en',
+      bodyParams: ['Ravi Kumar', '+91 98765 43210', 'No booking after 3 follow-ups'],
+    }
+
+    await metaWhatsAppProvider.sendTemplate('919876543210', template, credentials)
+
+    const components = (sentBody().template as { components: unknown[] }).components
+    expect(components).toHaveLength(1)
+  })
+
+  // The zero-placeholder case has to stay component-free even with the button
+  // branch added: Meta rejects an empty components array outright.
+  it('still omits components when there is neither a body param nor a button', async () => {
+    fetchMock.mockResolvedValueOnce(okResponse())
+    const template: WhatsAppTemplateSend = { templateName: 'connection_test_1', languageCode: 'en', bodyParams: [] }
+
+    await metaWhatsAppProvider.sendTemplate('919876543210', template, credentials)
+
+    expect(sentBody().template).not.toHaveProperty('components')
+  })
+
   it('posts to the phone number id, not the WABA id', async () => {
     fetchMock.mockResolvedValueOnce(okResponse())
     const template: WhatsAppTemplateSend = { templateName: 'hello_world', languageCode: 'en', bodyParams: [] }

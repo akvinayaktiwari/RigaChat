@@ -35,6 +35,14 @@ export interface WhatsAppTemplateSend {
   // (hello_world). Count must match what was approved -- Meta rejects a
   // parameter count mismatch with error 132000.
   bodyParams: string[]
+  // Fills the trailing {{1}} of a DYNAMIC URL button, and is the suffix alone,
+  // not a whole URL -- the base lives in the approved template. Absent for
+  // every template whose buttons are static or quick replies.
+  //
+  // Not part of bodyParams because it is a different component to Meta: a body
+  // parameter count mismatch fails with 132000, so folding one into the other
+  // breaks both templates that use it.
+  urlButtonParam?: string
 }
 
 export interface WhatsAppProvider {

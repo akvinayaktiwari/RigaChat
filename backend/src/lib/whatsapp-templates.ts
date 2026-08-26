@@ -16,9 +16,20 @@ export type WhatsAppTemplateCategory = 'UTILITY' | 'MARKETING' | 'AUTHENTICATION
 export interface WhatsAppTemplateButton {
   type: 'QUICK_REPLY' | 'URL'
   text: string
-  // Required for URL buttons, absent for quick replies. Static only —
-  // a dynamic URL suffix would need its own example value at create time.
+  // Required for URL buttons, absent for quick replies. May be STATIC
+  // ('https://vyostra.com/dashboard/leads') or DYNAMIC, in which case it ends
+  // in a single {{1}} that the send site fills:
+  // 'https://vyostra.com/l/{{1}}'.
+  //
+  // Meta allows the variable ONLY as a trailing suffix, never in the middle and
+  // never in a query string -- which is the entire reason lead-link.ts packs a
+  // LeadRef into one path segment.
   url?: string
+  // Required when `url` contains {{1}}, rejected by Meta when it does not: a
+  // dynamic URL button must ship a full example URL at create time, the same
+  // way a parameterised body must ship bodyExample. validateTemplate enforces
+  // both directions so the mismatch is caught here rather than at review.
+  urlExample?: string
 }
 
 export interface WhatsAppTemplateDefinition {
@@ -331,7 +342,57 @@ export const WHATSAPP_TEMPLATES: WhatsAppTemplateDefinition[] = [
       'Open your Vyostra inbox to read the conversation and take over.',
     bodyExample: ['Ravi Kumar', '+91 98765 43210', 'No booking after 3 follow-ups'],
     buttons: [{ type: 'URL', text: 'Open inbox', url: 'https://vyostra.com/dashboard/leads' }],
-    sentBy: 'notification-service.ts sendHandoffAlert, when _1 is not yet approved',
+    sentBy: 'notification-service.ts sendHandoffAlert, when neither _3 nor _1 is approved',
+  },
+  {
+    // What _1 and _2 were each half of. _1 has the deep link but spends a whole
+    // body line on a raw 120-character URL; _2 is clean but lands the human on
+    // the lead LIST and makes them hunt for the lead the message just named.
+    //
+    // The thing that made choosing necessary was Meta's rule that a URL
+    // button's variable may only be a trailing path SUFFIX -- a LeadRef needs
+    // query params, so it could not be a button. lib/lead-link.ts removes the
+    // constraint by packing the whole ref into one opaque path segment, so the
+    // link becomes '/l/<token>' and fits the rule. Nobody reads the token: it
+    // sits behind the button label.
+    //
+    // Four body variables instead of _1's five, because the link stops being
+    // one of them.
+    name: 'lead_handoff_alert_3',
+    category: 'UTILITY',
+    header: 'A lead needs you',
+    footer: 'Sent by Vyostra AI',
+    // Still true here and still load-bearing: Meta rejects a body ending in a
+    // variable (error_subcode 2388299), so the closing line is required. It is
+    // also the only remaining place that says what to DO, now that the link is
+    // a button rather than a sentence.
+    //
+    // {{4}} is a FLATTENED transcript summary -- template parameters cannot
+    // contain newlines, tabs, or 4+ consecutive spaces. Meta rejects the SEND,
+    // not the template, so this passes review and fails in production. The send
+    // site joins turns with a middot for that reason.
+    body:
+      'Your AI agent has stopped and handed this lead over.\n\n' +
+      'Name: {{1}}\n' +
+      'Phone: {{2}}\n' +
+      'Reason: {{3}}\n\n' +
+      'Recent messages: {{4}}\n\n' +
+      'Reply from your Vyostra inbox to take over.',
+    bodyExample: [
+      'Ravi Kumar',
+      '+91 98765 43210',
+      'No booking after 3 follow-ups',
+      'Lead: I just want to know about pricing \u00b7 Agent: I do not have that information right now. Would you like to speak with our team?',
+    ],
+    buttons: [
+      {
+        type: 'URL',
+        text: 'Open this lead',
+        url: 'https://vyostra.com/l/{{1}}',
+        urlExample: 'https://vyostra.com/l/Y2hhdHxiMWYyfDUzODNjYjE1',
+      },
+    ],
+    sentBy: 'notification-service.ts sendHandoffAlert (hand_to_agent + lead_reminder)',
   },
 ]
 
@@ -387,6 +448,26 @@ export function validateTemplate(template: WhatsAppTemplateDefinition): string[]
     }
     if (button.type === 'URL' && !button.url) {
       problems.push(`${template.name}: URL button "${button.text}" has no url`)
+    }
+
+    // A dynamic URL button and its example travel together in both directions:
+    // Meta rejects a {{1}} url with no example, and equally rejects an example
+    // on a static url. Both failures surface at CREATE as a generic message
+    // that names neither the button nor the reason.
+    const isDynamicUrl = button.type === 'URL' && (button.url?.includes('{{') ?? false)
+    if (isDynamicUrl && !button.urlExample) {
+      problems.push(`${template.name}: dynamic URL button "${button.text}" has no urlExample`)
+    }
+    if (!isDynamicUrl && button.urlExample) {
+      problems.push(`${template.name}: static URL button "${button.text}" must not carry a urlExample`)
+    }
+    // Meta only accepts the variable as a trailing suffix, and only one of
+    // them. A url with {{1}} anywhere but the end is accepted at create time
+    // and then builds the wrong link on every send.
+    if (isDynamicUrl && button.url && !/\{\{1\}\}$/.test(button.url)) {
+      problems.push(
+        `${template.name}: URL button "${button.text}" must end in {{1}} -- Meta allows the variable only as a trailing suffix`
+      )
     }
   }
 
