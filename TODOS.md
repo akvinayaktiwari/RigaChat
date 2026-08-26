@@ -364,6 +364,48 @@ prerequisite.
 **Priority:** P2
 **Depends on:** None
 
+### The form-schema lookup needs pages_manage_ads, which we never request
+
+**What:** `mapMetaFieldData`'s most authoritative layer reads the form schema via
+`metaProvider.fetchFormQuestions`, using the stored Page token. Meta gates leadgen FORM
+objects behind `pages_manage_ads`, which is not in `META_OAUTH_SCOPES`
+(`meta-provider.ts:31` requests `pages_show_list`, `pages_manage_metadata`,
+`pages_read_engagement`, `leads_retrieval`). Verified 2026-08-26 against the live API on
+Page 1264267750092807 ("Sobha Group", client f163ed8a):
+
+```
+GET /me                -> {"id":"1264267750092807","name":"Sobha Group "}      OK
+GET /subscribed_apps   -> subscribed_fields: ["leadgen"]                       OK
+GET /leadgen_forms     -> (#200) Requires pages_manage_ads permission          FAIL
+```
+
+The token is valid and the webhook subscription is healthy — this is a scope gap, not an
+expiry, and it does NOT affect lead delivery (`leads_retrieval` covers reading the lead
+itself).
+
+**Why:** layer 1 of the resolver silently returns `[]` on this Page and the mapping falls
+through to the keyword and value-shape layers. That degradation is by design and was tested,
+so nothing breaks — but the layer built to make mapping deterministic is not actually running
+for this client, and the log line that says so (`Meta form schema fetch failed`) is easy to
+miss. Page 353635678632363 DOES return its schema, which is most likely because it belongs to
+the app's own admin (the app is still in dev mode, one admin) rather than because its scopes
+differ — so the working case may be the unrepresentative one.
+
+**Context:** the fix is `pages_manage_ads` in two places, not one: `META_OAUTH_SCOPES` for
+the fallback path, AND the Facebook Login for Business configuration in the dashboard, which
+is what actually governs the consent screen whenever `META_LOGIN_CONFIG_ID` is set. Adding a
+permission means another App Review round, so it should be batched with whatever else that
+review needs rather than submitted on its own. Every already-connected Page also needs
+reconnecting to pick up the new scope — an existing token does not gain permissions.
+
+Worth deciding first whether it is worth it at all: layers 2 and 3 already resolve the
+standard fields, so the schema mainly buys correctness on CUSTOM questions and the human
+labels the mapping UI item wants.
+
+**Effort:** S (code) + an App Review round
+**Priority:** P2
+**Depends on:** None
+
 ### Meta Lead Ads: consent screen still answers "Feature Unavailable"
 
 **What:** `Meta Ads -> Connect with Facebook` never reaches a consent screen. Meta
