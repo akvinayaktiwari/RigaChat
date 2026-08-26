@@ -621,6 +621,22 @@ export interface Entitlements {
   }
 }
 
+// One question on a Meta Lead Ads form, as Meta itself describes it.
+//
+// `type` is the authoritative answer to "what is this question asking for" --
+// EMAIL, PHONE, FULL_NAME and so on -- and it is what makes mapping a Meta lead
+// a lookup rather than a guess. Verified against the live Graph API on
+// 2026-08-26: GET /{form_id}?fields=questions{key,label,type}.
+//
+// `label` is the human text the client typed in Ads Manager ("WhatsApp Number"),
+// which the webhook payload does NOT carry -- it gives only the slugified key.
+// That makes the label the better input for the keyword fallback.
+export interface MetaFormQuestion {
+  key: string
+  label?: string
+  type?: string
+}
+
 export interface WebhookEvent {
   eventId: string
   provider: string

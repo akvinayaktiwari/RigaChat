@@ -5,6 +5,13 @@ import {
   MetaPagesLookupError,
   MetaTokenExchangeError,
 } from '../lib/meta-connect-errors.js'
+import type { MetaFormQuestion } from '../types/index.js'
+// The mapping module owns this shape -- it is the input to mapMetaFieldData,
+// and duplicating it here is how the two drift. Re-exported so the existing
+// importers of it from this file keep working.
+import type { MetaFieldDatum } from '../lib/meta-field-mapping.js'
+
+export type { MetaFieldDatum }
 
 const META_OAUTH_URL = 'https://www.facebook.com/v21.0/dialog/oauth'
 const GRAPH_API_BASE = 'https://graph.facebook.com/v21.0'
@@ -58,11 +65,6 @@ export interface MetaPageCredentials {
   pageId: string
   pageName: string
   pageAccessToken: string
-}
-
-export interface MetaFieldDatum {
-  name: string
-  values: string[]
 }
 
 interface MetaLeadgenResponse {
@@ -313,6 +315,44 @@ export class MetaProvider {
 
     if (!data.success) {
       throw new Error(`Failed to subscribe Page ${pageId} to leadgen webhook: ${data.error?.message ?? 'Unknown error'}`)
+    }
+  }
+
+  // The form's OWN description of its questions, which is what makes mapping a
+  // Meta lead a lookup instead of a guess: every question carries a declared
+  // type (EMAIL, PHONE, FULL_NAME) and the human label the client typed in Ads
+  // Manager. The webhook payload carries neither -- only a slugified key.
+  //
+  // Fetched per FORM, not per lead, and cached: a Meta lead form cannot be
+  // edited after it has run, so its schema is effectively immutable (editing
+  // one in Ads Manager produces a copy, which is why real pages accumulate
+  // forms named '...-copy').
+  //
+  // Returns [] rather than throwing on any failure. A schema we cannot read
+  // must degrade the mapping to the keyword and value-shape heuristics, never
+  // fail the lead -- this runs on the lead-capture path.
+  async fetchFormQuestions(formId: string, pageAccessToken: string): Promise<MetaFormQuestion[]> {
+    const params = new URLSearchParams({
+      access_token: pageAccessToken,
+      fields: 'questions{key,label,type}',
+    })
+
+    try {
+      const response = await fetch(`${GRAPH_API_BASE}/${formId}?${params.toString()}`)
+      const data = (await response.json()) as {
+        questions?: MetaFormQuestion[]
+        error?: { message?: string }
+      }
+
+      if (data.error) {
+        console.error(`Meta form schema fetch failed for ${formId}: ${data.error.message ?? 'Unknown error'}`)
+        return []
+      }
+
+      return data.questions ?? []
+    } catch (error) {
+      console.error(`Meta form schema fetch threw for ${formId}:`, error instanceof Error ? error.message : error)
+      return []
     }
   }
 

@@ -5,10 +5,15 @@ import {
   QUICK_SIGNUP_RATE_LIMIT_SECONDS,
   RESYNC_COOLDOWN_SECONDS,
 } from '../config/entitlements-config.js'
-import type { Entitlements } from '../types/index.js'
+import type { Entitlements, MetaFormQuestion } from '../types/index.js'
 
 const EMBEDDING_TTL = 24 * 60 * 60        // 24 hours
 const ANSWER_TTL = 7 * 24 * 60 * 60       // 7 days
+// A Meta lead form cannot be edited once it has run -- editing produces a copy
+// under a new id -- so its schema is immutable for the life of the form. The
+// TTL is a safety net against a stale cache after a Meta-side change, not a
+// correctness requirement.
+const META_FORM_SCHEMA_TTL = 30 * 24 * 60 * 60  // 30 days
 
 function hashText(text: string): string {
   return createHash('sha256').update(text).digest('hex')
@@ -161,3 +166,30 @@ export async function incrementChatRate(
   return await redis.incr(`chat:rl:${bucket}:${ip}:${window}`, windowSeconds)
 }
 
+
+// The form schema behind mapMetaFieldData's most authoritative layer. Cached
+// per FORM rather than per lead: one Graph call covers every lead that form
+// ever produces, which is what keeps the schema lookup off the lead-capture
+// path's cost.
+//
+// Both halves swallow their errors, like the caches above: a Redis outage must
+// degrade the mapping to the keyword heuristics, never fail a lead.
+export async function getCachedFormQuestions(formId: string): Promise<MetaFormQuestion[] | null> {
+  try {
+    const redis = getRedisProvider()
+    const value = await redis.get(`metaform:${formId}`)
+    if (!value) return null
+    return JSON.parse(value) as MetaFormQuestion[]
+  } catch {
+    return null
+  }
+}
+
+export async function setCachedFormQuestions(formId: string, questions: MetaFormQuestion[]): Promise<void> {
+  try {
+    const redis = getRedisProvider()
+    await redis.set(`metaform:${formId}`, JSON.stringify(questions), META_FORM_SCHEMA_TTL)
+  } catch (error) {
+    console.error(`Failed to cache Meta form schema ${formId}:`, error)
+  }
+}
