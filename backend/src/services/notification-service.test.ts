@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LeadEvent } from '../types/index.js'
+import { unpackLeadRef } from '../lib/lead-link.js'
 
 const readJourneyLead = vi.fn()
 vi.mock('./lead-resolution-service.js', () => ({ readJourneyLead }))
@@ -47,14 +48,41 @@ describe('sendHandoffAlert', () => {
     const result = await sendHandoffAlert(baseInput)
 
     expect(result).toEqual({ notified: true })
-    const [clientId, templateName, params] = sendWhatsAppTemplateToClientNumber.mock.calls[0]
+    const [clientId, templateName, params, , urlButtonParam] = sendWhatsAppTemplateToClientNumber.mock.calls[0]
     expect(clientId).toBe('client-1')
-    expect(templateName, 'the richer template is preferred').toBe('lead_handoff_alert_1')
+    expect(templateName, 'the button template is preferred').toBe('lead_handoff_alert_3')
     expect(params[0]).toBe('Ravi Kumar')
     expect(params[1]).toBe('+919876543210')
     expect(params[2]).toBe('No booking after 3 follow-ups')
     expect(params[3]).toContain('Lead: Yes i just wanna know about pricing')
-    expect(params[4]).toBe('https://vyostra.com/dashboard/leads/lead-1?source=chat&botId=bot-1')
+    // Four body params, not five: _3's link is a BUTTON, so the deep link
+    // leaves the body and arrives as the button's suffix instead.
+    expect(params).toHaveLength(4)
+    expect(unpackLeadRef(urlButtonParam)).toEqual(chatRef)
+  })
+
+  // The suffix alone, never a whole URL: the 'https://vyostra.com/l/' half is
+  // baked into the approved template, so sending a full URL would build a link
+  // with the base repeated twice -- which Meta accepts and nobody can open.
+  it('sends the button parameter as a bare packed ref', async () => {
+    await sendHandoffAlert(baseInput)
+
+    const urlButtonParam = sendWhatsAppTemplateToClientNumber.mock.calls[0][4]
+    expect(urlButtonParam).not.toContain('http')
+    expect(urlButtonParam).not.toContain('/')
+  })
+
+  // Only _3 has a dynamic URL button. Passing a button parameter against _1 or
+  // _2 fails the send outright, so the fall-through has to drop it.
+  it('sends no button parameter for the templates that have no button', async () => {
+    sendWhatsAppTemplateToClientNumber
+      .mockResolvedValueOnce({ success: false, error: 'Template name does not exist', retryable: false })
+      .mockResolvedValueOnce({ success: true, messageId: 'wamid.2' })
+
+    await sendHandoffAlert(baseInput)
+
+    expect(sendWhatsAppTemplateToClientNumber.mock.calls[1][1]).toBe('lead_handoff_alert_1')
+    expect(sendWhatsAppTemplateToClientNumber.mock.calls[1][4]).toBeUndefined()
   })
 
   // AC5: a client who never set a notification number is a configuration gap,
@@ -85,8 +113,8 @@ describe('sendHandoffAlert', () => {
     const result = await sendHandoffAlert(baseInput)
 
     expect(result).toEqual({ notified: false, skipReason: 'send_failed', error: 'Template not approved' })
-    // Both templates were tried before giving up.
-    expect(sendWhatsAppTemplateToClientNumber).toHaveBeenCalledTimes(2)
+    // All three templates were tried before giving up.
+    expect(sendWhatsAppTemplateToClientNumber).toHaveBeenCalledTimes(3)
   })
 
   // AC4: the journey has already stopped talking to the lead by the time this
@@ -186,19 +214,27 @@ describe('handoff template fall-through', () => {
     const result = await sendHandoffAlert(baseInput)
 
     expect(result).toEqual({ notified: true })
-    expect(sendWhatsAppTemplateToClientNumber.mock.calls[1][1]).toBe('lead_handoff_alert_2')
+    expect(sendWhatsAppTemplateToClientNumber.mock.calls[1][1]).toBe('lead_handoff_alert_1')
   })
 
-  // Three params, not five. Sending _1's five against _2 would fail on
-  // parameter count, which is the obvious way a fall-through like this breaks.
-  it('sends the simpler template its own three parameters', async () => {
+  // Three params, not four or five. Every template in the ladder takes a
+  // DIFFERENT count, which is the obvious way a fall-through like this breaks:
+  // Meta fails a parameter count mismatch with error 132000.
+  it('gives each template in the ladder its own parameter count', async () => {
     sendWhatsAppTemplateToClientNumber
+      .mockResolvedValueOnce({ success: false, error: 'nope', retryable: false })
       .mockResolvedValueOnce({ success: false, error: 'nope', retryable: false })
       .mockResolvedValueOnce({ success: true, messageId: 'wamid.2' })
 
     await sendHandoffAlert(baseInput)
 
-    const [, , params] = sendWhatsAppTemplateToClientNumber.mock.calls[1]
+    const counts = sendWhatsAppTemplateToClientNumber.mock.calls.map(
+      (call: unknown[]) => (call[2] as string[]).length
+    )
+    expect(counts).toEqual([4, 5, 3])
+
+    const [, templateName, params] = sendWhatsAppTemplateToClientNumber.mock.calls[2]
+    expect(templateName).toBe('lead_handoff_alert_2')
     expect(params).toEqual(['Ravi Kumar', '+919876543210', 'No booking after 3 follow-ups'])
   })
 

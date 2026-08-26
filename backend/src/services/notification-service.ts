@@ -17,6 +17,7 @@ import { getLeadEvents } from '../repositories/lead-event-repository.js'
 import { readJourneyLead } from './lead-resolution-service.js'
 import { sendWhatsAppTemplateToClientNumber } from './whatsapp-service.js'
 import { templateLanguageOf } from '../lib/whatsapp-templates.js'
+import { packLeadRef } from '../lib/lead-link.js'
 import type { LeadEvent, LeadRef } from '../types/index.js'
 import type { WhatsAppSendResult } from '../lib/whatsapp-provider.js'
 
@@ -33,7 +34,17 @@ import type { WhatsAppSendResult } from '../lib/whatsapp-provider.js'
 // matching prose is how this would quietly stop working after a Meta copy edit.
 // The cost of the looser rule is one extra API call on a genuine failure --
 // against a handoff that fires days into a journey, that is nothing.
-export const HANDOFF_ALERT_TEMPLATES = ['lead_handoff_alert_1', 'lead_handoff_alert_2'] as const
+//
+// _3 leads because it is the only one whose deep link is a BUTTON rather than a
+// raw URL in the body. Order is preference, not fallback quality: _1 still
+// carries the same link and transcript, just less cleanly, and _2 is the
+// no-deep-link floor. A newly submitted _3 therefore costs nothing while it
+// sits in review -- _1 keeps sending, with no deploy needed when _3 clears.
+export const HANDOFF_ALERT_TEMPLATES = [
+  'lead_handoff_alert_3',
+  'lead_handoff_alert_1',
+  'lead_handoff_alert_2',
+] as const
 
 export type HandoffAlertTemplate = (typeof HANDOFF_ALERT_TEMPLATES)[number]
 
@@ -122,12 +133,21 @@ export async function sendHandoffAlert(input: HandoffAlertInput): Promise<Handof
     const phone = flattenTemplateParam(lead.phone || 'Not on file')
     const reason = flattenTemplateParam(input.reason) || 'No reason recorded'
 
-    // _2 is deliberately the same first three values, so the human gets the
-    // same identifying facts either way. What it loses is the transcript and
-    // the deep link -- it lands them on the inbox instead of on the lead.
+    // All three open with the same first three values, so the human gets the
+    // same identifying facts whichever one is approved. _3 and _1 add the
+    // transcript; _2 drops it along with the deep link and lands them on the
+    // inbox instead of on the lead.
+    const summary = summarizeRecentMessages(events)
     const paramsFor: Record<HandoffAlertTemplate, string[]> = {
-      lead_handoff_alert_1: [name, phone, reason, summarizeRecentMessages(events), leadDetailUrl(input.leadRef)],
+      lead_handoff_alert_3: [name, phone, reason, summary],
+      lead_handoff_alert_1: [name, phone, reason, summary, leadDetailUrl(input.leadRef)],
       lead_handoff_alert_2: [name, phone, reason],
+    }
+
+    // Only _3 has a dynamic URL button, and it takes the packed ref ALONE --
+    // the 'https://vyostra.com/l/' half is baked into the approved template.
+    const urlButtonParamFor: Partial<Record<HandoffAlertTemplate, string>> = {
+      lead_handoff_alert_3: packLeadRef(input.leadRef),
     }
 
     let result: WhatsAppSendResult | undefined
@@ -136,7 +156,8 @@ export async function sendHandoffAlert(input: HandoffAlertInput): Promise<Handof
         input.clientId,
         template,
         paramsFor[template],
-        templateLanguageOf(template)
+        templateLanguageOf(template),
+        urlButtonParamFor[template]
       )
 
       if (result.success) return { notified: true }
