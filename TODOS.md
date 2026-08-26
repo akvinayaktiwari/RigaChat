@@ -505,17 +505,29 @@ lead who typed nothing.
 Not verified against a real propagation lag — it cannot be provoked on demand. Covered by
 `meta-lead-service.test.ts`, which is also the first test file this service has had.
 
-### mapMetaFieldData silently truncates multi-value answers and has undocumented match precedence
+### [RESOLVED 2026-08-26] mapMetaFieldData silently truncates multi-value answers and has undocumented match precedence
 
-**What:** `mapMetaFieldData` in `meta-lead-service.ts` always takes `values[0]` for a Meta Lead Ads field, silently discarding any additional values (e.g. a multi-select question). Its label-matching `if/else if` chain (phone before email before property before budget) also means a field name matching multiple branches resolves via chain order with no logging when that happens.
+Both filed problems fixed, plus a third and worse one found while doing it: a form asking
+for a **"WhatsApp Number"** rather than a phone number slugifies to `whatsapp_number`,
+which matched no branch of the old `if/else` chain — so the lead saved with an EMPTY
+`phone` and the answer landed in `customFields`. That is the field lead notifications,
+journey outreach and the entire WhatsApp agent are addressed by, and these forms are
+common in Indian real estate.
 
-**Why:** Both are silent-data-loss risks that would be invisible without inspecting Meta's raw payload directly — a client whose Lead Ads form uses a multi-select question would never know their platform is only capturing the first answer.
+The chain is now an ordered `FIELD_RULES` list whose precedence is stated in a comment and
+asserted in tests (email → phone → name → budget → property), and `resolveFieldName` logs
+any key matching more than one rule instead of resolving it silently by source order.
+`first_name`/`last_name` are composed, having previously matched nothing. Multi-select
+answers are joined for fields a lead can genuinely give several of; `name`/`phone`/`email`
+keep the first value — `phonesMatch` and the WhatsApp send need exactly one — and park the
+rest under `<key>_additional` so nothing is discarded.
 
-**Context:** Found during the adversarial pass of this branch's `/ship`. Low urgency unless a client's actual form uses multi-value questions or ambiguous labels — revisit if real Meta lead data shows this happening.
-
-**Effort:** S
-**Priority:** P3
-**Depends on:** None
+**Still open:** the rule list is written from Meta's documented key names, NOT from
+observed client payloads — `meta_leads` holds only the six App Review test rows, so there
+was no real WhatsApp-form lead to check against. The ambiguity warnings in
+`/aws/lambda/rigachat-api` are the signal to watch once real forms arrive; a key that
+matches nothing still lands in `customFields`, so a miss is recoverable rather than lost.
+This is also the evidence the field-mapping UI item above was waiting for.
 
 ### [RESOLVED 2026-07-29] Gupshup WhatsApp webhook signature verification — done via URL token, not HMAC
 
