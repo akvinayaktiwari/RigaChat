@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
+import { safeNextPath, takePostLoginPath } from '../lib/post-login-redirect'
 import AuthHeroPanel from '../components/auth/AuthHeroPanel'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -46,13 +47,18 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // ?next= is the in-SPA carrier; sessionStorage is the fallback for a visitor
+  // who arrived here some other way. Validated either way -- an unchecked next
+  // param is an open redirect, and this product's links arrive over WhatsApp.
+  const [searchParams] = useSearchParams()
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     setLoading(true)
     try {
       await signIn(email, password)
-      navigate('/dashboard')
+      navigate(safeNextPath(searchParams.get('next')) ?? takePostLoginPath())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign in failed. Please try again.')
       setLoading(false)

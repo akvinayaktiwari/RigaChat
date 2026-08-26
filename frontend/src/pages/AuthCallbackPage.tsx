@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { LoadingScreen } from '../components/LoadingScreen'
+import { takePostLoginPath } from '../lib/post-login-redirect'
 
 export default function AuthCallbackPage() {
   const { handleCallback } = useAuth()
@@ -25,7 +26,11 @@ export default function AuthCallbackPage() {
 
     handleCallback(code).then((succeeded) => {
       if (succeeded) {
-        navigate('/dashboard', { replace: true })
+        // sessionStorage rather than a query param: useAuth.login() leaves the
+        // app via window.location.href and Cognito returns to a FIXED
+        // redirect_uri, so nothing we put in the URL survives the round trip.
+        // This is the path the Google-federated account actually uses.
+        navigate(takePostLoginPath(), { replace: true })
       }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
