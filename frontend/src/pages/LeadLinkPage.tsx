@@ -12,11 +12,10 @@ import { leadDetailPath, unpackLeadRef } from '../lib/lead-ref'
 // person may read the lead. Putting the guard here instead would only move the
 // same bounce one route earlier.
 //
-// Known gap, unchanged from the raw link this replaced: a client who is not
-// signed in on the device lands on /login and then /dashboard rather than on
-// the lead, because ProtectedRoute does not preserve the intended destination.
-// The lead's name and the handoff reason are in the message body, so they are
-// not lost -- see the TODOS.md entry for the real fix.
+// A client who is not signed in on the device still reaches the lead: the
+// forward lands on ProtectedRoute, which records the attempted path before
+// bouncing to /login and returns them here afterwards. See
+// lib/post-login-redirect.ts -- that mechanism exists for this button.
 export default function LeadLinkPage() {
   const { token } = useParams<{ token: string }>()
   const leadRef = token ? unpackLeadRef(token) : null
