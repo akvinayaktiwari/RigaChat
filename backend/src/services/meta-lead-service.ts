@@ -98,6 +98,42 @@ function buildSyntheticFormFields(fields: Record<string, string>): FormField[] {
   })
 }
 
+// Reads every form on the Page and caches its schema, so the field mapper has
+// Meta's declared question types from the FIRST lead rather than paying a Graph
+// call on the lead-capture path.
+//
+// Possible because a lead form exists as soon as the client builds the ad --
+// it does not need a submission to be readable -- so connect time is the
+// earliest and cheapest moment to do this.
+//
+// Best-effort in every direction: it is awaited so the Lambda cannot freeze
+// mid-flight, but no failure it can produce is allowed to fail the connection.
+// A Page connects fine with no schemas cached; the mapper just falls back to
+// its keyword and value-shape layers until the per-lead fetch fills them in.
+async function prewarmFormSchemas(pageId: string, pageAccessToken: string): Promise<void> {
+  try {
+    const forms = await metaProvider.fetchPageLeadgenForms(pageId, pageAccessToken)
+
+    if (forms.length === 0) {
+      // Either the Page genuinely has no forms yet, or pages_manage_ads is not
+      // granted. The provider has already logged which.
+      console.log(`[meta-connect] no lead form schemas cached for page ${pageId}`)
+      return
+    }
+
+    let cached = 0
+    for (const form of forms) {
+      if (form.questions.length === 0) continue
+      await setCachedFormQuestions(form.formId, form.questions)
+      cached += 1
+    }
+
+    console.log(`[meta-connect] cached ${cached}/${forms.length} lead form schemas for page ${pageId}`)
+  } catch (error) {
+    console.error(`[meta-connect] form schema prewarm failed for page ${pageId}:`, error)
+  }
+}
+
 export async function connectMetaAds(clientId: string, code: string): Promise<void> {
   const { pageId, pageName, pageAccessToken } = await metaProvider.exchangeCodeForPageCredentials(code)
 
@@ -159,6 +195,12 @@ export async function connectMetaAds(clientId: string, code: string): Promise<vo
       connectedAt: new Date().toISOString(),
     },
   })
+
+  // AFTER the client record is written, because the connection is complete
+  // without it. Ordering it earlier would let a Graph API hiccup on an optional
+  // cache warm delay -- or, if it ever threw, prevent -- a connection that has
+  // already claimed the Page and subscribed its webhook.
+  await prewarmFormSchemas(pageId, pageAccessToken)
 }
 
 export async function disconnectMetaAds(clientId: string): Promise<void> {

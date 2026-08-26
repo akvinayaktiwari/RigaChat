@@ -6,6 +6,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const verifyWebhookSignature = vi.fn(() => true)
 const fetchLeadFieldData = vi.fn()
 const fetchFormQuestions = vi.fn(async () => [] as { key: string; label?: string; type?: string }[])
+const fetchPageLeadgenForms = vi.fn(
+  async () => [] as { formId: string; questions: { key: string; type?: string }[] }[]
+)
+const exchangeCodeForPageCredentials = vi.fn(async () => ({
+  pageId: 'page-1',
+  pageName: 'Skyline Homes',
+  pageAccessToken: 'page-token',
+}))
+const subscribePageToWebhook = vi.fn(async () => undefined)
 vi.mock('../providers/meta-provider.js', () => ({
   metaProvider: {
     get verifyWebhookSignature() {
@@ -16,6 +25,15 @@ vi.mock('../providers/meta-provider.js', () => ({
     },
     get fetchFormQuestions() {
       return fetchFormQuestions
+    },
+    get fetchPageLeadgenForms() {
+      return fetchPageLeadgenForms
+    },
+    get exchangeCodeForPageCredentials() {
+      return exchangeCodeForPageCredentials
+    },
+    get subscribePageToWebhook() {
+      return subscribePageToWebhook
     },
   },
 }))
@@ -75,7 +93,7 @@ vi.mock('../repositories/email-repository.js', () => ({
   sendEmail: async () => undefined,
 }))
 
-const { processMetaLeadWebhook } = await import('./meta-lead-service.js')
+const { processMetaLeadWebhook, connectMetaAds } = await import('./meta-lead-service.js')
 
 const payload = JSON.stringify({
   entry: [{ id: 'page-1', changes: [{ field: 'leadgen', value: { leadgen_id: 'lead-gen-1', page_id: 'page-1' } }] }],
@@ -99,6 +117,12 @@ beforeEach(() => {
   createMetaLead.mockResolvedValue({ leadId: 'lead-1', clientId: 'client-1' })
   getCachedFormQuestions.mockResolvedValue(null)
   fetchFormQuestions.mockResolvedValue([])
+  fetchPageLeadgenForms.mockResolvedValue([])
+  exchangeCodeForPageCredentials.mockResolvedValue({
+    pageId: 'page-1',
+    pageName: 'Skyline Homes',
+    pageAccessToken: 'page-token',
+  })
 })
 
 describe('empty field_data from the Graph API', () => {
@@ -222,5 +246,69 @@ describe('form schema lookup', () => {
 
     expect(fetchFormQuestions).not.toHaveBeenCalled()
     expect(getCachedFormQuestions).not.toHaveBeenCalled()
+  })
+})
+
+// A lead form exists as soon as the client builds the ad, so connect time is
+// the earliest moment its schema can be read -- which is what gets the mapper
+// Meta's declared types from the FIRST lead instead of the second.
+describe('form schema prewarm on connect', () => {
+  it('caches every form schema on the page', async () => {
+    fetchPageLeadgenForms.mockResolvedValue([
+      { formId: 'form-77', questions: [{ key: 'phone_number', type: 'PHONE' }] },
+      { formId: 'form-88', questions: [{ key: 'email', type: 'EMAIL' }] },
+    ])
+
+    await connectMetaAds('client-1', 'oauth-code')
+
+    expect(setCachedFormQuestions).toHaveBeenCalledTimes(2)
+    expect(setCachedFormQuestions).toHaveBeenCalledWith('form-77', [{ key: 'phone_number', type: 'PHONE' }])
+    expect(setCachedFormQuestions).toHaveBeenCalledWith('form-88', [{ key: 'email', type: 'EMAIL' }])
+  })
+
+  it('skips a form whose questions came back empty', async () => {
+    fetchPageLeadgenForms.mockResolvedValue([
+      { formId: 'form-77', questions: [] },
+      { formId: 'form-88', questions: [{ key: 'email', type: 'EMAIL' }] },
+    ])
+
+    await connectMetaAds('client-1', 'oauth-code')
+
+    expect(setCachedFormQuestions).toHaveBeenCalledTimes(1)
+    expect(setCachedFormQuestions).toHaveBeenCalledWith('form-88', [{ key: 'email', type: 'EMAIL' }])
+  })
+
+  // The case that is live TODAY: pages_manage_ads is not granted, so the form
+  // list comes back empty. The Page must still connect.
+  it('connects the page even when no schema can be read', async () => {
+    fetchPageLeadgenForms.mockResolvedValue([])
+
+    await expect(connectMetaAds('client-1', 'oauth-code')).resolves.toBeUndefined()
+
+    expect(setCachedFormQuestions).not.toHaveBeenCalled()
+  })
+
+  // The prewarm is a cache warm, not a step of the connection. A Page that has
+  // claimed its mapping and subscribed its webhook is connected; losing the
+  // schemas must not undo that.
+  it('does not fail the connection when the prewarm throws', async () => {
+    fetchPageLeadgenForms.mockRejectedValue(new Error('graph exploded'))
+
+    await expect(connectMetaAds('client-1', 'oauth-code')).resolves.toBeUndefined()
+  })
+
+  it('runs only after the webhook subscription has succeeded', async () => {
+    const order: string[] = []
+    subscribePageToWebhook.mockImplementation(async () => {
+      order.push('subscribe')
+    })
+    fetchPageLeadgenForms.mockImplementation(async () => {
+      order.push('prewarm')
+      return []
+    })
+
+    await connectMetaAds('client-1', 'oauth-code')
+
+    expect(order).toEqual(['subscribe', 'prewarm'])
   })
 })
