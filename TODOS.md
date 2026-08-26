@@ -418,6 +418,150 @@ labels the mapping UI item wants.
 **Priority:** P2
 **Depends on:** None
 
+### [P0] The crawler discards most of a page's text on ordinary server-rendered sites
+
+**What:** `cleanText` (`backend/src/services/crawler-service.ts:91-99`) filters text **per line**,
+but "lines" are an artifact of how a site happens to whitespace its HTML, not semantic units.
+cheerio's `.text()` concatenates adjacent text nodes with no separator, so the same filter fails
+in two opposite directions depending on the site:
+
+- **Many short lines** (most marketing sites — headings, feature bullets, CTAs, prices, stats):
+  the `MIN_CHUNK_WORDS >= 10` filter (line 97) deletes nearly everything.
+- **One collapsed line** (measured on vyostra.com/privacy-policy, react.dev, vercel.com — all
+  produce `lines = 1`): the word filter becomes a no-op and the `BOILERPLATE_PATTERNS` filter
+  (line 96) turns all-or-nothing. One substring match anywhere discards the entire page.
+
+Measured 2026-08-26 by running the real `crawlPage()` against live sites. Client sites are
+anonymised here because this repository is PUBLIC; the real URL for each label is in the local
+spec archive at `~/.gstack/projects/akvinayaktiwari-RigaChat/specs/` (not synced, not committed):
+
+| Site | HTML | Extracted today | Cause |
+|---|---|---|---|
+| Client A | 53,457 b | **292 b** | 59 of 63 lines dropped by the >=10-word filter |
+| vyostra.com/privacy-policy | 38,642 b | **0 b** | one line, killed whole by `/privacy policy/i` |
+| Client B | 97,280 b | 7,725 b | partial loss |
+| Client C | 339,144 b | 33,043 b | partial loss |
+| Client D | 744,715 b | 9,723 b | partial loss |
+
+Client A breakdown, one page: raw body text 6,500 b -> 2,234 b after `REMOVE_SELECTORS`
+(66% deleted before extraction even starts, by wildcards like `[class*="banner"]`) -> `main`
+element 1,943 b -> 63 lines -> 4 lines survive the word filter -> **292 b**. 85% of what
+survived selector removal is then thrown away.
+
+**Why:** This is live client damage, not a hypothetical. Nine `Client A` bots in production
+completed indexing with **3-4 chunks each** and were flipped to `status: active`. A 3-chunk agent
+knows nothing, and the client discovers that from their own customers. Chunk counts across all 21
+completed jobs: Client A 3-4, Client B 19-21, Client E 37-73, Client D 117, Client C 219-237.
+
+**Compounding it:** `crawler-worker-service.ts:435-458` has **no check on `chunks.length`**. An
+empty crawl writes `status: 'complete'`, `phase: 'ready'`, `totalChunks: 0` and sets the bot
+`active`. Verified no production bot has actually hit 0 yet, so this is latent — but it is why
+every failure mode above presents to the client as success.
+
+**Fix (prototyped and measured, not proposed blind):** extract at BLOCK level from the DOM
+(`p, h1-h6, li, td, th, dd, dt, blockquote, figcaption`) so lines come from structure rather than
+whitespace; drop `MIN_CHUNK_WORDS` to 3 at block level; make boilerplate patterns match a whole
+short line (anchored `^...$`) instead of a substring of real prose; narrow `REMOVE_SELECTORS`
+wildcards (`[class*="cookie-"]` not `[class*="banner"]`).
+
+Prototype results against the same live sites:
+
+| Site | Current | Proposed | Change |
+|---|---|---|---|
+| Client A | 292 b | 2,926 b | **10.0x** |
+| Client D | 9,723 b | 51,003 b | 5.2x |
+| Client C | 33,043 b | 95,308 b | 2.9x |
+| Client B | 7,725 b | 13,546 b | 1.8x |
+| vyostra.com/privacy-policy | 0 b | 4,887 b | **0 -> 4,887** |
+| vyostra.com/blog | 602 b | 812 b | 1.3x |
+| **Client E** | 7,600 b | **1,686 b** | **0.2x REGRESSION** |
+
+**The regression is the important part of this spec.** Client E keeps its content in tags outside
+any block list: `<small>` 2,459 b, bare `<div>` 1,012 b, `<label>` 592 b, `<span>` 570 b. Block
+extraction alone loses it. **Required rule:** after block extraction, compare against the container
+element's full text; if block coverage is below 60%, fall back to the container text segmented by
+SENTENCE (never by line), with the same anchored boilerplate rules. No site may regress.
+
+**Acceptance criteria:**
+1. All 8 sites in the tables above extract >= their current byte count. Client E specifically
+   >= 7,600 b, which the naive block-only fix fails.
+2. `vyostra.com/privacy-policy` extracts > 4,000 b (currently 0).
+3. `Client A` extracts > 2,500 b (currently 292).
+4. A crawl finishing with 0 chunks sets `crawl_failed` with a reason naming the cause, and does
+   NOT set the bot `active`.
+5. A crawl finishing below the low-content threshold completes but is flagged in the UI with a
+   prompt to add knowledge base entries. Threshold to be set from the real distribution above;
+   Client A at 3-4 chunks must trip it, Client B at 19-21 must not.
+6. Unit tests cover both failure shapes: a many-short-lines fixture and a one-collapsed-line
+   fixture, asserting neither loses content.
+7. No existing test regresses. `crawler-service.ts` currently has NO test file.
+
+**Testing plan:**
+
+| Layer | What | Count |
+|---|---|---|
+| Unit | `cleanText`/block extraction on both line shapes + coverage fallback | +6 |
+| Unit | zero-chunk and low-chunk guard in `crawler-worker-service` | +3 |
+| Integration | full `crawlPage` against saved HTML fixtures of the 8 sites | +8 |
+
+**Rollback:** pure extraction logic, no schema or infra change. Revert the commit. Already-indexed
+bots keep their existing Pinecone chunks; re-crawl is a separate explicit action.
+
+**Effort:** M (~1 day: 3h extraction + coverage fallback, 2h guards + UI flag, 3h tests/fixtures)
+**Priority:** P0 — live clients have near-empty agents reported as ready
+**Depends on:** None. Blocks the CSR item below.
+
+### Crawl JavaScript-rendered sites via render-on-failure
+
+**What:** `crawler-service.ts` uses `node-fetch` + `cheerio` and never executes JavaScript, so a
+client-side-rendered site returns an empty shell. Measured: `vyostra.com/features` returns 1,598 b
+of HTML and **0 b** of text, then `crawlPage` drops it at line 171 for being under
+`MIN_CONTENT_LENGTH`.
+
+**Decision (2026-08-26): hosted rendering API, escalated per-page on failure.** Every page takes the
+cheap `fetch` + `cheerio` path first; only pages that come back with essentially no text are re-fetched
+through the rendering service. A fully server-rendered site never invokes the renderer, so crawl cost
+and latency for existing clients stay exactly where they are.
+
+Rejected: bundling `@sparticuz/chromium` in the crawler Lambda. It takes the 11.7 MB bundle past
+60 MB, which exceeds the direct zip upload limit and forces a container-image deploy — rewriting the
+release path for all three Lambdas to serve a case that, so far, no real client site has hit.
+
+**Detection — do NOT use a text-to-HTML ratio.** Measured across 7 server-rendered pages the ratio
+ranges 0.0055 (vercel.com) to 0.0921 (vyostra.com/privacy-policy). Vercel is a real SSR page with a
+LOWER ratio than most, because it ships 600 KB of inlined JS around 3 KB of copy. Any ratio threshold
+catching a CSR shell also flags Vercel, Stripe and Sobha and sends them all to the renderer. Use
+ABSOLUTE extracted text length: the CSR shell measured 0 chars, every SSR page >= 3,323 chars.
+Secondary confirming signal, zero false positives across the 7: an empty mount node
+(`<div id="root"></div>`, `#app`, `#__next`, `#__nuxt`).
+
+**Why this is gated behind the extraction fix:** the escalation trigger is "the cheap path extracted
+almost nothing". Today `vyostra.com/privacy-policy` extracts 0 b despite being fully prerendered, so
+that trigger would misfire and pay for a browser render on a page that was fine. Every page containing
+"privacy policy" or "cookie" would do the same. Fix extraction first, then the trigger measures
+something real.
+
+**Open before building:**
+- Vendor not chosen. Needs a per-page cost and p95 latency comparison, plus whether it fits the
+  crawler Lambda's 60s timeout across a 50-page crawl.
+- No cost/latency ceiling has been set for a crawl. That number decides concurrency and whether
+  rendering is capped to the top N pages rather than all 50.
+- No real client site has yet been shown to need this. `vyostra.com/features` is our own marketing
+  site. Worth re-measuring against client URLs after the extraction fix lands, since some sites that
+  look empty today are actually extraction failures, not CSR.
+
+**Acceptance criteria:**
+1. `vyostra.com/features` extracts > 1,000 b of real text.
+2. A fully server-rendered crawl makes ZERO rendering calls, asserted in a test.
+3. Rendering failure degrades to the cheap path's result and never fails the crawl.
+4. Per-crawl rendering calls are capped and the cap is logged.
+
+**Rollback:** feature-flag the escalation off; the cheap path is unchanged underneath.
+
+**Effort:** M (~1 day once a vendor is picked)
+**Priority:** P2
+**Depends on:** the extraction fix above
+
 ### Meta Lead Ads: consent screen still answers "Feature Unavailable"
 
 **What:** `Meta Ads -> Connect with Facebook` never reaches a consent screen. Meta
