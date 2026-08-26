@@ -59,3 +59,58 @@ export function parseLeadRef(leadId: string | undefined, params: URLSearchParams
 
   return null
 }
+
+// ---------------------------------------------------------------------------
+// Packed single-segment form, for the /l/:token route.
+//
+// A WhatsApp URL button can only carry its variable as a trailing path suffix,
+// which the query-string form above cannot satisfy. backend/src/lib/lead-link.ts
+// packs the ref; this unpacks it. The two are mirrors and must stay in step --
+// the same test vectors are asserted on both sides.
+//
+// This is the only lead URL form that is NOT human-readable, which is the
+// trade: the token sits behind a button label, so its opacity costs nothing and
+// buys a deep link where there could otherwise only be an "Open inbox" button.
+
+const PACKED_DELIMITER = '|'
+
+export function packLeadRef(ref: LeadRef): string {
+  const scopeId = ref.source === 'chat' ? ref.botId : ref.source === 'form' ? ref.formId : ref.pageId
+  const packed = [ref.source, scopeId, ref.leadId].join(PACKED_DELIMITER)
+  const bytes = new TextEncoder().encode(packed)
+  const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join('')
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+// Null for anything malformed rather than a throw: this parses a token that
+// arrived from a link in a WhatsApp message, where truncation and hand-editing
+// are ordinary inputs. The route renders "link is not valid" on null.
+export function unpackLeadRef(token: string): LeadRef | null {
+  // atob throws on a character outside the alphabet, so screen first rather
+  // than relying on the try/catch to classify a bad token.
+  if (!token || !/^[A-Za-z0-9_-]+$/.test(token)) return null
+
+  const base64 = token.replace(/-/g, '+').replace(/_/g, '/')
+  const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4)
+
+  let decoded: string
+  try {
+    const binary = atob(padded)
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0))
+    decoded = new TextDecoder().decode(bytes)
+  } catch {
+    return null
+  }
+
+  const parts = decoded.split(PACKED_DELIMITER)
+  if (parts.length !== 3) return null
+
+  const [source, scopeId, leadId] = parts
+  if (!scopeId || !leadId) return null
+
+  if (source === 'chat') return { source, botId: scopeId, leadId }
+  if (source === 'form') return { source, formId: scopeId, leadId }
+  if (source === 'meta') return { source, pageId: scopeId, leadId }
+
+  return null
+}
