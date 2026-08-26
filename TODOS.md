@@ -391,12 +391,24 @@ miss. Page 353635678632363 DOES return its schema, which is most likely because 
 the app's own admin (the app is still in dev mode, one admin) rather than because its scopes
 differ — so the working case may be the unrepresentative one.
 
-**Context:** the fix is `pages_manage_ads` in two places, not one: `META_OAUTH_SCOPES` for
-the fallback path, AND the Facebook Login for Business configuration in the dashboard, which
-is what actually governs the consent screen whenever `META_LOGIN_CONFIG_ID` is set. Adding a
-permission means another App Review round, so it should be batched with whatever else that
-review needs rather than submitted on its own. Every already-connected Page also needs
-reconnecting to pick up the new scope — an existing token does not gain permissions.
+**Context:** the fix is NOT a code change, and attempting one first is a trap. Production sets
+`META_LOGIN_CONFIG_ID=1581255013395833`, so the consent screen is driven by the Facebook Login
+for Business **dashboard configuration** and `META_OAUTH_SCOPES` is never sent — adding the
+scope there is inert in prod. On the fallback path where it IS sent, requesting a permission
+the App Review submission does not offer breaks the consent screen outright ("Facebook Login
+is currently unavailable for this app", naming no cause), which is the failure
+`meta-provider.test.ts` already guards against with an explicit assertion.
+
+The order is: add `pages_manage_ads` to the dashboard Login for Business configuration → get it
+through App Review → then add it to `META_OAUTH_SCOPES` and delete that assertion → then have
+every connected Page reconnect, since an issued token does not gain permissions retroactively.
+
+Batch it with whatever else the next App Review round needs rather than submitting it alone.
+
+**Already built and waiting on it:** `metaProvider.fetchPageLeadgenForms` and the connect-time
+`prewarmFormSchemas` (2026-08-26). Both are live and both no-op today — the form list comes
+back empty without the permission — so the day the scope lands, a reconnect populates every
+form schema with no further code change.
 
 Worth deciding first whether it is worth it at all: layers 2 and 3 already resolve the
 standard fields, so the schema mainly buys correctness on CUSTOM questions and the human
