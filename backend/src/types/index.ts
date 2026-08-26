@@ -627,6 +627,10 @@ export interface WebhookEvent {
   eventType: string
   processedAt: string
   expiresAt: number
+  // Present only on the bounded-retry COUNTER rows written by
+  // countWebhookAttempt, which live under their own key namespace. A row with
+  // this field is a "still being retried" marker, never a "processed" one.
+  attempts?: number
 }
 
 export interface PaymentRecord {

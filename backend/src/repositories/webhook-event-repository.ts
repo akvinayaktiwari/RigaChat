@@ -1,4 +1,4 @@
-import { DeleteCommand, GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb'
+import { DeleteCommand, GetCommand, PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import type { WebhookEvent } from '../types/index.js'
 
@@ -108,5 +108,57 @@ export async function releaseWebhookEventClaim(eventId: string): Promise<void> {
       `[webhook-events] could not release claim ${eventId}:`,
       error instanceof Error ? error.message : error
     )
+  }
+}
+
+// -------------------------------------------------------------------------
+// Bounded retry counter, for a webhook that must be retried a FEW times and
+// then given up on rather than either accepted immediately or retried until the
+// provider stops delivering.
+//
+// Written to the same table as the idempotency markers above but under its own
+// key namespace, so a counter row can never be mistaken for a "processed" one:
+// hasProcessed() would return true for a lead still being retried and drop it.
+//
+// Returns the attempt number INCLUDING this one, so the first call returns 1.
+// -------------------------------------------------------------------------
+export async function countWebhookAttempt(counterKey: string, provider: string, eventType: string): Promise<number> {
+  const now = new Date()
+
+  try {
+    const result = await dynamoClient.send(
+      new UpdateCommand({
+        TableName: TABLE_NAME(),
+        Key: { eventId: counterKey },
+        UpdateExpression:
+          'ADD #attempts :one SET #provider = :provider, #eventType = :eventType, #processedAt = :now, #expiresAt = :ttl',
+        ExpressionAttributeNames: {
+          '#attempts': 'attempts',
+          '#provider': 'provider',
+          '#eventType': 'eventType',
+          '#processedAt': 'processedAt',
+          '#expiresAt': 'expiresAt',
+        },
+        ExpressionAttributeValues: {
+          ':one': 1,
+          ':provider': provider,
+          ':eventType': eventType,
+          ':now': now.toISOString(),
+          ':ttl': Math.floor(now.getTime() / 1000) + TTL_SECONDS,
+        },
+        ReturnValues: 'UPDATED_NEW',
+      })
+    )
+
+    return Number(result.Attributes?.attempts ?? 1)
+  } catch (error) {
+    // Fail toward RETRYING (report attempt 1) rather than toward giving up. A
+    // broken counter should not be the reason a lead is accepted blank -- the
+    // provider's own redelivery window still bounds how long this can loop.
+    console.error(
+      `[webhook-events] could not count attempt for ${counterKey}, treating as the first:`,
+      error instanceof Error ? error.message : error
+    )
+    return 1
   }
 }
