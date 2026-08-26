@@ -1,6 +1,22 @@
 (function () {
   'use strict';
   var BACKEND_URL = '__BACKEND_URL__';
+  // Chat streaming rides a SECOND Function URL. The main one is a BUFFERED
+  // Lambda, which collects the whole response and sends it in one piece -- so
+  // the reader below receives exactly one chunk and the visitor watches a
+  // typing indicator for the full generation time instead of seeing words
+  // appear. Measured 2026-08-26: identical request, 4.84s to first byte
+  // buffered against 3.09s streamed, and on the buffered URL time-to-first-byte
+  // equals total time to within a third of a millisecond on every single call.
+  //
+  // Only /api/chat/message goes here. Every other route is a normal JSON
+  // request that gains nothing from RESPONSE_STREAM.
+  var STREAM_URL = '__STREAM_URL__';
+  // Falls back to the buffered URL when the placeholder was never substituted
+  // (a deploy path that does not know about it yet) or substituted with
+  // nothing. Degrading to today's behaviour is the correct failure here; a
+  // literal '__STREAM_URL__' as a host would break chat outright.
+  if (!STREAM_URL || STREAM_URL.indexOf('__') === 0) STREAM_URL = BACKEND_URL;
   var SS_WIDGET_STATE = 'vyostra_widget_state';
   var SS_LEAD_CAPTURED = 'vyostra_lead_captured';
   var SS_LEAD_DATA = 'vyostra_lead_data';
@@ -605,7 +621,7 @@
     var botBubble = addMessage('bot', '');
     var textNode = botBubble.querySelector('.ciq-msg-text');
     var accumulated = '';
-    fetch(BACKEND_URL + '/api/chat/message', {
+    fetch(STREAM_URL + '/api/chat/message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ botId: botId, conversationId: state.conversationId, message: text })

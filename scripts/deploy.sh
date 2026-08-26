@@ -132,6 +132,12 @@ VITE_COGNITO_REDIRECT_URI="$(resolve_var VITE_COGNITO_REDIRECT_URI)"
 VITE_CDN_URL="$(resolve_var VITE_CDN_URL)"
 VITE_STAFF_COGNITO_CLIENT_ID="$(resolve_var VITE_STAFF_COGNITO_CLIENT_ID)"
 VITE_STAFF_COGNITO_REGION="$(resolve_var VITE_STAFF_COGNITO_REGION)"
+# The RESPONSE_STREAM Function URL, used by /api/chat/message alone. Deliberately
+# NOT in the required list below: an unset value falls back to VITE_API_URL in
+# both the widget and DemoChat, which is exactly how chat behaved before this
+# existed. A missing stream URL should cost word-by-word rendering, never a
+# deploy.
+VITE_STREAM_URL="$(resolve_var VITE_STREAM_URL)"
 
 MISSING_VARS=()
 for VAR in VITE_API_URL VITE_COGNITO_DOMAIN VITE_COGNITO_CLIENT_ID \
@@ -312,6 +318,7 @@ VITE_COGNITO_REDIRECT_URI=${VITE_COGNITO_REDIRECT_URI}
 VITE_CDN_URL=${VITE_CDN_URL}
 VITE_STAFF_COGNITO_CLIENT_ID=${VITE_STAFF_COGNITO_CLIENT_ID}
 VITE_STAFF_COGNITO_REGION=${VITE_STAFF_COGNITO_REGION}
+VITE_STREAM_URL=${VITE_STREAM_URL}
 EOF
 
 npm run build
@@ -344,11 +351,19 @@ if [ -n "$MISSING_ASSETS" ]; then
 fi
 echo "    index.html references only assets present in this build."
 
-echo "==> Step 6: Injecting BACKEND_URL into widget.js..."
+# Falls back to BACKEND_URL rather than leaving the placeholder in place: the
+# widget guards against an unsubstituted value, but an empty string would make
+# it fetch a relative '/api/chat/message' against the CUSTOMER's own domain,
+# which is a 404 on their site rather than a visible deploy failure.
+STREAM_URL="${STREAM_URL:-${VITE_STREAM_URL:-$BACKEND_URL}}"
+
+echo "==> Step 6: Injecting BACKEND_URL and STREAM_URL into widget.js..."
 if [[ "$OSTYPE" == "darwin"* ]]; then
   sed -i '' "s|__BACKEND_URL__|${BACKEND_URL}|g" frontend/dist/widget.js
+  sed -i '' "s|__STREAM_URL__|${STREAM_URL}|g" frontend/dist/widget.js
 else
   sed -i "s|__BACKEND_URL__|${BACKEND_URL}|g" frontend/dist/widget.js
+  sed -i "s|__STREAM_URL__|${STREAM_URL}|g" frontend/dist/widget.js
 fi
 
 echo "==> Step 6b: Injecting BACKEND_URL into form-widget.js..."

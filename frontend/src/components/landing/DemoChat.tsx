@@ -3,6 +3,12 @@ import { ArrowRight, Bot, Mail, RotateCcw } from 'lucide-react'
 import VyostraLogo from '../VyostraLogo'
 
 const BACKEND_URL = import.meta.env.VITE_API_URL as string
+// The landing-page demo is the first thing a prospect sees the product do, so
+// it is the worst possible place to buffer. VITE_API_URL is the BUFFERED
+// Lambda: it collects the whole completion and sends it at once, which turns a
+// word-by-word demo into a multi-second blank pause. Falls back to it when
+// VITE_STREAM_URL is unset so a build that predates the variable still works.
+const STREAM_URL = (import.meta.env.VITE_STREAM_URL as string | undefined) || BACKEND_URL
 const BOT_ID = 'bda51d13-2060-4a8c-9650-d623e344c80e'
 const BOT_NAME = 'VyostraAI'
 const SUPPORT_EMAIL = 'support@vyostra.com'
@@ -47,7 +53,7 @@ interface StreamChatMessageParams {
 }
 
 async function streamChatMessage({ conversationId, message, onChunk }: StreamChatMessageParams): Promise<void> {
-  const res = await fetch(`${BACKEND_URL}/api/chat/message`, {
+  const res = await fetch(`${STREAM_URL}/api/chat/message`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ botId: BOT_ID, conversationId, message }),

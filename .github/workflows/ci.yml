@@ -273,6 +273,10 @@ jobs:
           VITE_CDN_URL: ${{ vars.VITE_CDN_URL }}
           VITE_STAFF_COGNITO_CLIENT_ID: ${{ vars.VITE_STAFF_COGNITO_CLIENT_ID }}
           VITE_STAFF_COGNITO_REGION: ${{ vars.VITE_STAFF_COGNITO_REGION }}
+          # The RESPONSE_STREAM Function URL, for /api/chat/message only. Unset
+          # is safe: DemoChat falls back to VITE_API_URL, which is how chat
+          # behaved before this variable existed.
+          VITE_STREAM_URL: ${{ vars.VITE_STREAM_URL }}
           VITE_META_APP_ID: ${{ vars.VITE_META_APP_ID }}
           VITE_META_WHATSAPP_CONFIG_ID: ${{ vars.VITE_META_WHATSAPP_CONFIG_ID }}
         run: npm run build
@@ -287,6 +291,12 @@ jobs:
         run: |
           sed -i 's|__BACKEND_URL__|${{ secrets.BACKEND_URL }}|g' frontend/dist/widget.js
           sed -i 's|__BACKEND_URL__|${{ secrets.BACKEND_URL }}|g' frontend/dist/form-widget.js
+          # Only widget.js carries this placeholder -- form-widget.js posts a
+          # form and streams nothing. Falls back to BACKEND_URL when the
+          # variable is unset, because an empty substitution would leave the
+          # widget fetching a relative path against the CUSTOMER's domain.
+          STREAM_URL='${{ vars.VITE_STREAM_URL }}'
+          sed -i "s|__STREAM_URL__|${STREAM_URL:-${{ secrets.BACKEND_URL }}}|g" frontend/dist/widget.js
 
       - name: Inject BACKEND_URL and VOICE_WS_URL into voice-widget.js
         run: |
