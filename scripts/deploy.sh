@@ -2,10 +2,17 @@
 set -e
 
 # --backend-only exists because that is the deploy that was actually safe
-# during the 2026-08-06 GitHub Actions outage: the Lambda half uses only
-# update-function-code and never touches env vars. Without this flag the
-# frontend config check below would abort the whole script when gh is
-# unreachable -- blocking the one path that was never the problem.
+# during the 2026-08-06 GitHub Actions outage: the Lambda half never touches
+# env vars. Without this flag the frontend config check below would abort the
+# whole script when gh is unreachable -- blocking the one path that was never
+# the problem.
+#
+# It used to be true that this half called update-function-code and nothing
+# else. Step 4b now also sets memory-size, deliberately narrowly: a single
+# scalar, written only when it differs, and never Environment -- which is the
+# setting that must be sent whole and can therefore be wiped by a partial
+# write. The safety property the flag depends on is "cannot destroy config",
+# not "makes exactly one kind of API call".
 BACKEND_ONLY=false
 for ARG in "$@"; do
   case "$ARG" in
@@ -40,6 +47,21 @@ S3_BUCKET_WIDGET="${S3_BUCKET_WIDGET:-rigachat-widget}"
 CLOUDFRONT_DISTRIBUTION_ID="${CLOUDFRONT_DISTRIBUTION_ID:-}"
 CLOUDFRONT_WIDGET_DISTRIBUTION_ID="${CLOUDFRONT_WIDGET_DISTRIBUTION_ID:-E2KNENIBJEZYTF}"
 VOICE_WS_URL="${VOICE_WS_URL:-}"
+
+# Memory is set here because nothing else records it. update-function-code does
+# not touch it, so a function RECREATED from scratch comes back at Lambda's
+# 128 MB default -- which is where rigachat-api actually was until 2026-08-26,
+# reporting "Max Memory Used: 128 MB" against a 128 MB ceiling on every single
+# invocation. It was not using exactly its limit, it was being clamped by it:
+# raising it to 256 showed a true working set of 185 MB.
+#
+# 256 stays inside the always-free tier by a wide margin. At the traffic that
+# prompted this (4,467 invocations / 3,444s over 30 days) it is 861 of the
+# 400,000 free GB-seconds, and the 1M request limit binds long before memory.
+LAMBDA_MEMORY_MB="${LAMBDA_MEMORY_MB:-256}"
+# The crawler fetches and parses whole pages and was provisioned at 512
+# deliberately; this script must not quietly halve it.
+LAMBDA_CRAWLER_MEMORY_MB="${LAMBDA_CRAWLER_MEMORY_MB:-512}"
 
 # Before anything reads repo state. `gh variable list` infers the repository
 # from the working directory, so running this script by absolute path from
@@ -173,6 +195,38 @@ if [ ! -f backend/dist/index.js ]; then
   exit 1
 fi
 
+# Reads before it writes, for two reasons. An update-function-configuration
+# call puts the function in Pending and forces another wait, so skipping the
+# no-op keeps a repeat deploy as fast as it was. More importantly it keeps this
+# script's promise intact: --backend-only is documented as safe during a CI
+# outage BECAUSE it only ever calls update-function-code. This is the one
+# exception, it touches memory-size and NOTHING else -- never Environment,
+# which is the setting that has to be sent whole and can therefore be wiped.
+ensure_lambda_memory() {
+  local function_name="$1"
+  local desired_mb="$2"
+
+  local current_mb
+  current_mb="$(aws lambda get-function-configuration \
+    --function-name "$function_name" \
+    --region "$AWS_REGION" \
+    --query MemorySize --output text)"
+
+  if [ "$current_mb" = "$desired_mb" ]; then
+    echo "    ${function_name}: memory already ${desired_mb} MB"
+    return 0
+  fi
+
+  echo "    ${function_name}: memory ${current_mb} MB -> ${desired_mb} MB"
+  aws lambda update-function-configuration \
+    --function-name "$function_name" \
+    --memory-size "$desired_mb" \
+    --region "$AWS_REGION" >/dev/null
+  aws lambda wait function-updated \
+    --function-name "$function_name" \
+    --region "$AWS_REGION"
+}
+
 echo "==> Step 4: Deploying backend to Lambda..."
 cd backend/dist
 zip -r ../function.zip index.js
@@ -210,6 +264,14 @@ echo "Waiting for $LAMBDA_CRAWLER_FUNCTION_NAME update..."
 aws lambda wait function-updated \
   --function-name "$LAMBDA_CRAWLER_FUNCTION_NAME" \
   --region "$AWS_REGION"
+
+# After the code updates, never between them: Lambda rejects a configuration
+# change while a code update is still Pending (ResourceConflictException), and
+# the waits above are what guarantee it is not.
+echo "==> Step 4b: Enforcing Lambda memory sizes..."
+ensure_lambda_memory "$LAMBDA_FUNCTION_NAME" "$LAMBDA_MEMORY_MB"
+ensure_lambda_memory "$LAMBDA_STREAMING_FUNCTION_NAME" "$LAMBDA_MEMORY_MB"
+ensure_lambda_memory "$LAMBDA_CRAWLER_FUNCTION_NAME" "$LAMBDA_CRAWLER_MEMORY_MB"
 
 if [ "$BACKEND_ONLY" = true ]; then
   echo "=============================="

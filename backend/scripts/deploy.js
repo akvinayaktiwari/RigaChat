@@ -5,6 +5,36 @@ function run(command) {
   execSync(command, { stdio: 'inherit' })
 }
 
+// Kept in step with LAMBDA_MEMORY_MB in scripts/deploy.sh. Set here too because
+// this is the command CLAUDE.md tells people to run, so a deploy through this
+// path must not leave a function on Lambda's 128 MB default -- which is where
+// rigachat-api sat until 2026-08-26, clamped against its ceiling on every
+// invocation (true working set: 185 MB).
+const MEMORY_MB = Number(process.env.LAMBDA_MEMORY_MB || 256)
+
+// Written only when it differs. An update-function-configuration call puts the
+// function in Pending and costs another wait, and a repeat deploy should not
+// pay for a no-op.
+function ensureMemory(functionName) {
+  const current = Number(
+    execSync(
+      `aws lambda get-function-configuration --function-name "${functionName}" --query MemorySize --output text`,
+      { encoding: 'utf8' }
+    ).trim()
+  )
+
+  if (current === MEMORY_MB) {
+    console.log(`  ${functionName}: memory already ${MEMORY_MB} MB`)
+    return
+  }
+
+  console.log(`  ${functionName}: memory ${current} MB -> ${MEMORY_MB} MB`)
+  run(
+    `aws lambda update-function-configuration --function-name "${functionName}" --memory-size ${MEMORY_MB}`
+  )
+  run(`aws lambda wait function-updated --function-name "${functionName}"`)
+}
+
 function main() {
   const mainFunctionName = process.env.LAMBDA_FUNCTION_NAME
   const streamingFunctionName = process.env.LAMBDA_STREAMING_FUNCTION_NAME
@@ -31,6 +61,13 @@ function main() {
 
   console.log('Waiting for streaming Lambda update to complete...')
   run(`aws lambda wait function-updated --function-name "${streamingFunctionName}"`)
+
+  // After both code updates, never between: Lambda rejects a configuration
+  // change while a code update is still Pending, and the waits above are what
+  // guarantee it is not.
+  console.log('Enforcing Lambda memory sizes...')
+  ensureMemory(mainFunctionName)
+  ensureMemory(streamingFunctionName)
 
   console.log(`Deploy succeeded at ${new Date().toISOString()}`)
 }
