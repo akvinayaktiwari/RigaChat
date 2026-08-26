@@ -152,7 +152,7 @@ export async function crawlPage(
   // emails in nav/footer/header survive REMOVE_SELECTORS below, and so tag
   // boundaries become whitespace — cheerio's .text() concatenates adjacent
   // text nodes with no separator, which can glue trailing words from one
-  // element onto an email in the next (e.g. "...you.hello@credvest.com").
+  // element onto an email in the next (e.g. "...you.hello@example.com").
   const fullPageText = html
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')

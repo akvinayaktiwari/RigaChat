@@ -16,7 +16,10 @@
 set -euo pipefail
 
 REGION="ap-south-1"
-ACCOUNT="291685935704"
+# Derived, never hardcoded: this repo is public, and an account id is a
+# targeting aid nobody needs handed to them. Also makes the script work
+# against any account rather than only the one it was written on.
+ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
 TABLE="lead_state"
 INDEX="clientId-updatedAt-index"
 LAMBDAS=(rigachat-api rigachat-api-streaming rigachat-crawler)

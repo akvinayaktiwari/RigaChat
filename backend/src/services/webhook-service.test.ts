@@ -77,18 +77,18 @@ describe('logGupshupWebhookEvent (inbound message resolution)', () => {
   it('records the inbound timestamp for the lead whose phone matches, across differing formats', async () => {
     getClientIdForGupshupApp.mockResolvedValueOnce('client-1')
     getLeadsForClient.mockResolvedValueOnce([
-      { leadId: 'lead-1', phone: '+91 82988 82194' },
+      { leadId: 'lead-1', phone: '+91 98765 43210' },
       { leadId: 'lead-2', phone: '9999999999' },
     ])
 
-    await logGupshupWebhookEvent(incomingMessage('DemoApp', '918298882194'))
+    await logGupshupWebhookEvent(incomingMessage('DemoApp', '919876543210'))
 
     expect(getClientIdForGupshupApp).toHaveBeenCalledWith('DemoApp')
     expect(recordInboundMessage).toHaveBeenCalledWith('lead-1')
   })
 
   it('does not record anything when the app field is missing', async () => {
-    await logGupshupWebhookEvent(incomingMessage(undefined, '918298882194'))
+    await logGupshupWebhookEvent(incomingMessage(undefined, '919876543210'))
 
     expect(getClientIdForGupshupApp).not.toHaveBeenCalled()
     expect(recordInboundMessage).not.toHaveBeenCalled()
@@ -97,7 +97,7 @@ describe('logGupshupWebhookEvent (inbound message resolution)', () => {
   it('does not record anything for an unmapped app', async () => {
     getClientIdForGupshupApp.mockResolvedValueOnce(null)
 
-    await logGupshupWebhookEvent(incomingMessage('UnknownApp', '918298882194'))
+    await logGupshupWebhookEvent(incomingMessage('UnknownApp', '919876543210'))
 
     expect(getLeadsForClient).not.toHaveBeenCalled()
     expect(recordInboundMessage).not.toHaveBeenCalled()
@@ -107,7 +107,7 @@ describe('logGupshupWebhookEvent (inbound message resolution)', () => {
     getClientIdForGupshupApp.mockResolvedValueOnce('client-1')
     getLeadsForClient.mockResolvedValueOnce([{ leadId: 'lead-1', phone: '+1 5551234567' }])
 
-    await logGupshupWebhookEvent(incomingMessage('DemoApp', '918298882194'))
+    await logGupshupWebhookEvent(incomingMessage('DemoApp', '919876543210'))
 
     expect(recordInboundMessage).not.toHaveBeenCalled()
   })
@@ -119,6 +119,6 @@ describe('logGupshupWebhookEvent (inbound message resolution)', () => {
   it('never throws, even if resolution fails partway through', async () => {
     getClientIdForGupshupApp.mockRejectedValueOnce(new Error('DynamoDB is down'))
 
-    await expect(logGupshupWebhookEvent(incomingMessage('DemoApp', '918298882194'))).resolves.toBeUndefined()
+    await expect(logGupshupWebhookEvent(incomingMessage('DemoApp', '919876543210'))).resolves.toBeUndefined()
   })
 })

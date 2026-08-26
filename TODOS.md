@@ -798,7 +798,7 @@ still work exactly as before, since the Agent layer is additive — but that
 client is invisible to the cross-channel view.
 
 **Context:** Verified 2026-08-21 by scanning `bots` and `agent_binding_lookup`
-against account 291685935704: 31 bots across 5 clients, 3 clients with exactly
+against the production AWS account: 31 bots across 5 clients, 3 clients with exactly
 one bot (all bound), 2 with several (none bound). The skip is the script
 behaving correctly, not a bug — guessing a pairing would silently bind the
 wrong bot to a client's Agent, which is worse than leaving it undone.
@@ -981,7 +981,7 @@ until tool-calling reaches a public endpoint
 **Resolved.** The script was run on 2026-08-06 at 18:04 UTC. The TODO's "at that
 point **none** of it existed" was a snapshot taken BEFORE that run and never
 updated, which is why this sat as an open P1 for two weeks. Verified against
-account 291685935704 / ap-south-1 on 2026-08-21:
+the production AWS account / ap-south-1 on 2026-08-21:
 
 - **All 10 DynamoDB tables exist** — journeys, journey_executions,
   journey_trigger_claims, journey_pending_replies, scheduled_actions,
@@ -1016,7 +1016,7 @@ account 291685935704 / ap-south-1 on 2026-08-21:
 
 **Original description, kept for the reasoning:**
 
-**What:** `scripts/provision-agent-journey.sh` does the whole thing in one run: creates all 8 DynamoDB tables, creates the EventBridge Scheduler execution role, grants the Lambda roles scheduler access, and sets all 11 env vars on all three Lambdas. It is idempotent (skips anything that already exists). Verified against account 291685935704 / ap-south-1 on 2026-08-06 — at that point **none** of it existed.
+**What:** `scripts/provision-agent-journey.sh` does the whole thing in one run: creates all 8 DynamoDB tables, creates the EventBridge Scheduler execution role, grants the Lambda roles scheduler access, and sets all 11 env vars on all three Lambdas. It is idempotent (skips anything that already exists). Verified against the production AWS account / ap-south-1 on 2026-08-06 — at that point **none** of it existed.
 
 Run it, then `backend/scripts/backfill-agents.ts` (see the old note below).
 
@@ -1040,7 +1040,7 @@ Original note, still accurate for the backfill half:
 
 **Backfill verified 2026-08-21.** `agents` holds 3 rows and
 `agent_binding_lookup` holds 4, stamped 2026-08-06 18:16-18:56 (the WhatsApp
-binding on Wonderise Assistance came later, 2026-08-16, from the Epic A/B
+binding on a client Agent came later, 2026-08-16, from the Epic A/B
 work). The counts reconcile with the script's own conservatism rather than
 indicating an under-run: 31 bots span 5 clients, 3 of which have exactly one
 bot and all 3 got an Agent; the other 2 have more than one bot and were
@@ -1075,7 +1075,7 @@ Worth keeping from the original note: main's version of that post carries `{ val
 **Depends on:** nothing
 ### [RESOLVED 2026-08-05] contact_messages table + SES sender provisioned
 
-**What:** All three manual AWS steps for the contact form are done and verified live against account `291685935704` / `ap-south-1`:
+**What:** All three manual AWS steps for the contact form are done and verified live against the production AWS account / `ap-south-1`:
 
 1. **`contact_messages` table** — created, `ACTIVE`, partition key `messageId`, GSI `recordType-createdAt-index` (`recordType` HASH, `createdAt` RANGE) also `ACTIVE`. `DYNAMODB_TABLE_CONTACT_MESSAGES=contact_messages` set on all three Lambdas (`rigachat-api`, `rigachat-api-streaming`, `rigachat-crawler`).
 2. **`SES_FROM_EMAIL=noreply@vyostra.com` + `CONTACT_NOTIFICATION_EMAIL=support@vyostra.com`** set on the same three Lambdas.

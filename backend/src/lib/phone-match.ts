@@ -1,8 +1,8 @@
 // Best-effort phone matching, not a canonical format: Gupshup's inbound
 // webhook carries a phone number in whatever format WhatsApp delivers it
-// (country code prefixed, no "+", e.g. "918298882194"), while Lead.phone is
+// (country code prefixed, no "+", e.g. "919876543210"), while Lead.phone is
 // whatever a client's lead-capture form/agent recorded (could be
-// "+91 8298882194", "8298882194", or something else entirely -- no
+// "+91 9876543210", "9876543210", or something else entirely -- no
 // canonical format is enforced anywhere leads are created). Comparing the
 // last 10 digits after stripping all non-digit characters is a common
 // heuristic for matching across these differing conventions.

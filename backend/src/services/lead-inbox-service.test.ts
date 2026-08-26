@@ -141,7 +141,7 @@ describe('getUnifiedInbox', () => {
       ...formLead('f1', '2026-08-02T00:00:00.000Z'),
       customFields: JSON.stringify({
         '8967c774-4ab1-4d7d-8d60-c62ff8e9db94': 'Whatsapppppp',
-        '21a12d38-a922-4b38-b490-7dd4956017ff': 'akvinayaktiwari5@gmail.com',
+        '21a12d38-a922-4b38-b490-7dd4956017ff': 'ravi@example.com',
         '6baea1e9-9d03-4a30-8530-6ecb3a46cedd': '3 BHK',
       }),
     }
@@ -160,7 +160,7 @@ describe('getUnifiedInbox', () => {
     const [lead] = await getUnifiedInbox(CLIENT)
 
     expect(lead.name).toBe('Whatsapppppp')
-    expect(lead.email).toBe('akvinayaktiwari5@gmail.com')
+    expect(lead.email).toBe('ravi@example.com')
     expect(lead.propertyInterest).toBe('3 BHK')
   })
 

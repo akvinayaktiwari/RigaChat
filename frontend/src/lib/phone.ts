@@ -1,7 +1,7 @@
 // wa.me needs a full international number with no punctuation and no leading
 // zero. Real captured leads are nothing like that: the chat widget and the form
 // builder both take free text, so the same inbox holds "1234567890",
-// "09648658889" and "+91 96486 58889". Linking those straight through lands on
+// "09876543210" and "+91 98765 43210". Linking those straight through lands on
 // WhatsApp's "phone number shared via url is invalid" page every time.
 //
 // DEFAULT_COUNTRY_CODE is India because that is who this product sells to

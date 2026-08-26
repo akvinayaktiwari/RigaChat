@@ -10,11 +10,14 @@
 # missing one breaks only its own feature instead of 500-ing every route. That
 # makes this script safe to run before or after a deploy, in either order.
 #
-# Verified against account 291685935704 / ap-south-1 on 2026-08-06.
+# Verified against ap-south-1 on 2026-08-06.
 set -euo pipefail
 
 REGION="ap-south-1"
-ACCOUNT="291685935704"
+# Derived, never hardcoded: this repo is public, and an account id is a
+# targeting aid nobody needs handed to them. Also makes the script work
+# against any account rather than only the one it was written on.
+ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
 LAMBDA_ARN="arn:aws:lambda:${REGION}:${ACCOUNT}:function:rigachat-api"
 SCHED_ROLE="RigaChatSchedulerExecutionRole"
 SCHED_ROLE_ARN="arn:aws:iam::${ACCOUNT}:role/${SCHED_ROLE}"
