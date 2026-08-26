@@ -228,15 +228,31 @@ component. `getRoutes()` in `prerender-entry.tsx` now documents the `/` trap.
 
 ### Add a field-mapping UI for Meta Lead Ads custom questions
 
-**What:** Meta Lead Ads forms have client-configurable custom questions with arbitrary labels. MVP does best-effort auto-mapping by label matching (e.g. a question labeled "phone" maps to `phone`) and stores anything unmatched as a raw custom field, same as `FormLead.customFields` does today. A dedicated mapping UI (mirroring how the form builder defines `FormField[]`) would let clients map Meta's question labels to `name`/`phone`/`email`/`propertyInterest`/`budgetRange` explicitly.
+**What:** Meta Lead Ads forms have client-configurable custom questions with arbitrary labels.
+As of 2026-08-26 the backend resolves them in three layers — Meta's declared question type
+from the form schema, then keyword rules on the key and human label, then value shape — which
+covers the standard fields deterministically. A mapping UI would let clients override the
+remaining `CUSTOM` questions explicitly, mirroring how the form builder defines `FormField[]`.
 
-**Why:** Clean, correctly-populated CRM/WhatsApp-notification data from day one instead of relying on label-matching heuristics.
+**Why:** The heuristics are now good enough that this is an override surface, not a
+correctness fix. What it adds is the ability to see and correct a mapping, which is also the
+only way a client can tell WHY a CRM column is wrong.
 
-**Context:** Deferred pending evidence clients actually need it — many clients may use Meta's default lead form template as-is, in which case auto-mapping is sufficient indefinitely. Revisit if auto-mapping visibly mishandles real client forms.
+**Context:** The layered resolver made this smaller: the UI only has to cover questions the
+schema reports as `CUSTOM` and the heuristics did not resolve, and the fetched schema already
+gives it the labels to render. A stored per-form override would slot in as a layer above the
+schema in `lib/meta-field-mapping.ts`.
+
+This is also where AI belongs, if it belongs anywhere: run it ONCE per form at
+mapping-discovery time over the question labels and types, store the proposal as the form's
+mapping, and let the client correct it. NOT on the webhook path — a per-lead LLM call adds
+latency and a failure mode to the one path that must never lose a lead, costs money per lead,
+and is non-deterministic, so the same form maps differently on different days and no client
+can be told why their CRM column changed.
 
 **Effort:** M
 **Priority:** P3
-**Depends on:** Meta Lead Ads backend integration landing first
+**Depends on:** None
 
 ## Backend
 
