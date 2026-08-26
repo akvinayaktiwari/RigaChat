@@ -18,6 +18,7 @@ import { readJourneyLead } from './lead-resolution-service.js'
 import { sendWhatsAppTemplateToClientNumber } from './whatsapp-service.js'
 import { templateLanguageOf } from '../lib/whatsapp-templates.js'
 import { packLeadRef } from '../lib/lead-link.js'
+import { sendLeadPush } from './push-notification-service.js'
 import type { LeadEvent, LeadRef } from '../types/index.js'
 import type { WhatsAppSendResult } from '../lib/whatsapp-provider.js'
 
@@ -132,6 +133,37 @@ export async function sendHandoffAlert(input: HandoffAlertInput): Promise<Handof
     const name = flattenTemplateParam(lead.name || 'Unnamed lead')
     const phone = flattenTemplateParam(lead.phone || 'Not on file')
     const reason = flattenTemplateParam(input.reason) || 'No reason recorded'
+
+    // PUSH FIRES HERE: after the lead read, before the template loop. Three
+    // reasons for this exact position:
+    //
+    // 1. NO SECOND READ. `lead` was fetched above; the push needs its name and
+    //    nothing more. Placing this before the read would cost a second
+    //    readJourneyLead on every handoff for data already in hand.
+    // 2. ORDER. The loop below RETURNS on the first successful send, so a push
+    //    placed after it would never run when WhatsApp works.
+    // 3. ISOLATION. This function's outer catch returns notified:false. A push
+    //    failure reaching it would report a delivered handoff alert as
+    //    undelivered, and the scheduler reads that. sendLeadPush promises never
+    //    to throw; this catch is the second lock on that door.
+    //
+    // The handoffs channel is HIGH importance (heads-up) rather than DEFAULT:
+    // a handoff means a human is waiting on the other end, which is a different
+    // urgency from a lead simply arriving.
+    try {
+      await sendLeadPush({
+        clientId: input.clientId,
+        kind: 'handoff',
+        leadRef: input.leadRef,
+        title: `${name} needs you`,
+        body: reason,
+      })
+    } catch (pushError) {
+      console.error(
+        `[notification] handoff push threw despite its contract: client=${input.clientId} lead=${input.leadRef.leadId}`,
+        pushError instanceof Error ? pushError.message : String(pushError)
+      )
+    }
 
     // All three open with the same first three values, so the human gets the
     // same identifying facts whichever one is approved. _3 and _1 add the

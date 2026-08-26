@@ -21,6 +21,12 @@ vi.mock('./whatsapp-service.js', () => ({
   sendWhatsAppMessageToLead,
 }))
 
+// Mocked so the isolation tests below can make it misbehave on purpose. In
+// production sendLeadPush promises never to throw; these tests exist to prove
+// that even if that promise were BROKEN, the WhatsApp/email path is unaffected.
+const sendLeadPush = vi.fn()
+vi.mock('./push-notification-service.js', () => ({ sendLeadPush }))
+
 const { sendLeadNotification, notificationInputFromEvent } = await import('./lead-notification-service.js')
 
 const input = {
@@ -42,6 +48,8 @@ beforeEach(() => {
   sendEmail.mockResolvedValue(undefined)
   sendWhatsAppTemplateToClientNumber.mockReset()
   sendWhatsAppTemplateToClientNumber.mockResolvedValue({ success: true, messageId: 'wamid.abc' })
+  sendLeadPush.mockReset()
+  sendLeadPush.mockResolvedValue({ sent: 1, failed: 0, retired: 0 })
   sendWhatsAppMessageToLead.mockReset()
 })
 
@@ -170,5 +178,80 @@ describe('notificationInputFromEvent', () => {
 
     expect(rebuilt.source).toBe('your website')
     expect(rebuilt.leadId).toBe('lead-1')
+  })
+})
+
+// The mobile push channel, added 2026-08-26. These tests are all about
+// ISOLATION: push and WhatsApp must succeed and fail independently, because
+// this function's catch branch fires the email fallback and a push failure
+// leaking into it would announce a delivery problem that never happened.
+describe('mobile push channel', () => {
+  const withRef = { ...input, leadRef: { source: 'chat', botId: 'bot-1', leadId: 'lead-1' } as const }
+
+  it('pushes when a leadRef is supplied', async () => {
+    await sendLeadNotification(withRef)
+
+    expect(sendLeadPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clientId: 'client-1',
+        kind: 'lead_captured',
+        leadRef: { source: 'chat', botId: 'bot-1', leadId: 'lead-1' },
+        title: 'New lead: Ravi Kumar',
+      })
+    )
+  })
+
+  // leadRef is optional so no existing caller breaks. notificationInputFromEvent
+  // rebuilds this input from a stored event and has no ref to give.
+  it('skips the push entirely when no leadRef is supplied', async () => {
+    await sendLeadNotification(input)
+
+    expect(sendLeadPush).not.toHaveBeenCalled()
+  })
+
+  // Order matters: the template loop below the push RETURNS on first success,
+  // so a push placed after it would never run on the happy path.
+  it('pushes even when the WhatsApp send succeeds and returns early', async () => {
+    sendWhatsAppTemplateToClientNumber.mockResolvedValue({ success: true, messageId: 'wamid.abc' })
+
+    const result = await sendLeadNotification(withRef)
+
+    expect(result.notified).toBe(true)
+    expect(result.via).toBe('whatsapp')
+    expect(sendLeadPush).toHaveBeenCalledTimes(1)
+  })
+
+  // THE REGRESSION THIS GUARDS: a thrown push must not reach the outer catch,
+  // because that catch sends a fallback email. A healthy WhatsApp alert would
+  // otherwise be accompanied by an email saying it failed.
+  it('does not fire the email fallback when the push throws', async () => {
+    sendLeadPush.mockRejectedValue(new Error('push exploded'))
+    sendWhatsAppTemplateToClientNumber.mockResolvedValue({ success: true, messageId: 'wamid.abc' })
+
+    const result = await sendLeadNotification(withRef)
+
+    expect(result).toEqual({ notified: true, via: 'whatsapp', wamid: 'wamid.abc' })
+    expect(sendEmail).not.toHaveBeenCalled()
+  })
+
+  it('still sends the WhatsApp alert when the push reports total failure', async () => {
+    sendLeadPush.mockResolvedValue({ sent: 0, failed: 3, retired: 0 })
+    sendWhatsAppTemplateToClientNumber.mockResolvedValue({ success: true, messageId: 'wamid.abc' })
+
+    const result = await sendLeadNotification(withRef)
+
+    expect(result.notified).toBe(true)
+    expect(result.via).toBe('whatsapp')
+  })
+
+  // The other direction of the same independence.
+  it('still pushes when WhatsApp is rejected and the email fallback runs', async () => {
+    sendWhatsAppTemplateToClientNumber.mockResolvedValue({ success: false, retryable: false, error: 'rejected' })
+
+    const result = await sendLeadNotification(withRef)
+
+    expect(sendLeadPush).toHaveBeenCalledTimes(1)
+    expect(result.via).toBe('email')
+    expect(sendEmail).toHaveBeenCalled()
   })
 })

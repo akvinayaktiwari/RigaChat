@@ -42,6 +42,11 @@ const PRODUCTION_TABLE_NAMES: Record<TableKey, string> = {
   voice_call_logs: 'voice_call_logs',
   voice_kb: 'voice_knowledge_base',
   lead_events: 'lead_events',
+  // Added 2026-08-26 with the mobile push slice. Unlike every entry above it,
+  // this one was never a DYNAMODB_TABLE_* variable and must not become one --
+  // the Lambda environment is at 3597/4096 bytes. Provisioned by
+  // scripts/provision-device-tokens.sh.
+  device_tokens: 'device_tokens',
 }
 
 // vitest.config.ts sets DYNAMODB_TABLE_PREFIX=test- as a safety boundary, so an

@@ -76,6 +76,11 @@ export async function captureFormLead(input: CreateFormLeadInput): Promise<FormL
     clientId: input.clientId,
     leadId: createdLead.leadId,
     botId: input.formId,
+    // A form lead is addressed by formId, not botId -- the botId field above
+    // carries the formId for the WhatsApp template's benefit, but the ref has
+    // to name the source correctly or GET /api/leads/detail reads the wrong
+    // table.
+    leadRef: { source: 'form', formId: input.formId, leadId: createdLead.leadId },
     source: 'Website form',
     ...(pick('name') ? { name: pick('name') as string } : {}),
     ...(pick('phone') ? { phone: pick('phone') as string } : {}),

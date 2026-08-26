@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
 import { requireAuth } from '../lib/cognito.js'
-import { getClient, updateClientProfile, upgradeClientPlan, upsertClient } from '../services/client-service.js'
+import { getAppBootstrap, getClient, updateClientProfile, upgradeClientPlan, upsertClient } from '../services/client-service.js'
 import { getSubscriptionSummary } from '../services/entitlement-service.js'
 import type { SubscriptionSummary } from '../services/entitlement-service.js'
-import type { ApiResponse, ClientRecord } from '../types/index.js'
+import type { ApiResponse, AppBootstrap, ClientRecord } from '../types/index.js'
 
 interface AuthEnv {
   Variables: {
@@ -53,6 +53,23 @@ clientRoutes.get('/me', requireAuth, async (c) => {
     if (error instanceof Error && error.message === 'Client not found') {
       return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
     }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+// The mobile app's launch call: readiness gate + what the app may do.
+// Consumed by vyostra-mobile; see docs/designs/web-mobile-contract.md there
+// before changing the shape. Adding a capability is safe for installed builds
+// (they ignore what they do not recognise); REMOVING one, renaming one, or
+// changing this route's path is a breaking change for phones in the field that
+// cannot be force-updated.
+clientRoutes.get('/me/app-bootstrap', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+
+  try {
+    const bootstrap = await getAppBootstrap(clientId)
+    return c.json<ApiResponse<AppBootstrap>>({ success: true, data: bootstrap }, 200)
+  } catch (error) {
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }
 })

@@ -437,6 +437,7 @@ async function processSingleLeadgenEvent(
     clientId,
     leadId: metaLead.leadId,
     botId: pageId,
+    leadRef: { source: 'meta', pageId, leadId: metaLead.leadId },
     source: `Meta Lead Ads (${client.metaConnection.pageName})`,
     ...(mapped.name ? { name: mapped.name } : {}),
     ...(mapped.phone ? { phone: mapped.phone } : {}),

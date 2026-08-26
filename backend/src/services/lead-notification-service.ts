@@ -21,6 +21,8 @@ import { sendWhatsAppTemplateToClientNumber } from './whatsapp-service.js'
 import { flattenTemplateParam } from './notification-service.js'
 import { templateLanguageOf } from '../lib/whatsapp-templates.js'
 import type { WhatsAppSendResult } from '../lib/whatsapp-provider.js'
+import { sendLeadPush } from './push-notification-service.js'
+import type { LeadRef } from '../types/index.js'
 
 // Tried in order, first success wins -- the same fall-through
 // notification-service.ts uses for handoff alerts, and for the same reason:
@@ -50,6 +52,15 @@ export interface LeadNotificationInput {
   // because a form lead's useful summary is its answers and a chat lead's is
   // its stated interest; the caller knows which, this service does not.
   interest?: string
+  // OPTIONAL on purpose. Added 2026-08-26 for the mobile push channel, and
+  // optional so no existing caller breaks -- notificationInputFromEvent below
+  // rebuilds this shape from a stored event blob and has no ref to give. When
+  // absent, the push is skipped and the WhatsApp/email path is untouched.
+  //
+  // The full LeadRef rather than a leadId: the three lead tables have three
+  // different partition keys, so a leadId alone is not addressable. The app
+  // passes this straight to GET /api/leads/detail.
+  leadRef?: LeadRef
 }
 
 // Rebuilds the notification input from the `result` blob stored on a
@@ -178,6 +189,39 @@ export async function sendLeadNotification(
   input: LeadNotificationInput
 ): Promise<LeadNotificationResult> {
   try {
+    // PUSH FIRES FIRST, AND IN ITS OWN TRY/CATCH. Two reasons, both load-bearing:
+    //
+    // 1. ORDER. The template loop below RETURNS on the first successful send.
+    //    A push placed after it would never run on the happy path -- which is
+    //    every path that works.
+    //
+    // 2. ISOLATION. This function's outer catch calls sendLeadNotificationEmail.
+    //    If a push failure reached it, a WhatsApp alert that was about to send
+    //    perfectly well would instead produce a fallback email announcing a
+    //    delivery problem that did not happen. sendLeadPush already promises
+    //    never to throw; this catch is the second lock on that door, because
+    //    the cost of the promise being broken is a corrupted working path.
+    //
+    // Push success and WhatsApp success are independent by construction. A
+    // failed push must never suppress the WhatsApp alert, and a failed
+    // WhatsApp send must never suppress the push.
+    if (input.leadRef) {
+      try {
+        await sendLeadPush({
+          clientId: input.clientId,
+          kind: 'lead_captured',
+          leadRef: input.leadRef,
+          title: input.name ? `New lead: ${input.name}` : 'New lead',
+          body: [input.interest, `from ${input.source}`].filter(Boolean).join(' · '),
+        })
+      } catch (pushError) {
+        console.error(
+          `[lead-notification] push threw despite its contract: client=${input.clientId} lead=${input.leadId}`,
+          pushError instanceof Error ? pushError.message : String(pushError)
+        )
+      }
+    }
+
     const bodyParams = [param(input.source), param(input.name), param(input.phone), param(input.interest)]
 
     let result: WhatsAppSendResult | undefined

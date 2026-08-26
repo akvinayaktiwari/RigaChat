@@ -16,7 +16,12 @@ vi.mock('../repositories/subscription-repository.js', () => ({
   getByAccountId: (...a: unknown[]) => getByAccountId(...a),
 }))
 
-const { upsertClient, ensureTrialSubscription } = await import('./client-service.js')
+const countBotsForClient = vi.fn()
+vi.mock('../repositories/bot-repository.js', () => ({
+  countBotsForClient: (...a: unknown[]) => countBotsForClient(...a),
+}))
+
+const { upsertClient, ensureTrialSubscription, getAppBootstrap } = await import('./client-service.js')
 
 const CLIENT_ID = 'client-1'
 const SIGNED_UP_AT = '2026-07-09T16:14:12.496Z'
@@ -162,5 +167,51 @@ describe('ensureTrialSubscription', () => {
 
     await expect(ensureTrialSubscription(CLIENT_ID)).resolves.toBeNull()
     expect(createSubscription).not.toHaveBeenCalled()
+  })
+})
+
+// The mobile app's launch call. Readiness is bot count > 0 (decision D1), and
+// capabilities are the runtime half of the web/mobile contract -- see
+// vyostra-mobile docs/designs/web-mobile-contract.md.
+describe('getAppBootstrap', () => {
+  beforeEach(() => {
+    countBotsForClient.mockReset()
+  })
+
+  it('gates a client with no bots and hands back no capabilities', async () => {
+    countBotsForClient.mockResolvedValue(0)
+
+    await expect(getAppBootstrap('client-1')).resolves.toEqual({
+      ready: false,
+      reason: 'no_bot',
+      capabilities: [],
+    })
+  })
+
+  it('unlocks at one bot and declares the phase-1 capabilities', async () => {
+    countBotsForClient.mockResolvedValue(1)
+
+    await expect(getAppBootstrap('client-1')).resolves.toEqual({
+      ready: true,
+      capabilities: ['lead.read', 'lead.state', 'lead.note'],
+    })
+  })
+
+  // A capability the app cannot render yet must not be advertised: an installed
+  // build would show a control for a screen that does not exist.
+  it('does not advertise lead.timeline while it is still phase 2', async () => {
+    countBotsForClient.mockResolvedValue(3)
+
+    const bootstrap = await getAppBootstrap('client-1')
+
+    expect(bootstrap.capabilities).not.toContain('lead.timeline')
+  })
+
+  it('reads bot count scoped to the caller, never across clients', async () => {
+    countBotsForClient.mockResolvedValue(2)
+
+    await getAppBootstrap('client-42')
+
+    expect(countBotsForClient).toHaveBeenCalledWith('client-42')
   })
 })

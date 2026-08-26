@@ -99,6 +99,9 @@ export async function captureLead(bot: BotConfig, input: CreateLeadInput): Promi
       clientId: input.clientId,
       leadId: lead.leadId,
       botId: input.botId,
+      // Same ref the journey ignition above uses. Carries the mobile push to
+      // this lead's detail screen with no reconstruction.
+      leadRef: { source: 'chat', botId: input.botId, leadId: lead.leadId },
       source: 'Website chat',
       ...(lead.name ? { name: lead.name } : {}),
       ...(lead.phone ? { phone: lead.phone } : {}),

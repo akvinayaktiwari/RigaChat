@@ -1,7 +1,18 @@
 import { createClient, getClientById, updateClient } from '../repositories/client-repository.js'
 import { create as createSubscription, getByAccountId } from '../repositories/subscription-repository.js'
 import { TRIAL } from '../config/entitlements-config.js'
-import type { ClientRecord, Subscription } from '../types/index.js'
+import { countBotsForClient } from '../repositories/bot-repository.js'
+import type { AppBootstrap, Capability, ClientRecord, Subscription } from '../types/index.js'
+
+// What a set-up client's mobile app may do today. Phase 1 only: 'lead.timeline'
+// is deliberately absent until GET /api/leads/events ships in the app, because
+// advertising a capability the app cannot render is worse than withholding one
+// it could.
+//
+// Adding an entry here is how a new mobile feature reaches installed builds --
+// see vyostra-mobile docs/designs/web-mobile-contract.md. Builds that predate
+// the entry ignore it and render no control, which is the whole point.
+const READY_CAPABILITIES: Capability[] = ['lead.read', 'lead.state', 'lead.note']
 
 interface UpsertClientInput {
   clientId: string
@@ -175,4 +186,23 @@ export async function upgradeClientPlan(
       `Failed to upgrade plan for client ${clientId}: ${error instanceof Error ? error.message : String(error)}`
     )
   }
+}
+
+// Everything the mobile app needs on launch, in one call.
+//
+// Readiness is bot count > 0 (decision D1). Not derived from an empty lead
+// list: "you have not set up a bot yet" and "you are set up and no leads have
+// arrived" look identical from the inbox, and they need opposite screens.
+//
+// Capabilities are empty when not ready. An app behind the setup gate can do
+// nothing, and returning a list it cannot act on invites a UI that renders
+// buttons the user cannot reach.
+export async function getAppBootstrap(clientId: string): Promise<AppBootstrap> {
+  const botCount = await countBotsForClient(clientId)
+
+  if (botCount === 0) {
+    return { ready: false, reason: 'no_bot', capabilities: [] }
+  }
+
+  return { ready: true, capabilities: READY_CAPABILITIES }
 }

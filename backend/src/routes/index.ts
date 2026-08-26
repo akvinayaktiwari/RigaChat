@@ -8,6 +8,7 @@ import { billingRoutes } from './billing-routes.js'
 import { botRoutes } from './bot-routes.js'
 import { chatRoutes } from './chat-routes.js'
 import { clientRoutes } from './client-routes.js'
+import { deviceRoutes } from './device-routes.js'
 import { contactRoutes } from './contact-routes.js'
 import { formRoutes } from './form-routes.js'
 import { integrationRoutes } from './integration-routes.js'
@@ -155,6 +156,7 @@ app.route('/api/journeys', journeyRoutes)
 app.route('/api/scheduler', schedulerRoutes)
 app.route('/api/appointments', appointmentRoutes)
 app.route('/api/clients', clientRoutes)
+app.route('/api/devices', deviceRoutes)
 app.route('/api/contact', contactRoutes)
 app.route('/api/forms', formRoutes)
 app.route('/api/integrations', integrationRoutes)

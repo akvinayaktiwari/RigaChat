@@ -1100,6 +1100,72 @@ export type LeadRef =
   | { source: 'form'; formId: string; leadId: string }
   | { source: 'meta'; pageId: string; leadId: string }
 
+// ---------------------------------------------------------------------------
+// Mobile app: device registry and readiness. Added 2026-08-26.
+// ---------------------------------------------------------------------------
+
+export type DevicePlatform = 'android' | 'ios'
+
+// One row per install, in the device_tokens table (PK clientId, SK deviceId).
+// No GSI: the only access pattern is "every device belonging to this client",
+// which is a Query on the partition key. Same reasoning as
+// meta_deletion_requests -- there is no second access pattern to serve.
+export interface DeviceToken {
+  clientId: string
+  // App-generated UUID, stable for the life of an install. NOT the Expo token:
+  // that rotates, and a rotating value cannot be a sort key without orphaning
+  // the old row on every rotation.
+  deviceId: string
+  expoPushToken: string
+  platform: DevicePlatform
+  appVersion: string
+  registeredAt: string
+  // Refreshed on every app foreground. Used to tell a live install from one
+  // that was uninstalled without ever calling DELETE /api/devices/:deviceId.
+  lastSeenAt: string
+  // Incremented when Expo reports the token dead. The row is deleted at 1, so
+  // in practice this is only ever 0 -- it exists so a future soft-retry policy
+  // has somewhere to count, without a migration.
+  failureCount: number
+}
+
+// What the mobile app is allowed to do, as declared by the server.
+//
+// THIS IS THE RUNTIME HALF OF THE WEB/MOBILE CONTRACT. An app build cannot be
+// force-updated -- a release leaves old builds running on real phones for
+// months -- so the app must not hardcode its own feature list. It renders its
+// action bar FROM this array, which means a build that does not recognise a
+// capability simply shows no control for it instead of calling an endpoint it
+// cannot handle. That is what lets a new server-side feature ship without
+// waiting for every install to update.
+//
+// A union rather than string[] on purpose: a typo here should be a compile
+// error, not a button that silently never appears.
+//
+// See vyostra-mobile docs/designs/web-mobile-contract.md.
+export type Capability =
+  | 'lead.read'      // GET /api/leads/inbox, GET /api/leads/detail
+  | 'lead.state'     // PATCH /api/leads/state
+  | 'lead.note'      // POST /api/leads/notes
+  | 'lead.timeline'  // GET /api/leads/events   (phase 2)
+
+// Everything the app needs on launch, in one call: whether to show the inbox or
+// the "finish setting up on the web" gate, and what it may do once inside.
+//
+// Readiness is deliberately not derived client-side from an empty lead list: the
+// app must be able to tell "you have not set up a bot yet" from "you are set up
+// and no leads have arrived", and those look identical from the inbox alone.
+//
+// Named bootstrap rather than readiness because it answers two questions.
+export interface AppBootstrap {
+  ready: boolean
+  reason?: 'no_bot'
+  // Empty when ready is false: an app that has not finished setup can do
+  // nothing, and sending a capability list it cannot act on invites a UI that
+  // renders buttons behind the gate.
+  capabilities: Capability[]
+}
+
 // Normalized read view across the three tables. Only the fields the journey
 // layer actually acts on -- delivery needs phone, Cal.com needs name/email,
 // the qualification prompt uses the property fields. Deliberately not a union

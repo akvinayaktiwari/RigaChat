@@ -11,6 +11,9 @@ vi.mock('../repositories/lead-event-repository.js', () => ({ getLeadEvents }))
 const sendWhatsAppTemplateToClientNumber = vi.fn()
 vi.mock('./whatsapp-service.js', () => ({ sendWhatsAppTemplateToClientNumber }))
 
+const sendLeadPush = vi.fn()
+vi.mock('./push-notification-service.js', () => ({ sendLeadPush }))
+
 const { flattenTemplateParam, leadDetailUrl, sendHandoffAlert, summarizeRecentMessages } = await import(
   './notification-service.js'
 )
@@ -248,5 +251,64 @@ describe('handoff template fall-through', () => {
 
     expect(result.notified).toBe(false)
     expect(sendWhatsAppTemplateToClientNumber).toHaveBeenCalledTimes(1)
+  })
+})
+
+// The handoff push, added 2026-08-26. Same isolation contract as the lead
+// push: this function's catch returns notified:false, and the scheduler reads
+// that, so a push failure must never make a delivered alert look undelivered.
+describe('handoff push', () => {
+  beforeEach(() => {
+    sendLeadPush.mockReset()
+    sendLeadPush.mockResolvedValue({ sent: 1, failed: 0, retired: 0 })
+  })
+
+  it('pushes on the handoffs channel with the lead name already in hand', async () => {
+    readJourneyLead.mockResolvedValue({ clientId: 'client-1', name: 'Ravi Kumar', phone: '+919876543210' })
+    sendWhatsAppTemplateToClientNumber.mockResolvedValue({ success: true })
+
+    await sendHandoffAlert(baseInput)
+
+    expect(sendLeadPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clientId: 'client-1',
+        kind: 'handoff',
+        leadRef: chatRef,
+        title: 'Ravi Kumar needs you',
+      })
+    )
+  })
+
+  // The template loop returns on first success, so a push placed after it would
+  // never run when WhatsApp works.
+  it('pushes even when the WhatsApp template succeeds and returns early', async () => {
+    readJourneyLead.mockResolvedValue({ clientId: 'client-1', name: 'Ravi Kumar' })
+    sendWhatsAppTemplateToClientNumber.mockResolvedValue({ success: true })
+
+    const result = await sendHandoffAlert(baseInput)
+
+    expect(result.notified).toBe(true)
+    expect(sendLeadPush).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not report a delivered alert as failed when the push throws', async () => {
+    readJourneyLead.mockResolvedValue({ clientId: 'client-1', name: 'Ravi Kumar' })
+    sendLeadPush.mockRejectedValue(new Error('push exploded'))
+    sendWhatsAppTemplateToClientNumber.mockResolvedValue({ success: true })
+
+    const result = await sendHandoffAlert(baseInput)
+
+    expect(result).toEqual({ notified: true })
+  })
+
+  // No lead, no push: the alert is skipped before the read succeeds, so there
+  // is nothing to notify about and no name to put in the title.
+  it('does not push when the lead cannot be resolved', async () => {
+    readJourneyLead.mockResolvedValue(null)
+
+    const result = await sendHandoffAlert(baseInput)
+
+    expect(result).toEqual({ notified: false, skipReason: 'lead_not_found' })
+    expect(sendLeadPush).not.toHaveBeenCalled()
   })
 })
