@@ -487,17 +487,23 @@ several permissions. See `docs/META_APP_REVIEW_SUBMISSION.md` and
 **Priority:** P2 (was P1 — the dishonest-response half is fixed)
 **Depends on:** None
 
-### Empty Graph API field_data on lead fetch is treated as a valid (empty) lead
+### [RESOLVED 2026-08-26] Empty Graph API field_data on lead fetch is treated as a valid (empty) lead
 
-**What:** `fetchLeadFieldData` in `meta-provider.ts` returns `data.field_data ?? []` — if Meta's Graph API responds before the lead's field data has propagated (a known eventual-consistency lag between webhook delivery and field_data availability), the lead is persisted as a real record with all fields empty and permanently marked processed, rather than retried.
+`fetchLeadFieldData` returned `data.field_data ?? []`, so a Graph API response
+arriving before the lead's answers had propagated was persisted as a real record with
+every field blank and permanently marked processed.
 
-**Why:** A silently degraded lead (name/phone/email all blank) is worse than a missing one — it shows up in the CRM/dashboard looking like real signal, and there's no path to backfill it later since the idempotency key is already marked processed.
+Fixed by treating an empty `field_data` as retryable for three deliveries, reusing the
+don't-mark-processed mechanism the fetch-failure path already had, with the attempt count
+in a new `countWebhookAttempt` counter (own key namespace in `webhook_events`, so
+`hasProcessed` can never see it and drop the lead). Bounded rather than unbounded because
+Meta stops redelivering after ~36h: past that the choice is a blank record or no record,
+and a blank one at least tells the client a lead exists to look up. Accepted-but-empty
+leads carry a `_fieldDataUnavailable` marker in `customFields` so they cannot pass as a
+lead who typed nothing.
 
-**Context:** Found during the adversarial pass of this branch's `/ship`. Needs a decision on retry strategy (e.g., treat an empty `field_data` array as retryable for a bounded number of attempts before accepting it as genuinely empty) rather than a one-line fix.
-
-**Effort:** S
-**Priority:** P2
-**Depends on:** None
+Not verified against a real propagation lag — it cannot be provoked on demand. Covered by
+`meta-lead-service.test.ts`, which is also the first test file this service has had.
 
 ### mapMetaFieldData silently truncates multi-value answers and has undocumented match precedence
 
