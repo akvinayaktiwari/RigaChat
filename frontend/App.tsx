@@ -18,6 +18,7 @@ import BotsPage from './src/pages/BotsPage'
 import NewBotPage from './src/pages/NewBotPage'
 import BotDetailPage from './src/pages/BotDetailPage'
 import LeadsPage from './src/pages/LeadsPage'
+import LeadLinkPage from './src/pages/LeadLinkPage'
 import LeadDetailPage from './src/pages/LeadDetailPage'
 import SchedulerPage from './src/pages/SchedulerPage'
 import AppointmentsPage from './src/pages/AppointmentsPage'
@@ -88,6 +89,10 @@ function App() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
+        {/* Landing point for the WhatsApp handoff alert's "Open this lead" button.
+            Public because it only unpacks a ref and forwards; ProtectedRoute on
+            /dashboard still guards the lead itself. */}
+        <Route path="/l/:token" element={<LeadLinkPage />} />
         <Route path="/widget-test" element={<WidgetTestPage />} />
         <Route path="/widget-test/preview" element={<WidgetTestPreviewPage />} />
         <Route path="/form-test" element={<FormTestPage />} />
