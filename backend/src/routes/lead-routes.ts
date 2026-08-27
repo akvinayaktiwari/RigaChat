@@ -28,6 +28,7 @@ import type {
   LeadState,
   UnifiedLead,
   UnifiedLeadDetail,
+  UnifiedInboxPage,
 } from '../types/index.js'
 
 interface AuthEnv {
@@ -122,12 +123,28 @@ function stateErrorResponse(error: unknown): { message: string; status: 400 | 40
   return { message: errorMessage(error), status: 500 }
 }
 
+// Returns a PAGE, not a bare array. The shape changed on 2026-08-27 when this
+// endpoint was paginated -- see lead-inbox-service.ts for what that fixes (the
+// multi-megabyte response over mobile data) and what it does not (the read
+// cost, which needs a materialised inbox table).
+//
+// `limit` and `cursor` are both optional. Omitting them returns the first page
+// at the default size rather than everything, which is the point.
 leadRoutes.get('/inbox', requireAuth, async (c) => {
   const clientId = c.get('user').sub
 
+  const rawLimit = c.req.query('limit')
+  const limit = rawLimit === undefined ? undefined : Number.parseInt(rawLimit, 10)
+  if (limit !== undefined && (!Number.isFinite(limit) || limit < 1)) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'limit must be a positive integer' }, 400)
+  }
+
   try {
-    const leads = await getUnifiedInbox(clientId)
-    return c.json<ApiResponse<UnifiedLead[]>>({ success: true, data: leads }, 200)
+    const page = await getUnifiedInbox(clientId, {
+      ...(limit !== undefined ? { limit } : {}),
+      ...(c.req.query('cursor') ? { cursor: c.req.query('cursor') as string } : {}),
+    })
+    return c.json<ApiResponse<UnifiedInboxPage>>({ success: true, data: page }, 200)
   } catch (error) {
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }

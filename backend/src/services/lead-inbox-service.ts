@@ -17,6 +17,8 @@ import {
 } from './lead-resolution-service.js'
 import type { FormField, LeadRef, LeadState, UnifiedLead, UnifiedLeadDetail,
   LeadEvent,
+  UrgencyTier,
+  UnifiedInboxPage,
 } from '../types/index.js'
 import { getLeadEvents } from '../repositories/lead-event-repository.js'
 
@@ -30,7 +32,66 @@ import { getLeadEvents } from '../repositories/lead-event-repository.js'
 // journey layer.
 const META_INBOX_LIMIT = 500
 
-export async function getUnifiedInbox(clientId: string): Promise<UnifiedLead[]> {
+// NO DEFAULT PAGE SIZE. Omitting `limit` returns the whole inbox, exactly as
+// this endpoint behaved before pagination existed.
+//
+// That looks like the wrong default and is the right one here, for two reasons:
+//
+//   1. The web CRM calls this with no limit and renders every lead. Defaulting
+//      to a page would silently truncate a dashboard -- a client with 300 leads
+//      would quietly lose 250 of them, with no error anywhere.
+//   2. Paging does NOT reduce the read. Every page re-runs the full
+//      cross-table fetch and sort, so a client fetching 5 pages costs 5 scans.
+//      Making the web loop over pages to rebuild the full list would multiply
+//      its backend cost by the page count for no benefit.
+//
+// So pagination is OPT-IN, and the caller that opts in is the phone, where the
+// payload over mobile data is what actually hurts. The footgun -- a new client
+// forgetting `limit` and pulling everything -- is the pre-existing behaviour,
+// not a regression this introduces.
+const MAX_PAGE_SIZE = 200
+
+export interface InboxQuery {
+  limit?: number
+  cursor?: string
+}
+
+// A cursor is the sort POSITION of the last lead on the previous page, not an
+// offset. An offset silently skips or repeats a lead when the list changes
+// mid-scroll, which on a lead inbox means never seeing one that arrived.
+//
+// Opaque to callers on purpose: the encoding is an implementation detail and a
+// client that parses it will break when the sort changes.
+function encodeCursor(position: InboxPosition): string {
+  return Buffer.from(JSON.stringify(position)).toString('base64url')
+}
+
+function decodeCursor(cursor: string): InboxPosition | null {
+  try {
+    const parsed: unknown = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'))
+    if (typeof parsed !== 'object' || parsed === null) return null
+    const { rank, sortKey, leadId } = parsed as Record<string, unknown>
+    if (typeof rank !== 'number' || typeof sortKey !== 'number' || typeof leadId !== 'string') return null
+    return { rank, sortKey, leadId }
+  } catch {
+    return null
+  }
+}
+
+// WHAT THIS FIXES AND WHAT IT DOES NOT.
+//
+//   Fixed: the RESPONSE. A client with several thousand leads was sent all of
+//   them on every app open, over mobile data, to render the first five rows.
+//
+//   NOT fixed: the READ. This still queries every chat lead, every form lead,
+//   the capped Meta leads, every lead state and every form, then sorts in
+//   memory -- because a global urgency order across three tables with three
+//   different partition keys cannot be pushed down to DynamoDB. Making the read
+//   cheap needs a materialised inbox table, which is its own project.
+//
+//   That split is deliberate: the payload is what the user feels on a phone,
+//   and it is fixable today without touching the data model.
+export async function getUnifiedInbox(clientId: string, query: InboxQuery = {}): Promise<UnifiedInboxPage> {
   // The client's forms come along because a form lead's answers are keyed by
   // fieldId -- without the field definitions every form row renders as
   // "Unnamed lead / No contact". One query for all of them, not one per lead.
@@ -46,7 +107,7 @@ export async function getUnifiedInbox(clientId: string): Promise<UnifiedLead[]> 
   const read = (leadId: string): LeadState | null => stateByLeadId.get(leadId) ?? null
   const fieldsByFormId = new Map<string, FormField[]>(forms.map((form) => [form.formId, form.fields]))
 
-  const unified: UnifiedLead[] = [
+  const unified: SortableLead[] = [
     ...chatLeads.map((lead) => ({
       ...normalizeChatLead(lead),
       leadRef: { source: 'chat', botId: lead.botId, leadId: lead.leadId } as LeadRef,
@@ -72,47 +133,114 @@ export async function getUnifiedInbox(clientId: string): Promise<UnifiedLead[]> 
   // stable total order: a lead whose nextActionAt straddles the current instant
   // can compare inconsistently between two calls within the same sort.
   const now = Date.now()
-  return unified.sort((a, b) => compareByUrgency(a, b, now))
+  const sorted: UnifiedLead[] = unified
+    .sort((a, b) => compareByUrgency(a, b, now))
+    // Stamped AFTER the sort, so the value a client renders is provably the
+    // same one that decided the row's position.
+    .map((lead) => ({ ...lead, urgencyTier: urgencyTierOf(lead, now) }))
+
+  const after = query.cursor ? decodeCursor(query.cursor) : null
+  // An unreadable cursor starts from the top rather than erroring. A client
+  // holding a stale cursor after a deploy should see their inbox, not a 400.
+  const start = after ? sorted.findIndex((lead) => comparePositions(positionOf(lead, now), after) > 0) : 0
+  const from = start === -1 ? sorted.length : start
+
+  const limit = query.limit === undefined ? sorted.length : Math.min(Math.max(query.limit, 1), MAX_PAGE_SIZE)
+  const page = sorted.slice(from, from + limit)
+  const last = page[page.length - 1]
+  const hasMore = from + page.length < sorted.length
+
+  return {
+    leads: page,
+    total: sorted.length,
+    ...(hasMore && last ? { nextCursor: encodeCursor(positionOf(last, now)) } : {}),
+  }
 }
 
 // Lower tier = needs you sooner. This is the one design decision that makes the
 // inbox a queue instead of a table: a recency-sorted list buries the lead you
 // promised to call back yesterday under leads that just arrived.
-const TIER_OVERDUE = 0
-const TIER_UNTOUCHED = 1
-const TIER_SCHEDULED = 2
-const TIER_IN_PROGRESS = 3
-const TIER_CLOSED = 4
+// Rank drives the sort; the NAME goes on the wire. Clients used to recompute
+// this from state.status and state.nextActionAt to explain a lead's position in
+// the queue, which meant a second copy of this logic with nothing checking the
+// mirror. Now the server says it once.
+const TIER_RANK: Record<UrgencyTier, number> = {
+  overdue: 0,
+  untouched: 1,
+  scheduled: 2,
+  in_progress: 3,
+  closed: 4,
+}
 
-function urgencyTier(lead: UnifiedLead, now: number): number {
+export function urgencyTierOf(lead: { state: UnifiedLead['state'] }, now: number): UrgencyTier {
   const state = lead.state
-  if (state?.status === 'closed') return TIER_CLOSED
+  if (state?.status === 'closed') return 'closed'
   if (state?.nextActionAt) {
-    return Date.parse(state.nextActionAt) <= now ? TIER_OVERDUE : TIER_SCHEDULED
+    return Date.parse(state.nextActionAt) <= now ? 'overdue' : 'scheduled'
   }
   // No state row at all means nobody has opened it yet -- same as 'new'.
-  if (!state || state.status === 'new') return TIER_UNTOUCHED
-  return TIER_IN_PROGRESS
+  if (!state || state.status === 'new') return 'untouched'
+  return 'in_progress'
 }
 
 // Within a tier, the ordering that makes the tier actionable: due work oldest
 // first, waiting leads oldest first (they are going cold), and finished or
 // in-flight work newest first.
-function compareWithinTier(a: UnifiedLead, b: UnifiedLead, tier: number): number {
-  if (tier === TIER_OVERDUE || tier === TIER_SCHEDULED) {
-    return Date.parse(a.state?.nextActionAt ?? '') - Date.parse(b.state?.nextActionAt ?? '')
-  }
-  if (tier === TIER_UNTOUCHED) {
-    return Date.parse(a.createdAt) - Date.parse(b.createdAt)
-  }
-  return Date.parse(b.createdAt) - Date.parse(a.createdAt)
+//
+// NEGATED for the "newest first" tiers so that ASCENDING is always correct.
+// That uniformity is what lets a pagination cursor be a single comparable
+// number instead of a direction-aware special case per tier.
+// An unparseable date yields NaN, and NaN destroys the TOTAL ORDER pagination
+// depends on: NaN !== NaN, and every comparison against it is false, so the
+// cursor can never advance past such a lead and the caller is served the same
+// page forever. On a phone that is an inbox that scrolls without end.
+//
+// Real leads always carry a valid ISO createdAt, so this is defensive -- but
+// the failure it prevents is severe and silent, and the guard is one line.
+// Unparseable sorts LAST rather than first: a corrupt row should not be the
+// first thing an operator sees.
+function finite(value: number, fallback: number): number {
+  return Number.isFinite(value) ? value : fallback
 }
 
-function compareByUrgency(a: UnifiedLead, b: UnifiedLead, now: number): number {
-  const tierA = urgencyTier(a, now)
-  const tierB = urgencyTier(b, now)
-  if (tierA !== tierB) return tierA - tierB
-  return compareWithinTier(a, b, tierA)
+function sortKeyOf(lead: SortableLead, tier: UrgencyTier): number {
+  if (tier === 'overdue' || tier === 'scheduled') {
+    return finite(Date.parse(lead.state?.nextActionAt ?? ''), Number.MAX_SAFE_INTEGER)
+  }
+  if (tier === 'untouched') {
+    return finite(Date.parse(lead.createdAt), Number.MAX_SAFE_INTEGER)
+  }
+  return finite(-Date.parse(lead.createdAt), Number.MAX_SAFE_INTEGER)
+}
+
+// The full sort position of a lead. Carrying leadId is not cosmetic: without a
+// tiebreak the order was NOT a total order, so two leads sharing a timestamp
+// could swap places between two requests -- which for a paginated reader means
+// seeing one lead twice and never seeing the other at all.
+// The comparator only reads state, createdAt and leadId, so it works on a lead
+// that does not carry its tier yet. That is what lets the tier be stamped AFTER
+// the sort rather than guessed during construction.
+type SortableLead = Omit<UnifiedLead, 'urgencyTier'>
+
+export interface InboxPosition {
+  rank: number
+  sortKey: number
+  leadId: string
+}
+
+export function positionOf(lead: SortableLead, now: number): InboxPosition {
+  const tier = urgencyTierOf(lead, now)
+  return { rank: TIER_RANK[tier], sortKey: sortKeyOf(lead, tier), leadId: lead.leadId }
+}
+
+function comparePositions(a: InboxPosition, b: InboxPosition): number {
+  if (a.rank !== b.rank) return a.rank - b.rank
+  if (a.sortKey !== b.sortKey) return a.sortKey - b.sortKey
+  return a.leadId < b.leadId ? -1 : a.leadId > b.leadId ? 1 : 0
+}
+
+function compareByUrgency(a: SortableLead, b: SortableLead, now: number): number {
+  return comparePositions(positionOf(a, now), positionOf(b, now))
 }
 
 // A malformed customFields blob must not 404 the lead -- the same posture
@@ -150,7 +278,9 @@ function labelCustomFields(
 // Everything the workspace needs out of the source record, from ONE read of it.
 // Deliberately not readJourneyLead + a second fetch for the extras: that would
 // read the same row twice per page load to assemble one object.
-type SourceRecord = Omit<UnifiedLeadDetail, 'leadRef' | 'state'>
+// urgencyTier is omitted too: it is derived from `state`, which a source record
+// does not carry. getUnifiedLeadDetail stamps it once both halves are in hand.
+type SourceRecord = Omit<UnifiedLeadDetail, 'leadRef' | 'state' | 'urgencyTier'>
 
 async function readSourceRecord(leadRef: LeadRef, clientId: string): Promise<SourceRecord | null> {
   switch (leadRef.source) {
@@ -195,7 +325,9 @@ export async function getUnifiedLeadDetail(
     throw new Error('Lead not found')
   }
 
-  return { ...record, leadRef, state }
+  // The detail screen shows the same badge the list does, so the tier has to
+  // travel here too rather than being recomputed by the client.
+  return { ...record, leadRef, state, urgencyTier: urgencyTierOf({ state }, Date.now()) }
 }
 
 // Ownership is checked against the LEAD, not against the lead_state row: an

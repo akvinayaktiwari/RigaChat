@@ -99,6 +99,18 @@ export interface LeadState {
   updatedAt: string
 }
 
+// Why a lead sits where it does in the urgency-ordered inbox. Server-computed
+// and sent on the wire, so no client recomputes the rule.
+export type UrgencyTier = 'overdue' | 'untouched' | 'scheduled' | 'in_progress' | 'closed'
+
+// One page of the unified inbox. Pagination is OPT-IN: omit `limit` and this
+// carries the whole inbox with no nextCursor, which is what the web does.
+export interface UnifiedInboxPage {
+  leads: UnifiedLead[]
+  total: number
+  nextCursor?: string
+}
+
 export interface UnifiedLead {
   leadId: string
   clientId: string
@@ -114,6 +126,9 @@ export interface UnifiedLead {
   // null means nobody has touched this lead yet -- there is no state row, which
   // the UI reads as 'new' rather than writing one on capture just to say so.
   state: LeadState | null
+  // Stamped by the same code that decides the order, so what a client renders
+  // is provably the value that produced the row's position.
+  urgencyTier: UrgencyTier
 }
 
 // One lead, opened. Mirrors backend UnifiedLeadDetail: everything the list row

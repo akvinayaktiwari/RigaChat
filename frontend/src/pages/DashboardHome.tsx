@@ -259,7 +259,7 @@ export default function DashboardHome() {
       setBots(botsRes.status === 'fulfilled' ? (botsRes.value.data ?? []) : [])
 
       const leadsOk = leadsRes.status === 'fulfilled' && leadsRes.value.success
-      setLeads(leadsOk ? (leadsRes.value.data ?? []) : [])
+      setLeads(leadsOk ? (leadsRes.value.data?.leads ?? []) : [])
       setLeadsUnavailable(!leadsOk)
       setLoading(false)
     }
