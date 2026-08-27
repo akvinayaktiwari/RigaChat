@@ -356,8 +356,43 @@ export interface ClientRecord {
   activeWhatsappProvider?: WhatsAppActiveProvider
   metaConnection?: MetaConnection
   calComConnection?: CalComConnection
+  notificationPreferences?: NotificationPreferences
   createdAt: string
   updatedAt: string
+}
+
+// Which channels fire when a lead arrives or a conversation is handed off.
+//
+// WHY THIS EXISTS
+//   Before push, a lead produced one alert. With push it produces two, and a
+//   handoff produces up to three (WhatsApp + email fallback + push). Alert
+//   fatigue is the standard reason people mute an app, and a muted app is a
+//   dead app -- so the client gets a switch instead of a heuristic.
+//
+// OPTIONAL, AND ABSENT MEANS ALL ON. Every existing client predates this field.
+// Defaulting to "on" means the rollout changes nobody's behaviour on the day it
+// deploys, and a client who never opens Settings keeps exactly what they have.
+export interface NotificationPreferences {
+  // Push to registered mobile devices.
+  push: boolean
+  // The WhatsApp template to the client's notificationNumber.
+  whatsapp: boolean
+  // The email fallback. Turning this off means a failed WhatsApp send reaches
+  // NOBODY unless push is on, which the UI has to say out loud.
+  email: boolean
+}
+
+// Absent, or partially absent, means on. Written as a function rather than a
+// spread default so a stored `{push:false}` cannot accidentally re-enable push
+// through an object spread ordering mistake.
+export function resolveNotificationPreferences(
+  stored: NotificationPreferences | undefined
+): NotificationPreferences {
+  return {
+    push: stored?.push ?? true,
+    whatsapp: stored?.whatsapp ?? true,
+    email: stored?.email ?? true,
+  }
 }
 
 // Tokens KMS-encrypted (lib/kms.ts), matching WhatsApp/Meta's connection

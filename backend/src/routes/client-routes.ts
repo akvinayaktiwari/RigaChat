@@ -1,9 +1,16 @@
 import { Hono } from 'hono'
 import { requireAuth } from '../lib/cognito.js'
-import { getAppBootstrap, getClient, updateClientProfile, upgradeClientPlan, upsertClient } from '../services/client-service.js'
+import {
+  getAppBootstrap,
+  getClient,
+  updateClientProfile,
+  updateNotificationPreferences,
+  upgradeClientPlan,
+  upsertClient,
+} from '../services/client-service.js'
 import { getSubscriptionSummary } from '../services/entitlement-service.js'
 import type { SubscriptionSummary } from '../services/entitlement-service.js'
-import type { ApiResponse, AppBootstrap, ClientRecord } from '../types/index.js'
+import type { ApiResponse, AppBootstrap, ClientRecord, NotificationPreferences } from '../types/index.js'
 
 interface AuthEnv {
   Variables: {
@@ -21,6 +28,26 @@ interface UpgradePlanBody {
 
 interface UpdateProfileBody {
   name?: string
+}
+
+interface NotificationPreferencesBody {
+  push?: unknown
+  whatsapp?: unknown
+  email?: unknown
+}
+
+// Only booleans are accepted, and only for known keys. A truthy string like
+// "false" would otherwise turn a channel ON while reading as off to whoever
+// sent it.
+function readPreferencePatch(body: NotificationPreferencesBody): Partial<NotificationPreferences> | null {
+  const patch: Partial<NotificationPreferences> = {}
+  for (const key of ['push', 'whatsapp', 'email'] as const) {
+    const value = body[key]
+    if (value === undefined) continue
+    if (typeof value !== 'boolean') return null
+    patch[key] = value
+  }
+  return Object.keys(patch).length > 0 ? patch : null
 }
 
 function errorMessage(error: unknown): string {
@@ -70,6 +97,33 @@ clientRoutes.get('/me/app-bootstrap', requireAuth, async (c) => {
     const bootstrap = await getAppBootstrap(clientId)
     return c.json<ApiResponse<AppBootstrap>>({ success: true, data: bootstrap }, 200)
   } catch (error) {
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+// Which channels fire when a lead arrives. A separate route rather than an
+// extension of PATCH /me, because that one hard-requires `name` and mixing an
+// unrelated required field into a toggle would mean the UI has to send the
+// user's name to turn off an email. /me/plan sets the same precedent.
+clientRoutes.patch('/me/notification-preferences', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+
+  try {
+    const body = await c.req.json<NotificationPreferencesBody>().catch(() => ({}))
+    const patch = readPreferencePatch(body)
+    if (!patch) {
+      return c.json<ApiResponse<null>>(
+        { success: false, error: 'Send at least one of push, whatsapp or email as a boolean' },
+        400
+      )
+    }
+
+    const client = await updateNotificationPreferences(clientId, patch)
+    return c.json<ApiResponse<ClientRecord>>({ success: true, data: client }, 200)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Client not found') {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
+    }
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }
 })

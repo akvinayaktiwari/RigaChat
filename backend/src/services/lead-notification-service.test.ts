@@ -255,3 +255,107 @@ describe('mobile push channel', () => {
     expect(sendEmail).toHaveBeenCalled()
   })
 })
+
+// Channel preferences, added 2026-08-27. The default matters as much as the
+// toggles: every existing client predates this field, so absent must mean ON
+// or the rollout silently mutes people.
+describe('notification preferences', () => {
+  const withRef = { ...input, leadRef: { source: 'chat', botId: 'bot-1', leadId: 'lead-1' } as const }
+
+  function clientWith(preferences?: Record<string, boolean>) {
+    getClientById.mockResolvedValue({
+      clientId: 'client-1',
+      email: 'owner@example.com',
+      ...(preferences ? { notificationPreferences: preferences } : {}),
+    })
+  }
+
+  it('sends on every channel when the field is absent', async () => {
+    clientWith()
+    sendWhatsAppTemplateToClientNumber.mockResolvedValue({ success: true, messageId: 'wamid.abc' })
+
+    const result = await sendLeadNotification(withRef)
+
+    expect(sendLeadPush).toHaveBeenCalledTimes(1)
+    expect(sendWhatsAppTemplateToClientNumber).toHaveBeenCalledTimes(1)
+    expect(result.via).toBe('whatsapp')
+  })
+
+  it('sends on every channel when the field is only partly filled in', async () => {
+    clientWith({ whatsapp: false })
+    sendLeadPush.mockResolvedValue({ sent: 1, failed: 0, retired: 0 })
+
+    await sendLeadNotification(withRef)
+
+    // whatsapp explicitly off, push and email default to on
+    expect(sendWhatsAppTemplateToClientNumber).not.toHaveBeenCalled()
+    expect(sendLeadPush).toHaveBeenCalledTimes(1)
+    expect(sendEmail).toHaveBeenCalledTimes(1)
+  })
+
+  it('skips push when push is off but still sends WhatsApp', async () => {
+    clientWith({ push: false })
+    sendWhatsAppTemplateToClientNumber.mockResolvedValue({ success: true, messageId: 'wamid.abc' })
+
+    const result = await sendLeadNotification(withRef)
+
+    expect(sendLeadPush).not.toHaveBeenCalled()
+    expect(result.via).toBe('whatsapp')
+  })
+
+  // A suppressed alert must not consume a template send or write a
+  // notification_out event.
+  it('does not touch the template loop when WhatsApp is off', async () => {
+    clientWith({ whatsapp: false, email: false })
+    sendLeadPush.mockResolvedValue({ sent: 2, failed: 0, retired: 0 })
+
+    const result = await sendLeadNotification(withRef)
+
+    expect(sendWhatsAppTemplateToClientNumber).not.toHaveBeenCalled()
+    expect(sendEmail).not.toHaveBeenCalled()
+    expect(result).toEqual({ notified: true, via: 'push', suppressedByPreference: true })
+  })
+
+  it('reports nobody-told when every channel is off', async () => {
+    clientWith({ push: false, whatsapp: false, email: false })
+
+    const result = await sendLeadNotification(withRef)
+
+    expect(result).toEqual({ notified: false, via: 'none', suppressedByPreference: true })
+  })
+
+  // Turning the fallback off is legitimate, but it means a rejected WhatsApp
+  // send reaches nobody unless push landed. That has to be distinguishable in
+  // the result from an outright failure.
+  it('marks a rejected WhatsApp send as suppressed, not failed, when email is off', async () => {
+    clientWith({ email: false })
+    sendLeadPush.mockResolvedValue({ sent: 0, failed: 0, retired: 0, skipped: 'no_devices' })
+    sendWhatsAppTemplateToClientNumber.mockResolvedValue({ success: false, retryable: false, error: 'rejected' })
+
+    const result = await sendLeadNotification(withRef)
+
+    expect(sendEmail).not.toHaveBeenCalled()
+    expect(result).toMatchObject({ notified: false, via: 'none', suppressedByPreference: true, error: 'rejected' })
+  })
+
+  it('still reports success via push when WhatsApp is rejected and email is off', async () => {
+    clientWith({ email: false })
+    sendLeadPush.mockResolvedValue({ sent: 1, failed: 0, retired: 0 })
+    sendWhatsAppTemplateToClientNumber.mockResolvedValue({ success: false, retryable: false, error: 'rejected' })
+
+    const result = await sendLeadNotification(withRef)
+
+    expect(result).toMatchObject({ notified: true, via: 'push', suppressedByPreference: true })
+  })
+
+  // A client record that cannot be read must not mute anyone.
+  it('falls back to all channels on when the client record cannot be read', async () => {
+    getClientById.mockRejectedValue(new Error('dynamo down'))
+    sendWhatsAppTemplateToClientNumber.mockResolvedValue({ success: true, messageId: 'wamid.abc' })
+
+    const result = await sendLeadNotification(withRef)
+
+    expect(sendLeadPush).toHaveBeenCalledTimes(1)
+    expect(result.via).toBe('whatsapp')
+  })
+})

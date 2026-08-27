@@ -2,7 +2,8 @@ import { createClient, getClientById, updateClient } from '../repositories/clien
 import { create as createSubscription, getByAccountId } from '../repositories/subscription-repository.js'
 import { TRIAL } from '../config/entitlements-config.js'
 import { countBotsForClient } from '../repositories/bot-repository.js'
-import type { AppBootstrap, Capability, ClientRecord, Subscription } from '../types/index.js'
+import { resolveNotificationPreferences } from '../types/index.js'
+import type { AppBootstrap, Capability, ClientRecord, NotificationPreferences, Subscription } from '../types/index.js'
 
 // What a set-up client's mobile app may do today. Phase 1 only: 'lead.timeline'
 // is deliberately absent until GET /api/leads/events ships in the app, because
@@ -205,4 +206,16 @@ export async function getAppBootstrap(clientId: string): Promise<AppBootstrap> {
   }
 
   return { ready: true, capabilities: READY_CAPABILITIES }
+}
+
+// Partial by design: the Settings UI toggles one channel at a time, and sending
+// the whole object back would let a stale page silently revert a change made on
+// another device.
+export async function updateNotificationPreferences(
+  clientId: string,
+  patch: Partial<NotificationPreferences>
+): Promise<ClientRecord> {
+  const client = await getClient(clientId)
+  const current = resolveNotificationPreferences(client.notificationPreferences)
+  return updateClient(clientId, { notificationPreferences: { ...current, ...patch } })
 }

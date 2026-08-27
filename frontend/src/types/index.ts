@@ -205,6 +205,7 @@ export interface ClientRecord {
   name: string
   authProvider: 'google'
   plan: 'starter' | 'growth' | 'agency'
+  notificationPreferences?: NotificationPreferences
   createdAt: string
   updatedAt: string
 }
@@ -406,11 +407,31 @@ export interface MetaLead {
   crmSyncAttempts?: number
 }
 
-export interface Preferences {
-  emailNotifications: boolean
-  desktopAlerts: boolean
-  weeklySummary: boolean
-  leadAssignmentAlerts: boolean
+// Which channels fire when a lead arrives. Absent, or partially absent, means
+// on -- every client predates this field.
+//
+// REPLACED the old `Preferences` interface on 2026-08-27. That one had four
+// toggles (emailNotifications, desktopAlerts, weeklySummary,
+// leadAssignmentAlerts) held in sessionStorage and read by nothing: a grep of
+// backend/src returned zero hits for all four. Persisting them server-side
+// would have made three placebo switches durable instead of removing them, so
+// the three that gate a real send replaced the four that gated nothing.
+export interface NotificationPreferences {
+  push: boolean
+  whatsapp: boolean
+  email: boolean
+}
+
+// One registered mobile install. expoPushToken is never sent to the browser --
+// it is a send credential of no use to a human.
+export interface LinkedDevice {
+  clientId: string
+  deviceId: string
+  platform: 'android' | 'ios'
+  appVersion: string
+  registeredAt: string
+  lastSeenAt: string
+  failureCount: number
 }
 
 export type VoiceAgentVoice = 'alloy' | 'echo' | 'shimmer' | 'nova' | 'onyx' | 'fable'

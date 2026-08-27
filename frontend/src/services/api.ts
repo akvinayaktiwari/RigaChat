@@ -26,6 +26,8 @@ import type {
   KnowledgeBaseEntry,
   Lead,
   LeadRef,
+  LinkedDevice,
+  NotificationPreferences,
   MetaDeletionRequestStatus,
   LeadState,
   LeadStatePatch,
@@ -332,6 +334,24 @@ export function getMe(): Promise<ApiResponse<ClientRecord>> {
 
 export function updateProfile(name: string): Promise<ApiResponse<ClientRecord>> {
   return apiClient<ClientRecord>('/api/clients/me', 'PATCH', { name })
+}
+
+// Partial on purpose: the UI toggles one channel at a time, so a stale tab
+// cannot revert a change made elsewhere by echoing back a whole object.
+export function updateNotificationPreferences(
+  patch: Partial<NotificationPreferences>
+): Promise<ApiResponse<ClientRecord>> {
+  return apiClient<ClientRecord>('/api/clients/me/notification-preferences', 'PATCH', patch)
+}
+
+export function getLinkedDevices(): Promise<ApiResponse<LinkedDevice[]>> {
+  return apiClient<LinkedDevice[]>('/api/devices')
+}
+
+// Revoking from the web is the answer to a lost phone. The app's own sign-out
+// calls the same route.
+export function revokeDevice(deviceId: string): Promise<ApiResponse<null>> {
+  return apiClient<null>(`/api/devices/${encodeURIComponent(deviceId)}`, 'DELETE')
 }
 
 export function getMySubscription(): Promise<ApiResponse<SubscriptionSummary>> {

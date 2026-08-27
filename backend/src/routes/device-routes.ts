@@ -10,6 +10,7 @@ import { requireAuth } from '../lib/cognito.js'
 import {
   upsertDeviceToken,
   deleteDeviceToken,
+  getDeviceTokensForClient,
 } from '../repositories/device-token-repository.js'
 import type { ApiResponse, DevicePlatform, DeviceToken } from '../types/index.js'
 
@@ -85,7 +86,26 @@ deviceRoutes.post('/', requireAuth, async (c) => {
   }
 })
 
-// Called on sign-out. Answers 200 on a second call too: DynamoDB's delete
+// The "linked devices" list in web Settings. Also the only way a client can see
+// that a phone they lost is still registered, which is why the DELETE below is
+// reachable from the web and not just from the app's own sign-out.
+//
+// expoPushToken is deliberately NOT returned: it is a send credential, it is of
+// no use to a human, and a UI has no reason to hold one.
+deviceRoutes.get('/', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+
+  try {
+    const devices = await getDeviceTokensForClient(clientId)
+    const safe = devices.map(({ expoPushToken: _token, ...rest }) => rest)
+    return c.json<ApiResponse<Omit<DeviceToken, 'expoPushToken'>[]>>({ success: true, data: safe }, 200)
+  } catch (error) {
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+// Called on sign-out, and by the revoke button in web Settings. Answers 200 on
+// a second call too: DynamoDB's delete
 // succeeds on a row that is not there, so there is no read-before-delete and no
 // way for a client to learn whether a deviceId existed.
 deviceRoutes.delete('/:deviceId', requireAuth, async (c) => {

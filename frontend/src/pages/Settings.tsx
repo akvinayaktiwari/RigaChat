@@ -4,6 +4,7 @@ import { useToast } from '../components/Toast/Toast'
 import UserProfileSection from '../components/settings/UserProfileSection'
 import SubscriptionSection from '../components/settings/SubscriptionSection'
 import PreferencesSection from '../components/settings/PreferencesSection'
+import MobileAppSection from '../components/settings/MobileAppSection'
 import IntegrationsSection from '../components/settings/IntegrationsSection'
 import DangerZoneSection from '../components/settings/DangerZoneSection'
 import EditProfileModal from '../components/settings/EditProfileModal'
@@ -19,30 +20,26 @@ import {
   getIntegrationStatus,
   getMe,
   setCalComDefaultEventType,
+  updateNotificationPreferences,
   updateProfile,
 } from '../services/api'
-import type { CalComEventType, ClientRecord, Preferences } from '../types/index'
+import type { CalComEventType, ClientRecord, NotificationPreferences } from '../types/index'
 import { useSubscription } from '../hooks/useSubscription'
 
-const PREFS_STORAGE_KEY = 'vyostra_prefs'
-// Pre-rename key. Read as a fallback so an existing session keeps its saved
-// preferences instead of silently reverting to defaults; the next save writes
-// the new key.
-const LEGACY_PREFS_STORAGE_KEY = 'beepboop_prefs'
+// Preferences moved to the CLIENT RECORD on 2026-08-27. They used to live in
+// sessionStorage under 'vyostra_prefs' (with a 'beepboop_prefs' legacy key) and
+// were read by nothing: a grep of backend/src returned zero hits for all four
+// of the old toggles. Nothing is migrated from the old keys, deliberately --
+// the three channels that replaced them are different switches, and defaulting
+// everyone to "all on" matches the server, which treats an absent field as on.
 
-const DEFAULT_PREFS: Preferences = {
-  emailNotifications: true,
-  desktopAlerts: false,
-  weeklySummary: true,
-  leadAssignmentAlerts: true,
-}
-
-function loadPreferences(): Preferences {
-  try {
-    const saved = sessionStorage.getItem(PREFS_STORAGE_KEY) ?? sessionStorage.getItem(LEGACY_PREFS_STORAGE_KEY)
-    return saved ? { ...DEFAULT_PREFS, ...(JSON.parse(saved) as Partial<Preferences>) } : DEFAULT_PREFS
-  } catch {
-    return DEFAULT_PREFS
+// Absent, or partly absent, means on. Mirrors resolveNotificationPreferences on
+// the backend.
+function resolvePreferences(stored: NotificationPreferences | undefined): NotificationPreferences {
+  return {
+    push: stored?.push ?? true,
+    whatsapp: stored?.whatsapp ?? true,
+    email: stored?.email ?? true,
   }
 }
 
@@ -60,7 +57,7 @@ export default function Settings() {
   const [calComStatus, setCalComStatus] = useState<'connected' | 'disconnected' | 'loading'>('loading')
   const [calComEventTypes, setCalComEventTypes] = useState<CalComEventType[]>([])
   const [calComDefaultEventTypeId, setCalComDefaultEventTypeId] = useState<number | null>(null)
-  const [preferences, setPreferences] = useState<Preferences>(loadPreferences)
+  const [preferences, setPreferences] = useState<NotificationPreferences>(() => resolvePreferences(undefined))
   const [showEditProfile, setShowEditProfile] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -78,7 +75,14 @@ export default function Settings() {
     async function load() {
       try {
         const res = await getMe()
-        if (res.success && res.data) setProfile(res.data)
+        if (res.success && res.data) {
+          setProfile(res.data)
+          // Seeded from the client record, not from local storage. The initial
+          // all-on state above is only what renders for the moment before this
+          // resolves; without this line a client who had turned WhatsApp off
+          // would see it back on every time they opened Settings.
+          setPreferences(resolvePreferences(res.data.notificationPreferences))
+        }
         else toast.show(res.error ?? 'Failed to load profile', 'error')
       } catch {
         toast.show('Failed to load profile', 'error')
@@ -203,12 +207,28 @@ export default function Settings() {
     }
   }
 
-  function handleTogglePreference(key: keyof Preferences) {
-    setPreferences((prev) => {
-      const next = { ...prev, [key]: !prev[key] }
-      sessionStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(next))
-      return next
-    })
+  // Optimistic, then reverted on failure. A toggle that does not move until a
+  // round trip completes feels broken; one that moves and stays moved after a
+  // failed save is a lie. Returns success so the section can show its own
+  // inline error rather than a toast that scrolls away.
+  async function handleTogglePreference(
+    key: keyof NotificationPreferences,
+    value: boolean
+  ): Promise<boolean> {
+    const previous = preferences
+    setPreferences({ ...previous, [key]: value })
+    try {
+      const res = await updateNotificationPreferences({ [key]: value })
+      if (res.success && res.data) {
+        setPreferences(resolvePreferences(res.data.notificationPreferences))
+        return true
+      }
+      setPreferences(previous)
+      return false
+    } catch {
+      setPreferences(previous)
+      return false
+    }
   }
 
   function handleDeleteAccount() {
@@ -252,6 +272,8 @@ export default function Settings() {
             onSelectCalComEventType={handleSelectCalComEventType}
           />
         </div>
+
+        <MobileAppSection />
 
         <DangerZoneSection onSignOut={logout} onDeleteAccount={() => setShowDeleteConfirm(true)} />
       </div>

@@ -21,7 +21,8 @@ vi.mock('../repositories/bot-repository.js', () => ({
   countBotsForClient: (...a: unknown[]) => countBotsForClient(...a),
 }))
 
-const { upsertClient, ensureTrialSubscription, getAppBootstrap } = await import('./client-service.js')
+const { upsertClient, ensureTrialSubscription, getAppBootstrap, updateNotificationPreferences } =
+  await import('./client-service.js')
 
 const CLIENT_ID = 'client-1'
 const SIGNED_UP_AT = '2026-07-09T16:14:12.496Z'
@@ -213,5 +214,47 @@ describe('getAppBootstrap', () => {
     await getAppBootstrap('client-42')
 
     expect(countBotsForClient).toHaveBeenCalledWith('client-42')
+  })
+})
+
+describe('updateNotificationPreferences', () => {
+  beforeEach(() => {
+    getClientById.mockReset()
+    updateClient.mockReset()
+    updateClient.mockImplementation((_id: string, updates: unknown) => Promise.resolve({ clientId: 'c-1', ...(updates as object) }))
+  })
+
+  // A partial patch must not wipe the channels it does not mention.
+  it('merges a partial patch onto the resolved current value', async () => {
+    getClientById.mockResolvedValue({ clientId: 'c-1', notificationPreferences: { push: true, whatsapp: false, email: true } })
+
+    await updateNotificationPreferences('c-1', { push: false })
+
+    expect(updateClient).toHaveBeenCalledWith('c-1', {
+      notificationPreferences: { push: false, whatsapp: false, email: true },
+    })
+  })
+
+  // A client who predates the field must end up with the two untouched
+  // channels ON, not undefined -- undefined would read as on later anyway, but
+  // writing it explicitly is what makes the stored row self-describing.
+  it('fills in the absent channels as on when the field does not exist yet', async () => {
+    getClientById.mockResolvedValue({ clientId: 'c-1' })
+
+    await updateNotificationPreferences('c-1', { whatsapp: false })
+
+    expect(updateClient).toHaveBeenCalledWith('c-1', {
+      notificationPreferences: { push: true, whatsapp: false, email: true },
+    })
+  })
+
+  it('can turn every channel off', async () => {
+    getClientById.mockResolvedValue({ clientId: 'c-1' })
+
+    await updateNotificationPreferences('c-1', { push: false, whatsapp: false, email: false })
+
+    expect(updateClient).toHaveBeenCalledWith('c-1', {
+      notificationPreferences: { push: false, whatsapp: false, email: false },
+    })
   })
 })

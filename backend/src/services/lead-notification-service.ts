@@ -22,7 +22,8 @@ import { flattenTemplateParam } from './notification-service.js'
 import { templateLanguageOf } from '../lib/whatsapp-templates.js'
 import type { WhatsAppSendResult } from '../lib/whatsapp-provider.js'
 import { sendLeadPush } from './push-notification-service.js'
-import type { LeadRef } from '../types/index.js'
+import { resolveNotificationPreferences } from '../types/index.js'
+import type { ClientRecord, LeadRef } from '../types/index.js'
 
 // Tried in order, first success wins -- the same fall-through
 // notification-service.ts uses for handoff alerts, and for the same reason:
@@ -92,9 +93,19 @@ export interface LeadNotificationResult {
   notified: boolean
   // How the client was actually told. 'none' means nobody was told, which is
   // the outcome an operator most needs to be able to search for.
-  via: 'whatsapp' | 'email' | 'none'
+  //
+  // 'push' was added 2026-08-27. It is only ever returned when the client has
+  // deliberately turned WhatsApp and email OFF -- on the normal path push runs
+  // alongside WhatsApp and the WhatsApp result still wins the label, because
+  // that is the channel whose delivery we can actually verify.
+  via: 'whatsapp' | 'email' | 'push' | 'none'
   wamid?: string
   error?: string
+  // True when a channel was skipped because the CLIENT turned it off, rather
+  // than because it failed. An operator reading logs needs to tell "nobody was
+  // told because everything broke" from "nobody was told because they asked
+  // for that".
+  suppressedByPreference?: boolean
 }
 
 function param(value: string | undefined): string {
@@ -123,10 +134,14 @@ function emailBody(input: LeadNotificationInput, reason: string): string {
 // necessary, and it is only ever visible from the status webhook.
 export async function sendLeadNotificationEmail(
   input: LeadNotificationInput,
-  reason: string
+  reason: string,
+  // Optional so the delivery-status path in meta-whatsapp-webhook-service.ts
+  // can keep calling this with two arguments. sendLeadNotification passes the
+  // record it already read, which makes the happy path cost no extra GetItem.
+  knownClient?: ClientRecord | null
 ): Promise<LeadNotificationResult> {
   try {
-    const client = await getClientById(input.clientId)
+    const client = knownClient !== undefined ? knownClient : await getClientById(input.clientId)
     if (!client?.email) {
       console.error(
         `[lead-notification] no fallback address: client=${input.clientId} lead=${input.leadId}`
@@ -189,6 +204,13 @@ export async function sendLeadNotification(
   input: LeadNotificationInput
 ): Promise<LeadNotificationResult> {
   try {
+    // One read, used for BOTH the preference check and the email fallback
+    // below. Before this the happy path never read the client and the fallback
+    // path read it separately, so preferences cost nothing on the path that
+    // ends in an email and one GetItem on the path that ends in WhatsApp.
+    const client = await getClientById(input.clientId).catch(() => null)
+    const preferences = resolveNotificationPreferences(client?.notificationPreferences)
+
     // PUSH FIRES FIRST, AND IN ITS OWN TRY/CATCH. Two reasons, both load-bearing:
     //
     // 1. ORDER. The template loop below RETURNS on the first successful send.
@@ -205,21 +227,38 @@ export async function sendLeadNotification(
     // Push success and WhatsApp success are independent by construction. A
     // failed push must never suppress the WhatsApp alert, and a failed
     // WhatsApp send must never suppress the push.
-    if (input.leadRef) {
+    let pushed = false
+    if (input.leadRef && preferences.push) {
       try {
-        await sendLeadPush({
+        const pushResult = await sendLeadPush({
           clientId: input.clientId,
           kind: 'lead_captured',
           leadRef: input.leadRef,
           title: input.name ? `New lead: ${input.name}` : 'New lead',
           body: [input.interest, `from ${input.source}`].filter(Boolean).join(' · '),
         })
+        pushed = pushResult.sent > 0
       } catch (pushError) {
         console.error(
           `[lead-notification] push threw despite its contract: client=${input.clientId} lead=${input.leadId}`,
           pushError instanceof Error ? pushError.message : String(pushError)
         )
       }
+    }
+
+    // The client turned WhatsApp off. Skip the template loop entirely rather
+    // than sending and discarding the result -- a suppressed alert must not
+    // consume a template send or write a notification_out event.
+    if (!preferences.whatsapp) {
+      if (preferences.email) {
+        return sendLeadNotificationEmail(input, 'WhatsApp alerts are turned off for this account', client)
+      }
+      console.log(
+        `[lead-notification] whatsapp+email off by preference: client=${input.clientId} lead=${input.leadId} pushed=${pushed}`
+      )
+      return pushed
+        ? { notified: true, via: 'push', suppressedByPreference: true }
+        : { notified: false, via: 'none', suppressedByPreference: true }
     }
 
     const bodyParams = [param(input.source), param(input.name), param(input.phone), param(input.interest)]
@@ -280,7 +319,21 @@ export async function sendLeadNotification(
     // The send was REJECTED outright, so no wamid exists and no status webhook
     // will ever arrive for it. This is the only fallback trigger that can fire
     // here; the accepted-then-failed case belongs to the status path.
-    return sendLeadNotificationEmail(input, result?.error ?? 'WhatsApp send failed with no detail')
+    const whatsappError = result?.error ?? 'WhatsApp send failed with no detail'
+
+    // The client turned the email fallback off. That is a legitimate choice,
+    // but it means a failed WhatsApp send reaches nobody unless push landed --
+    // worth its own log line, because it looks identical to a bug otherwise.
+    if (!preferences.email) {
+      console.log(
+        `[lead-notification] email fallback off by preference: client=${input.clientId} lead=${input.leadId} pushed=${pushed} whatsappError="${whatsappError}"`
+      )
+      return pushed
+        ? { notified: true, via: 'push', suppressedByPreference: true }
+        : { notified: false, via: 'none', suppressedByPreference: true, error: whatsappError }
+    }
+
+    return sendLeadNotificationEmail(input, whatsappError, client)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     console.error(
