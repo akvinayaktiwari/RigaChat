@@ -44,6 +44,7 @@ import type {
   SubmitContactMessageInput,
   SubmitContactMessageResult,
   SubscriptionSummary,
+  UnifiedInboxPage,
   UnifiedLead,
   UnifiedLeadDetail,
   UpdateKBInput,
@@ -253,8 +254,12 @@ export function getLeadById(botId: string, leadId: string): Promise<ApiResponse<
 // Unified inbox: chat + form + Meta leads in one list, already ordered by
 // urgency server-side (overdue follow-ups first, then untouched oldest-first).
 // Do not re-sort by date on the client -- that ordering is the product.
-export function getLeadInbox(): Promise<ApiResponse<UnifiedLead[]>> {
-  return apiClient<UnifiedLead[]>('/api/leads/inbox')
+// Returns a PAGE. The web deliberately sends no `limit`, which asks for the
+// whole inbox and matches this endpoint's behaviour before it was paginated --
+// a default page size would silently truncate the dashboard. Pagination is for
+// the mobile app, where the payload over mobile data is what hurts.
+export function getLeadInbox(): Promise<ApiResponse<UnifiedInboxPage>> {
+  return apiClient<UnifiedInboxPage>('/api/leads/inbox')
 }
 
 // The whole LeadRef travels in the query string because this is a GET reached

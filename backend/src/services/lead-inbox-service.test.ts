@@ -112,7 +112,7 @@ describe('getUnifiedInbox', () => {
     getFormLeadsByClientId.mockResolvedValue([formLead('f1', '2026-08-02T00:00:00.000Z')])
     getMetaLeadsByClientId.mockResolvedValue([metaLead('m1', '2026-08-03T00:00:00.000Z')])
 
-    const inbox = await getUnifiedInbox(CLIENT)
+    const inbox = (await getUnifiedInbox(CLIENT)).leads
 
     expect(inbox).toHaveLength(3)
     expect(inbox.map((lead) => lead.leadRef)).toEqual(
@@ -127,7 +127,7 @@ describe('getUnifiedInbox', () => {
   it('normalizes a form lead’s contact fields out of customFields', async () => {
     getFormLeadsByClientId.mockResolvedValue([formLead('f1', '2026-08-02T00:00:00.000Z')])
 
-    const [lead] = await getUnifiedInbox(CLIENT)
+    const [lead] = (await getUnifiedInbox(CLIENT)).leads
 
     expect(lead.name).toBe('form f1')
     expect(lead.phone).toBe('+919900000000')
@@ -157,7 +157,7 @@ describe('getUnifiedInbox', () => {
       },
     ])
 
-    const [lead] = await getUnifiedInbox(CLIENT)
+    const [lead] = (await getUnifiedInbox(CLIENT)).leads
 
     expect(lead.name).toBe('Whatsapppppp')
     expect(lead.email).toBe('ravi@example.com')
@@ -180,7 +180,7 @@ describe('getUnifiedInbox', () => {
       },
     ])
 
-    const [lead] = await getUnifiedInbox(CLIENT)
+    const [lead] = (await getUnifiedInbox(CLIENT)).leads
 
     expect(lead.phone).toBe('+919900000000')
   })
@@ -189,7 +189,7 @@ describe('getUnifiedInbox', () => {
     getFormLeadsByClientId.mockResolvedValue([formLead('f1', '2026-08-02T00:00:00.000Z')])
     getFormsByClientId.mockResolvedValue([])
 
-    const [lead] = await getUnifiedInbox(CLIENT)
+    const [lead] = (await getUnifiedInbox(CLIENT)).leads
 
     expect(lead.name).toBe('form f1')
     expect(lead.phone).toBe('+919900000000')
@@ -202,7 +202,7 @@ describe('getUnifiedInbox', () => {
     ])
     getLeadStatesForClient.mockResolvedValue([state('c1', { status: 'qualified' })])
 
-    const inbox = await getUnifiedInbox(CLIENT)
+    const inbox = (await getUnifiedInbox(CLIENT)).leads
     const byId = new Map(inbox.map((lead) => [lead.leadId, lead]))
 
     expect(byId.get('c1')?.state?.status).toBe('qualified')
@@ -220,7 +220,7 @@ describe('getUnifiedInbox', () => {
       state('very-overdue', { nextActionAt: '2026-08-05T09:00:00.000Z' }),
     ])
 
-    const inbox = await getUnifiedInbox(CLIENT)
+    const inbox = (await getUnifiedInbox(CLIENT)).leads
 
     expect(inbox.map((lead) => lead.leadId)).toEqual(['very-overdue', 'due-soon', 'recent'])
   })
@@ -231,7 +231,7 @@ describe('getUnifiedInbox', () => {
       chatLead('older', '2026-08-02T00:00:00.000Z'),
     ])
 
-    const inbox = await getUnifiedInbox(CLIENT)
+    const inbox = (await getUnifiedInbox(CLIENT)).leads
 
     expect(inbox.map((lead) => lead.leadId)).toEqual(['older', 'newer'])
   })
@@ -250,7 +250,7 @@ describe('getUnifiedInbox', () => {
       state('in-progress', { status: 'contacted' }),
     ])
 
-    const inbox = await getUnifiedInbox(CLIENT)
+    const inbox = (await getUnifiedInbox(CLIENT)).leads
 
     expect(inbox.map((lead) => lead.leadId)).toEqual([
       'untouched',
@@ -270,7 +270,7 @@ describe('getUnifiedInbox', () => {
       state('overdue', { nextActionAt: '2026-08-06T00:00:00.000Z' }),
     ])
 
-    const inbox = await getUnifiedInbox(CLIENT)
+    const inbox = (await getUnifiedInbox(CLIENT)).leads
 
     expect(inbox.map((lead) => lead.leadId)).toEqual(['overdue', 'closed'])
   })
@@ -470,5 +470,181 @@ describe('getLeadTimeline', () => {
     await getLeadTimeline({ source: 'chat', botId: 'bot-1', leadId: 'lead-1' }, 'client-1')
 
     expect(getLeadEvents).toHaveBeenCalledWith('lead-1', 500)
+  })
+})
+
+// Added 2026-08-27 with the tier-on-the-wire and pagination changes.
+describe('urgencyTier on the wire', () => {
+  it('stamps a tier on every lead', async () => {
+    getLeadsByClientId.mockResolvedValue([chatLead('c1', '2026-08-01T00:00:00.000Z')])
+    getFormLeadsByClientId.mockResolvedValue([formLead('f1', '2026-08-02T00:00:00.000Z')])
+
+    const { leads } = await getUnifiedInbox(CLIENT)
+
+    expect(leads.every((lead) => typeof lead.urgencyTier === 'string')).toBe(true)
+  })
+
+  it('names each tier the same way the sort ranks it', async () => {
+    getLeadsByClientId.mockResolvedValue([
+      chatLead('overdue', '2026-08-01T00:00:00.000Z'),
+      chatLead('untouched', '2026-08-02T00:00:00.000Z'),
+      chatLead('scheduled', '2026-08-03T00:00:00.000Z'),
+      chatLead('progress', '2026-08-04T00:00:00.000Z'),
+      chatLead('closed', '2026-08-05T00:00:00.000Z'),
+    ])
+    getLeadStatesForClient.mockResolvedValue([
+      state('overdue', { status: 'contacted', nextActionAt: '2026-08-06T00:00:00.000Z' }),
+      state('scheduled', { status: 'contacted', nextActionAt: '2026-08-09T00:00:00.000Z' }),
+      state('progress', { status: 'contacted' }),
+      state('closed', { status: 'closed' }),
+    ])
+
+    const { leads } = await getUnifiedInbox(CLIENT)
+
+    // The order IS the tier order, so this asserts both at once.
+    expect(leads.map((lead) => [lead.leadId, lead.urgencyTier])).toEqual([
+      ['overdue', 'overdue'],
+      ['untouched', 'untouched'],
+      ['scheduled', 'scheduled'],
+      ['progress', 'in_progress'],
+      ['closed', 'closed'],
+    ])
+  })
+
+  it('sends the tier on the detail read too, so the badge matches the list', async () => {
+    getLeadById.mockResolvedValue(chatLead('c1', '2026-08-01T00:00:00.000Z'))
+    getLeadState.mockResolvedValue(state('c1', { status: 'contacted', nextActionAt: '2026-08-06T00:00:00.000Z' }))
+
+    const detail = await getUnifiedLeadDetail({ source: 'chat', botId: 'bot-1', leadId: 'c1' }, CLIENT)
+
+    expect(detail.urgencyTier).toBe('overdue')
+  })
+})
+
+describe('inbox pagination', () => {
+  function manyLeads(count: number) {
+    // Epoch offsets, NOT a seconds field -- `00:00:60` is not a valid ISO time
+    // and Date.parse returns NaN for it, which is how the first version of this
+    // helper produced an inbox that paged forever.
+    const base = Date.parse('2026-08-01T00:00:00.000Z')
+    return Array.from({ length: count }, (_, i) =>
+      chatLead(`c${String(i).padStart(3, '0')}`, new Date(base + i * 1000).toISOString())
+    )
+  }
+
+  // Pagination is OPT-IN. The web CRM calls this with no limit and renders
+  // every lead; a default page size would silently truncate a dashboard.
+  it('returns the whole inbox when no limit is given', async () => {
+    getLeadsByClientId.mockResolvedValue(manyLeads(120))
+
+    const page = await getUnifiedInbox(CLIENT)
+
+    expect(page.leads).toHaveLength(120)
+    expect(page.total).toBe(120)
+    expect(page.nextCursor).toBeUndefined()
+  })
+
+  it('pages once a limit is given, and reports the full total', async () => {
+    getLeadsByClientId.mockResolvedValue(manyLeads(120))
+
+    const page = await getUnifiedInbox(CLIENT, { limit: 50 })
+
+    expect(page.leads).toHaveLength(50)
+    // total is the whole inbox, not the page -- a UI showing "50 leads" when
+    // there are 120 would be worse than showing nothing.
+    expect(page.total).toBe(120)
+    expect(page.nextCursor).toBeDefined()
+  })
+
+  it('honours an explicit limit and caps it', async () => {
+    getLeadsByClientId.mockResolvedValue(manyLeads(400))
+
+    expect((await getUnifiedInbox(CLIENT, { limit: 10 })).leads).toHaveLength(10)
+    expect((await getUnifiedInbox(CLIENT, { limit: 9999 })).leads).toHaveLength(200)
+  })
+
+  it('omits nextCursor on the last page', async () => {
+    getLeadsByClientId.mockResolvedValue(manyLeads(10))
+
+    const page = await getUnifiedInbox(CLIENT, { limit: 50 })
+
+    expect(page.leads).toHaveLength(10)
+    expect(page.nextCursor).toBeUndefined()
+  })
+
+  // The property that matters: walking every page must yield every lead exactly
+  // once. A cursor that skips one means an operator never sees that lead.
+  it('walks the whole inbox exactly once across pages', async () => {
+    const all = manyLeads(137)
+    getLeadsByClientId.mockResolvedValue(all)
+
+    const seen: string[] = []
+    let cursor: string | undefined
+    let guard = 0
+    do {
+      const page = await getUnifiedInbox(CLIENT, { limit: 25, ...(cursor ? { cursor } : {}) })
+      seen.push(...page.leads.map((lead) => lead.leadId))
+      cursor = page.nextCursor
+      guard += 1
+    } while (cursor && guard < 20)
+
+    expect(seen).toHaveLength(137)
+    expect(new Set(seen).size).toBe(137)
+    expect(seen).toEqual([...all].map((lead) => lead.leadId).sort())
+  })
+
+  it('starts from the top when the cursor cannot be read', async () => {
+    getLeadsByClientId.mockResolvedValue(manyLeads(10))
+
+    const page = await getUnifiedInbox(CLIENT, { limit: 50, cursor: 'not-a-real-cursor' })
+
+    // A stale cursor after a deploy should show the inbox, not a 400.
+    expect(page.leads).toHaveLength(10)
+  })
+
+  // Without a leadId tiebreak the sort is not a TOTAL order, so two leads
+  // sharing a timestamp can swap between requests -- which for a paginated
+  // reader means seeing one twice and the other never.
+  it('orders leads with identical timestamps deterministically', async () => {
+    const sameInstant = '2026-08-01T00:00:00.000Z'
+    getLeadsByClientId.mockResolvedValue([
+      chatLead('zzz', sameInstant),
+      chatLead('aaa', sameInstant),
+      chatLead('mmm', sameInstant),
+    ])
+
+    const first = (await getUnifiedInbox(CLIENT)).leads.map((lead) => lead.leadId)
+    const second = (await getUnifiedInbox(CLIENT)).leads.map((lead) => lead.leadId)
+
+    expect(first).toEqual(['aaa', 'mmm', 'zzz'])
+    expect(first).toEqual(second)
+  })
+})
+
+// Regression guard for the failure the first draft of the test above found:
+// a lead whose createdAt cannot be parsed used to make the cursor unable to
+// advance, so the same page was served forever.
+describe('pagination with a corrupt date', () => {
+  it('still terminates and returns every lead exactly once', async () => {
+    const base = Date.parse('2026-08-01T00:00:00.000Z')
+    const leads = Array.from({ length: 9 }, (_, i) =>
+      chatLead(`c${i}`, new Date(base + i * 1000).toISOString())
+    )
+    leads.push(chatLead('corrupt', 'not-a-date'))
+    getLeadsByClientId.mockResolvedValue(leads)
+
+    const seen: string[] = []
+    let cursor: string | undefined
+    let guard = 0
+    do {
+      const page = await getUnifiedInbox(CLIENT, { limit: 3, ...(cursor ? { cursor } : {}) })
+      seen.push(...page.leads.map((lead) => lead.leadId))
+      cursor = page.nextCursor
+      guard += 1
+    } while (cursor && guard < 10)
+
+    expect(new Set(seen).size).toBe(10)
+    // Sorted last, so a corrupt row is not the first thing an operator sees.
+    expect(seen[seen.length - 1]).toBe('corrupt')
   })
 })

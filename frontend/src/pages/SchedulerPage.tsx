@@ -95,7 +95,7 @@ export default function SchedulerPage() {
       .then((res) => {
         if (cancelled || !res.success) return
         const links: Record<string, { name: string; href: string }> = {}
-        for (const lead of res.data ?? []) {
+        for (const lead of res.data?.leads ?? []) {
           links[lead.leadId] = {
             name: lead.name?.trim() || lead.phone || lead.email || 'Unnamed lead',
             href: leadDetailPath(lead.leadRef),

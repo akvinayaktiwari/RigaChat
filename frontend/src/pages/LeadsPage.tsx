@@ -191,7 +191,7 @@ export default function LeadsPage() {
     getLeadInbox()
       .then((res) => {
         if (cancelled) return
-        if (res.success) setLeads(res.data ?? [])
+        if (res.success) setLeads(res.data?.leads ?? [])
         else
           setLoadError(
             describeApiError('leads/inbox', res.error, 'We couldn’t load your leads just now.')

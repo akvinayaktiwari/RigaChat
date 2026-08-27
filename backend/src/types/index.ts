@@ -1130,6 +1130,20 @@ export interface JourneyBundle {
 
 export type LeadSource = 'chat' | 'form' | 'meta'
 
+// Why a lead sits where it does in the urgency-ordered inbox. Server-computed
+// and sent on the wire so a client can explain the queue without recomputing
+// the rule -- an urgency-ordered list with no visible reason reads as broken.
+export type UrgencyTier = 'overdue' | 'untouched' | 'scheduled' | 'in_progress' | 'closed'
+
+// One page of the unified inbox. See lead-inbox-service.ts for what pagination
+// here does and does not fix.
+export interface UnifiedInboxPage {
+  leads: UnifiedLead[]
+  total: number
+  // Absent on the last page.
+  nextCursor?: string
+}
+
 export type LeadRef =
   | { source: 'chat'; botId: string; leadId: string }
   | { source: 'form'; formId: string; leadId: string }
@@ -1277,6 +1291,10 @@ export interface UnifiedLead extends JourneyLead {
   leadRef: LeadRef
   createdAt: string
   state: LeadState | null
+  // Why this lead sits where it does. Computed by the same code that decides
+  // the order (lead-inbox-service.ts) and stamped after the sort, so what a
+  // client renders is provably the value that produced the position.
+  urgencyTier: UrgencyTier
 }
 
 // One lead, opened. Everything UnifiedLead carries plus the raw material a
