@@ -194,18 +194,19 @@ describe('getAppBootstrap', () => {
 
     await expect(getAppBootstrap('client-1')).resolves.toEqual({
       ready: true,
-      capabilities: ['lead.read', 'lead.state', 'lead.note'],
+      capabilities: ['lead.read', 'lead.state', 'lead.note', 'lead.timeline'],
     })
   })
 
-  // A capability the app cannot render yet must not be advertised: an installed
-  // build would show a control for a screen that does not exist.
-  it('does not advertise lead.timeline while it is still phase 2', async () => {
+  // Adding a capability is safe for builds already on a phone: an older app does
+  // not recognise the string and renders no control for it. That is what lets
+  // this list grow without a forced update.
+  it('advertises lead.timeline now that the app renders it', async () => {
     countBotsForClient.mockResolvedValue(3)
 
     const bootstrap = await getAppBootstrap('client-1')
 
-    expect(bootstrap.capabilities).not.toContain('lead.timeline')
+    expect(bootstrap.capabilities).toContain('lead.timeline')
   })
 
   it('reads bot count scoped to the caller, never across clients', async () => {

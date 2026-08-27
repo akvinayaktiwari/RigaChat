@@ -5,15 +5,17 @@ import { countBotsForClient } from '../repositories/bot-repository.js'
 import { resolveNotificationPreferences } from '../types/index.js'
 import type { AppBootstrap, Capability, ClientRecord, NotificationPreferences, Subscription } from '../types/index.js'
 
-// What a set-up client's mobile app may do today. Phase 1 only: 'lead.timeline'
-// is deliberately absent until GET /api/leads/events ships in the app, because
-// advertising a capability the app cannot render is worse than withholding one
-// it could.
+// What a set-up client's mobile app may do.
 //
 // Adding an entry here is how a new mobile feature reaches installed builds --
 // see vyostra-mobile docs/designs/web-mobile-contract.md. Builds that predate
-// the entry ignore it and render no control, which is the whole point.
-const READY_CAPABILITIES: Capability[] = ['lead.read', 'lead.state', 'lead.note']
+// the entry ignore it and render no control, which is the whole point: this
+// list can grow without waiting for anyone to update their app.
+//
+// 'lead.timeline' added 2026-08-27 with the mobile timeline view. Safe to
+// advertise before every install has it: an older build does not recognise the
+// string and simply renders no timeline section.
+const READY_CAPABILITIES: Capability[] = ['lead.read', 'lead.state', 'lead.note', 'lead.timeline']
 
 interface UpsertClientInput {
   clientId: string
