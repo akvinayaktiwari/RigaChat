@@ -57,6 +57,12 @@ const adminCors = cors({
 app.use('/api/admin/*', adminCors)
 
 app.use('/api/clients/*', dashboardCors)
+// The mobile app does not need this -- React Native's fetch has no browser
+// origin and no preflight. The WEB Settings page does: MobileAppSection.tsx
+// calls GET /api/devices and DELETE /api/devices/:deviceId from the browser to
+// render and revoke linked devices, and without this every one of those calls
+// is blocked by CORS in production while working fine on the phone.
+app.use('/api/devices/*', dashboardCors)
 app.use('/api/billing/*', dashboardCors)
 app.use('/api/kb/*', dashboardCors)
 app.use('/api/journeys/*', dashboardCors)
