@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
+  Archive,
+  ArchiveRestore,
   Bot as BotIcon,
   Calendar,
   CalendarClock,
@@ -12,8 +14,9 @@ import {
   MessageSquare,
   Phone,
   StickyNote,
+  Trash2,
 } from 'lucide-react'
-import { addLeadNote, getLeadEvents, getUnifiedLeadDetail, updateLeadState } from '../services/api'
+import { addLeadNote, eraseLead, getLeadEvents, getUnifiedLeadDetail, setLeadArchived, updateLeadState } from '../services/api'
 import { useToast } from '../components/Toast/Toast'
 import { describeApiError } from '../lib/api-error'
 import { parseLeadRef } from '../lib/lead-ref'
@@ -142,6 +145,10 @@ export default function LeadDetailPage() {
   const [eventsLoading, setEventsLoading] = useState(true)
   const [eventsError, setEventsError] = useState<string | null>(null)
   const [noteDraft, setNoteDraft] = useState('')
+  const [archiving, setArchiving] = useState(false)
+  const [eraseOpen, setEraseOpen] = useState(false)
+  const [eraseConfirm, setEraseConfirm] = useState('')
+  const [erasing, setErasing] = useState(false)
 
   // Loaded separately from the lead itself. A timeline failure must not blank a
   // page whose main job is showing the lead's contact details, and a failed load
@@ -234,6 +241,43 @@ export default function LeadDetailPage() {
 
   if (loading) return <LoadingSkeleton />
 
+  async function handleToggleArchive(archived: boolean) {
+    if (!leadRef) return
+    setArchiving(true)
+    const res = await setLeadArchived(leadRef, archived)
+    setArchiving(false)
+
+    if (!res.success || !res.data) {
+      toast.show(res.error ?? 'Couldn’t update this lead.', 'error')
+      return
+    }
+    const updated = res.data
+    setLead((prev) => (prev ? { ...prev, state: updated } : prev))
+    toast.show(archived ? 'Archived — hidden from the inbox' : 'Restored to the inbox', 'success')
+  }
+
+  async function handleErase() {
+    if (!leadRef) return
+    setErasing(true)
+    const res = await eraseLead(leadRef)
+    setErasing(false)
+
+    if (!res.success || !res.data) {
+      toast.show(res.error ?? 'Couldn’t erase this lead.', 'error')
+      return
+    }
+
+    // Reports what was actually destroyed rather than a bare "done". An
+    // irreversible action should state its blast radius.
+    const { eventsDeleted, executionsStopped } = res.data
+    toast.show(
+      `Erased. ${eventsDeleted} history ${eventsDeleted === 1 ? 'entry' : 'entries'} deleted` +
+        (executionsStopped > 0 ? `, ${executionsStopped} journey stopped` : ''),
+      'success'
+    )
+    navigate('/dashboard/leads')
+  }
+
   if (error || !lead) {
     return (
       <div className="flex flex-col items-center text-center py-16">
@@ -261,14 +305,49 @@ export default function LeadDetailPage() {
 
   return (
     <div>
-      <button
-        type="button"
-        onClick={() => navigate('/dashboard/leads')}
-        className="flex items-center gap-1 text-gray-500 text-sm hover:text-gray-900 transition-colors mb-6"
-      >
-        <ChevronLeft size={16} />
-        Back to Leads
-      </button>
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-6">
+        <button
+          type="button"
+          onClick={() => navigate('/dashboard/leads')}
+          className="flex items-center gap-1 text-gray-500 text-sm hover:text-gray-900 transition-colors"
+        >
+          <ChevronLeft size={16} />
+          Back to Leads
+        </button>
+
+        <div className="flex items-center gap-2">
+          {/* The safe action sits next to the destructive one deliberately:
+              seeing "Archive" beside "Erase" is what stops the second being
+              reached for when the first was meant. */}
+          <button
+            type="button"
+            disabled={archiving}
+            onClick={() => handleToggleArchive(!lead.state?.archivedAt)}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 px-3 py-2 rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-50"
+          >
+            {lead.state?.archivedAt ? <ArchiveRestore size={15} /> : <Archive size={15} />}
+            {archiving ? 'Saving…' : lead.state?.archivedAt ? 'Restore' : 'Archive'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setEraseConfirm('')
+              setEraseOpen(true)
+            }}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 px-3 py-2 rounded-xl hover:bg-red-50 hover:text-red-600 transition-colors"
+          >
+            <Trash2 size={15} />
+            Erase data
+          </button>
+        </div>
+      </div>
+
+      {lead.state?.archivedAt && (
+        <div className="mb-6 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+          This lead is archived, so it does not appear in the inbox. Nothing has been deleted — restore it any time.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1 space-y-6">
@@ -511,6 +590,59 @@ export default function LeadDetailPage() {
           </div>
         </div>
       </div>
+
+      {eraseOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl shadow-black/8 border border-gray-100 p-6 max-w-md w-full">
+            <h2 className="font-bold text-xl text-gray-900">Erase this lead&apos;s data?</h2>
+            <p className="text-sm text-gray-500 mt-2">
+              This is permanent and cannot be undone. If you only want it out of your inbox, close this and use
+              Archive instead.
+            </p>
+
+            {/* Named, not hidden behind "all associated data". Someone
+                authorising an irreversible deletion should see exactly what
+                disappears. */}
+            <ul className="text-sm text-gray-600 bg-gray-50 border border-gray-100 rounded-xl p-3 mt-4 space-y-1">
+              <li>· the lead record and their contact details</li>
+              <li>· every message to and from them, and the delivery history</li>
+              <li>· their CRM status, owner, score and notes</li>
+              <li>· any journey still running for them will be stopped</li>
+            </ul>
+
+            <label className="block text-sm text-gray-600 mt-4">
+              Type <span className="font-mono font-semibold text-gray-900">{lead.name || lead.leadId.slice(0, 8)}</span>{' '}
+              to confirm
+            </label>
+            <input
+              value={eraseConfirm}
+              onChange={(e) => setEraseConfirm(e.target.value)}
+              aria-label="Confirm erasure by typing the lead name"
+              autoFocus
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm mt-1.5 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            />
+
+            <div className="flex items-center justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setEraseOpen(false)}
+                disabled={erasing}
+                className="text-gray-600 font-medium px-3 py-2 rounded-xl text-sm hover:bg-gray-100 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleErase}
+                disabled={erasing || eraseConfirm.trim() !== (lead.name || lead.leadId.slice(0, 8))}
+                className="bg-red-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm hover:bg-red-600 transition-colors disabled:opacity-40"
+              >
+                {erasing ? 'Erasing…' : 'Erase permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

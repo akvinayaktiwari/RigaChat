@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { ComponentProps } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Download, Mail, Phone, TriangleAlert, Users } from 'lucide-react'
-import { getLeadInbox, updateLeadState } from '../services/api'
+import { Archive, ChevronLeft, ChevronRight, Download, Mail, Phone, TriangleAlert, Users } from 'lucide-react'
+import { getLeadInbox, setLeadArchived, updateLeadState } from '../services/api'
 import FilterBar from '../components/FilterBar/FilterBar'
 import type { FilterChip } from '../components/FilterBar/FilterBar'
 import { useToast } from '../components/Toast/Toast'
@@ -225,6 +225,26 @@ export default function LeadsPage() {
   // someone open a detail page to do it is why leads stop getting marked at
   // all. The row order is deliberately NOT recomputed here: re-sorting under
   // the cursor after a click moves the next row you were about to touch.
+  // Archiving from the row, because the whole point is speed: a junk lead you
+  // want gone should not cost a page navigation. Removed from the list
+  // optimistically since the inbox filters archived leads server-side anyway —
+  // leaving it visible would show a row that a refresh makes vanish.
+  async function handleArchive(lead: UnifiedLead) {
+    setSavingLeadId(lead.leadId)
+    const res = await setLeadArchived(lead.leadRef, true)
+    setSavingLeadId(null)
+
+    if (!res.success) {
+      toast.show(describeApiError('leads/archive', res.error, 'Couldn’t archive this lead.'), 'error')
+      return
+    }
+
+    setLeads((prev) => prev.filter((l) => l.leadId !== lead.leadId))
+    // Undo matters more than a confirmation dialog here: archiving is cheap and
+    // reversible, so the fast path should be doing it, not being asked twice.
+    toast.show(`Archived ${lead.name ?? 'lead'}. Open the lead to restore it.`, 'success')
+  }
+
   async function handleStatusChange(lead: UnifiedLead, status: LeadStatus) {
     setSavingLeadId(lead.leadId)
     const res = await updateLeadState(lead.leadRef, { status })
@@ -483,12 +503,24 @@ export default function LeadsPage() {
                         {/* w-full + min-w-0 so the select fills its fixed
                             column instead of forcing the table 6px wider than
                             its container, which clipped this control at lg. */}
-                        <StatusSelect
-                          lead={lead}
-                          saving={savingLeadId === lead.leadId}
-                          onChange={(status) => handleStatusChange(lead, status)}
-                          className="w-full min-w-0"
-                        />
+                        <div className="flex items-center gap-2">
+                          <StatusSelect
+                            lead={lead}
+                            saving={savingLeadId === lead.leadId}
+                            onChange={(status) => handleStatusChange(lead, status)}
+                            className="w-full min-w-0"
+                          />
+                          <button
+                            type="button"
+                            title="Archive — hides it from the inbox, keeps the history"
+                            aria-label={`Archive ${lead.name ?? 'lead'}`}
+                            disabled={savingLeadId === lead.leadId}
+                            onClick={() => handleArchive(lead)}
+                            className="shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-40"
+                          >
+                            <Archive size={15} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )

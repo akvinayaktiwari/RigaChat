@@ -97,6 +97,11 @@ export interface LeadState {
   notes: LeadNote[]
   createdAt: string
   updatedAt: string
+  // Set when an operator archives the lead: hidden from the inbox, nothing
+  // else touched. Absent on every lead that has never been archived, so the
+  // check is "has an archivedAt", never a boolean needing a backfill.
+  archivedAt?: string
+  archivedBy?: string
 }
 
 // Why a lead sits where it does in the urgency-ordered inbox. Server-computed
@@ -744,6 +749,15 @@ export interface JourneyTemplate {
 // 'cancelled'/'timed_out' are deliberately absent until a writer exists, so the
 // UI never renders a status the data cannot produce.
 export type JourneyOutcome = 'completed' | 'failed' | 'handed_off'
+
+// What an erasure destroyed. Surfaced to the operator so an irreversible action
+// reports what it actually did rather than a bare success.
+export interface LeadErasureReport {
+  leadId: string
+  source: LeadRef['source']
+  eventsDeleted: number
+  executionsStopped: number
+}
 
 // One event inside a run, as the drill-down renders it.
 export interface JourneyExecutionEvent {

@@ -50,6 +50,13 @@ GET  /api/leads/inbox          -> unified inbox: chat + form + Meta leads merged
 GET  /api/leads/detail         -> one lead, source-agnostic: normalized fields plus the transcript (chat) or the submitted answers relabelled from fieldId (form/Meta). LeadRef travels as query params (auth required)
 PATCH /api/leads/state         -> set status/outcome/ownerId/nextActionAt/leadScore on a lead (auth required; body carries the LeadRef. `replied`/`appointmentBooked` are journey-written and NOT settable here)
 POST /api/leads/notes          -> append a note to a lead (auth required; body carries the LeadRef)
+POST /api/leads/archive        -> hide a lead from the inbox, or restore it. Reversible, destroys nothing. Its own
+                                  route rather than a field on PATCH /state, because /state stamps lastTouchedAt on
+                                  every call and archiving is the opposite claim (auth required)
+DELETE /api/leads              -> IRREVERSIBLE. Erases the lead and everything keyed by its leadId (lead_state,
+                                  lead_events, journey_executions, journey_pending_replies,
+                                  whatsapp_inbound_activity) and stops any journey still running for them. LeadRef
+                                  travels as QUERY PARAMS, plus confirmLeadId which must equal leadId (auth required)
 POST /api/kb                -> add knowledge base entry + embed it
 GET  /api/kb                -> fetch all KB entries (auth required)
 GET  /api/journeys/templates             -> list the prebuilt agent library (auth required; code-defined seeds, identical for every client)
@@ -146,7 +153,7 @@ interface KnowledgeBaseEntry {
 - agent_binding_lookup — partition key: resourceId (reverse index botId/voiceAgentId → owning Agent; atomic-claim so one resource maps to at most one Agent, mirrors gupshup_app_lookup)
 - journey_pending_replies — partition key: leadId (Step Functions callback tokens for executions parked on an await_reply step; TTL on expiresAt, because a timed-out execution never calls back to clean itself up)
 - journey_trigger_claims — partition key: claimKey (`agent:<agentId>#<trigger>` or `bot:<botId>#<trigger>`; atomic-claim so exactly ONE published bundle owns a trigger — prevents duplicate outreach. Doubles as the ignition index: "which journey runs for this lead" is a point read)
-- lead_state — partition key: leadId, GSI clientId-updatedAt-index (per-lead CRM working state: status/owner/nextActionAt/notes/leadScore. Its own table because the three lead tables have three different partition keys — same reason whatsapp_inbound_activity and journey_pending_replies are leadId-keyed side tables. Also where JourneyStep.recheckField's `replied`/`leadScore`/`appointmentBooked` finally live)
+- lead_state — partition key: leadId, GSI clientId-updatedAt-index (per-lead CRM working state: status/owner/nextActionAt/notes/leadScore/archivedAt. Its own table because the three lead tables have three different partition keys — same reason whatsapp_inbound_activity and journey_pending_replies are leadId-keyed side tables. Also where JourneyStep.recheckField's `replied`/`leadScore`/`appointmentBooked` finally live)
 - meta_deletion_requests — partition key: confirmationCode (Meta's mandated data-deletion callback. No GSI: every read is a point lookup by the code Meta hands the user. No TTL — the row is the evidence the request was handled)
 - lead_events — partition key: leadId, sort key: ts (`<iso>#<uuid>`), GSI clientId-ts-index, sparse GSI wamid-index, sparse GSI bundleId-ts-index (append-only record of everything that happened to a lead: messages both directions, delivery statuses, journey steps, tool calls, handoffs. The wamid index exists because a Meta status webhook carries a wamid and no leadId. No TTL — this is the audit record)
 - contact_messages — partition key: messageId, GSI recordType-createdAt-index (marketing-site contact form; no clientId/botId — these are messages to us, not leads for a client's bot)
