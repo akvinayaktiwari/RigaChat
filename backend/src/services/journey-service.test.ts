@@ -300,12 +300,19 @@ describe('publishJourneyBundle — ordering is what keeps AWS clean', () => {
       expect.any(String),
       undefined
     )
-    expect(updateJourneyBundleRepo).toHaveBeenCalledWith('bot-1', 'bundle-1', {
-      status: 'published',
-      compiledStateMachineArn: 'arn:aws:states:ap-south-1:1:stateMachine:sm',
-      compiledStateMachineVersionArn: 'arn:aws:states:ap-south-1:1:stateMachine:sm:1',
-      publishedVersion: 1,
-    })
+    expect(updateJourneyBundleRepo).toHaveBeenCalledWith(
+      'bot-1',
+      'bundle-1',
+      {
+        status: 'published',
+        compiledStateMachineArn: 'arn:aws:states:ap-south-1:1:stateMachine:sm',
+        compiledStateMachineVersionArn: 'arn:aws:states:ap-south-1:1:stateMachine:sm:1',
+        publishedVersion: 1,
+      },
+      // The status this call read: the write is conditional on the bundle not
+      // having moved underneath it (see the pause/publish race tests below).
+      'draft'
+    )
   })
 
   it('updates in place on republish rather than creating a second machine', async () => {
@@ -524,6 +531,64 @@ describe('pauseJourneyBundle', () => {
     await expect(pauseJourneyBundle('bot-1', 'bundle-1', 'client-1')).rejects.toBeInstanceOf(JourneyValidationError)
     expect(releaseJourneyTrigger).not.toHaveBeenCalled()
     expect(updateJourneyBundleRepo).not.toHaveBeenCalled()
+  })
+
+  // REGRESSION (Codex structured review, P1). The first fix guarded only the
+  // pause side, which left the MIRROR interleaving open: publish claims ->
+  // pause releases -> pause writes paused -> publish writes published, ending
+  // at status 'published' with no trigger claim. Publish's write is now
+  // conditional on the status IT read, so the loser fails instead.
+  it('fails a publish whose status write lost the race, and gives back the claim', async () => {
+    getJourneyBundleById.mockResolvedValue(publishedBundle)
+    updateJourneyBundleRepo.mockRejectedValue(new JourneyBundleStateConflictError('bundle-1', 'published'))
+
+    await expect(publishJourneyBundle('bot-1', 'bundle-1', 'client-1')).rejects.toBeInstanceOf(
+      JourneyValidationError
+    )
+    // Not tidiness: a claim left held by a bundle that never became published
+    // would block every other journey from ever taking that trigger.
+    expect(releaseJourneyTrigger).toHaveBeenCalledWith('agent:agent-1#lead_captured', 'bundle-1')
+  })
+
+  // Publish is entered from draft, paused AND published, so the guard has to be
+  // the status this call read — a hardcoded value would break two of the three.
+  it('guards the publish write with the status it actually read', async () => {
+    getJourneyBundleById.mockResolvedValue({ ...publishedBundle, status: 'paused' })
+
+    await publishJourneyBundle('bot-1', 'bundle-1', 'client-1')
+
+    expect(updateJourneyBundleRepo).toHaveBeenCalledWith(
+      'bot-1',
+      'bundle-1',
+      expect.objectContaining({ status: 'published' }),
+      'paused'
+    )
+  })
+
+  // The claim is released before the status write, so a failed write leaves the
+  // one state that lies: reads as published, ignites nothing.
+  it('restores the trigger claim when the paused status write fails outright', async () => {
+    getJourneyBundleById.mockResolvedValue(publishedBundle)
+    updateJourneyBundleRepo.mockRejectedValue(new Error('DynamoDB unavailable'))
+
+    await expect(pauseJourneyBundle('bot-1', 'bundle-1', 'client-1')).rejects.toThrow('DynamoDB unavailable')
+    expect(claimJourneyTrigger).toHaveBeenCalledWith('agent:agent-1#lead_captured', {
+      bundleId: 'bundle-1',
+      botId: 'bot-1',
+      clientId: 'client-1',
+    })
+  })
+
+  // A conflict means someone else legitimately owns the trigger now; putting
+  // the claim back would steal it, or resurrect it for a deleted bundle.
+  it('does NOT restore the claim when the write lost to another writer', async () => {
+    getJourneyBundleById.mockResolvedValue(publishedBundle)
+    updateJourneyBundleRepo.mockRejectedValue(new JourneyBundleStateConflictError('bundle-1', 'published'))
+
+    await expect(pauseJourneyBundle('bot-1', 'bundle-1', 'client-1')).rejects.toBeInstanceOf(
+      JourneyValidationError
+    )
+    expect(claimJourneyTrigger).not.toHaveBeenCalled()
   })
 
   // Resuming is publish again: the claim must come back, or the journey would

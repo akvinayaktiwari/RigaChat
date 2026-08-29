@@ -331,12 +331,30 @@ export async function pauseJourneyBundle(botId: string, bundleId: string, client
     bundleId
   )
 
+  const claimKey = triggerClaimKey({ agentId: existing.agentId, botId }, existing.journey.triggerType)
+
   try {
     return await updateJourneyBundleRepo(botId, bundleId, { status: 'paused' }, 'published')
   } catch (error) {
     if (error instanceof JourneyBundleStateConflictError) {
+      // Someone else moved this bundle first (a republish, an edit, a delete).
+      // The claim is deliberately NOT restored: whoever won owns the trigger
+      // now, and re-claiming here would either steal it back or resurrect a
+      // claim for a bundle that no longer exists.
       throw new JourneyValidationError('Only a published journey can be paused')
     }
+    // A real infrastructure failure. The bundle is still 'published' but its
+    // claim is gone, which is the one combination that lies: the dashboard
+    // shows Live while ignition finds nothing. Put the claim back so the
+    // failed pause is a no-op rather than a silent outage, then surface the
+    // original error -- best-effort, because if Dynamo is down this fails too.
+    await claimJourneyTrigger(claimKey, { bundleId, botId, clientId }).catch((restoreError) => {
+      console.error(
+        `[journey] pause failed for bundle ${bundleId} AND its trigger claim could not be restored; ` +
+          `the bundle reads as published but no lead will ignite into it:`,
+        restoreError
+      )
+    })
     throw error
   }
 }
@@ -381,14 +399,44 @@ export async function publishJourneyBundle(botId: string, bundleId: string, clie
     existing.compiledStateMachineArn
   )
 
-  return updateJourneyBundleRepo(botId, bundleId, {
-    status: 'published',
-    compiledStateMachineArn: published.stateMachineArn,
-    compiledStateMachineVersionArn: published.versionArn,
-    // Taken from the version AWS actually published, never incremented locally.
-    // Step Functions does not mint a new version for an unchanged definition, so
-    // a counter drifts from reality the first time someone republishes without
-    // editing -- verified live on 2026-08-06 (record said 2, arn said :1).
-    publishedVersion: published.version,
-  })
+  // Conditional on the status this call READ, not on a fixed value, because
+  // publish is legitimately entered from draft, paused, and published (a
+  // republish). Guarding only the pause side is not enough: with an unguarded
+  // write here, the interleaving `publish claims -> pause releases -> pause
+  // writes paused -> publish writes published` still ends at 'published' with
+  // no trigger claim, which is a journey the dashboard shows as Live that no
+  // lead can enter. Codex caught exactly this against the first fix.
+  try {
+    return await updateJourneyBundleRepo(
+      botId,
+      bundleId,
+      {
+        status: 'published',
+        compiledStateMachineArn: published.stateMachineArn,
+        compiledStateMachineVersionArn: published.versionArn,
+        // Taken from the version AWS actually published, never incremented locally.
+        // Step Functions does not mint a new version for an unchanged definition, so
+        // a counter drifts from reality the first time someone republishes without
+        // editing -- verified live on 2026-08-06 (record said 2, arn said :1).
+        publishedVersion: published.version,
+      },
+      existing.status
+    )
+  } catch (error) {
+    if (error instanceof JourneyBundleStateConflictError) {
+      // We already hold the claim but lost the status write, so releasing it is
+      // mandatory rather than tidy: leaving it held would let a PAUSED bundle
+      // keep the trigger and block every other journey from claiming it.
+      await releaseJourneyTrigger(
+        triggerClaimKey({ agentId: existing.agentId, botId }, existing.journey.triggerType),
+        bundleId
+      ).catch((releaseError) => {
+        console.error(`[journey] failed to release trigger claim after a lost publish race on ${bundleId}:`, releaseError)
+      })
+      throw new JourneyValidationError(
+        'This journey changed while it was being published. Reload it and try again.'
+      )
+    }
+    throw error
+  }
 }
