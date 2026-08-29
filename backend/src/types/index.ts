@@ -215,6 +215,20 @@ export interface ResolvedConditionFields {
 // exists to fix -- journey_ended itself sat in LeadEventType for a month with
 // zero call sites, which is why a finished journey and a dead one were
 // indistinguishable. Add a value here when, and only when, a writer exists.
+// One event inside a run, trimmed to what a drill-down renders. Deliberately
+// not the whole LeadEvent: wamid, body and result are either noise here or
+// carry message content that does not belong in a journey-level view.
+export interface JourneyExecutionEvent {
+  ts: string
+  type: LeadEventType
+  stepId?: string
+  toolName?: string
+  channel?: LeadEventChannel
+  status?: MessageDeliveryStatus
+  outcome?: JourneyOutcome
+  errorDetail?: string
+}
+
 // One lead's run through one journey, reconstructed from its events. Not a
 // stored record: it is derived on read, which is why it can be rebuilt for
 // executions that predate the terminal event without backfilling anything.
@@ -232,6 +246,11 @@ export interface JourneyExecutionSummary {
   lastStepId?: string
   lastEventType: LeadEventType
   eventCount: number
+  // Every event in this run, oldest first. Returned rather than discarded
+  // because the read already had to fetch them to derive the summary — sending
+  // only the summary meant a drill-down would re-query for data the caller
+  // already paid to read.
+  events: JourneyExecutionEvent[]
   // Failure path only, the flattened Step Functions error.
   errorDetail?: string
   executionArn?: string

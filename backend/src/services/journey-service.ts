@@ -515,6 +515,32 @@ export async function getJourneyExecutions(
   return summariseExecutions(events, bundleId)
 }
 
+// A terminal event is the best proof of an ending, but not the only one.
+//
+// A `handoff` event is emitted by a human_handoff step, and human_handoff is
+// terminal BY CONSTRUCTION -- validateJourneyStructure has no outgoing
+// reference to check for it, and the compiler routes it straight to a terminal
+// state. So a run whose last event is a handoff has ended, whether or not a
+// journey_ended row exists.
+//
+// That distinction is not academic. Every execution started before terminal
+// events shipped lacks journey_ended, and on the first live journey 25 of 29
+// runs had been handed to a human days earlier while the dashboard reported
+// them as still in flight -- telling an operator the agent was working 29 leads
+// when it was working 4.
+//
+// Nothing else is inferred. A run sitting on a send_message could genuinely be
+// mid-journey or could have died silently, and those two are NOT
+// distinguishable from the events, so it stays 'running'.
+function deriveStatus(
+  terminal: LeadEvent | undefined,
+  last: LeadEvent
+): JourneyExecutionSummary['status'] {
+  if (terminal?.outcome) return terminal.outcome
+  if (last.type === 'handoff') return 'handed_off'
+  return 'running'
+}
+
 // Exported for tests: the grouping is the only real logic here, and it is worth
 // pinning independently of DynamoDB.
 export function summariseExecutions(events: LeadEvent[], bundleId: string): JourneyExecutionSummary[] {
@@ -537,12 +563,7 @@ export function summariseExecutions(events: LeadEvent[], bundleId: string): Jour
     summaries.push({
       leadId,
       bundleId,
-      // A terminal event is the ONLY thing that proves an ending. Absent one,
-      // this is 'running' — which for a pre-existing execution may really mean
-      // "died before terminal events existed". The UI is responsible for not
-      // overstating that; inventing an outcome here would be the same lie the
-      // missing journey_ended write used to tell.
-      status: terminal?.outcome ?? 'running',
+      status: deriveStatus(terminal, last),
       // The ISO prefix of the `${iso}#${uuid}` sort key.
       startedAt: first.ts.split('#')[0],
       lastEventAt: last.ts.split('#')[0],
@@ -551,6 +572,16 @@ export function summariseExecutions(events: LeadEvent[], bundleId: string): Jour
       ...(last.stepId ? { lastStepId: last.stepId } : {}),
       ...(terminal?.errorDetail ? { errorDetail: terminal.errorDetail } : {}),
       ...(terminal?.executionArn ? { executionArn: terminal.executionArn } : {}),
+      events: ordered.map((event) => ({
+        ts: event.ts.split('#')[0],
+        type: event.type,
+        ...(event.stepId ? { stepId: event.stepId } : {}),
+        ...(event.toolName ? { toolName: event.toolName } : {}),
+        ...(event.channel ? { channel: event.channel } : {}),
+        ...(event.status ? { status: event.status } : {}),
+        ...(event.outcome ? { outcome: event.outcome } : {}),
+        ...(event.errorDetail ? { errorDetail: event.errorDetail } : {}),
+      })),
     })
   }
 

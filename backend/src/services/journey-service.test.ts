@@ -699,6 +699,65 @@ describe('summariseExecutions', () => {
     expect(out[0].status).toBe('running')
   })
 
+  // REGRESSION, seen in production on the first live journey: 25 of 29 runs had
+  // been handed to a human days earlier and every one of them read "In flight",
+  // because they predate the terminal event. human_handoff is terminal BY
+  // CONSTRUCTION, so the ending was knowable from data already stored.
+  it('treats a trailing handoff as an ending, terminal event or not', () => {
+    const out = summariseExecutions(
+      [
+        ev('lead-a', '2026-08-23T10:00:00.000Z', 'journey_started'),
+        ev('lead-a', '2026-08-23T11:15:00.000Z', 'handoff', { stepId: 'hand_to_agent' }),
+      ],
+      'bundle-1'
+    )
+
+    expect(out[0].status).toBe('handed_off')
+  })
+
+  // The other half: nothing else is inferred. A run sitting on a send_message
+  // could be mid-journey or could have died silently, and the events cannot
+  // tell those apart — so it must stay 'running' rather than guess.
+  it('does not infer an ending from a non-terminal last event', () => {
+    const out = summariseExecutions(
+      [
+        ev('lead-a', '2026-08-23T10:00:00.000Z', 'journey_started'),
+        ev('lead-a', '2026-08-23T10:05:00.000Z', 'message_out'),
+      ],
+      'bundle-1'
+    )
+
+    expect(out[0].status).toBe('running')
+  })
+
+  // A real terminal event always wins over the inference.
+  it('prefers the terminal event even when a handoff came before it', () => {
+    const out = summariseExecutions(
+      [
+        ev('lead-a', '2026-08-23T10:00:00.000Z', 'handoff', { stepId: 'hand_to_agent' }),
+        ev('lead-a', '2026-08-23T10:01:00.000Z', 'journey_ended', { outcome: 'failed' }),
+      ],
+      'bundle-1'
+    )
+
+    expect(out[0].status).toBe('failed')
+  })
+
+  // The events were already fetched to build the summary; discarding them meant
+  // a drill-down would re-query for data the caller already paid to read.
+  it('returns the run\'s events, oldest first, with the ts prefix stripped', () => {
+    const out = summariseExecutions(
+      [
+        ev('lead-a', '2026-08-23T10:05:00.000Z', 'message_out'),
+        ev('lead-a', '2026-08-23T10:00:00.000Z', 'journey_started'),
+      ],
+      'bundle-1'
+    )
+
+    expect(out[0].events.map((e) => e.type)).toEqual(['journey_started', 'message_out'])
+    expect(out[0].events[0].ts).toBe('2026-08-23T10:00:00.000Z')
+  })
+
   it('takes the outcome from the terminal event', () => {
     const out = summariseExecutions(
       [

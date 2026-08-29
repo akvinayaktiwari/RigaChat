@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Clock, UserRound } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Clock, UserRound } from 'lucide-react'
 import { getJourneyExecutions } from '../../services/api'
-import type { JourneyExecutionSummary } from '../../types/index'
+import type { JourneyExecutionEvent, JourneyExecutionSummary } from '../../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -33,10 +33,45 @@ function relativeTime(iso: string): string {
   return `${Math.round(hours / 24)}d ago`
 }
 
+// Journey-level language, not raw event types. An operator scanning a run wants
+// to know what the agent DID, not which enum member was written.
+function describeEvent(event: JourneyExecutionEvent): string {
+  switch (event.type) {
+    case 'journey_started':
+      return 'Journey started'
+    case 'journey_step':
+      return event.stepId ? `Step ${event.stepId}` : 'Step'
+    case 'message_out':
+      return `Sent a message${event.channel ? ` (${event.channel})` : ''}${event.status ? ` — ${event.status}` : ''}`
+    case 'message_in':
+      return 'They replied'
+    case 'message_status':
+      return `Delivery: ${event.status ?? 'unknown'}`
+    case 'tool_call':
+      return `Called ${event.toolName ?? 'a tool'}`
+    case 'handoff':
+      return 'Handed to a human'
+    case 'notification_out':
+      return 'You were alerted'
+    case 'journey_ended':
+      return `Journey ended — ${event.outcome ?? 'unknown'}`
+    default:
+      return event.type
+  }
+}
+
+function clockTime(iso: string): string {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
 export default function JourneyExecutions({ botId, bundleId }: { botId: string; bundleId: string }) {
   const [executions, setExecutions] = useState<JourneyExecutionSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Which runs are open. Expansion needs no fetch — the events came down with
+  // the summary, because the read had to load them anyway to derive it.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     let cancelled = false
@@ -116,33 +151,70 @@ export default function JourneyExecutions({ botId, bundleId }: { botId: string; 
       </div>
 
       <div className="divide-y divide-black/5">
-        {executions.map((execution) => (
-          <div key={execution.leadId} className="px-6 py-3.5 flex items-start gap-4 hover:bg-gray-50/60 transition-colors">
-            <span
-              className={`inline-flex items-center gap-1.5 border text-[10px] font-semibold px-2 py-1 rounded-full shrink-0 ${STATUS_STYLES[execution.status].className}`}
-            >
-              <StatusIcon status={execution.status} />
-              {STATUS_STYLES[execution.status].label}
-            </span>
+        {executions.map((execution) => {
+          const isOpen = expanded.has(execution.leadId)
+          return (
+            <div key={execution.leadId}>
+              <button
+                type="button"
+                aria-expanded={isOpen}
+                onClick={() =>
+                  setExpanded((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(execution.leadId)) next.delete(execution.leadId)
+                    else next.add(execution.leadId)
+                    return next
+                  })
+                }
+                className="w-full px-6 py-3.5 flex items-start gap-4 text-left hover:bg-gray-50/60 transition-colors"
+              >
+                <span className="text-gray-300 mt-0.5 shrink-0">
+                  {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                </span>
 
-            <div className="min-w-0 grow">
-              <p className="text-sm font-medium text-gray-900 truncate">
-                {execution.lastStepId ? `Step: ${execution.lastStepId}` : execution.lastEventType}
-              </p>
-              <p className="text-xs text-gray-400 truncate">
-                lead {execution.leadId.slice(0, 8)} · {execution.eventCount}{' '}
-                {execution.eventCount === 1 ? 'event' : 'events'} · started {relativeTime(execution.startedAt)}
-              </p>
-              {/* The whole reason the terminal event carries an error: this line
-                  is the difference between "it failed" and knowing why. */}
-              {execution.errorDetail && (
-                <p className="text-xs text-red-600 mt-1 break-words">{execution.errorDetail}</p>
+                <span
+                  className={`inline-flex items-center gap-1.5 border text-[10px] font-semibold px-2 py-1 rounded-full shrink-0 ${STATUS_STYLES[execution.status].className}`}
+                >
+                  <StatusIcon status={execution.status} />
+                  {STATUS_STYLES[execution.status].label}
+                </span>
+
+                <span className="min-w-0 grow">
+                  <span className="block text-sm font-medium text-gray-900 truncate">
+                    {execution.lastStepId ? `Step: ${execution.lastStepId}` : execution.lastEventType}
+                  </span>
+                  <span className="block text-xs text-gray-400 truncate">
+                    lead {execution.leadId.slice(0, 8)} · {execution.eventCount}{' '}
+                    {execution.eventCount === 1 ? 'event' : 'events'} · started {relativeTime(execution.startedAt)}
+                  </span>
+                  {/* The whole reason the terminal event carries an error: this
+                      line is the difference between "it failed" and knowing why. */}
+                  {execution.errorDetail && (
+                    <span className="block text-xs text-red-600 mt-1 break-words">{execution.errorDetail}</span>
+                  )}
+                </span>
+
+                <span className="text-xs text-gray-400 shrink-0">{relativeTime(execution.lastEventAt)}</span>
+              </button>
+
+              {isOpen && (
+                <ol className="px-6 pb-4 pl-16 space-y-2 border-l-2 border-gray-100 ml-8">
+                  {execution.events.map((event, i) => (
+                    <li key={`${event.ts}-${i}`} className="flex items-baseline gap-3 text-xs">
+                      <span className="text-gray-400 tabular-nums shrink-0 w-28">{clockTime(event.ts)}</span>
+                      <span className={event.type === 'journey_ended' && event.outcome === 'failed' ? 'text-red-600' : 'text-gray-700'}>
+                        {describeEvent(event)}
+                      </span>
+                      {event.errorDetail && (
+                        <span className="text-red-600 break-words">{event.errorDetail}</span>
+                      )}
+                    </li>
+                  ))}
+                </ol>
               )}
             </div>
-
-            <span className="text-xs text-gray-400 shrink-0">{relativeTime(execution.lastEventAt)}</span>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Said plainly rather than implied: an execution that started before the
@@ -151,8 +223,9 @@ export default function JourneyExecutions({ botId, bundleId }: { botId: string; 
           the exact ambiguity this feature exists to remove. */}
       {executions.some((execution) => execution.status === 'running') && (
         <p className="px-6 py-3 text-xs text-gray-400 border-t border-black/5">
-          "In flight" means no ending was recorded. Runs that started before this journey was last published never
-          record one, so check the lead's own timeline before assuming it is still going.
+          "In flight" means no ending was recorded and none can be inferred. A run that reached a handoff is shown as
+          handed off even without a terminal event, but one sitting on a message could be mid-journey or could have
+          stopped — open it to see how long it has been there.
         </p>
       )}
     </div>
