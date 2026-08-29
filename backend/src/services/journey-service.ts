@@ -424,15 +424,25 @@ export async function publishJourneyBundle(botId: string, bundleId: string, clie
     )
   } catch (error) {
     if (error instanceof JourneyBundleStateConflictError) {
-      // We already hold the claim but lost the status write, so releasing it is
-      // mandatory rather than tidy: leaving it held would let a PAUSED bundle
-      // keep the trigger and block every other journey from claiming it.
-      await releaseJourneyTrigger(
-        triggerClaimKey({ agentId: existing.agentId, botId }, existing.journey.triggerType),
-        bundleId
-      ).catch((releaseError) => {
-        console.error(`[journey] failed to release trigger claim after a lost publish race on ${bundleId}:`, releaseError)
-      })
+      // Losing the status write does NOT by itself mean the claim is ours to
+      // drop. claimJourneyTrigger lets the SAME bundleId re-claim (that is what
+      // makes republish idempotent), so two concurrent publishes of this bundle
+      // both hold it -- and blind cleanup here would delete the winner's claim,
+      // leaving the bundle published with no ignition index. That is the very
+      // corruption this whole guard exists to prevent, so re-read first and
+      // release only when nothing ended up published.
+      const current = await getJourneyBundleById(botId, bundleId).catch(() => null)
+      if (current?.status !== 'published') {
+        await releaseJourneyTrigger(
+          triggerClaimKey({ agentId: existing.agentId, botId }, existing.journey.triggerType),
+          bundleId
+        ).catch((releaseError) => {
+          console.error(
+            `[journey] failed to release trigger claim after a lost publish race on ${bundleId}:`,
+            releaseError
+          )
+        })
+      }
       throw new JourneyValidationError(
         'This journey changed while it was being published. Reload it and try again.'
       )

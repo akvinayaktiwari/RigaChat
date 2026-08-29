@@ -205,6 +205,20 @@ describe('pausing a live journey', () => {
     expect(screen.queryByRole('button', { name: 'Pause' })).toBeNull()
   })
 
+  // Resume used to route through handlePublish, which saves first. Saving
+  // regenerates the journey from the plan builder and that round trip is lossy
+  // (it drops mcpToolbox capabilities the plan cannot express), so resuming a
+  // paused journey could silently rewrite the definition being resumed.
+  it('resumes without saving, so the paused definition is what goes live', async () => {
+    await renderBuilder('paused')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resume' }))
+
+    await waitFor(() => expect(publishJourneyBundle).toHaveBeenCalledWith('bot-1', 'bundle-1'))
+    expect(updateJourneyBundle).not.toHaveBeenCalled()
+    expect(toastShow).toHaveBeenCalledWith('Journey resumed', 'success')
+  })
+
   it('surfaces a failed pause instead of silently leaving it live', async () => {
     pauseJourneyBundle.mockResolvedValue({ success: false, error: 'Only a published journey can be paused' })
     await renderBuilder('published')

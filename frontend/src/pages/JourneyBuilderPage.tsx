@@ -827,6 +827,29 @@ export default function JourneyBuilderPage() {
     }
   }
 
+  // Resume publishes the journey EXACTLY as it was paused. It deliberately does
+  // not go through handlePublish, which saves first: saving regenerates the
+  // journey from the plan builder, and that round trip is known to be lossy
+  // (it drops mcpToolbox capabilities the plan cannot express). Resuming a
+  // paused journey must not quietly rewrite its definition.
+  async function handleResume() {
+    if (!existing) return
+    setPublishing(true)
+    try {
+      const res = await publishJourneyBundle(existing.botId, existing.bundleId)
+      if (res.success && res.data) {
+        setExisting(res.data)
+        toast.show('Journey resumed', 'success')
+      } else {
+        setError(res.error ?? 'Failed to resume journey')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong')
+    } finally {
+      setPublishing(false)
+    }
+  }
+
   // No save first, unlike handlePublish: pausing is about the live journey as
   // it currently runs, and saving would drop it to draft and release the claim
   // for a different reason, losing the "paused, resumable" state entirely.
@@ -926,11 +949,17 @@ export default function JourneyBuilderPage() {
         )}
         <button
           type="button"
-          onClick={handlePublish}
+          onClick={existing?.status === 'paused' ? handleResume : handlePublish}
           disabled={saving || publishing}
           className={`px-4 py-2.5 text-sm ${primaryButtonClasses} disabled:opacity-50`}
         >
-          {publishing ? 'Publishing…' : existing?.status === 'paused' ? 'Resume' : 'Publish'}
+          {publishing
+            ? existing?.status === 'paused'
+              ? 'Resuming…'
+              : 'Publishing…'
+            : existing?.status === 'paused'
+              ? 'Resume'
+              : 'Publish'}
         </button>
       </div>
 

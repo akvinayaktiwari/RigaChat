@@ -537,16 +537,35 @@ describe('pauseJourneyBundle', () => {
   // pause side, which left the MIRROR interleaving open: publish claims ->
   // pause releases -> pause writes paused -> publish writes published, ending
   // at status 'published' with no trigger claim. Publish's write is now
-  // conditional on the status IT read, so the loser fails instead.
-  it('fails a publish whose status write lost the race, and gives back the claim', async () => {
-    getJourneyBundleById.mockResolvedValue(publishedBundle)
-    updateJourneyBundleRepo.mockRejectedValue(new JourneyBundleStateConflictError('bundle-1', 'published'))
+  // conditional on the status IT read, so the loser fails instead. What the
+  // loser then does with the claim is the pair of tests below — it depends on
+  // whether anything actually ended up published.
+  // REGRESSION (Codex, cycle 3). The cycle-2 compensation released the claim on
+  // ANY conflict. But claimJourneyTrigger lets the same bundleId re-claim, so
+  // two concurrent publishes of one bundle both hold it — and the loser's blind
+  // cleanup deleted the WINNER's claim, producing exactly the published-with-no-
+  // claim corruption the guard was added to prevent. The fix re-reads first.
+  it('does NOT release the claim when a concurrent publish of the same bundle won', async () => {
+    getJourneyBundleById
+      .mockResolvedValueOnce({ ...publishedBundle, status: 'paused' })
+      .mockResolvedValueOnce(publishedBundle)
+    updateJourneyBundleRepo.mockRejectedValue(new JourneyBundleStateConflictError('bundle-1', 'paused'))
 
     await expect(publishJourneyBundle('bot-1', 'bundle-1', 'client-1')).rejects.toBeInstanceOf(
       JourneyValidationError
     )
-    // Not tidiness: a claim left held by a bundle that never became published
-    // would block every other journey from ever taking that trigger.
+    expect(releaseJourneyTrigger).not.toHaveBeenCalled()
+  })
+
+  it('releases the claim when the conflict left nothing published', async () => {
+    getJourneyBundleById
+      .mockResolvedValueOnce({ ...publishedBundle, status: 'draft' })
+      .mockResolvedValueOnce({ ...publishedBundle, status: 'paused' })
+    updateJourneyBundleRepo.mockRejectedValue(new JourneyBundleStateConflictError('bundle-1', 'draft'))
+
+    await expect(publishJourneyBundle('bot-1', 'bundle-1', 'client-1')).rejects.toBeInstanceOf(
+      JourneyValidationError
+    )
     expect(releaseJourneyTrigger).toHaveBeenCalledWith('agent:agent-1#lead_captured', 'bundle-1')
   })
 
