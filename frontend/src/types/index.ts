@@ -735,7 +735,12 @@ export interface JourneyTemplate {
   agent: AgentConfig
 }
 
-export type JourneyBundleStatus = 'draft' | 'published'
+// 'paused' is a published bundle whose trigger claim has been released: it
+// still holds its compiled state machine (so resuming is a republish, not a
+// rebuild) but no new lead ignites into it. Every consumer gates on
+// `status === 'published'`, so paused reads as not-live everywhere without
+// any of them needing to know the value exists.
+export type JourneyBundleStatus = 'draft' | 'published' | 'paused'
 
 export interface JourneyBundle {
   bundleId: string

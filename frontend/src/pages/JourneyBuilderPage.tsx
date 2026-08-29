@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
-import { createJourneyBundle, getJourneyBundle, publishJourneyBundle, updateJourneyBundle } from '../services/api'
+import { ArrowLeft, ChevronDown, ChevronUp, Pause, Plus, Trash2 } from 'lucide-react'
+import {
+  createJourneyBundle,
+  getJourneyBundle,
+  pauseJourneyBundle,
+  publishJourneyBundle,
+  updateJourneyBundle,
+} from '../services/api'
 import { useToast } from '../components/Toast/Toast'
 import JourneyGraph from '../components/journey/JourneyGraph'
 import PlanBuilder from '../components/journey/PlanBuilder'
@@ -821,6 +827,27 @@ export default function JourneyBuilderPage() {
     }
   }
 
+  // No save first, unlike handlePublish: pausing is about the live journey as
+  // it currently runs, and saving would drop it to draft and release the claim
+  // for a different reason, losing the "paused, resumable" state entirely.
+  async function handlePause() {
+    if (!existing) return
+    setPublishing(true)
+    try {
+      const res = await pauseJourneyBundle(existing.botId, existing.bundleId)
+      if (res.success && res.data) {
+        setExisting(res.data)
+        toast.show('Journey paused — leads already in it will finish', 'success')
+      } else {
+        setError(res.error ?? 'Failed to pause journey')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong')
+    } finally {
+      setPublishing(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="max-w-3xl space-y-4 animate-pulse">
@@ -865,11 +892,13 @@ export default function JourneyBuilderPage() {
             className={`inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2.5 py-1 rounded-full ${
               existing.status === 'published'
                 ? 'bg-emerald-50 text-emerald-700'
-                : 'bg-slate-100 text-slate-500'
+                : existing.status === 'paused'
+                  ? 'bg-amber-50 text-amber-700'
+                  : 'bg-slate-100 text-slate-500'
             }`}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-current" aria-hidden="true" />
-            {existing.status === 'published' ? 'Live' : 'Draft'}
+            {existing.status === 'published' ? 'Live' : existing.status === 'paused' ? 'Paused' : 'Draft'}
           </span>
         )}
         <div className="flex-1" />
@@ -881,13 +910,27 @@ export default function JourneyBuilderPage() {
         >
           {saving ? 'Saving…' : 'Save draft'}
         </button>
+        {/* Only offered on a live journey: pausing is releasing the trigger
+            claim, and a draft or paused bundle isn't holding one. */}
+        {existing?.status === 'published' && (
+          <button
+            type="button"
+            onClick={handlePause}
+            disabled={saving || publishing}
+            title="Stop new leads entering this journey"
+            className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm ${secondaryButtonClasses} disabled:opacity-50`}
+          >
+            <Pause size={15} />
+            {publishing ? 'Pausing…' : 'Pause'}
+          </button>
+        )}
         <button
           type="button"
           onClick={handlePublish}
           disabled={saving || publishing}
           className={`px-4 py-2.5 text-sm ${primaryButtonClasses} disabled:opacity-50`}
         >
-          {publishing ? 'Publishing…' : 'Publish'}
+          {publishing ? 'Publishing…' : existing?.status === 'paused' ? 'Resume' : 'Publish'}
         </button>
       </div>
 

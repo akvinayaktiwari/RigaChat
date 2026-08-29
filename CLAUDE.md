@@ -60,6 +60,9 @@ GET  /api/journeys/:botId/:bundleId      -> fetch one JourneyBundle (auth requir
 PATCH /api/journeys/:botId/:bundleId     -> update a JourneyBundle (auth required)
 DELETE /api/journeys/:botId/:bundleId    -> delete a JourneyBundle (auth required)
 POST /api/journeys/:botId/:bundleId/publish -> compile + mark published, no live infra provisioned yet (auth required)
+POST /api/journeys/:botId/:bundleId/pause   -> take a live journey off the air: releases its trigger claim so no new
+                                            lead ignites into it, KEEPS the compiled state machine so anyone
+                                            mid-journey finishes. Resume = POST /publish again (auth required)
 POST /api/agents                         -> create a cross-channel Agent (auth required)
 GET  /api/agents                         -> list the caller's Agents (auth required)
 GET  /api/agents/:agentId                -> fetch one Agent (auth required)

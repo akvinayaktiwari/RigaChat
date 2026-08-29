@@ -297,6 +297,34 @@ export async function deleteJourneyBundle(botId: string, bundleId: string, clien
   await deleteJourneyBundleRepo(botId, bundleId)
 }
 
+// Takes a published journey off the air without destroying anything.
+//
+// Pausing is only the trigger claim being released: new leads stop igniting
+// into this bundle, and the client is free to publish a different journey on
+// the same trigger. The compiled state machine and its published version arn
+// are deliberately KEPT, which is what separates pause from delete --
+// in-flight executions keep running to completion instead of failing with
+// `States.Runtime: State machine has been deleted`, and resuming is a
+// republish of the same definition rather than a rebuild.
+//
+// Resuming is publishJourneyBundle: it re-claims the trigger and re-publishes
+// the (unchanged) definition, which Step Functions answers with the existing
+// version rather than minting a new one.
+export async function pauseJourneyBundle(botId: string, bundleId: string, clientId: string): Promise<JourneyBundle> {
+  const existing = await getOwnedJourneyBundle(botId, bundleId, clientId)
+
+  if (existing.status !== 'published') {
+    throw new JourneyValidationError('Only a published journey can be paused')
+  }
+
+  await releaseJourneyTrigger(
+    triggerClaimKey({ agentId: existing.agentId, botId }, existing.journey.triggerType),
+    bundleId
+  )
+
+  return updateJourneyBundleRepo(botId, bundleId, { status: 'paused' })
+}
+
 // Compiles, claims the trigger, provisions a real Step Functions state machine,
 // and records the immutable version executions will target.
 //

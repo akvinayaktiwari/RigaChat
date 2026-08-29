@@ -1003,7 +1003,12 @@ export interface JourneyTriggerClaim {
   claimedAt: string
 }
 
-export type JourneyBundleStatus = 'draft' | 'published'
+// 'paused' is a published bundle whose trigger claim has been released: it
+// still holds its compiled state machine (so resuming is a republish, not a
+// rebuild) but no new lead ignites into it. Every consumer gates on
+// `status === 'published'`, so paused reads as not-live everywhere without
+// any of them needing to know the value exists.
+export type JourneyBundleStatus = 'draft' | 'published' | 'paused'
 
 // Fused Journey + Agent + toolbox, per the 2026-07-29 architecture session's
 // Decision #2: a prebuilt "agent" (lead-qualification, appointment-booking,

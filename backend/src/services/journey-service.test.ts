@@ -54,6 +54,7 @@ const {
   deleteJourneyBundle,
   JourneyTemplateNotFoundError,
   JourneyValidationError,
+  pauseJourneyBundle,
   publishJourneyBundle,
   updateJourneyBundle,
 } = await import('./journey-service.js')
@@ -450,5 +451,57 @@ describe('updateJourneyBundle — palette validation applies to edits too', () =
     ).rejects.toThrow(JourneyValidationError)
 
     expect(updateJourneyBundleRepo).not.toHaveBeenCalled()
+  })
+})
+
+describe('pauseJourneyBundle', () => {
+  it('releases the trigger claim and marks the bundle paused', async () => {
+    getJourneyBundleById.mockResolvedValue(publishedBundle)
+
+    await pauseJourneyBundle('bot-1', 'bundle-1', 'client-1')
+
+    expect(releaseJourneyTrigger).toHaveBeenCalledWith('agent:agent-1#lead_captured', 'bundle-1')
+    expect(updateJourneyBundleRepo).toHaveBeenCalledWith('bot-1', 'bundle-1', { status: 'paused' })
+  })
+
+  // The whole point of pause over delete: leads mid-journey keep running,
+  // which they cannot do if the state machine is torn down.
+  it('leaves the compiled state machine in place', async () => {
+    getJourneyBundleById.mockResolvedValue({
+      ...publishedBundle,
+      compiledStateMachineArn: 'arn:aws:states:ap-south-1:1:stateMachine:sm',
+    })
+
+    await pauseJourneyBundle('bot-1', 'bundle-1', 'client-1')
+
+    expect(deleteStateMachine).not.toHaveBeenCalled()
+    const patch = updateJourneyBundleRepo.mock.calls[0][2] as Record<string, unknown>
+    expect(patch).not.toHaveProperty('compiledStateMachineArn')
+    expect(patch).not.toHaveProperty('compiledStateMachineVersionArn')
+  })
+
+  // A draft holds no claim, so "pausing" one would release a trigger a
+  // different published bundle may legitimately hold.
+  it('rejects pausing a bundle that is not published', async () => {
+    getJourneyBundleById.mockResolvedValue({ ...publishedBundle, status: 'draft' })
+
+    await expect(pauseJourneyBundle('bot-1', 'bundle-1', 'client-1')).rejects.toBeInstanceOf(JourneyValidationError)
+    expect(releaseJourneyTrigger).not.toHaveBeenCalled()
+    expect(updateJourneyBundleRepo).not.toHaveBeenCalled()
+  })
+
+  // Resuming is publish again: the claim must come back, or the journey would
+  // read as live while nothing ignites into it.
+  it('re-claims the trigger when a paused bundle is published again', async () => {
+    getJourneyBundleById.mockResolvedValue({ ...publishedBundle, status: 'paused' })
+
+    const result = await publishJourneyBundle('bot-1', 'bundle-1', 'client-1')
+
+    expect(claimJourneyTrigger).toHaveBeenCalledWith('agent:agent-1#lead_captured', {
+      bundleId: 'bundle-1',
+      botId: 'bot-1',
+      clientId: 'client-1',
+    })
+    expect(result).toMatchObject({ status: 'published' })
   })
 })

@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { GitBranch, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { GitBranch, Pause, Play, Plus, Sparkles, Trash2 } from 'lucide-react'
 import {
   createJourneyBundleFromTemplate,
   deleteJourneyBundle,
   getJourneyBundles,
   getJourneyTemplates,
   getMyBots,
+  pauseJourneyBundle,
   publishJourneyBundle,
 } from '../services/api'
 import { useToast } from '../components/Toast/Toast'
-import type { BotConfig, JourneyBundle, JourneyTemplate } from '../types/index'
+import type { BotConfig, JourneyBundle, JourneyTemplate, JourneyTriggerType } from '../types/index'
 import Dropdown from '../components/Dropdown/Dropdown'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -22,6 +23,28 @@ const ghostButtonClasses = 'text-gray-600 font-medium rounded-xl hover:bg-gray-1
 const STATUS_BADGES: Record<JourneyBundle['status'], string> = {
   draft: 'bg-gray-100 text-gray-600 border-gray-200',
   published: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  paused: 'bg-amber-50 text-amber-700 border-amber-200',
+}
+
+const STATUS_LABELS: Record<JourneyBundle['status'], string> = {
+  draft: 'Draft',
+  published: 'Live',
+  paused: 'Paused',
+}
+
+// What "live" actually means for this journey, spelled out -- a status badge
+// alone doesn't tell the client which leads it is currently picking up.
+const TRIGGER_LABELS: Record<JourneyTriggerType, string> = {
+  lead_captured: 'a new lead comes in',
+  manual_score: 'a lead is scored',
+  site_visit_done: 'a site visit is completed',
+}
+
+function statusLine(bundle: JourneyBundle): string {
+  const trigger = TRIGGER_LABELS[bundle.journey.triggerType] ?? 'its trigger fires'
+  if (bundle.status === 'published') return `Running — starts when ${trigger}`
+  if (bundle.status === 'paused') return `Paused — no new leads are entering it`
+  return `Draft — not running yet`
 }
 
 function ListSkeleton() {
@@ -193,6 +216,25 @@ export default function JourneysPage() {
     }
   }
 
+  // Resume is deliberately the same call as publish: the definition hasn't
+  // changed, so going live again is re-claiming the trigger, not a new build.
+  async function handlePause(bundle: JourneyBundle) {
+    setPublishingId(bundle.bundleId)
+    try {
+      const res = await pauseJourneyBundle(bundle.botId, bundle.bundleId)
+      if (res.success && res.data) {
+        setBundles((prev) => prev.map((b) => (b.bundleId === bundle.bundleId ? (res.data as JourneyBundle) : b)))
+        toast.show('Journey paused — leads already in it will finish', 'success')
+      } else {
+        toast.show(res.error ?? 'Failed to pause journey', 'error')
+      }
+    } catch {
+      toast.show('Failed to pause journey', 'error')
+    } finally {
+      setPublishingId(null)
+    }
+  }
+
   async function handleConfirmDelete() {
     if (!bundleToDelete) return
     setDeleting(true)
@@ -331,13 +373,23 @@ export default function JourneysPage() {
                       {bundle.name}
                     </h3>
                     <span
-                      className={`inline-flex border text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${STATUS_BADGES[bundle.status]}`}
+                      className={`inline-flex items-center gap-1.5 border text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${STATUS_BADGES[bundle.status]}`}
                     >
-                      {bundle.status === 'published' ? 'Published' : 'Draft'}
+                      {/* Only the live state gets the pulsing dot -- it is the
+                          one status the client scans the list for. */}
+                      {bundle.status === 'published' && (
+                        <span className="relative flex w-1.5 h-1.5">
+                          <span className="absolute inline-flex w-full h-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                          <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        </span>
+                      )}
+                      {STATUS_LABELS[bundle.status]}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-500 truncate">
-                    {bundle.description || `${bundle.journey.steps.length} step${bundle.journey.steps.length === 1 ? '' : 's'}`}
+                  <p className="text-sm text-gray-500 truncate">{statusLine(bundle)}</p>
+                  <p className="text-xs text-gray-400 truncate mt-0.5">
+                    {bundle.description ||
+                      `${bundle.journey.steps.length} step${bundle.journey.steps.length === 1 ? '' : 's'}`}
                   </p>
                 </div>
               </div>
@@ -352,6 +404,30 @@ export default function JourneysPage() {
                     {publishingId === bundle.bundleId ? 'Publishing…' : 'Publish'}
                   </button>
                 )}
+                {bundle.status === 'published' && (
+                  <button
+                    type="button"
+                    onClick={() => handlePause(bundle)}
+                    disabled={publishingId === bundle.bundleId}
+                    title="Stop new leads entering this journey"
+                    className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs ${ghostButtonClasses} disabled:opacity-50`}
+                  >
+                    <Pause size={14} />
+                    {publishingId === bundle.bundleId ? 'Pausing…' : 'Pause'}
+                  </button>
+                )}
+                {bundle.status === 'paused' && (
+                  <button
+                    type="button"
+                    onClick={() => handlePublish(bundle)}
+                    disabled={publishingId === bundle.bundleId}
+                    title="Put this journey back on the air"
+                    className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs ${ghostButtonClasses} disabled:opacity-50`}
+                  >
+                    <Play size={14} />
+                    {publishingId === bundle.bundleId ? 'Resuming…' : 'Resume'}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => navigate(`/dashboard/journeys/${bundle.botId}/${bundle.bundleId}`)}
@@ -359,13 +435,15 @@ export default function JourneysPage() {
                 >
                   Edit
                 </button>
+                {/* Labelled, not a bare icon: an unlabelled trash can in a row
+                    of text buttons reads as decoration and gets missed. */}
                 <button
                   type="button"
                   onClick={() => setBundleToDelete(bundle)}
-                  title="Delete journey"
-                  className="text-gray-400 hover:text-red-500 transition-colors p-2"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors"
                 >
-                  <Trash2 size={16} />
+                  <Trash2 size={14} />
+                  Delete
                 </button>
               </div>
             </div>
@@ -382,6 +460,15 @@ export default function JourneysPage() {
             <p className="text-sm text-gray-500 mt-2">
               "{bundleToDelete.name}" will be permanently deleted. This can't be undone.
             </p>
+            {/* Deleting tears down the state machine, which fails any lead
+                currently mid-journey rather than letting them finish. Pause
+                does not -- so the choice is worth putting in front of them. */}
+            {bundleToDelete.status === 'published' && (
+              <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3 mt-3">
+                This journey is live. Deleting it will also drop any leads currently part-way through it. Pause it
+                instead if you only want to stop new leads entering.
+              </p>
+            )}
             <div className="flex items-center justify-end gap-3 mt-6">
               <button
                 type="button"

@@ -818,6 +818,12 @@ export function publishJourneyBundle(botId: string, bundleId: string): Promise<A
   return apiClient<JourneyBundle>(`/api/journeys/${botId}/${bundleId}/publish`, 'POST')
 }
 
+// Takes a live journey off the air: new leads stop entering it, anyone already
+// mid-journey finishes. Resuming is publishJourneyBundle again.
+export function pauseJourneyBundle(botId: string, bundleId: string): Promise<ApiResponse<JourneyBundle>> {
+  return apiClient<JourneyBundle>(`/api/journeys/${botId}/${bundleId}/pause`, 'POST')
+}
+
 // Contact API
 
 // Public endpoint — no auth token needed, but apiClient attaches one if the

@@ -10,6 +10,7 @@ import {
   getJourneyTemplates,
   JourneyTemplateNotFoundError,
   JourneyValidationError,
+  pauseJourneyBundle,
   publishJourneyBundle,
   updateJourneyBundle,
 } from '../services/journey-service.js'
@@ -210,6 +211,30 @@ journeyRoutes.delete('/:botId/:bundleId', requireAuth, async (c) => {
   } catch (error) {
     if (error instanceof Error && error.message === 'Journey bundle not found') {
       return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+// Releases the trigger claim so no new lead ignites into this journey, while
+// keeping the compiled state machine so anyone mid-journey finishes and
+// resuming is just POST /publish again. Its own route rather than a generic
+// PATCH of `status`, for the same reason publish is: status is server-owned
+// state derived from real AWS resources, never a field the client sets.
+journeyRoutes.post('/:botId/:bundleId/pause', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const botId = c.req.param('botId')
+  const bundleId = c.req.param('bundleId')
+
+  try {
+    const bundle = await pauseJourneyBundle(botId, bundleId, clientId)
+    return c.json<ApiResponse<JourneyBundle>>({ success: true, data: bundle }, 200)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Journey bundle not found') {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
+    }
+    if (error instanceof JourneyValidationError) {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 400)
     }
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }
