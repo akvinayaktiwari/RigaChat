@@ -460,6 +460,7 @@ export function compileJourneyToAsl(journey: JourneyDefinition): AslStateMachine
   // invariant, not a separate check.
   emitTerminalStates(states)
 
+
   return {
     Comment: `Compiled Journey: ${journey.name} (${journey.journeyId})`,
     StartAt: resolve(journey.startStepId),
@@ -499,18 +500,49 @@ function terminalEventState(outcome: JourneyOutcome, next: { Next: string } | { 
   } satisfies AslTaskState
 }
 
+// Emits ONLY the terminals something actually transitions to.
+//
+// Step Functions rejects a definition containing an unreachable state:
+//
+//   InvalidDefinition: MISSING_TRANSITION_TARGET:
+//     State "__journey_handed_off" is not reachable.
+//
+// Emitting all three unconditionally therefore made every journey WITHOUT a
+// human_handoff step unpublishable -- which is most journeys. Caught by the
+// observability drill (scripts/break-a-journey.ts) on the first journey that
+// had no handoff step; the one live journey happened to have one, so it
+// republished cleanly and hid the bug.
+//
+// Reachability is computed from the states actually emitted rather than from
+// the step list, so it cannot drift from what the compiler really produced --
+// the same question Step Functions itself asks.
 function emitTerminalStates(states: Record<string, AslState>): void {
-  states[JOURNEY_COMPLETED_STATE] = terminalEventState('completed', { End: true })
-  states[JOURNEY_HANDED_OFF_STATE] = terminalEventState('handed_off', { End: true })
+  const targets = new Set<string>()
+  for (const state of Object.values(states)) {
+    if ('Next' in state && typeof state.Next === 'string') targets.add(state.Next)
+    if ('Default' in state && typeof state.Default === 'string') targets.add(state.Default)
+    if ('Choices' in state) for (const choice of state.Choices) targets.add(choice.Next)
+    if ('Catch' in state && state.Catch) for (const c of state.Catch) targets.add(c.Next)
+  }
 
-  // Records first, THEN fails. The order is the whole point: ending on a
-  // Succeed would make a crashed journey report success in the Step Functions
-  // console, and failing before the Task would leave no audit row at all.
-  states[JOURNEY_FAILED_STATE] = terminalEventState('failed', { Next: JOURNEY_FAILED_TERMINAL_STATE })
+  if (targets.has(JOURNEY_COMPLETED_STATE)) {
+    states[JOURNEY_COMPLETED_STATE] = terminalEventState('completed', { End: true })
+  }
+  if (targets.has(JOURNEY_HANDED_OFF_STATE)) {
+    states[JOURNEY_HANDED_OFF_STATE] = terminalEventState('handed_off', { End: true })
+  }
 
-  states[JOURNEY_FAILED_TERMINAL_STATE] = {
-    Type: 'Fail',
-    Error: 'JourneyFailed',
-    Cause: 'A journey step failed. The journey_ended event on the lead carries the caught error.',
-  } satisfies AslFailState
+  // Reachable whenever any Task carries the catch-all. A journey of nothing but
+  // Wait and Choice states has no Task, so no Catch, so no failure terminal.
+  if (targets.has(JOURNEY_FAILED_STATE)) {
+    // Records first, THEN fails. The order is the whole point: ending on a
+    // Succeed would make a crashed journey report success in the Step Functions
+    // console, and failing before the Task would leave no audit row at all.
+    states[JOURNEY_FAILED_STATE] = terminalEventState('failed', { Next: JOURNEY_FAILED_TERMINAL_STATE })
+    states[JOURNEY_FAILED_TERMINAL_STATE] = {
+      Type: 'Fail',
+      Error: 'JourneyFailed',
+      Cause: 'A journey step failed. The journey_ended event on the lead carries the caught error.',
+    } satisfies AslFailState
+  }
 }
