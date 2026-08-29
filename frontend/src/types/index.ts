@@ -873,4 +873,9 @@ export interface LeadEvent {
   stepId?: string
   toolName?: string
   reason?: string
+  // journey_ended only. Named `outcome` like the backend field; note this is a
+  // JourneyOutcome (how a journey ENDED) and is unrelated to LeadOutcome, which
+  // is the CRM disposition of the lead itself.
+  outcome?: JourneyOutcome
+  executionArn?: string
 }

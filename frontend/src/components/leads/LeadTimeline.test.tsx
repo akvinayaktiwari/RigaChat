@@ -178,3 +178,55 @@ describe('agent actions', () => {
     expect(screen.queryByText(/abc-def/)).toBeNull()
   })
 })
+
+// REGRESSION. journey_ended used to render a flat "Journey finished" for every
+// outcome, which was harmless while nothing ever wrote the event. Now that the
+// engine writes one with an outcome, a CRASHED journey would have read as
+// "finished" in the one timeline a client actually sees — reproducing the exact
+// ambiguity the terminal event was added to remove.
+describe('how a journey ended', () => {
+  it('says a failed journey stopped on an error, and names the error', () => {
+    render(
+      <LeadTimeline
+        events={[
+          event({
+            type: 'journey_ended',
+            ts: '2026-08-29T10:00:00.000Z#1',
+            outcome: 'failed',
+            errorDetail: 'States.TaskFailed: booking blew up',
+          }),
+        ]}
+        loading={false}
+        error={null}
+      />
+    )
+
+    expect(screen.getByText(/Journey stopped on an error/)).toBeTruthy()
+    expect(screen.getByText(/booking blew up/)).toBeTruthy()
+    expect(screen.queryByText('Journey finished')).toBeNull()
+  })
+
+  it('distinguishes a handoff ending from a completion', () => {
+    render(
+      <LeadTimeline
+        events={[event({ type: 'journey_ended', ts: '2026-08-29T10:00:00.000Z#1', outcome: 'handed_off' })]}
+        loading={false}
+        error={null}
+      />
+    )
+
+    expect(screen.getByText('Journey ended — handed to a human')).toBeTruthy()
+  })
+
+  it('still reads as finished when it completed normally', () => {
+    render(
+      <LeadTimeline
+        events={[event({ type: 'journey_ended', ts: '2026-08-29T10:00:00.000Z#1', outcome: 'completed' })]}
+        loading={false}
+        error={null}
+      />
+    )
+
+    expect(screen.getByText('Journey finished')).toBeTruthy()
+  })
+})
