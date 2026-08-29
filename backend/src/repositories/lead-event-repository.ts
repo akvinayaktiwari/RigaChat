@@ -14,6 +14,13 @@ const WAMID_INDEX = 'wamid-index'
 
 const CLIENT_INDEX = 'clientId-ts-index'
 
+// Sparse GSI, and sparse is the point: only journey events carry a bundleId, so
+// the ~90% of rows that are plain messages and delivery statuses never enter
+// the index. Every journey event already stored a bundleId; there was simply no
+// way to read along it, which is why answering "what has this journey done"
+// meant scanning the whole table by hand.
+const BUNDLE_INDEX = 'bundleId-ts-index'
+
 // `${iso}#${uuid}`: the ISO prefix gives chronological ordering straight from a
 // Query with no client-side sort, and the uuid suffix stops two events written
 // in the same millisecond from overwriting each other on the key. Both halves
@@ -163,5 +170,32 @@ export async function countInboundLeadsSince(clientId: string, sinceIso: string)
       error instanceof Error ? error.message : error
     )
     return 0
+  }
+}
+
+// Every journey event for one bundle, newest first. The read half of the
+// executions view: callers group these by leadId to reconstruct per-lead runs.
+//
+// Bounded by `limit` and deliberately NOT paginated across the whole history.
+// The audit table has no TTL by design, so this query grows forever; a caller
+// that needs "everything" would eventually be asking for an unbounded read on
+// a Lambda. Capping here keeps that impossible rather than merely unlikely.
+export async function getEventsByBundleId(bundleId: string, limit = 200): Promise<LeadEvent[]> {
+  try {
+    const result = await dynamoClient.send(
+      new QueryCommand({
+        TableName: TABLE_NAME(),
+        IndexName: BUNDLE_INDEX,
+        KeyConditionExpression: 'bundleId = :bundleId',
+        ExpressionAttributeValues: { ':bundleId': bundleId },
+        ScanIndexForward: false,
+        Limit: limit,
+      })
+    )
+    return (result.Items as LeadEvent[] | undefined) ?? []
+  } catch (error) {
+    throw new Error(
+      `Failed to read events for journey ${bundleId}: ${error instanceof Error ? error.message : String(error)}`
+    )
   }
 }

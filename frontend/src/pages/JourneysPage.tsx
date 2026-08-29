@@ -4,6 +4,7 @@ import { GitBranch, Pause, Play, Plus, Sparkles, Trash2 } from 'lucide-react'
 import {
   createJourneyBundleFromTemplate,
   deleteJourneyBundle,
+  getActiveJourneys,
   getJourneyBundles,
   getJourneyTemplates,
   getMyBots,
@@ -128,6 +129,8 @@ export default function JourneysPage() {
   const [templatesLoading, setTemplatesLoading] = useState(true)
   const [cloningId, setCloningId] = useState<string | null>(null)
   const [showTemplates, setShowTemplates] = useState(false)
+  const [activeJourneys, setActiveJourneys] = useState<JourneyBundle[]>([])
+  const [activeLoading, setActiveLoading] = useState(true)
 
   // Fetched once, not per bot: the library is identical for every client and
   // every bot, so re-fetching on each bot switch would be pure waste.
@@ -149,6 +152,10 @@ export default function JourneysPage() {
     }
   }, [])
 
+  // The strip shows journeys from bots other than the selected one, so it needs
+  // to name them itself rather than relying on the dropdown's current label.
+  const botNameById = new Map(bots.map((bot) => [bot.botId, bot.name]))
+
   async function handleUseTemplate(template: JourneyTemplate) {
     if (!selectedBotId) return
     setCloningId(template.templateId)
@@ -169,19 +176,51 @@ export default function JourneysPage() {
     }
   }
 
+  // Fetched once and across ALL bots, not per bot: the whole point is to answer
+  // "what is running" without the operator first guessing which of their bots
+  // to look at.
+  useEffect(() => {
+    let cancelled = false
+    getActiveJourneys()
+      .then((res) => {
+        if (cancelled) return
+        if (res.success) setActiveJourneys(res.data ?? [])
+        setActiveLoading(false)
+      })
+      .catch(() => {
+        // Never blocks the page. A failed index costs the strip, not the list.
+        if (!cancelled) setActiveLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     getMyBots().then((res) => {
       if (cancelled) return
       const myBots = res.data ?? []
       setBots(myBots)
-      if (myBots.length > 0) setSelectedBotId(myBots[0].botId)
-      else setLoading(false)
+      // Deliberately does NOT default here when bots exist. myBots[0] is
+      // whichever botId sorts first, which is how a client with 23 bots and one
+      // live journey opened on a bot with nothing running. The effect below
+      // picks the bot once the active index has loaded.
+      if (myBots.length === 0) setLoading(false)
     })
     return () => {
       cancelled = true
     }
   }, [])
+
+  // Prefer a bot that actually has something running. Runs once both lists have
+  // arrived, and only when nothing is selected yet, so it never yanks the
+  // dropdown out from under an operator who has already chosen a bot.
+  useEffect(() => {
+    if (selectedBotId || bots.length === 0 || activeLoading) return
+    const liveBotId = activeJourneys.find((bundle) => bots.some((bot) => bot.botId === bundle.botId))?.botId
+    setSelectedBotId(liveBotId ?? bots[0].botId)
+  }, [bots, activeJourneys, activeLoading, selectedBotId])
 
   useEffect(() => {
     if (!selectedBotId) return
@@ -299,6 +338,53 @@ export default function JourneysPage() {
           )}
         </div>
       </div>
+
+      {/* Above everything and independent of the bot dropdown. With 23 bots and
+          one live journey, the dropdown defaults to whichever botId sorts first
+          and the running journey is invisible — this is the index that answers
+          "what is on right now" without picking a bot at all. */}
+      {!activeLoading && activeJourneys.length > 0 && (
+        <div className="mt-6 bg-white rounded-2xl border border-black/5 p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="relative flex w-2 h-2">
+              <span className="absolute inline-flex w-full h-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+              <span className="relative inline-flex w-2 h-2 rounded-full bg-emerald-500" />
+            </span>
+            <h2 className="text-sm font-bold text-gray-900" style={JAKARTA_FONT}>
+              Active across all bots
+            </h2>
+            <span className="text-xs text-gray-400">
+              {activeJourneys.length} of {bots.length} {bots.length === 1 ? 'bot' : 'bots'}
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            {activeJourneys.map((bundle) => (
+              <button
+                key={bundle.bundleId}
+                type="button"
+                onClick={() => {
+                  // Switch the dropdown to this journey's bot as well as
+                  // navigating, so going back lands on the right bot instead of
+                  // the alphabetically-first one again.
+                  setSelectedBotId(bundle.botId)
+                  navigate(`/dashboard/journeys/${bundle.botId}/${bundle.bundleId}`)
+                }}
+                className="w-full flex items-center gap-3 text-left px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                <span
+                  className={`inline-flex items-center gap-1.5 border text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${STATUS_BADGES[bundle.status]}`}
+                >
+                  {STATUS_LABELS[bundle.status]}
+                </span>
+                <span className="font-semibold text-sm text-gray-900 truncate">{bundle.name}</span>
+                <span className="text-xs text-gray-400 truncate ml-auto shrink-0">
+                  {botNameById.get(bundle.botId) ?? bundle.botId} · {TRIGGER_LABELS[bundle.journey.triggerType] ?? 'trigger'}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {bots.length === 0 && !loading ? (
         <div className="flex flex-col items-center justify-center py-16 px-4">

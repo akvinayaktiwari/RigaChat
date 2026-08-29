@@ -1,4 +1,4 @@
-import { AlertCircle, BellRing, Bot, Check, CheckCheck, Clock, PhoneForwarded, Play, User, Wrench } from 'lucide-react'
+import { AlertCircle, AlertTriangle, BellRing, Bot, Check, CheckCheck, Clock, PhoneForwarded, Play, User, Wrench } from 'lucide-react'
 import type { LeadEvent, MessageDeliveryStatus } from '../../types/index'
 
 // -------------------------------------------------------------------------
@@ -116,7 +116,20 @@ function describeSystemEvent(event: LeadEvent): { icon: JSX.Element; label: stri
       }
     case 'notification_out':
       return { icon: <BellRing size={13} />, label: event.body ?? 'You were alerted about this lead' }
+    // The outcome is the whole point of the event. A flat "finished" here would
+    // put a CRASHED journey and a completed one under the same words, in the one
+    // timeline a client actually reads — which is the exact ambiguity the
+    // terminal event was added to remove.
     case 'journey_ended':
+      if (event.outcome === 'failed') {
+        return {
+          icon: <AlertTriangle size={13} />,
+          label: `Journey stopped on an error${event.errorDetail ? `: ${event.errorDetail}` : ''}`,
+        }
+      }
+      if (event.outcome === 'handed_off') {
+        return { icon: <PhoneForwarded size={13} />, label: 'Journey ended — handed to a human' }
+      }
       return { icon: <Bot size={13} />, label: 'Journey finished' }
     case 'state_change':
       return { icon: <Bot size={13} />, label: event.body ?? 'State changed' }

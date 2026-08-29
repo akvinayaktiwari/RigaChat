@@ -11,6 +11,7 @@ import {
 import { useToast } from '../components/Toast/Toast'
 import JourneyGraph from '../components/journey/JourneyGraph'
 import PlanBuilder from '../components/journey/PlanBuilder'
+import JourneyExecutions from '../components/journey/JourneyExecutions'
 import Dropdown from '../components/Dropdown/Dropdown'
 import { Modal } from '../components/Modal/Modal'
 import {
@@ -579,7 +580,7 @@ export default function JourneyBuilderPage() {
   const [plan, setPlan] = useState<JourneyPlan>(DEFAULT_PLAN)
   const [planMode, setPlanMode] = useState(true)
   const [planRefusal, setPlanRefusal] = useState<string | null>(null)
-  const [view, setView] = useState<'plan' | 'map' | 'steps'>('plan')
+  const [view, setView] = useState<'plan' | 'map' | 'steps' | 'activity'>('plan')
   // Gates the Save path on a PUBLISHED bundle. See requestSave() for why Save
   // needs a confirmation and Publish does not.
   const [confirmUnpublish, setConfirmUnpublish] = useState(false)
@@ -882,15 +883,16 @@ export default function JourneyBuilderPage() {
   }
   const previewSteps = planMode ? planToJourney(plan, 'preview', triggerType, name).steps : steps
 
-  const VIEWS: Array<{ id: 'plan' | 'map' | 'steps'; label: string }> = planMode
-    ? [
-        { id: 'plan', label: 'Plan' },
-        { id: 'map', label: 'Journey map' },
-      ]
-    : [
-        { id: 'steps', label: 'Steps' },
-        { id: 'map', label: 'Journey map' },
-      ]
+  const VIEWS: Array<{ id: 'plan' | 'map' | 'steps' | 'activity'; label: string }> = [
+    ...(planMode
+      ? ([{ id: 'plan', label: 'Plan' }] as const)
+      : ([{ id: 'steps', label: 'Steps' }] as const)),
+    { id: 'map', label: 'Journey map' },
+    // Only on a saved journey: activity is keyed by bundleId, and an unsaved
+    // draft has none. Offering an empty tab on a journey that cannot have run
+    // would read as "nothing happened" rather than "this does not exist yet".
+    ...(existing ? ([{ id: 'activity', label: 'Activity' }] as const) : []),
+  ]
 
   return (
     <div className="pb-10">
@@ -1074,6 +1076,10 @@ export default function JourneyBuilderPage() {
           </div>
         </div>
       </Modal>
+
+      {view === 'activity' && existing && (
+        <JourneyExecutions botId={existing.botId} bundleId={existing.bundleId} />
+      )}
 
       {view === 'steps' && !planMode && (
         <div className="bg-white rounded-2xl border border-black/5 p-6">

@@ -20,6 +20,7 @@ import type {
   JourneyTemplate,
   IndexingJob,
   JourneyBundle,
+  JourneyExecutionSummary,
   JourneyDefinition,
   KBFileType,
   KBUploadUrlResult,
@@ -822,6 +823,21 @@ export function publishJourneyBundle(botId: string, bundleId: string): Promise<A
 // mid-journey finishes. Resuming is publishJourneyBundle again.
 export function pauseJourneyBundle(botId: string, bundleId: string): Promise<ApiResponse<JourneyBundle>> {
   return apiClient<JourneyBundle>(`/api/journeys/${botId}/${bundleId}/pause`, 'POST')
+}
+
+// Every journey that is live or paused, across every bot. The answer to "what
+// is running right now" without picking a bot first — which the Journeys page
+// cannot do, since it defaults to whichever bot sorts first.
+export function getActiveJourneys(): Promise<ApiResponse<JourneyBundle[]>> {
+  return apiClient<JourneyBundle[]>('/api/journeys/active', 'GET')
+}
+
+// Each lead's run through one journey, newest first.
+export function getJourneyExecutions(
+  botId: string,
+  bundleId: string
+): Promise<ApiResponse<JourneyExecutionSummary[]>> {
+  return apiClient<JourneyExecutionSummary[]>(`/api/journeys/${botId}/${bundleId}/executions`, 'GET')
 }
 
 // Contact API

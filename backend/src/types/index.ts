@@ -179,13 +179,64 @@ export interface LeadEvent {
   // of a failed status, and summarising it is how a day gets lost.
   errorDetail?: string
 
-  // journey_step / tool_call / handoff
+  // journey_step / tool_call / handoff / journey_ended
   bundleId?: string
   stepId?: string
   toolName?: string
   reason?: string
   result?: Record<string, unknown>
+
+  // journey_ended only. Without an outcome a terminal event says a journey
+  // stopped and nothing about whether that was success -- which is the exact
+  // ambiguity the event exists to remove, so it is REQUIRED on that type even
+  // though the field is optional on the shared interface.
+  outcome?: JourneyOutcome
+  // The ARN of the Step Functions execution that produced this event, so an
+  // operator can jump from the dashboard row straight to the real execution
+  // history. Absent on events written outside a journey.
+  executionArn?: string
 }
+
+// Deliberately only the three outcomes something actually WRITES.
+//
+// 'cancelled' and 'timed_out' were in the approved design and are omitted on
+// purpose: a stopped execution runs no further states, so nothing inside the
+// state machine can report it, and there is no whole-execution timeout to fire
+// a 'timed_out'. Declaring them would repeat the exact defect this feature
+// exists to fix -- journey_ended itself sat in LeadEventType for a month with
+// zero call sites, which is why a finished journey and a dead one were
+// indistinguishable. Add a value here when, and only when, a writer exists.
+// One lead's run through one journey, reconstructed from its events. Not a
+// stored record: it is derived on read, which is why it can be rebuilt for
+// executions that predate the terminal event without backfilling anything.
+export interface JourneyExecutionSummary {
+  leadId: string
+  bundleId: string
+  // 'running' is an inference, not a fact: it means events exist and none of
+  // them is terminal. An execution that died before the terminal event was
+  // introduced looks identical, which is why the UI must never present this as
+  // proof the journey is alive — see startedAt for how stale it might be.
+  status: 'running' | JourneyOutcome
+  startedAt: string
+  lastEventAt: string
+  // The step the run is sitting on, or the step it ended at.
+  lastStepId?: string
+  lastEventType: LeadEventType
+  eventCount: number
+  // Failure path only, the flattened Step Functions error.
+  errorDetail?: string
+  executionArn?: string
+}
+
+export type JourneyOutcome =
+  // Ran off the end of the step list.
+  | 'completed'
+  // A state threw and the catch-all routed here. The execution still fails
+  // afterwards, so Step Functions' own status stays honest.
+  | 'failed'
+  // Reached a human_handoff step. Terminal, but not the same thing as running
+  // to the end -- an operator reading a feed needs to tell those apart.
+  | 'handed_off'
 
 export interface AppendLeadEventInput extends Omit<LeadEvent, 'ts'> {
   // Optional so callers normally let the repository stamp it; injectable so a
@@ -1407,7 +1458,16 @@ export interface AslSucceedState {
   Type: 'Succeed'
 }
 
-export type AslState = AslWaitState | AslTaskState | AslChoiceState | AslSucceedState
+// Terminates the execution as FAILED. Reached only after the terminal-event
+// Task has recorded the failure, so the audit row exists and Step Functions'
+// own execution status still reports failure rather than a misleading success.
+export interface AslFailState {
+  Type: 'Fail'
+  Error?: string
+  Cause?: string
+}
+
+export type AslState = AslWaitState | AslTaskState | AslChoiceState | AslSucceedState | AslFailState
 
 export interface AslStateMachine {
   Comment?: string
@@ -1492,6 +1552,9 @@ export type JourneyExecutorOperation =
   | 'wait_and_recheck_check'
   | 'human_handoff'
   | 'await_reply'
+  // Synthetic: emitted by the compiler's terminal states, never authored as a
+  // JourneyStep. Its only job is to write the journey_ended event.
+  | 'journey_ended'
 
 // The shape every compiled Task state's Parameters produces (see
 // CONTEXT_PASSTHROUGH_PARAMETERS in journey-compiler-service.ts), and what
@@ -1521,6 +1584,17 @@ export interface JourneyExecutorEvent {
   promptHint?: string
   stepId?: string
   messageHint?: string
+  // journey_ended only. Static in the compiled Parameters, one terminal state
+  // per outcome, so the executor never has to infer why the journey stopped.
+  outcome?: JourneyOutcome
+  // journey_ended on the failure path. The WHOLE caught error object, never a
+  // JSONPath into it: a path to a missing Cause throws States.Runtime, which
+  // would turn a failing journey into a journey that fails while trying to
+  // record that it failed.
+  journeyError?: Record<string, unknown>
+  // journey_ended only, from $$.Execution.Id. Lets a dashboard row link to the
+  // real Step Functions execution instead of making an operator hunt for it.
+  executionArn?: string
   // The previous Task's result, merged in at $.lastResult by the compiler. After
   // an await_reply resume this carries what the lead said and, when an agent turn
   // ran, its grounded answer. Passed as a whole object because a JSONPath into a

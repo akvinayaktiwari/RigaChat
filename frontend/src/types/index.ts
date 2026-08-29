@@ -740,6 +740,28 @@ export interface JourneyTemplate {
 // rebuild) but no new lead ignites into it. Every consumer gates on
 // `status === 'published'`, so paused reads as not-live everywhere without
 // any of them needing to know the value exists.
+// Mirrors the backend. Only the three outcomes something actually writes:
+// 'cancelled'/'timed_out' are deliberately absent until a writer exists, so the
+// UI never renders a status the data cannot produce.
+export type JourneyOutcome = 'completed' | 'failed' | 'handed_off'
+
+// One lead's run through one journey, derived on read from lead_events.
+export interface JourneyExecutionSummary {
+  leadId: string
+  bundleId: string
+  // 'running' means no terminal event exists — which for a run that started
+  // before terminal events shipped may really mean "died silently". The UI must
+  // not present it as proof the journey is alive.
+  status: 'running' | JourneyOutcome
+  startedAt: string
+  lastEventAt: string
+  lastStepId?: string
+  lastEventType: string
+  eventCount: number
+  errorDetail?: string
+  executionArn?: string
+}
+
 export type JourneyBundleStatus = 'draft' | 'published' | 'paused'
 
 export interface JourneyBundle {
@@ -851,4 +873,9 @@ export interface LeadEvent {
   stepId?: string
   toolName?: string
   reason?: string
+  // journey_ended only. Named `outcome` like the backend field; note this is a
+  // JourneyOutcome (how a journey ENDED) and is unrelated to LeadOutcome, which
+  // is the CRM disposition of the lead itself.
+  outcome?: JourneyOutcome
+  executionArn?: string
 }

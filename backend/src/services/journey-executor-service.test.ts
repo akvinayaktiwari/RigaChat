@@ -85,6 +85,86 @@ beforeEach(() => {
 })
 
 describe('executeJourneyStep', () => {
+  // The terminal event is the whole reason a finished journey and a dead one
+  // stopped being indistinguishable. journey_ended sat in LeadEventType for a
+  // month with zero call sites before this.
+  describe('journey_ended', () => {
+    it('records the outcome, final step and execution arn', async () => {
+      await executeJourneyStep({
+        ...baseContext,
+        operation: 'journey_ended',
+        outcome: 'completed',
+        stepId: 'greet',
+        executionArn: 'arn:aws:states:ap-south-1:1:execution:sm:exec-1',
+      })
+
+      expect(appendLeadEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'journey_ended',
+          outcome: 'completed',
+          stepId: 'greet',
+          bundleId: 'bundle-1',
+          executionArn: 'arn:aws:states:ap-south-1:1:execution:sm:exec-1',
+        })
+      )
+    })
+
+    it('distinguishes a handoff ending from running to the end', async () => {
+      await executeJourneyStep({ ...baseContext, operation: 'journey_ended', outcome: 'handed_off' })
+
+      expect(appendLeadEvent).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'handed_off' }))
+    })
+
+    // Step Functions sends { Error, Cause } where Cause is usually a JSON
+    // string wrapping the Lambda's errorMessage. Flattened into errorDetail,
+    // which the timeline already renders for failed WhatsApp statuses.
+    it('flattens a caught Step Functions error into errorDetail', async () => {
+      await executeJourneyStep({
+        ...baseContext,
+        operation: 'journey_ended',
+        outcome: 'failed',
+        journeyError: {
+          Error: 'States.TaskFailed',
+          Cause: JSON.stringify({ errorMessage: 'booking tool exploded' }),
+        },
+      })
+
+      expect(appendLeadEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'journey_ended',
+          outcome: 'failed',
+          errorDetail: 'States.TaskFailed: booking tool exploded',
+        })
+      )
+    })
+
+    // Cause is a bare string for States.Timeout / States.Runtime. Parsing must
+    // not throw on the failure path — that would replace a recorded failure
+    // with an unrecorded one.
+    it('survives a non-JSON Cause', async () => {
+      await executeJourneyStep({
+        ...baseContext,
+        operation: 'journey_ended',
+        outcome: 'failed',
+        journeyError: { Error: 'States.Timeout', Cause: 'no reply within 24h' },
+      })
+
+      expect(appendLeadEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ errorDetail: 'States.Timeout: no reply within 24h' })
+      )
+    })
+
+    // An execution started against a state machine version that predates this
+    // feature carries no outcome. Recording 'completed' would be a lie and
+    // dropping it would keep the blind spot, so it must fail loudly.
+    it('refuses to invent an outcome when the state machine predates the feature', async () => {
+      await expect(
+        executeJourneyStep({ ...baseContext, operation: 'journey_ended' })
+      ).rejects.toThrow(/no outcome/)
+      expect(appendLeadEvent).not.toHaveBeenCalled()
+    })
+  })
+
   describe('wait_and_recheck_check', () => {
     // replied / lead_score still have nowhere to live, and a step with no
     // recheckField has nothing to check, so these stay false by design.

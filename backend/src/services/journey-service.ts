@@ -7,6 +7,8 @@ import {
   updateJourneyBundle as updateJourneyBundleRepo,
 } from '../repositories/journey-repository.js'
 import { compileJourneyToAsl, JourneyCompileError } from './journey-compiler-service.js'
+import { getEventsByBundleId } from '../repositories/lead-event-repository.js'
+import { getBotsByClientId } from '../repositories/bot-repository.js'
 import { getBotConfig } from './bot-service.js'
 import { resolveOwningAgentId } from './agent-service.js'
 import { findInvalidCapabilities, MCP_CAPABILITIES } from '../lib/mcp-capabilities.js'
@@ -18,7 +20,14 @@ import {
   triggerClaimKey,
 } from '../repositories/journey-trigger-claim-repository.js'
 import type {
-  JourneyPlan, AgentConfig, JourneyBundle, JourneyDefinition, JourneyTemplate } from '../types/index.js'
+  JourneyPlan,
+  AgentConfig,
+  JourneyBundle,
+  JourneyDefinition,
+  JourneyExecutionSummary,
+  JourneyTemplate,
+  LeadEvent,
+} from '../types/index.js'
 
 export class JourneyValidationError extends Error {
   constructor(message: string) {
@@ -449,4 +458,105 @@ export async function publishJourneyBundle(botId: string, bundleId: string, clie
     }
     throw error
   }
+}
+
+// Rebuilds each lead's run through a journey from its raw events.
+//
+// Derived on read rather than stored, per the approved design: the events are
+// already the source of truth, and a second materialised store is a thing that
+// can disagree with them. The cost is that this reduces on every request; the
+// bounded read in getEventsByBundleId is what keeps that from becoming
+// unbounded work.
+export async function getJourneyExecutions(
+  botId: string,
+  bundleId: string,
+  clientId: string,
+  limit = 200
+): Promise<JourneyExecutionSummary[]> {
+  // Ownership first, and via the bundle rather than the events: the GSI is
+  // keyed by bundleId alone, so a caller who guessed a bundleId would otherwise
+  // read another client's lead activity.
+  await getOwnedJourneyBundle(botId, bundleId, clientId)
+
+  const events = await getEventsByBundleId(bundleId, limit)
+  return summariseExecutions(events, bundleId)
+}
+
+// Exported for tests: the grouping is the only real logic here, and it is worth
+// pinning independently of DynamoDB.
+export function summariseExecutions(events: LeadEvent[], bundleId: string): JourneyExecutionSummary[] {
+  const byLead = new Map<string, LeadEvent[]>()
+  for (const event of events) {
+    const existing = byLead.get(event.leadId)
+    if (existing) existing.push(event)
+    else byLead.set(event.leadId, [event])
+  }
+
+  const summaries: JourneyExecutionSummary[] = []
+  for (const [leadId, leadEvents] of byLead) {
+    // getEventsByBundleId returns newest-first; sort ascending so first/last
+    // mean what they say regardless of how the caller got here.
+    const ordered = [...leadEvents].sort((a, b) => a.ts.localeCompare(b.ts))
+    const first = ordered[0]
+    const last = ordered[ordered.length - 1]
+    const terminal = ordered.find((e) => e.type === 'journey_ended')
+
+    summaries.push({
+      leadId,
+      bundleId,
+      // A terminal event is the ONLY thing that proves an ending. Absent one,
+      // this is 'running' — which for a pre-existing execution may really mean
+      // "died before terminal events existed". The UI is responsible for not
+      // overstating that; inventing an outcome here would be the same lie the
+      // missing journey_ended write used to tell.
+      status: terminal?.outcome ?? 'running',
+      // The ISO prefix of the `${iso}#${uuid}` sort key.
+      startedAt: first.ts.split('#')[0],
+      lastEventAt: last.ts.split('#')[0],
+      lastEventType: last.type,
+      eventCount: ordered.length,
+      ...(last.stepId ? { lastStepId: last.stepId } : {}),
+      ...(terminal?.errorDetail ? { errorDetail: terminal.errorDetail } : {}),
+      ...(terminal?.executionArn ? { executionArn: terminal.executionArn } : {}),
+    })
+  }
+
+  // Newest run first: an operator opening this is looking at what just
+  // happened, not at the oldest lead in the table.
+  return summaries.sort((a, b) => b.lastEventAt.localeCompare(a.lastEventAt))
+}
+
+// Every journey that is live or paused, across every bot the client owns.
+//
+// The cross-bot index. The Journeys page defaults its bot dropdown to
+// myBots[0], which is whichever botId sorts first — so a client with 23 bots
+// and one live journey opens on the wrong bot and sees nothing running. This is
+// the answer to "what is actually on right now" without picking a bot first.
+//
+// Queries per bot rather than scanning: the journeys table is partitioned by
+// botId and has no clientId index, and N bounded point queries beat a table
+// scan that grows with every other client's journeys.
+export async function getActiveJourneys(clientId: string): Promise<JourneyBundle[]> {
+  const bots = await getBotsByClientId(clientId)
+
+  const perBot = await Promise.all(
+    bots.map((bot) =>
+      getJourneyBundlesByBotId(bot.botId).catch((error) => {
+        // One unreadable bot must not blank the whole index — the operator is
+        // using this to find out what is running, and a partial answer beats an
+        // error page.
+        console.error(`[journey] failed to list journeys for bot ${bot.botId}:`, error)
+        return [] as JourneyBundle[]
+      })
+    )
+  )
+
+  return perBot
+    .flat()
+    .filter((bundle) => bundle.clientId === clientId && bundle.status !== 'draft')
+    .sort((a, b) => {
+      // Live first, then paused; within each, most recently updated first.
+      if (a.status !== b.status) return a.status === 'published' ? -1 : 1
+      return b.updatedAt.localeCompare(a.updatedAt)
+    })
 }

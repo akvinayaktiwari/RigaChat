@@ -1,10 +1,12 @@
 import type {
   AslChoiceState,
+  AslFailState,
   AslState,
   AslStateMachine,
   AslTaskState,
   AslWaitState,
   JourneyDefinition,
+  JourneyOutcome,
   JourneyStep,
 } from '../types/index.js'
 
@@ -98,6 +100,41 @@ const TASK_RESULT_PATH = '$.lastResult'
 // only non-arbitrary place to branch. See AwaitReplyStep.onNoReply.
 export const AWAIT_REPLY_TIMEOUT_SECONDS = 24 * 60 * 60
 
+// Synthetic terminal states. A journey used to end at whichever step happened
+// to have no `next` -- End: true scattered across four step types -- so nothing
+// observed the ending and journey_ended was never written. Funnelling every
+// exit through a named state gives the ending exactly one place to live.
+//
+// Three states rather than one Task with a dynamic outcome: the outcome is then
+// static in the compiled Parameters, which means it cannot be wrong at runtime
+// and is readable straight off the state machine definition.
+const JOURNEY_COMPLETED_STATE = '__journey_completed'
+const JOURNEY_HANDED_OFF_STATE = '__journey_handed_off'
+const JOURNEY_FAILED_STATE = '__journey_failed'
+const JOURNEY_FAILED_TERMINAL_STATE = '__journey_failed_terminal'
+
+// Where a caught error is parked. Its own key for the same reason
+// TASK_RESULT_PATH exists: a Catch with no ResultPath REPLACES the execution
+// context with the error object, and the terminal Task's own
+// CONTEXT_PASSTHROUGH_PARAMETERS then resolve against an error -- so the
+// recording of the failure would itself fail.
+const JOURNEY_ERROR_PATH = '$.journeyError'
+
+// Applied to every Task. Ordered after any step-specific Catch (await_reply's
+// States.Timeout -> onNoReply), because Step Functions takes the FIRST matching
+// entry and States.ALL matches everything -- putting it first would swallow the
+// timeout branch and turn every unanswered message into a failed journey.
+const CATCH_ALL_TO_FAILED = {
+  ErrorEquals: ['States.ALL'],
+  Next: JOURNEY_FAILED_STATE,
+  ResultPath: JOURNEY_ERROR_PATH,
+}
+
+// The compiler owns this namespace. A stepId colliding with a terminal state
+// would silently overwrite it in the states map and lose either the step or the
+// ending, so it is rejected at compile time rather than debugged later.
+const RESERVED_STATE_PREFIX = '__journey_'
+
 // Every step reference (next/onTrue/onFalse/onSatisfied/onExhausted) must
 // point to a LATER array index than the referring step. This is what makes
 // a JourneyDefinition a DAG by construction -- no general graph-cycle
@@ -112,6 +149,15 @@ export function validateJourneyStructure(journey: JourneyDefinition): void {
 
   if (!indexByStepId.has(journey.startStepId)) {
     throw new JourneyCompileError(`startStepId "${journey.startStepId}" does not match any step`)
+  }
+
+  for (const step of journey.steps) {
+    if (step.stepId.startsWith(RESERVED_STATE_PREFIX)) {
+      throw new JourneyCompileError(
+        `Step id "${step.stepId}" uses the reserved "${RESERVED_STATE_PREFIX}" prefix, which the compiler ` +
+          'uses for the terminal states that record how a journey ended.'
+      )
+    }
   }
 
   const assertForwardReference = (fromStep: JourneyStep, targetStepId: string, field: string): void => {
@@ -225,6 +271,7 @@ function compileWaitAndRecheckStep(
     ResultPath: '$.recheckResult',
     Next: choiceStateName,
     Retry: [{ ErrorEquals: ['States.TaskFailed'], MaxAttempts: 3, IntervalSeconds: 30, BackoffRate: 2 }],
+    Catch: [CATCH_ALL_TO_FAILED],
   } satisfies AslTaskState
 
   states[choiceStateName] = {
@@ -276,8 +323,9 @@ export function compileJourneyToAsl(journey: JourneyDefinition): AslStateMachine
             ...CONTEXT_PASSTHROUGH_PARAMETERS,
           },
           ResultPath: TASK_RESULT_PATH,
-          ...(step.next ? { Next: resolve(step.next) } : { End: true }),
+          Next: step.next ? resolve(step.next) : JOURNEY_COMPLETED_STATE,
           Retry: [{ ErrorEquals: ['States.TaskFailed'], MaxAttempts: 3, IntervalSeconds: 30, BackoffRate: 2 }],
+          Catch: [CATCH_ALL_TO_FAILED],
         } satisfies AslTaskState
         break
 
@@ -285,7 +333,9 @@ export function compileJourneyToAsl(journey: JourneyDefinition): AslStateMachine
         states[step.stepId] = {
           Type: 'Wait',
           Seconds: step.waitDays * 86400,
-          ...(step.next ? { Next: resolve(step.next) } : { End: true }),
+          // A Wait cannot fail, so it needs no Catch -- but it still has to
+          // route its ending through the terminal state like every other exit.
+          Next: step.next ? resolve(step.next) : JOURNEY_COMPLETED_STATE,
         } satisfies AslWaitState
         break
 
@@ -293,6 +343,22 @@ export function compileJourneyToAsl(journey: JourneyDefinition): AslStateMachine
         compileWaitAndRecheckStep(step, states, resolve)
         break
 
+      // KNOWN GAP, and the one failure class that still ends a journey with no
+      // journey_ended event: ASL does not allow Catch on a Choice state, so
+      // CATCH_ALL_TO_FAILED cannot be attached here. If the Variable path is
+      // missing, Step Functions fails the execution and nothing records it.
+      //
+      // That is not hypothetical. `field` is 'replied' | 'lead_score' |
+      // 'appointment_booked', none of which are ever written into the execution
+      // state -- they live in the lead_state table (see CLAUDE.md). So a
+      // condition step is a latent States.Runtime today, exactly as it was
+      // before this change; what IS new is that every other failure now leaves
+      // a record and this one does not.
+      //
+      // Fixing it properly means resolving those fields into the execution
+      // state before the Choice runs (a Task that reads lead_state), which is
+      // its own piece of work -- tracked in TODOS.md rather than smuggled in
+      // here.
       case 'condition':
         states[step.stepId] = {
           Type: 'Choice',
@@ -312,8 +378,9 @@ export function compileJourneyToAsl(journey: JourneyDefinition): AslStateMachine
             ...CONTEXT_PASSTHROUGH_PARAMETERS,
           },
           ResultPath: TASK_RESULT_PATH,
-          ...(step.next ? { Next: resolve(step.next) } : { End: true }),
+          Next: step.next ? resolve(step.next) : JOURNEY_COMPLETED_STATE,
           Retry: [{ ErrorEquals: ['States.TaskFailed'], MaxAttempts: 3, IntervalSeconds: 30, BackoffRate: 2 }],
+          Catch: [CATCH_ALL_TO_FAILED],
         } satisfies AslTaskState
         break
 
@@ -328,7 +395,11 @@ export function compileJourneyToAsl(journey: JourneyDefinition): AslStateMachine
             ...CONTEXT_PASSTHROUGH_PARAMETERS,
           },
           ResultPath: TASK_RESULT_PATH,
-          End: true,
+          // Terminal, but its own ending: "a human took this over" is not the
+          // same as "ran to the end of the script", and an operator scanning a
+          // feed needs to tell those apart at a glance.
+          Next: JOURNEY_HANDED_OFF_STATE,
+          Catch: [CATCH_ALL_TO_FAILED],
         } satisfies AslTaskState
         break
 
@@ -365,6 +436,10 @@ export function compileJourneyToAsl(journey: JourneyDefinition): AslStateMachine
               Next: resolve(step.onNoReply),
               ResultPath: '$.noReplyError',
             },
+            // Must stay LAST: States.ALL matches the timeout too, and Step
+            // Functions takes the first match, so ordering it above would turn
+            // every unanswered message into a failed journey.
+            CATCH_ALL_TO_FAILED,
           ],
           ResultPath: TASK_RESULT_PATH,
           Next: resolve(step.next),
@@ -383,9 +458,59 @@ export function compileJourneyToAsl(journey: JourneyDefinition): AslStateMachine
   // with no `next` (compiles to End: true) or a human_handoff step (always
   // End: true) -- termination falls out of the DAG-by-construction
   // invariant, not a separate check.
+  emitTerminalStates(states)
+
   return {
     Comment: `Compiled Journey: ${journey.name} (${journey.journeyId})`,
     StartAt: resolve(journey.startStepId),
     States: states,
   }
+}
+
+// One Task per outcome, each writing the journey_ended event and nothing else.
+//
+// Deliberately NO Retry and NO Catch on these. A Retry would re-record the same
+// ending, and a Catch would need somewhere to go -- which is another terminal
+// state, which needs a Catch. If recording the ending fails, the execution
+// fails: the audit row is missing, which is visible, rather than the execution
+// silently reporting an ending that was never written.
+function terminalEventState(outcome: JourneyOutcome, next: { Next: string } | { End: true }): AslTaskState {
+  return {
+    Type: 'Task',
+    Resource: journeyExecutorLambdaArn(),
+    Parameters: {
+      operation: 'journey_ended',
+      outcome,
+      // The execution's own ARN, so a dashboard row can link straight to the
+      // real execution history instead of making an operator search for it.
+      'executionArn.$': '$$.Execution.Id',
+      ...CONTEXT_PASSTHROUGH_PARAMETERS,
+      // Failure path only. The WHOLE caught object: a JSONPath into
+      // $.journeyError.Cause throws States.Runtime when Cause is absent, which
+      // would mean the journey fails while trying to record that it failed.
+      // On the success states this path does not exist at all, which is why it
+      // is only added where it is guaranteed to resolve.
+      ...(outcome === 'failed' ? { 'journeyError.$': JOURNEY_ERROR_PATH } : {}),
+    },
+    // Merged to a scratch key like every other Task, so nothing downstream
+    // resolves against this Task's return value.
+    ResultPath: '$.terminalResult',
+    ...next,
+  } satisfies AslTaskState
+}
+
+function emitTerminalStates(states: Record<string, AslState>): void {
+  states[JOURNEY_COMPLETED_STATE] = terminalEventState('completed', { End: true })
+  states[JOURNEY_HANDED_OFF_STATE] = terminalEventState('handed_off', { End: true })
+
+  // Records first, THEN fails. The order is the whole point: ending on a
+  // Succeed would make a crashed journey report success in the Step Functions
+  // console, and failing before the Task would leave no audit row at all.
+  states[JOURNEY_FAILED_STATE] = terminalEventState('failed', { Next: JOURNEY_FAILED_TERMINAL_STATE })
+
+  states[JOURNEY_FAILED_TERMINAL_STATE] = {
+    Type: 'Fail',
+    Error: 'JourneyFailed',
+    Cause: 'A journey step failed. The journey_ended event on the lead carries the caught error.',
+  } satisfies AslFailState
 }

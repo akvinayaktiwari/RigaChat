@@ -25,8 +25,99 @@ describe('compileJourneyToAsl', () => {
 
     expect(asl.StartAt).toBe('greet')
     expect(asl.States.greet).toMatchObject({ Type: 'Task', Next: 'handoff' })
-    expect(asl.States.handoff).toMatchObject({ Type: 'Task', End: true })
+    // Terminal steps no longer End: true in place — every exit routes through a
+    // synthetic state so the ending gets recorded exactly once.
+    expect(asl.States.handoff).toMatchObject({ Type: 'Task', Next: '__journey_handed_off' })
   })
+
+// The whole point of the terminal states: before them, a journey ended at
+// whichever step happened to have no `next`, nothing observed it, and
+// journey_ended sat in LeadEventType with zero call sites. A finished journey
+// and a dead one were indistinguishable in the data.
+describe('terminal states', () => {
+  const linear = () =>
+    compileJourneyToAsl(
+      baseJourney([
+        { stepId: 'greet', type: 'send_message', name: 'Greet', messageHint: 'hi' },
+      ])
+    )
+
+  it('routes a step with no next to the completed terminal instead of ending in place', () => {
+    const asl = linear()
+    expect(asl.States.greet).toMatchObject({ Type: 'Task', Next: '__journey_completed' })
+    expect(asl.States.greet).not.toHaveProperty('End')
+  })
+
+  it('emits all three outcomes, each with its outcome static in Parameters', () => {
+    const asl = linear()
+    expect(asl.States.__journey_completed).toMatchObject({
+      Type: 'Task',
+      Parameters: { operation: 'journey_ended', outcome: 'completed' },
+      End: true,
+    })
+    expect(asl.States.__journey_handed_off).toMatchObject({
+      Parameters: { operation: 'journey_ended', outcome: 'handed_off' },
+    })
+    expect(asl.States.__journey_failed).toMatchObject({
+      Parameters: { operation: 'journey_ended', outcome: 'failed' },
+    })
+  })
+
+  // Order matters: record the failure, THEN fail. Ending on a Succeed would
+  // make a crashed journey report success in the Step Functions console.
+  it('fails the execution AFTER recording, not instead of recording', () => {
+    const asl = linear()
+    expect(asl.States.__journey_failed).toMatchObject({ Next: '__journey_failed_terminal' })
+    expect(asl.States.__journey_failed_terminal).toMatchObject({ Type: 'Fail' })
+  })
+
+  it('carries the whole caught error object, never a JSONPath into it', () => {
+    const asl = linear()
+    const params = (asl.States.__journey_failed as { Parameters: Record<string, unknown> }).Parameters
+    // $.journeyError.Cause would throw States.Runtime when Cause is absent —
+    // the journey would fail while recording that it failed.
+    expect(params['journeyError.$']).toBe('$.journeyError')
+    // And the success terminals must NOT reference a path that does not exist
+    // on their branch.
+    const okParams = (asl.States.__journey_completed as { Parameters: Record<string, unknown> }).Parameters
+    expect(okParams['journeyError.$']).toBeUndefined()
+  })
+
+  it('gives every Task a catch-all that routes to the failed terminal', () => {
+    const asl = compileJourneyToAsl(
+      baseJourney([
+        { stepId: 'call', type: 'tool_call', name: 'Book', toolName: 'booking', toolInput: { requestedAt: 'x' } },
+      ])
+    )
+    expect(asl.States.call).toMatchObject({
+      Catch: [{ ErrorEquals: ['States.ALL'], Next: '__journey_failed', ResultPath: '$.journeyError' }],
+    })
+  })
+
+  // States.ALL matches a timeout too, and Step Functions takes the FIRST match.
+  // Ordering the catch-all first would turn every unanswered message into a
+  // failed journey instead of taking the onNoReply branch.
+  it('keeps await_reply timeout ahead of the catch-all', () => {
+    const asl = compileJourneyToAsl(
+      baseJourney([
+        { stepId: 'ask', type: 'await_reply', name: 'Ask', next: 'thanks', onNoReply: 'nudge' },
+        { stepId: 'thanks', type: 'send_message', name: 'Thanks' },
+        { stepId: 'nudge', type: 'send_message', name: 'Nudge' },
+      ])
+    )
+    const c = (asl.States.ask as { Catch: { ErrorEquals: string[]; Next: string }[] }).Catch
+    expect(c[0]).toMatchObject({ ErrorEquals: ['States.Timeout'], Next: 'nudge' })
+    expect(c[1]).toMatchObject({ ErrorEquals: ['States.ALL'], Next: '__journey_failed' })
+  })
+
+  // A stepId colliding with a terminal name would silently overwrite it in the
+  // states map and lose either the step or the ending.
+  it('rejects a stepId in the compiler reserved namespace', () => {
+    expect(() =>
+      compileJourneyToAsl(baseJourney([{ stepId: '__journey_completed', type: 'send_message', name: 'Sneaky' }]))
+    ).toThrow(JourneyCompileError)
+  })
+})
 
   // Regression guard for the "step-list, not graph canvas" architecture
   // decision: a backward reference must never compile, since that would
