@@ -197,6 +197,15 @@ export interface LeadEvent {
   executionArn?: string
 }
 
+// What resolve_condition merges into the execution state. Every value is a
+// STRING because the compiled Choice uses StringEquals -- a boolean here would
+// silently never match, which is worse than failing.
+export interface ResolvedConditionFields {
+  replied: string
+  lead_score: string
+  appointment_booked: string
+}
+
 // Deliberately only the three outcomes something actually WRITES.
 //
 // 'cancelled' and 'timed_out' were in the approved design and are omitted on
@@ -206,6 +215,20 @@ export interface LeadEvent {
 // exists to fix -- journey_ended itself sat in LeadEventType for a month with
 // zero call sites, which is why a finished journey and a dead one were
 // indistinguishable. Add a value here when, and only when, a writer exists.
+// One event inside a run, trimmed to what a drill-down renders. Deliberately
+// not the whole LeadEvent: wamid, body and result are either noise here or
+// carry message content that does not belong in a journey-level view.
+export interface JourneyExecutionEvent {
+  ts: string
+  type: LeadEventType
+  stepId?: string
+  toolName?: string
+  channel?: LeadEventChannel
+  status?: MessageDeliveryStatus
+  outcome?: JourneyOutcome
+  errorDetail?: string
+}
+
 // One lead's run through one journey, reconstructed from its events. Not a
 // stored record: it is derived on read, which is why it can be rebuilt for
 // executions that predate the terminal event without backfilling anything.
@@ -223,6 +246,11 @@ export interface JourneyExecutionSummary {
   lastStepId?: string
   lastEventType: LeadEventType
   eventCount: number
+  // Every event in this run, oldest first. Returned rather than discarded
+  // because the read already had to fetch them to derive the summary — sending
+  // only the summary meant a drill-down would re-query for data the caller
+  // already paid to read.
+  events: JourneyExecutionEvent[]
   // Failure path only, the flattened Step Functions error.
   errorDetail?: string
   executionArn?: string
@@ -1555,6 +1583,10 @@ export type JourneyExecutorOperation =
   // Synthetic: emitted by the compiler's terminal states, never authored as a
   // JourneyStep. Its only job is to write the journey_ended event.
   | 'journey_ended'
+  // Synthetic: emitted ahead of every condition step's Choice state. Resolves
+  // the lead's replied / lead_score / appointment_booked into the execution
+  // state so the Choice reads a path that is guaranteed to exist.
+  | 'resolve_condition'
 
 // The shape every compiled Task state's Parameters produces (see
 // CONTEXT_PASSTHROUGH_PARAMETERS in journey-compiler-service.ts), and what

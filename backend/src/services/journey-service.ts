@@ -397,16 +397,48 @@ export async function publishJourneyBundle(botId: string, bundleId: string, clie
     throw error
   }
 
-  await claimJourneyTrigger(
-    triggerClaimKey({ agentId: existing.agentId, botId }, existing.journey.triggerType),
-    { bundleId, botId, clientId }
-  )
+  const claimKey = triggerClaimKey({ agentId: existing.agentId, botId }, existing.journey.triggerType)
 
-  const published = await createOrUpdateStateMachine(
-    stateMachineNameFor(clientId, bundleId),
-    JSON.stringify(asl),
-    existing.compiledStateMachineArn
-  )
+  // Whether THIS call is what acquired the claim. claimJourneyTrigger lets the
+  // same bundle re-claim its own trigger, so republishing an already-published
+  // bundle finds the claim already held -- and releasing it on a later failure
+  // would take a working journey off the air for an error that changed nothing.
+  // Only a claim we newly acquired is ours to give back.
+  const claimIsNewlyOurs = existing.status !== 'published'
+
+  await claimJourneyTrigger(claimKey, { bundleId, botId, clientId })
+
+  // Everything after the claim has to give it back on the way out.
+  //
+  // The ordering above is deliberate (claim before provisioning, so losing the
+  // race never leaves a state machine nobody will start), but its cost is that
+  // a FAILED provision strands the claim on a bundle that never went live: the
+  // client then cannot publish anything on that trigger, and the error names a
+  // bundle that is not published. Hit for real on 2026-08-29, when the
+  // unreachable-terminal-state bug made provisioning fail and the orphaned
+  // claim then blocked the retry.
+  const releaseIfOursOnFailure = async (reason: string): Promise<void> => {
+    if (!claimIsNewlyOurs) return
+    await releaseJourneyTrigger(claimKey, bundleId).catch((releaseError) => {
+      console.error(
+        `[journey] ${reason} for bundle ${bundleId} AND its trigger claim could not be released; ` +
+          `${claimKey} is now held by a bundle that never went live:`,
+        releaseError
+      )
+    })
+  }
+
+  let published
+  try {
+    published = await createOrUpdateStateMachine(
+      stateMachineNameFor(clientId, bundleId),
+      JSON.stringify(asl),
+      existing.compiledStateMachineArn
+    )
+  } catch (error) {
+    await releaseIfOursOnFailure('provisioning failed')
+    throw error
+  }
 
   // Conditional on the status this call READ, not on a fixed value, because
   // publish is legitimately entered from draft, paused, and published (a
@@ -442,10 +474,7 @@ export async function publishJourneyBundle(botId: string, bundleId: string, clie
       // release only when nothing ended up published.
       const current = await getJourneyBundleById(botId, bundleId).catch(() => null)
       if (current?.status !== 'published') {
-        await releaseJourneyTrigger(
-          triggerClaimKey({ agentId: existing.agentId, botId }, existing.journey.triggerType),
-          bundleId
-        ).catch((releaseError) => {
+        await releaseJourneyTrigger(claimKey, bundleId).catch((releaseError) => {
           console.error(
             `[journey] failed to release trigger claim after a lost publish race on ${bundleId}:`,
             releaseError
@@ -456,6 +485,10 @@ export async function publishJourneyBundle(botId: string, bundleId: string, clie
         'This journey changed while it was being published. Reload it and try again.'
       )
     }
+    // Any other failure of the status write leaves the state machine published
+    // but the record untouched, so this bundle is not live and must not keep a
+    // claim it newly took.
+    await releaseIfOursOnFailure('the status write failed')
     throw error
   }
 }
@@ -482,6 +515,32 @@ export async function getJourneyExecutions(
   return summariseExecutions(events, bundleId)
 }
 
+// A terminal event is the best proof of an ending, but not the only one.
+//
+// A `handoff` event is emitted by a human_handoff step, and human_handoff is
+// terminal BY CONSTRUCTION -- validateJourneyStructure has no outgoing
+// reference to check for it, and the compiler routes it straight to a terminal
+// state. So a run whose last event is a handoff has ended, whether or not a
+// journey_ended row exists.
+//
+// That distinction is not academic. Every execution started before terminal
+// events shipped lacks journey_ended, and on the first live journey 25 of 29
+// runs had been handed to a human days earlier while the dashboard reported
+// them as still in flight -- telling an operator the agent was working 29 leads
+// when it was working 4.
+//
+// Nothing else is inferred. A run sitting on a send_message could genuinely be
+// mid-journey or could have died silently, and those two are NOT
+// distinguishable from the events, so it stays 'running'.
+function deriveStatus(
+  terminal: LeadEvent | undefined,
+  last: LeadEvent
+): JourneyExecutionSummary['status'] {
+  if (terminal?.outcome) return terminal.outcome
+  if (last.type === 'handoff') return 'handed_off'
+  return 'running'
+}
+
 // Exported for tests: the grouping is the only real logic here, and it is worth
 // pinning independently of DynamoDB.
 export function summariseExecutions(events: LeadEvent[], bundleId: string): JourneyExecutionSummary[] {
@@ -504,12 +563,7 @@ export function summariseExecutions(events: LeadEvent[], bundleId: string): Jour
     summaries.push({
       leadId,
       bundleId,
-      // A terminal event is the ONLY thing that proves an ending. Absent one,
-      // this is 'running' — which for a pre-existing execution may really mean
-      // "died before terminal events existed". The UI is responsible for not
-      // overstating that; inventing an outcome here would be the same lie the
-      // missing journey_ended write used to tell.
-      status: terminal?.outcome ?? 'running',
+      status: deriveStatus(terminal, last),
       // The ISO prefix of the `${iso}#${uuid}` sort key.
       startedAt: first.ts.split('#')[0],
       lastEventAt: last.ts.split('#')[0],
@@ -518,6 +572,16 @@ export function summariseExecutions(events: LeadEvent[], bundleId: string): Jour
       ...(last.stepId ? { lastStepId: last.stepId } : {}),
       ...(terminal?.errorDetail ? { errorDetail: terminal.errorDetail } : {}),
       ...(terminal?.executionArn ? { executionArn: terminal.executionArn } : {}),
+      events: ordered.map((event) => ({
+        ts: event.ts.split('#')[0],
+        type: event.type,
+        ...(event.stepId ? { stepId: event.stepId } : {}),
+        ...(event.toolName ? { toolName: event.toolName } : {}),
+        ...(event.channel ? { channel: event.channel } : {}),
+        ...(event.status ? { status: event.status } : {}),
+        ...(event.outcome ? { outcome: event.outcome } : {}),
+        ...(event.errorDetail ? { errorDetail: event.errorDetail } : {}),
+      })),
     })
   }
 

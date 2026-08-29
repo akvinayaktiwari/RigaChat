@@ -178,6 +178,88 @@ describe('terminal states', () => {
     }
   })
 
+  // REGRESSION. The Choice used to read `$.replied` — a path nothing ever wrote
+  // into the execution state, since those values live in lead_state. Every
+  // journey containing a condition step therefore died at that state with
+  // States.Runtime, and because ASL forbids Catch on a Choice it was the ONE
+  // failure that ended a journey with no journey_ended event.
+  describe('condition steps', () => {
+    const withCondition = () =>
+      compileJourneyToAsl(
+        baseJourney([
+          {
+            stepId: 'gate',
+            type: 'condition',
+            name: 'Replied?',
+            field: 'replied',
+            operator: 'equals',
+            value: 'true',
+            onTrue: 'yes',
+            onFalse: 'no',
+          },
+          { stepId: 'yes', type: 'send_message', name: 'Yes' },
+          { stepId: 'no', type: 'send_message', name: 'No' },
+        ])
+      )
+
+    it('resolves the branch fields in a Task before the Choice reads them', () => {
+      const asl = withCondition()
+
+      expect(asl.States.gate_resolve).toMatchObject({
+        Type: 'Task',
+        Parameters: { operation: 'resolve_condition' },
+        ResultPath: '$.conditionFields',
+        Next: 'gate',
+      })
+    })
+
+    it('points the Choice at the resolved path, never the bare field', () => {
+      const asl = withCondition()
+      const choice = asl.States.gate as { Choices: { Variable: string }[] }
+
+      expect(choice.Choices[0].Variable).toBe('$.conditionFields.replied')
+      expect(choice.Choices[0].Variable).not.toBe('$.replied')
+    })
+
+    // The other half of the fix: a Choice cannot carry a Catch, but the Task in
+    // front of it can — so a condition failure is now recorded like every other.
+    it('gives the resolver the catch-all a Choice cannot have', () => {
+      const asl = withCondition()
+
+      expect(asl.States.gate_resolve).toMatchObject({
+        Catch: [{ ErrorEquals: ['States.ALL'], Next: '__journey_failed' }],
+      })
+    })
+
+    // Everything referencing the condition must land on the resolver, or the
+    // Choice runs before its fields exist and we are back where we started.
+    it('routes references to the resolver, not straight to the Choice', () => {
+      const asl = compileJourneyToAsl(
+        baseJourney([
+          { stepId: 'greet', type: 'send_message', name: 'Greet', next: 'gate' },
+          {
+            stepId: 'gate',
+            type: 'condition',
+            name: 'Replied?',
+            field: 'replied',
+            operator: 'equals',
+            value: 'true',
+            onTrue: 'yes',
+            onFalse: 'no',
+          },
+          { stepId: 'yes', type: 'send_message', name: 'Yes' },
+          { stepId: 'no', type: 'send_message', name: 'No' },
+        ])
+      )
+
+      expect(asl.States.greet).toMatchObject({ Next: 'gate_resolve' })
+    })
+
+    it('makes a condition-first journey start at the resolver', () => {
+      expect(withCondition().StartAt).toBe('gate_resolve')
+    })
+  })
+
   // A stepId colliding with a terminal name would silently overwrite it in the
   // states map and lose either the step or the ending.
   it('rejects a stepId in the compiler reserved namespace', () => {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { JourneyExecutionSummary } from '../../types/index'
 
 // frontend vitest runs without globals, so @testing-library's auto-cleanup never
@@ -22,6 +22,11 @@ function execution(overrides: Partial<JourneyExecutionSummary> = {}): JourneyExe
     lastEventAt: new Date(Date.now() - 60_000).toISOString(),
     lastEventType: 'journey_step',
     eventCount: 3,
+    events: [
+      { ts: '2026-08-29T10:00:00.000Z', type: 'journey_started' },
+      { ts: '2026-08-29T10:01:00.000Z', type: 'journey_step', stepId: 'greet' },
+      { ts: '2026-08-29T10:02:00.000Z', type: 'message_out', channel: 'whatsapp', status: 'delivered' },
+    ],
     ...overrides,
   }
 }
@@ -128,5 +133,85 @@ describe('JourneyExecutions', () => {
 
     expect(await screen.findByText('Journey bundle not found')).toBeTruthy()
     expect(screen.queryByText('No leads have entered this journey yet')).toBeNull()
+  })
+})
+
+// The events came down with the summary, because the read had to load them to
+// derive it. Expanding must therefore cost NO extra request — re-querying for
+// data already in the browser is the waste this shape exists to avoid.
+describe('drilling into a run', () => {
+  it('shows nothing until a run is opened', async () => {
+    getJourneyExecutions.mockResolvedValue({ success: true, data: [execution()] })
+    renderPanel()
+
+    await screen.findByText('1 recent run')
+    expect(screen.queryByText('Journey started')).toBeNull()
+  })
+
+  it('reveals that run\'s events on click, with no second request', async () => {
+    getJourneyExecutions.mockResolvedValue({ success: true, data: [execution()] })
+    renderPanel()
+
+    fireEvent.click(await screen.findByRole('button', { expanded: false }))
+
+    expect(await screen.findByText('Journey started')).toBeTruthy()
+    expect(screen.getByText('Step greet')).toBeTruthy()
+    expect(screen.getByText(/Sent a message \(whatsapp\) — delivered/)).toBeTruthy()
+    expect(getJourneyExecutions).toHaveBeenCalledTimes(1)
+  })
+
+  it('closes again on a second click', async () => {
+    getJourneyExecutions.mockResolvedValue({ success: true, data: [execution()] })
+    renderPanel()
+
+    const row = await screen.findByRole('button', { expanded: false })
+    fireEvent.click(row)
+    await screen.findByText('Journey started')
+    fireEvent.click(screen.getByRole('button', { expanded: true }))
+
+    await waitFor(() => expect(screen.queryByText('Journey started')).toBeNull())
+  })
+
+  it('opens runs independently', async () => {
+    getJourneyExecutions.mockResolvedValue({
+      success: true,
+      data: [
+        execution({ leadId: 'lead-one', events: [{ ts: '2026-08-29T10:00:00.000Z', type: 'handoff' }] }),
+        execution({ leadId: 'lead-two', events: [{ ts: '2026-08-29T11:00:00.000Z', type: 'message_in' }] }),
+      ],
+    })
+    renderPanel()
+
+    await screen.findByText('2 recent runs')
+    fireEvent.click(screen.getAllByRole('button', { expanded: false })[0])
+
+    expect(await screen.findByText('Handed to a human')).toBeTruthy()
+    expect(screen.queryByText('They replied')).toBeNull()
+  })
+
+  it('spells out a failed ending inside the run', async () => {
+    getJourneyExecutions.mockResolvedValue({
+      success: true,
+      data: [
+        execution({
+          status: 'failed',
+          events: [
+            { ts: '2026-08-29T10:00:00.000Z', type: 'tool_call', toolName: 'booking' },
+            {
+              ts: '2026-08-29T10:01:00.000Z',
+              type: 'journey_ended',
+              outcome: 'failed',
+              errorDetail: 'States.TaskFailed: booking blew up',
+            },
+          ],
+        }),
+      ],
+    })
+    renderPanel()
+
+    fireEvent.click(await screen.findByRole('button', { expanded: false }))
+
+    expect(await screen.findByText('Called booking')).toBeTruthy()
+    expect(screen.getByText('Journey ended — failed')).toBeTruthy()
   })
 })

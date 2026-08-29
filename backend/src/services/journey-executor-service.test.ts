@@ -15,6 +15,9 @@ vi.mock('../repositories/journey-pending-reply-repository.js', () => ({ claimPen
 const getAppointmentRequestsByBotId = vi.fn()
 vi.mock('../repositories/appointment-request-repository.js', () => ({ getAppointmentRequestsByBotId }))
 
+const getLeadState = vi.fn()
+vi.mock('../repositories/lead-state-repository.js', () => ({ getLeadState }))
+
 const incrementWaitAndRecheckIteration = vi.fn()
 const bookAppointment = vi.fn()
 const scheduleReminder = vi.fn()
@@ -67,6 +70,8 @@ beforeEach(() => {
   claimPendingReply.mockResolvedValue(undefined)
   getAppointmentRequestsByBotId.mockReset()
   getAppointmentRequestsByBotId.mockResolvedValue([])
+  getLeadState.mockReset()
+  getLeadState.mockResolvedValue(null)
   incrementWaitAndRecheckIteration.mockReset()
   bookAppointment.mockReset()
   scheduleReminder.mockReset()
@@ -162,6 +167,50 @@ describe('executeJourneyStep', () => {
         executeJourneyStep({ ...baseContext, operation: 'journey_ended' })
       ).rejects.toThrow(/no outcome/)
       expect(appendLeadEvent).not.toHaveBeenCalled()
+    })
+  })
+
+  // The Choice that follows uses StringEquals, so every value has to come back
+  // as a STRING. A boolean here would silently never match and every lead would
+  // take the onFalse branch — working software making wrong decisions.
+  describe('resolve_condition', () => {
+    it('returns string values a StringEquals Choice can actually match', async () => {
+      getLeadState.mockResolvedValue({ leadId: 'lead-1', replied: true, leadScore: 42, appointmentBooked: false })
+
+      const out = await executeJourneyStep({ ...baseContext, operation: 'resolve_condition', stepId: 'gate' })
+
+      expect(out).toEqual({ replied: 'true', lead_score: '42', appointment_booked: 'false' })
+    })
+
+    // A fresh lead has no lead_state row. That is not an error — it means they
+    // have not replied, have no score and have not booked.
+    it('treats a missing lead state as a fresh lead, not a failure', async () => {
+      getLeadState.mockResolvedValue(null)
+
+      const out = await executeJourneyStep({ ...baseContext, operation: 'resolve_condition', stepId: 'gate' })
+
+      expect(out).toEqual({ replied: 'false', lead_score: '0', appointment_booked: 'false' })
+    })
+
+    // A confirmed booking lands in appointment_requests today, which is the
+    // source isRecheckSatisfied already trusts.
+    it('falls back to appointment_requests when lead_state has no booking flag', async () => {
+      getLeadState.mockResolvedValue({ leadId: 'lead-1', replied: false })
+      getAppointmentRequestsByBotId.mockResolvedValue([{ leadId: 'lead-1', status: 'confirmed' }])
+
+      const out = await executeJourneyStep({ ...baseContext, operation: 'resolve_condition', stepId: 'gate' })
+
+      expect(out).toMatchObject({ appointment_booked: 'true' })
+    })
+
+    // Swallowing a read failure into 'false' would send every lead down the
+    // onFalse branch during an outage. Failing is loud, and now recorded.
+    it('fails loudly rather than defaulting everyone to the false branch', async () => {
+      getLeadState.mockRejectedValue(new Error('Dynamo unavailable'))
+
+      await expect(
+        executeJourneyStep({ ...baseContext, operation: 'resolve_condition', stepId: 'gate' })
+      ).rejects.toThrow(/could not read lead state/)
     })
   })
 

@@ -745,6 +745,18 @@ export interface JourneyTemplate {
 // UI never renders a status the data cannot produce.
 export type JourneyOutcome = 'completed' | 'failed' | 'handed_off'
 
+// One event inside a run, as the drill-down renders it.
+export interface JourneyExecutionEvent {
+  ts: string
+  type: string
+  stepId?: string
+  toolName?: string
+  channel?: string
+  status?: string
+  outcome?: JourneyOutcome
+  errorDetail?: string
+}
+
 // One lead's run through one journey, derived on read from lead_events.
 export interface JourneyExecutionSummary {
   leadId: string
@@ -760,6 +772,8 @@ export interface JourneyExecutionSummary {
   eventCount: number
   errorDetail?: string
   executionArn?: string
+  // Already fetched to build the summary, so the drill-down costs no extra call.
+  events: JourneyExecutionEvent[]
 }
 
 export type JourneyBundleStatus = 'draft' | 'published' | 'paused'
