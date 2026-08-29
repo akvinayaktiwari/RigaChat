@@ -334,6 +334,40 @@ can be told why their CRM column changed.
 
 ## Backend
 
+### Journey state transitions are guarded but not serialisable (2026-08-29)
+
+Found by the Codex structured review during `/ship` of the journey pause feature.
+Two holes were fixed in that diff (both sides of the pause/publish status write are
+now conditional on the status the caller read, and a lost publish no longer deletes
+a concurrent publish's shared claim). These two survive, and both need a design
+change rather than another conditional.
+
+**Guard the pause transition with a revision, not just a status.** A status-only
+condition admits an ABA race: pause A reads `published` and releases the claim,
+pause B writes `paused`, a resume re-claims the trigger and writes `published`, then
+pause A's stale condition still matches and succeeds. Pause A already released the
+OLD claim, so the bundle ends up `paused` while holding the NEW claim — blocking
+every other journey from ever publishing on that trigger. The fix is a monotonic
+revision (or an expected `updatedAt`) threaded through
+`updateJourneyBundle`'s conditional, so any intervening transition invalidates a
+stale one. Touches `backend/src/repositories/journey-repository.ts` and both
+transition sites in `backend/src/services/journey-service.ts`.
+
+**Priority:** P1
+**Effort:** S (~half a day)
+
+**Don't re-claim on an ambiguous write failure.** `pauseJourneyBundle` restores the
+trigger claim when the status write throws a non-conflict error, so a failed pause is
+a no-op rather than a silent outage. But a DynamoDB timeout is ambiguous: the write
+may have committed `paused` and only the response was lost. In that case the
+compensation re-claims the trigger for a bundle that IS paused, which ignition
+rejects — so the trigger is held by a journey that can never run, and no other
+journey can take it. Read the bundle back (or make the release + status write a
+`TransactWriteItems`) before restoring. Same file, `pauseJourneyBundle`.
+
+**Priority:** P1
+**Effort:** S (~2h, or M if done properly as a transaction)
+
 ### Deferred by the eng review of Epic A (2026-08-16)
 
 Three items pushed out of [#16](https://github.com/akvinayaktiwari/RigaChat/issues/16)
