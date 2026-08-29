@@ -2,6 +2,7 @@ import { incrementWaitAndRecheckIteration } from '../repositories/journey-execut
 import { claimPendingReply } from '../repositories/journey-pending-reply-repository.js'
 import { isOptedOut } from '../repositories/whatsapp-inbound-activity-repository.js'
 import { getAppointmentRequestsByBotId } from '../repositories/appointment-request-repository.js'
+import { getLeadState } from '../repositories/lead-state-repository.js'
 import { AWAIT_REPLY_TIMEOUT_SECONDS } from './journey-compiler-service.js'
 import { readJourneyLead, toLeadRef } from './lead-resolution-service.js'
 import { sendHandoffAlert } from './notification-service.js'
@@ -16,7 +17,13 @@ import {
   sendWhatsAppMessageToLead,
   sendWhatsAppTemplateToLead,
 } from './whatsapp-service.js'
-import type { JourneyExecutorEvent, JourneyLead, JourneyOutcome, WaitAndRecheckResult } from '../types/index.js'
+import type {
+  JourneyExecutorEvent,
+  JourneyLead,
+  JourneyOutcome,
+  ResolvedConditionFields,
+  WaitAndRecheckResult,
+} from '../types/index.js'
 
 // The Lambda handler journey-compiler-service.ts's compiled Task states
 // actually invoke (via journeyExecutorLambdaArn) -- see backend/index.ts's
@@ -341,6 +348,48 @@ async function isRecheckSatisfied(event: JourneyExecutorEvent): Promise<boolean>
   return requests.some((request) => request.leadId === event.leadId && request.status === 'confirmed')
 }
 
+// Resolves the fields a condition step branches on, so the Choice that follows
+// reads a path that exists.
+//
+// Before this, `condition` compiled to a Choice reading `$.replied` — a path
+// nothing ever wrote into the execution state, because those values live in the
+// lead_state table. Any journey containing a condition step therefore died at
+// that state with States.Runtime, and ASL forbids Catch on a Choice, so it was
+// the one failure that ended a journey with NO journey_ended event. Moving the
+// read into a Task fixes both halves: the path exists, and the Task carries the
+// catch-all like every other Task.
+//
+// Missing state is not an error. A lead with no lead_state row simply has not
+// replied, has no score and has not booked — which is the correct answer for a
+// fresh lead, not a reason to fail their journey.
+async function handleResolveCondition(event: JourneyExecutorEvent): Promise<ResolvedConditionFields> {
+  const state = await getLeadState(event.leadId).catch((error) => {
+    // Read failures are NOT swallowed into "false": that would silently send
+    // every lead down the onFalse branch during an outage, which looks like
+    // working software making wrong decisions. Failing is loud and recorded.
+    throw new Error(`resolve_condition could not read lead state for ${event.leadId}: ${errorText(error)}`)
+  })
+
+  // appointment_booked prefers the lead_state flag but falls back to the
+  // appointment_requests table, which is where a confirmed booking actually
+  // lands today — the same source isRecheckSatisfied already trusts.
+  const booked =
+    state?.appointmentBooked ??
+    (await getAppointmentRequestsByBotId(event.botId)
+      .then((requests) => requests.some((r) => r.leadId === event.leadId && r.status === 'confirmed'))
+      .catch(() => false))
+
+  return {
+    replied: String(state?.replied ?? false),
+    lead_score: String(state?.leadScore ?? 0),
+    appointment_booked: String(booked),
+  }
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
 async function handleWaitAndRecheckCheck(event: JourneyExecutorEvent): Promise<WaitAndRecheckResult> {
   if (!event.stepId || event.maxIterations === undefined) {
     throw new Error('wait_and_recheck_check event missing stepId or maxIterations')
@@ -406,5 +455,9 @@ export async function executeJourneyStep(event: JourneyExecutorEvent): Promise<R
     // journey_step row beside it would double the ending in the timeline.
     case 'journey_ended':
       return handleJourneyEnded(event)
+    // No recordStep: this is plumbing for the Choice that follows, not a step
+    // the client authored, and a timeline row for it would be noise.
+    case 'resolve_condition':
+      return { ...(await handleResolveCondition(event)) }
   }
 }

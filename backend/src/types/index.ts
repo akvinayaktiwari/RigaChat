@@ -197,6 +197,15 @@ export interface LeadEvent {
   executionArn?: string
 }
 
+// What resolve_condition merges into the execution state. Every value is a
+// STRING because the compiled Choice uses StringEquals -- a boolean here would
+// silently never match, which is worse than failing.
+export interface ResolvedConditionFields {
+  replied: string
+  lead_score: string
+  appointment_booked: string
+}
+
 // Deliberately only the three outcomes something actually WRITES.
 //
 // 'cancelled' and 'timed_out' were in the approved design and are omitted on
@@ -1555,6 +1564,10 @@ export type JourneyExecutorOperation =
   // Synthetic: emitted by the compiler's terminal states, never authored as a
   // JourneyStep. Its only job is to write the journey_ended event.
   | 'journey_ended'
+  // Synthetic: emitted ahead of every condition step's Choice state. Resolves
+  // the lead's replied / lead_score / appointment_booked into the execution
+  // state so the Choice reads a path that is guaranteed to exist.
+  | 'resolve_condition'
 
 // The shape every compiled Task state's Parameters produces (see
 // CONTEXT_PASSTHROUGH_PARAMETERS in journey-compiler-service.ts), and what

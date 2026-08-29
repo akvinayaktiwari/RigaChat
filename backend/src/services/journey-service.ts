@@ -397,16 +397,48 @@ export async function publishJourneyBundle(botId: string, bundleId: string, clie
     throw error
   }
 
-  await claimJourneyTrigger(
-    triggerClaimKey({ agentId: existing.agentId, botId }, existing.journey.triggerType),
-    { bundleId, botId, clientId }
-  )
+  const claimKey = triggerClaimKey({ agentId: existing.agentId, botId }, existing.journey.triggerType)
 
-  const published = await createOrUpdateStateMachine(
-    stateMachineNameFor(clientId, bundleId),
-    JSON.stringify(asl),
-    existing.compiledStateMachineArn
-  )
+  // Whether THIS call is what acquired the claim. claimJourneyTrigger lets the
+  // same bundle re-claim its own trigger, so republishing an already-published
+  // bundle finds the claim already held -- and releasing it on a later failure
+  // would take a working journey off the air for an error that changed nothing.
+  // Only a claim we newly acquired is ours to give back.
+  const claimIsNewlyOurs = existing.status !== 'published'
+
+  await claimJourneyTrigger(claimKey, { bundleId, botId, clientId })
+
+  // Everything after the claim has to give it back on the way out.
+  //
+  // The ordering above is deliberate (claim before provisioning, so losing the
+  // race never leaves a state machine nobody will start), but its cost is that
+  // a FAILED provision strands the claim on a bundle that never went live: the
+  // client then cannot publish anything on that trigger, and the error names a
+  // bundle that is not published. Hit for real on 2026-08-29, when the
+  // unreachable-terminal-state bug made provisioning fail and the orphaned
+  // claim then blocked the retry.
+  const releaseIfOursOnFailure = async (reason: string): Promise<void> => {
+    if (!claimIsNewlyOurs) return
+    await releaseJourneyTrigger(claimKey, bundleId).catch((releaseError) => {
+      console.error(
+        `[journey] ${reason} for bundle ${bundleId} AND its trigger claim could not be released; ` +
+          `${claimKey} is now held by a bundle that never went live:`,
+        releaseError
+      )
+    })
+  }
+
+  let published
+  try {
+    published = await createOrUpdateStateMachine(
+      stateMachineNameFor(clientId, bundleId),
+      JSON.stringify(asl),
+      existing.compiledStateMachineArn
+    )
+  } catch (error) {
+    await releaseIfOursOnFailure('provisioning failed')
+    throw error
+  }
 
   // Conditional on the status this call READ, not on a fixed value, because
   // publish is legitimately entered from draft, paused, and published (a
@@ -442,10 +474,7 @@ export async function publishJourneyBundle(botId: string, bundleId: string, clie
       // release only when nothing ended up published.
       const current = await getJourneyBundleById(botId, bundleId).catch(() => null)
       if (current?.status !== 'published') {
-        await releaseJourneyTrigger(
-          triggerClaimKey({ agentId: existing.agentId, botId }, existing.journey.triggerType),
-          bundleId
-        ).catch((releaseError) => {
+        await releaseJourneyTrigger(claimKey, bundleId).catch((releaseError) => {
           console.error(
             `[journey] failed to release trigger claim after a lost publish race on ${bundleId}:`,
             releaseError
@@ -456,6 +485,10 @@ export async function publishJourneyBundle(botId: string, bundleId: string, clie
         'This journey changed while it was being published. Reload it and try again.'
       )
     }
+    // Any other failure of the status write leaves the state machine published
+    // but the record untouched, so this bundle is not live and must not keep a
+    // claim it newly took.
+    await releaseIfOursOnFailure('the status write failed')
     throw error
   }
 }

@@ -580,6 +580,40 @@ describe('pauseJourneyBundle', () => {
     expect(releaseJourneyTrigger).toHaveBeenCalledWith('agent:agent-1#lead_captured', 'bundle-1')
   })
 
+  // REGRESSION, hit for real on 2026-08-29. publishJourneyBundle claims the
+  // trigger BEFORE provisioning, so a failed provision used to strand the claim
+  // on a bundle that never went live -- and the client then could not publish
+  // anything on that trigger, with an error naming a bundle that is not
+  // published. The unreachable-terminal-state bug made provisioning fail, and
+  // the orphaned claim then blocked the retry.
+  it('gives the claim back when provisioning fails', async () => {
+    getJourneyBundleById.mockResolvedValue({ ...publishedBundle, status: 'draft' })
+    createOrUpdateStateMachine.mockRejectedValue(new Error('InvalidDefinition: MISSING_TRANSITION_TARGET'))
+
+    await expect(publishJourneyBundle('bot-1', 'bundle-1', 'client-1')).rejects.toThrow(/MISSING_TRANSITION_TARGET/)
+    expect(releaseJourneyTrigger).toHaveBeenCalledWith('agent:agent-1#lead_captured', 'bundle-1')
+  })
+
+  it('gives the claim back when the status write fails outright', async () => {
+    getJourneyBundleById.mockResolvedValue({ ...publishedBundle, status: 'paused' })
+    updateJourneyBundleRepo.mockRejectedValue(new Error('DynamoDB unavailable'))
+
+    await expect(publishJourneyBundle('bot-1', 'bundle-1', 'client-1')).rejects.toThrow('DynamoDB unavailable')
+    expect(releaseJourneyTrigger).toHaveBeenCalledWith('agent:agent-1#lead_captured', 'bundle-1')
+  })
+
+  // The other half, and the one that would break a live journey: republishing
+  // an ALREADY-published bundle finds the claim already held, so it was never
+  // this call's to give back. Releasing it on a failed republish would take a
+  // working journey off the air over an error that changed nothing.
+  it('does NOT release a claim it did not acquire when a republish fails', async () => {
+    getJourneyBundleById.mockResolvedValue(publishedBundle)
+    createOrUpdateStateMachine.mockRejectedValue(new Error('throttled'))
+
+    await expect(publishJourneyBundle('bot-1', 'bundle-1', 'client-1')).rejects.toThrow('throttled')
+    expect(releaseJourneyTrigger).not.toHaveBeenCalled()
+  })
+
   // Publish is entered from draft, paused AND published, so the guard has to be
   // the status this call read — a hardcoded value would break two of the three.
   it('guards the publish write with the status it actually read', async () => {

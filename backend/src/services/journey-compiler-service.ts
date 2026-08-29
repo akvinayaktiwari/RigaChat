@@ -120,6 +120,11 @@ const JOURNEY_FAILED_TERMINAL_STATE = '__journey_failed_terminal'
 // recording of the failure would itself fail.
 const JOURNEY_ERROR_PATH = '$.journeyError'
 
+// Where resolve_condition merges the lead's branch fields. Its own key, merged
+// rather than replacing $, so the Choice can read it while the execution
+// context survives for whatever the branch leads to.
+const CONDITION_FIELDS_PATH = '$.conditionFields'
+
 // Applied to every Task. Ordered after any step-specific Catch (await_reply's
 // States.Timeout -> onNoReply), because Step Functions takes the FIRST matching
 // entry and States.ALL matches everything -- putting it first would swallow the
@@ -229,7 +234,11 @@ export function validateJourneyStructure(journey: JourneyDefinition): void {
 // through, so a reference to a wait_and_recheck step lands on its actual
 // first state rather than a state name that was never emitted.
 function entryStateName(step: JourneyStep): string {
-  return step.type === 'wait_and_recheck' ? `${step.stepId}_wait` : step.stepId
+  if (step.type === 'wait_and_recheck') return `${step.stepId}_wait`
+  // A condition's real entry point is the Task that resolves the fields its
+  // Choice branches on, not the Choice itself.
+  if (step.type === 'condition') return `${step.stepId}_resolve`
+  return step.stepId
 }
 
 function compileWaitAndRecheckStep(
@@ -359,13 +368,45 @@ export function compileJourneyToAsl(journey: JourneyDefinition): AslStateMachine
       // state before the Choice runs (a Task that reads lead_state), which is
       // its own piece of work -- tracked in TODOS.md rather than smuggled in
       // here.
-      case 'condition':
+      // Two states, not one. The Choice used to read `$.replied` directly -- a
+      // path nothing ever wrote into the execution state, because those values
+      // live in the lead_state table -- so any journey with a condition step
+      // died there with States.Runtime. ASL forbids Catch on a Choice, which
+      // made it the ONLY failure that ended a journey with no journey_ended
+      // event.
+      //
+      // Resolving the fields in a Task first fixes both halves: the Choice now
+      // reads a path that is guaranteed to exist, and the Task carries the
+      // catch-all like every other Task, so a failure here is recorded.
+      case 'condition': {
+        const resolveStateName = `${step.stepId}_resolve`
+        states[resolveStateName] = {
+          Type: 'Task',
+          Resource: journeyExecutorLambdaArn(),
+          Parameters: {
+            operation: 'resolve_condition',
+            stepId: step.stepId,
+            ...CONTEXT_PASSTHROUGH_PARAMETERS,
+          },
+          ResultPath: CONDITION_FIELDS_PATH,
+          Next: step.stepId,
+          Retry: [{ ErrorEquals: ['States.TaskFailed'], MaxAttempts: 3, IntervalSeconds: 30, BackoffRate: 2 }],
+          Catch: [CATCH_ALL_TO_FAILED],
+        } satisfies AslTaskState
+
         states[step.stepId] = {
           Type: 'Choice',
-          Choices: [{ Variable: `$.${step.field}`, StringEquals: step.value, Next: resolve(step.onTrue) }],
+          Choices: [
+            {
+              Variable: `${CONDITION_FIELDS_PATH}.${step.field}`,
+              StringEquals: step.value,
+              Next: resolve(step.onTrue),
+            },
+          ],
           Default: resolve(step.onFalse),
         } satisfies AslChoiceState
         break
+      }
 
       case 'tool_call':
         states[step.stepId] = {
