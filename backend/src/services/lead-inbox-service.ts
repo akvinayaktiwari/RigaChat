@@ -54,6 +54,10 @@ const MAX_PAGE_SIZE = 200
 export interface InboxQuery {
   limit?: number
   cursor?: string
+  // Off by default: the inbox is a work queue, and a lead someone dismissed
+  // should not reappear in it. On, it is the same queue with the dismissed ones
+  // shown, which is how you find something you archived by mistake.
+  includeArchived?: boolean
 }
 
 // A cursor is the sort POSITION of the last lead on the previous page, not an
@@ -104,23 +108,29 @@ export async function getUnifiedInbox(clientId: string, query: InboxQuery = {}):
   ])
 
   const stateByLeadId = new Map(states.map((state) => [state.leadId, state]))
+  // Archived leads are excluded BEFORE the urgency sort and before any count,
+  // so a dismissed lead cannot occupy a slot or inflate a total. Opt back in
+  // with includeArchived rather than a separate endpoint -- it is the same
+  // inbox, just showing more of it.
+  const isArchived = (leadId: string): boolean =>
+    !query.includeArchived && Boolean(stateByLeadId.get(leadId)?.archivedAt)
   const read = (leadId: string): LeadState | null => stateByLeadId.get(leadId) ?? null
   const fieldsByFormId = new Map<string, FormField[]>(forms.map((form) => [form.formId, form.fields]))
 
   const unified: SortableLead[] = [
-    ...chatLeads.map((lead) => ({
+    ...chatLeads.filter((lead) => !isArchived(lead.leadId)).map((lead) => ({
       ...normalizeChatLead(lead),
       leadRef: { source: 'chat', botId: lead.botId, leadId: lead.leadId } as LeadRef,
       createdAt: lead.createdAt,
       state: read(lead.leadId),
     })),
-    ...formLeads.map((lead) => ({
+    ...formLeads.filter((lead) => !isArchived(lead.leadId)).map((lead) => ({
       ...normalizeFormLead(lead, fieldsByFormId.get(lead.formId)),
       leadRef: { source: 'form', formId: lead.formId, leadId: lead.leadId } as LeadRef,
       createdAt: lead.createdAt,
       state: read(lead.leadId),
     })),
-    ...metaLeads.map((lead) => ({
+    ...metaLeads.filter((lead) => !isArchived(lead.leadId)).map((lead) => ({
       ...normalizeMetaLead(lead),
       leadRef: { source: 'meta', pageId: lead.pageId, leadId: lead.leadId } as LeadRef,
       createdAt: lead.createdAt,
@@ -356,6 +366,29 @@ export async function updateLeadStateForClient(
   return upsertLeadState(leadRef.leadId, clientId, {
     ...patch,
     lastTouchedAt: new Date().toISOString(),
+  })
+}
+
+// Archiving hides a lead from the inbox and changes nothing else.
+//
+// Deliberately NOT routed through updateLeadStateForClient: that function
+// stamps lastTouchedAt on every call, because an operator changing a status is
+// working the lead. Archiving is the opposite -- it is saying "I am never
+// working this one" -- and letting it bump lastTouchedAt would push a lead you
+// just dismissed UP the urgency sort if it were ever unarchived.
+export async function setLeadArchivedForClient(
+  leadRef: LeadRef,
+  clientId: string,
+  archived: boolean,
+  actorId: string
+): Promise<LeadState> {
+  await assertLeadOwnedByClient(leadRef, clientId)
+
+  // Explicitly-undefined is a REMOVE, so unarchiving leaves no trace of having
+  // been archived rather than a lingering archived:false to reason about.
+  return upsertLeadState(leadRef.leadId, clientId, {
+    archivedAt: archived ? new Date().toISOString() : undefined,
+    archivedBy: archived ? actorId : undefined,
   })
 }
 

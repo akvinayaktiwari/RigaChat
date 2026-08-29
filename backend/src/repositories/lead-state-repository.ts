@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid'
-import { GetCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand, QueryCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import type { LeadNote, LeadState } from '../types/index.js'
 
@@ -23,6 +23,10 @@ export interface LeadStatePatch {
   leadScore?: number
   replied?: boolean
   appointmentBooked?: boolean
+  // Archive marker. Passing them explicitly-undefined REMOVEs them, which is
+  // exactly how unarchiving works -- see the buildUpdateFragments comment.
+  archivedAt?: string
+  archivedBy?: string
 }
 
 const PATCHABLE_FIELDS = [
@@ -34,6 +38,8 @@ const PATCHABLE_FIELDS = [
   'leadScore',
   'replied',
   'appointmentBooked',
+  'archivedAt',
+  'archivedBy',
 ] as const
 
 interface UpdateFragments {
@@ -199,6 +205,19 @@ export async function getLeadStatesForClient(clientId: string): Promise<LeadStat
   } catch (error) {
     throw new Error(
       `Failed to get lead states for client ${clientId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
+// Erasure only. Nothing else deletes a lead_state row -- archiving clears the
+// marker fields and leaves the row, because notes and status are still the
+// record of how that lead was worked.
+export async function deleteLeadState(leadId: string): Promise<void> {
+  try {
+    await dynamoClient.send(new DeleteCommand({ TableName: TABLE_NAME(), Key: { leadId } }))
+  } catch (error) {
+    throw new Error(
+      `Failed to delete lead state ${leadId}: ${error instanceof Error ? error.message : String(error)}`
     )
   }
 }

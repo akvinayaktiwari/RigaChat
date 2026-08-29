@@ -80,3 +80,16 @@ export async function clearPendingReply(leadId: string, taskToken: string): Prom
     )
   }
 }
+
+// Erasure only. clearPendingReply is conditional on the task token, because a
+// stale resume must never clear a newer one -- but erasure has no token and
+// wants the row gone regardless of which execution parked it.
+export async function deletePendingReply(leadId: string): Promise<void> {
+  try {
+    await dynamoClient.send(new DeleteCommand({ TableName: TABLE_NAME(), Key: { leadId } }))
+  } catch (error) {
+    throw new Error(
+      `Failed to delete pending reply for lead ${leadId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}

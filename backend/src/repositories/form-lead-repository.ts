@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid'
-import { GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand, PutCommand, QueryCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import { updatePartialFields } from '../lib/dynamo-update.js'
 import type { FormLead } from '../types/index.js'
@@ -96,6 +96,17 @@ export async function updateFormLeadSyncStatus(
   } catch (error) {
     throw new Error(
       `Failed to update sync status for form lead ${leadId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
+// Erasure only. Keyed directly by (formId, leadId), unlike the chat table.
+export async function deleteFormLead(formId: string, leadId: string): Promise<void> {
+  try {
+    await dynamoClient.send(new DeleteCommand({ TableName: TABLE_NAME(), Key: { formId, leadId } }))
+  } catch (error) {
+    throw new Error(
+      `Failed to delete form lead ${leadId}: ${error instanceof Error ? error.message : String(error)}`
     )
   }
 }

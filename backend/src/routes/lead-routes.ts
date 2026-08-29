@@ -14,12 +14,15 @@ import {
   getUnifiedInbox,
   getUnifiedLeadDetail,
   updateLeadStateForClient,
+  setLeadArchivedForClient,
 } from '../services/lead-inbox-service.js'
 import {
   LeadStateValidationError,
   parseLeadRef,
   parseStatePatch,
 } from '../lib/lead-state-validation.js'
+import { eraseLead, LeadNotFoundError } from '../services/lead-erasure-service.js'
+import type { LeadErasureReport } from '../services/lead-erasure-service.js'
 import type {
   ApiResponse,
   Lead,
@@ -143,6 +146,7 @@ leadRoutes.get('/inbox', requireAuth, async (c) => {
     const page = await getUnifiedInbox(clientId, {
       ...(limit !== undefined ? { limit } : {}),
       ...(c.req.query('cursor') ? { cursor: c.req.query('cursor') as string } : {}),
+      ...(c.req.query('includeArchived') === 'true' ? { includeArchived: true } : {}),
     })
     return c.json<ApiResponse<UnifiedInboxPage>>({ success: true, data: page }, 200)
   } catch (error) {
@@ -236,6 +240,74 @@ leadRoutes.post('/notes', requireAuth, async (c) => {
   } catch (error) {
     const { message, status } = stateErrorResponse(error)
     return c.json<ApiResponse<null>>({ success: false, error: message }, status)
+  }
+})
+
+// Archive / unarchive. Its own route rather than a field on PATCH /state
+// because it is not a state change: /state stamps lastTouchedAt on every call
+// (an operator changing a status is working the lead), and archiving is the
+// opposite claim.
+leadRoutes.post('/archive', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const body = await c.req.json<Record<string, unknown>>()
+
+  const leadRef = parseLeadRef(body.leadRef)
+  if (!leadRef) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'A valid leadRef is required' }, 400)
+  }
+  if (typeof body.archived !== 'boolean') {
+    return c.json<ApiResponse<null>>({ success: false, error: 'archived must be true or false' }, 400)
+  }
+
+  try {
+    const state = await setLeadArchivedForClient(leadRef, clientId, body.archived, clientId)
+    return c.json<ApiResponse<LeadState>>({ success: true, data: state }, 200)
+  } catch (error) {
+    const { message, status } = stateErrorResponse(error)
+    return c.json<ApiResponse<null>>({ success: false, error: message }, status)
+  }
+})
+
+// IRREVERSIBLE. Deletes the lead and everything keyed by its leadId, including
+// the message history, and stops any journey still running for them.
+//
+// DELETE with the LeadRef in QUERY PARAMS, matching /detail and /events: a
+// LeadRef is three fields with a discriminator, bodies on DELETE are widely
+// mishandled by proxies and clients, and this is the one route where a request
+// silently losing its parameters must not be able to mean something else.
+leadRoutes.delete('/', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+
+  const leadRef = parseLeadRef({
+    source: c.req.query('source'),
+    leadId: c.req.query('leadId'),
+    botId: c.req.query('botId'),
+    formId: c.req.query('formId'),
+    pageId: c.req.query('pageId'),
+  })
+  if (!leadRef) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'A valid leadRef is required' }, 400)
+  }
+
+  // The lead's own id, echoed back by the caller. Not security -- the auth
+  // middleware already did that -- but a guard against a UI wiring the wrong
+  // row's ref into an irreversible action, which is the realistic way this
+  // deletes the wrong person.
+  if (c.req.query('confirmLeadId') !== leadRef.leadId) {
+    return c.json<ApiResponse<null>>(
+      { success: false, error: 'confirmLeadId must match the leadId being erased' },
+      400
+    )
+  }
+
+  try {
+    const report = await eraseLead(leadRef, clientId)
+    return c.json<ApiResponse<LeadErasureReport>>({ success: true, data: report }, 200)
+  } catch (error) {
+    if (error instanceof LeadNotFoundError) {
+      return c.json<ApiResponse<null>>({ success: false, error: 'Lead not found' }, 404)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }
 })
 

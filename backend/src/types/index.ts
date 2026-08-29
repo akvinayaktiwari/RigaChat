@@ -1335,6 +1335,20 @@ export interface JourneyLead {
 // different buyer. `closed` carries an outcome.
 export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'closed'
 
+// Archiving is a marker on lead_state, NOT a fifth LeadStatus. The four
+// statuses are a queue position ("where is this lead in my process"), and
+// "I never want to see this" is not a position in that queue -- folding it in
+// would make every status filter carry an implicit "and not archived", which is
+// how a lead silently vanishes from a count someone is trusting.
+//
+// Reversible by construction: clearing the timestamp restores the lead exactly,
+// because nothing else was touched. That is the whole difference between this
+// and eraseLead, which is not reversible at all.
+export interface LeadArchiveMarker {
+  archivedAt?: string
+  archivedBy?: string
+}
+
 export type LeadOutcome = 'won' | 'lost' | 'unreachable'
 
 export interface LeadNote {
@@ -1364,6 +1378,11 @@ export interface LeadState {
   notes: LeadNote[]
   createdAt: string
   updatedAt: string
+  // Set when an operator archives the lead: hidden from the inbox, everything
+  // else untouched. Absent on every lead that has never been archived, so the
+  // filter is "has no archivedAt", never a boolean that needs backfilling.
+  archivedAt?: string
+  archivedBy?: string
 }
 
 // What the unified inbox returns: the normalized cross-source lead fields

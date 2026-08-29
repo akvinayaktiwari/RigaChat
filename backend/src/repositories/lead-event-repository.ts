@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid'
-import { PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
+import { PutCommand, QueryCommand, BatchWriteCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import type { AppendLeadEventInput, LeadEvent } from '../types/index.js'
 
@@ -198,4 +198,52 @@ export async function getEventsByBundleId(bundleId: string, limit = 200): Promis
       `Failed to read events for journey ${bundleId}: ${error instanceof Error ? error.message : String(error)}`
     )
   }
+}
+
+// Erasure only, and the one delete in this file that needs justifying: this
+// table is the audit record and has no TTL precisely so nothing expires it.
+// The single case where removing rows is correct is a data-deletion request,
+// where the message bodies ARE the personal data being erased.
+//
+// Paginated and batched because a lead's history is unbounded: a long WhatsApp
+// conversation is one row per message plus one per delivery status, and a
+// single Query page or a 25-item batch will not cover it.
+export async function deleteAllEventsForLead(leadId: string): Promise<number> {
+  let deleted = 0
+  let lastKey: Record<string, unknown> | undefined
+
+  try {
+    do {
+      const page = await dynamoClient.send(
+        new QueryCommand({
+          TableName: TABLE_NAME(),
+          KeyConditionExpression: 'leadId = :leadId',
+          ExpressionAttributeValues: { ':leadId': leadId },
+          // Only the key attributes: the bodies are about to be deleted and do
+          // not need to travel back through the Lambda first.
+          ProjectionExpression: 'leadId, ts',
+          ...(lastKey ? { ExclusiveStartKey: lastKey } : {}),
+        })
+      )
+
+      const items = (page.Items as { leadId: string; ts: string }[] | undefined) ?? []
+      for (let i = 0; i < items.length; i += 25) {
+        const chunk = items.slice(i, i + 25)
+        await dynamoClient.send(
+          new BatchWriteCommand({
+            RequestItems: { [TABLE_NAME()]: chunk.map((item) => ({ DeleteRequest: { Key: { leadId: item.leadId, ts: item.ts } } })) },
+          })
+        )
+        deleted += chunk.length
+      }
+
+      lastKey = page.LastEvaluatedKey as Record<string, unknown> | undefined
+    } while (lastKey)
+  } catch (error) {
+    throw new Error(
+      `Failed to delete events for lead ${leadId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+
+  return deleted
 }
