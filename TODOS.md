@@ -334,6 +334,31 @@ can be told why their CRM column changed.
 
 ## Backend
 
+### A condition step is a latent States.Runtime, and the one failure with no record (2026-08-29)
+
+Found while adding the journey terminal event. `condition` compiles to a Choice
+state reading `$.replied` / `$.lead_score` / `$.appointment_booked`
+(`journey-compiler-service.ts`), and none of those are ever written into the
+execution state — they live in the `lead_state` table. So a journey containing a
+condition step fails at that state.
+
+Two things make this worth fixing now rather than later:
+
+1. It was already broken; nothing changed that. But ASL does not permit `Catch`
+   on a Choice state, so this is now the ONLY failure class that ends a journey
+   without writing a `journey_ended` event. Every other failure records itself.
+   The observability feature is complete except for this hole.
+2. No shipped template uses a condition step, which is why it has never fired.
+   The first client who adds one hits it immediately, and gets no record.
+
+Fix: resolve the recheck fields into the execution state before the Choice runs
+— a Task that reads `lead_state` and merges the result, the same shape as the
+existing `wait_and_recheck` recheck Task. Then the Choice reads a path that is
+guaranteed to exist, and the Task carries the catch-all like every other Task.
+
+**Priority:** P1
+**Effort:** S (~half a day)
+
 ### Journey state transitions are guarded but not serialisable (2026-08-29)
 
 Found by the Codex structured review during `/ship` of the journey pause feature.

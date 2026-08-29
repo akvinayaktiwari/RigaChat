@@ -58,7 +58,7 @@ describe('JourneyExecutions', () => {
     })
     renderPanel()
 
-    expect(await screen.findByText('2 runs')).toBeTruthy()
+    expect(await screen.findByText('2 recent runs')).toBeTruthy()
     expect(screen.getByText('Completed')).toBeTruthy()
     expect(screen.getByText('Failed')).toBeTruthy()
   })
@@ -100,7 +100,7 @@ describe('JourneyExecutions', () => {
     getJourneyExecutions.mockResolvedValue({ success: true, data: [execution({ status: 'completed' })] })
     renderPanel()
 
-    await screen.findByText('1 run')
+    await screen.findByText('1 recent run')
     expect(screen.queryByText(/means no ending was recorded/)).toBeNull()
   })
 

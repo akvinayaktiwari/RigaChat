@@ -343,6 +343,22 @@ export function compileJourneyToAsl(journey: JourneyDefinition): AslStateMachine
         compileWaitAndRecheckStep(step, states, resolve)
         break
 
+      // KNOWN GAP, and the one failure class that still ends a journey with no
+      // journey_ended event: ASL does not allow Catch on a Choice state, so
+      // CATCH_ALL_TO_FAILED cannot be attached here. If the Variable path is
+      // missing, Step Functions fails the execution and nothing records it.
+      //
+      // That is not hypothetical. `field` is 'replied' | 'lead_score' |
+      // 'appointment_booked', none of which are ever written into the execution
+      // state -- they live in the lead_state table (see CLAUDE.md). So a
+      // condition step is a latent States.Runtime today, exactly as it was
+      // before this change; what IS new is that every other failure now leaves
+      // a record and this one does not.
+      //
+      // Fixing it properly means resolving those fields into the execution
+      // state before the Choice runs (a Task that reads lead_state), which is
+      // its own piece of work -- tracked in TODOS.md rather than smuggled in
+      // here.
       case 'condition':
         states[step.stepId] = {
           Type: 'Choice',

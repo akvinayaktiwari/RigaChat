@@ -99,7 +99,11 @@ export default function JourneyExecutions({ botId, bundleId }: { botId: string; 
     <div className="bg-white rounded-2xl border border-black/5 overflow-hidden">
       <div className="flex items-center gap-4 flex-wrap px-6 py-4 border-b border-black/5">
         <h3 className="font-bold text-gray-900" style={JAKARTA_FONT}>
-          {executions.length} {executions.length === 1 ? 'run' : 'runs'}
+          {/* "Recent" is load-bearing, not filler. The endpoint reads the last N
+              EVENTS, not all of them, so a busy journey's oldest runs fall
+              outside the window entirely. Printing a bare "12 runs" would state
+              a total this view cannot actually know. */}
+          {executions.length} recent {executions.length === 1 ? 'run' : 'runs'}
         </h3>
         {/* Counts, never rates. */}
         {(Object.keys(STATUS_STYLES) as JourneyExecutionSummary['status'][])
