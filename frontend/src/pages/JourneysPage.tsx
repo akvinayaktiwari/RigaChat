@@ -461,12 +461,17 @@ export default function JourneysPage() {
               "{bundleToDelete.name}" will be permanently deleted. This can't be undone.
             </p>
             {/* Deleting tears down the state machine, which fails any lead
-                currently mid-journey rather than letting them finish. Pause
-                does not -- so the choice is worth putting in front of them. */}
-            {bundleToDelete.status === 'published' && (
+                currently mid-journey rather than letting them finish.
+                A PAUSED journey needs this warning just as much as a live one:
+                pause keeps the state machine precisely so those leads finish,
+                so a paused journey is the MOST likely to still have people in
+                it -- warning only on 'published' would break the promise pause
+                just made. */}
+            {bundleToDelete.status !== 'draft' && (
               <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3 mt-3">
-                This journey is live. Deleting it will also drop any leads currently part-way through it. Pause it
-                instead if you only want to stop new leads entering.
+                {bundleToDelete.status === 'published'
+                  ? 'This journey is live. Deleting it will also drop any leads currently part-way through it. Pause it instead if you only want to stop new leads entering.'
+                  : 'This journey is paused, but leads that were already part-way through it are still running. Deleting it drops them.'}
               </p>
             )}
             <div className="flex items-center justify-end gap-3 mt-6">

@@ -1,6 +1,7 @@
 import {
   createJourneyBundle as createJourneyBundleRepo,
   deleteJourneyBundle as deleteJourneyBundleRepo,
+  JourneyBundleStateConflictError,
   getJourneyBundleById,
   getJourneyBundlesByBotId,
   updateJourneyBundle as updateJourneyBundleRepo,
@@ -276,8 +277,9 @@ export async function updateJourneyBundle(
 // CAVEAT, verified live 2026-08-06: deleting the state machine can FAIL leads
 // currently running that journey (`States.Runtime: State machine ... has been
 // deleted`) rather than letting them finish. A client deleting a published
-// journey therefore silently drops anyone mid-flight. Warning them first is a
-// product decision, tracked as a TODO rather than changed here.
+// journey therefore drops anyone mid-flight. The dashboard now warns before
+// that click and points at pauseJourneyBundle instead (JourneysPage.tsx),
+// which is the whole reason pause keeps the state machine alive.
 export async function deleteJourneyBundle(botId: string, bundleId: string, clientId: string): Promise<void> {
   const existing = await getOwnedJourneyBundle(botId, bundleId, clientId)
 
@@ -317,12 +319,26 @@ export async function pauseJourneyBundle(botId: string, bundleId: string, client
     throw new JourneyValidationError('Only a published journey can be paused')
   }
 
+  // Ordered so a failure leaves no state that lies. The status write is
+  // conditional on the bundle STILL being published, which is what makes the
+  // pair safe against a concurrent publish of the same bundle: without it, the
+  // interleaving (publish claims -> pause releases -> pause writes paused ->
+  // publish writes published) ends with status 'published' and no trigger
+  // claim, i.e. a journey the dashboard shows as Live that no lead can ever
+  // enter. Losing the race now fails as a 400 and leaves the winner's state.
   await releaseJourneyTrigger(
     triggerClaimKey({ agentId: existing.agentId, botId }, existing.journey.triggerType),
     bundleId
   )
 
-  return updateJourneyBundleRepo(botId, bundleId, { status: 'paused' })
+  try {
+    return await updateJourneyBundleRepo(botId, bundleId, { status: 'paused' }, 'published')
+  } catch (error) {
+    if (error instanceof JourneyBundleStateConflictError) {
+      throw new JourneyValidationError('Only a published journey can be paused')
+    }
+    throw error
+  }
 }
 
 // Compiles, claims the trigger, provisions a real Step Functions state machine,

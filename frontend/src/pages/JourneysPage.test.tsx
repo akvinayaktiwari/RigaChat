@@ -193,6 +193,19 @@ describe('deleting a journey', () => {
     expect(deleteJourneyBundle).not.toHaveBeenCalled()
   })
 
+  // Regression: the warning originally fired only on 'published'. Pause keeps
+  // the state machine alive so in-flight leads finish, which makes a paused
+  // journey the one MOST likely to still have people in it — deleting it
+  // silently killed exactly the executions pause had just promised to keep.
+  it('warns about mid-flight leads when deleting a PAUSED journey too', async () => {
+    await renderList('paused')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+
+    expect(await screen.findByText('Delete this journey?')).toBeTruthy()
+    expect(screen.getByText(/still running. Deleting it drops them/)).toBeTruthy()
+  })
+
   it('does not warn about mid-flight leads for a draft', async () => {
     await renderList('draft')
 
@@ -200,6 +213,7 @@ describe('deleting a journey', () => {
 
     expect(await screen.findByText('Delete this journey?')).toBeTruthy()
     expect(screen.queryByText(/drop any leads currently part-way through it/)).toBeNull()
+    expect(screen.queryByText(/still running. Deleting it drops them/)).toBeNull()
   })
 
   it('deletes only after the confirmation, and removes the row', async () => {

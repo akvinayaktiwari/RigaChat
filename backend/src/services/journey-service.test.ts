@@ -6,12 +6,22 @@ const deleteJourneyBundleRepo = vi.fn()
 const getJourneyBundleById = vi.fn()
 const getJourneyBundlesByBotId = vi.fn()
 const updateJourneyBundleRepo = vi.fn()
+class JourneyBundleStateConflictError extends Error {
+  constructor(
+    readonly bundleId: string,
+    readonly expectedStatus: string
+  ) {
+    super(`Journey bundle ${bundleId} is no longer ${expectedStatus}`)
+    this.name = 'JourneyBundleStateConflictError'
+  }
+}
 vi.mock('../repositories/journey-repository.js', () => ({
   createJourneyBundle: createJourneyBundleRepo,
   deleteJourneyBundle: deleteJourneyBundleRepo,
   getJourneyBundleById,
   getJourneyBundlesByBotId,
   updateJourneyBundle: updateJourneyBundleRepo,
+  JourneyBundleStateConflictError,
 }))
 
 const getBotConfig = vi.fn()
@@ -461,7 +471,33 @@ describe('pauseJourneyBundle', () => {
     await pauseJourneyBundle('bot-1', 'bundle-1', 'client-1')
 
     expect(releaseJourneyTrigger).toHaveBeenCalledWith('agent:agent-1#lead_captured', 'bundle-1')
-    expect(updateJourneyBundleRepo).toHaveBeenCalledWith('bot-1', 'bundle-1', { status: 'paused' })
+    // The 4th argument is the guard, not decoration: it makes the write
+    // conditional on the bundle still being published.
+    expect(updateJourneyBundleRepo).toHaveBeenCalledWith('bot-1', 'bundle-1', { status: 'paused' }, 'published')
+  })
+
+  // REGRESSION (ship review + Codex, both independently). Pause and publish are
+  // each a claim write plus a status write, and nothing serialises the four.
+  // The interleaving publish-claims -> pause-releases -> pause-writes-paused ->
+  // publish-writes-published used to end with status 'published' and NO trigger
+  // claim: the dashboard shows a green Live dot on a journey no lead can enter,
+  // and nothing surfaces the contradiction. The conditional write turns that
+  // silent corruption into a 400.
+  it('fails as a validation error when the bundle stopped being published mid-flight', async () => {
+    getJourneyBundleById.mockResolvedValue(publishedBundle)
+    updateJourneyBundleRepo.mockRejectedValue(new JourneyBundleStateConflictError('bundle-1', 'published'))
+
+    await expect(pauseJourneyBundle('bot-1', 'bundle-1', 'client-1')).rejects.toBeInstanceOf(JourneyValidationError)
+  })
+
+  // A genuine infrastructure failure must NOT be laundered into a 400 — that
+  // would tell the client their journey was in the wrong state when DynamoDB
+  // was simply unreachable.
+  it('lets a non-conflict repository failure propagate', async () => {
+    getJourneyBundleById.mockResolvedValue(publishedBundle)
+    updateJourneyBundleRepo.mockRejectedValue(new Error('DynamoDB unavailable'))
+
+    await expect(pauseJourneyBundle('bot-1', 'bundle-1', 'client-1')).rejects.toThrow('DynamoDB unavailable')
   })
 
   // The whole point of pause over delete: leads mid-journey keep running,
