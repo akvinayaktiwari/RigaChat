@@ -334,6 +334,26 @@ can be told why their CRM column changed.
 
 ## Backend
 
+### A failed publish leaves its trigger claim held (2026-08-29)
+
+Found during the observability drill. `publishJourneyBundle` claims the trigger
+BEFORE calling `createOrUpdateStateMachine`, deliberately — the ordering comment
+explains that claiming after provisioning could leave a state machine nobody
+will ever start. The cost of that choice, which the comment does not mention:
+when provisioning FAILS, the claim stays held by a bundle that never went live,
+and the client cannot publish anything else on that trigger. They get
+`JourneyTriggerConflictError` naming a bundle that is not published.
+
+Hit for real when the unreachable-terminal-state bug made publishing fail: the
+first attempt orphaned the claim and the retry was then blocked by it.
+
+Fix: release the claim on the failure path in `publishJourneyBundle`, guarded on
+still being the holder — the same conditional release `deleteJourneyBundle`
+already uses. Roughly six lines and a test.
+
+**Priority:** P1
+**Effort:** S (~1h)
+
 ### A condition step is a latent States.Runtime, and the one failure with no record (2026-08-29)
 
 Found while adding the journey terminal event. `condition` compiles to a Choice

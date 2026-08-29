@@ -49,7 +49,18 @@ describe('terminal states', () => {
   })
 
   it('emits all three outcomes, each with its outcome static in Parameters', () => {
-    const asl = linear()
+    // Needs a journey where all three are genuinely REACHABLE: a linear journey
+    // has no handoff, and Step Functions rejects an unreachable state.
+    const asl = compileJourneyToAsl(
+      baseJourney([
+        { stepId: 'greet', type: 'send_message', name: 'Greet', messageHint: 'hi', next: 'maybe' },
+        // A condition gives one branch that ends and one that hands off, so
+        // completed AND handed_off are both genuinely reachable.
+        { stepId: 'maybe', type: 'condition', name: 'Replied?', field: 'replied', operator: 'equals', value: 'true', onTrue: 'done', onFalse: 'handoff' },
+        { stepId: 'done', type: 'send_message', name: 'Done' },
+        { stepId: 'handoff', type: 'human_handoff', name: 'Handoff' },
+      ])
+    )
     expect(asl.States.__journey_completed).toMatchObject({
       Type: 'Task',
       Parameters: { operation: 'journey_ended', outcome: 'completed' },
@@ -108,6 +119,63 @@ describe('terminal states', () => {
     const c = (asl.States.ask as { Catch: { ErrorEquals: string[]; Next: string }[] }).Catch
     expect(c[0]).toMatchObject({ ErrorEquals: ['States.Timeout'], Next: 'nudge' })
     expect(c[1]).toMatchObject({ ErrorEquals: ['States.ALL'], Next: '__journey_failed' })
+  })
+
+  // REGRESSION, found by the observability drill on the first journey without a
+  // handoff step. Step Functions rejects a definition containing an unreachable
+  // state, so emitting all three terminals unconditionally made every journey
+  // WITHOUT a human_handoff step fail to publish:
+  //   InvalidDefinition: MISSING_TRANSITION_TARGET:
+  //     State "__journey_handed_off" is not reachable.
+  it('omits the handoff terminal when no step hands off', () => {
+    const asl = compileJourneyToAsl(
+      baseJourney([{ stepId: 'greet', type: 'send_message', name: 'Greet', messageHint: 'hi' }])
+    )
+
+    expect(asl.States.__journey_handed_off).toBeUndefined()
+    expect(asl.States.__journey_completed).toBeDefined()
+  })
+
+  it('omits the completed terminal when every path hands off', () => {
+    const asl = compileJourneyToAsl(baseJourney([{ stepId: 'handoff', type: 'human_handoff', name: 'Handoff' }]))
+
+    expect(asl.States.__journey_completed).toBeUndefined()
+    expect(asl.States.__journey_handed_off).toBeDefined()
+  })
+
+  // A journey of nothing but Wait states has no Task, so nothing carries the
+  // catch-all, so the failure terminal is unreachable too.
+  it('omits the failure terminal when no state can fail', () => {
+    const asl = compileJourneyToAsl(baseJourney([{ stepId: 'hold', type: 'wait', name: 'Hold', waitDays: 1 }]))
+
+    expect(asl.States.__journey_failed).toBeUndefined()
+    expect(asl.States.__journey_failed_terminal).toBeUndefined()
+    expect(asl.States.__journey_completed).toBeDefined()
+  })
+
+  // The real invariant behind all three: Step Functions rejects ANY unreachable
+  // state, so every emitted state must be a transition target or the StartAt.
+  it('emits no unreachable state, whatever the journey shape', () => {
+    for (const journey of [
+      baseJourney([{ stepId: 'greet', type: 'send_message', name: 'Greet' }]),
+      baseJourney([{ stepId: 'handoff', type: 'human_handoff', name: 'Handoff' }]),
+      baseJourney([{ stepId: 'hold', type: 'wait', name: 'Hold', waitDays: 1 }]),
+      baseJourney([
+        { stepId: 'greet', type: 'send_message', name: 'Greet', next: 'handoff' },
+        { stepId: 'handoff', type: 'human_handoff', name: 'Handoff' },
+      ]),
+    ]) {
+      const asl = compileJourneyToAsl(journey)
+      const targets = new Set<string>([asl.StartAt])
+      for (const state of Object.values(asl.States) as unknown as Record<string, unknown>[]) {
+        if (typeof state.Next === 'string') targets.add(state.Next)
+        if (typeof state.Default === 'string') targets.add(state.Default)
+        for (const c of (state.Choices as { Next: string }[] | undefined) ?? []) targets.add(c.Next)
+        for (const c of (state.Catch as { Next: string }[] | undefined) ?? []) targets.add(c.Next)
+      }
+      const unreachable = Object.keys(asl.States).filter((name) => !targets.has(name))
+      expect(unreachable).toEqual([])
+    }
   })
 
   // A stepId colliding with a terminal name would silently overwrite it in the
