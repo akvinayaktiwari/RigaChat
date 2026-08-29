@@ -29,7 +29,26 @@ async function main(): Promise<void> {
   console.log(`bundle: ${bundle.name} status=${bundle.status} version=${bundle.publishedVersion}`)
 
   const asl = compileJourneyToAsl(bundle.journey)
-  const states = asl.States as Record<string, { Type?: string; Parameters?: Record<string, unknown> }>
+  const states = asl.States as Record<
+    string,
+    { Type?: string; Parameters?: Record<string, unknown>; Catch?: { ErrorEquals: string[]; Next: string }[]; End?: boolean; Next?: string }
+  >
+
+  // What the recompile is FOR, printed so a dry run proves it rather than
+  // implying it. Updated 2026-08-29: the original diagnostic checked the
+  // lastResult passthrough (the 2026-08-25 fix); the reason to republish now is
+  // that terminal states did not exist when this bundle was last compiled, so
+  // it can never record how a journey ended.
+  const terminals = Object.keys(states).filter((name) => name.startsWith('__journey_'))
+  console.log(`  terminal states: ${terminals.length ? terminals.join(', ') : 'NONE — this journey cannot record an ending'}`)
+
+  const tasks = Object.entries(states).filter(([, state]) => state.Type === 'Task')
+  const uncaught = tasks.filter(([name, state]) => !name.startsWith('__journey_') && !state.Catch?.length)
+  console.log(`  tasks: ${tasks.length}, without a catch-all: ${uncaught.length}${uncaught.length ? ` (${uncaught.map(([n]) => n).join(', ')})` : ''}`)
+
+  const strandedEnds = Object.entries(states).filter(([name, state]) => state.End === true && !name.startsWith('__journey_'))
+  console.log(`  steps still ending in place (should be 0): ${strandedEnds.length}${strandedEnds.length ? ` (${strandedEnds.map(([n]) => n).join(', ')})` : ''}`)
+
   for (const [name, state] of Object.entries(states)) {
     const params = state.Parameters ?? {}
     if ('operation' in params && params.operation === 'send_message') {
