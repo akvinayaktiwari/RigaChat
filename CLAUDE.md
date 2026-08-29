@@ -60,6 +60,11 @@ GET  /api/journeys/:botId/:bundleId      -> fetch one JourneyBundle (auth requir
 PATCH /api/journeys/:botId/:bundleId     -> update a JourneyBundle (auth required)
 DELETE /api/journeys/:botId/:bundleId    -> delete a JourneyBundle (auth required)
 POST /api/journeys/:botId/:bundleId/publish -> compile + mark published, no live infra provisioned yet (auth required)
+GET  /api/journeys/active                -> every journey that is live or paused, across ALL of the caller's bots.
+                                            The cross-bot index: answers "what is running right now" without
+                                            picking a bot first (auth required)
+GET  /api/journeys/:botId/:bundleId/executions -> each lead's run through this journey, newest first. Derived on read
+                                            from lead_events via the bundleId-ts GSI, never stored (auth required)
 POST /api/journeys/:botId/:bundleId/pause   -> take a live journey off the air: releases its trigger claim so no new
                                             lead ignites into it, KEEPS the compiled state machine so anyone
                                             mid-journey finishes. Resume = POST /publish again (auth required)
@@ -143,7 +148,7 @@ interface KnowledgeBaseEntry {
 - journey_trigger_claims — partition key: claimKey (`agent:<agentId>#<trigger>` or `bot:<botId>#<trigger>`; atomic-claim so exactly ONE published bundle owns a trigger — prevents duplicate outreach. Doubles as the ignition index: "which journey runs for this lead" is a point read)
 - lead_state — partition key: leadId, GSI clientId-updatedAt-index (per-lead CRM working state: status/owner/nextActionAt/notes/leadScore. Its own table because the three lead tables have three different partition keys — same reason whatsapp_inbound_activity and journey_pending_replies are leadId-keyed side tables. Also where JourneyStep.recheckField's `replied`/`leadScore`/`appointmentBooked` finally live)
 - meta_deletion_requests — partition key: confirmationCode (Meta's mandated data-deletion callback. No GSI: every read is a point lookup by the code Meta hands the user. No TTL — the row is the evidence the request was handled)
-- lead_events — partition key: leadId, sort key: ts (`<iso>#<uuid>`), GSI clientId-ts-index, sparse GSI wamid-index (append-only record of everything that happened to a lead: messages both directions, delivery statuses, journey steps, tool calls, handoffs. The wamid index exists because a Meta status webhook carries a wamid and no leadId. No TTL — this is the audit record)
+- lead_events — partition key: leadId, sort key: ts (`<iso>#<uuid>`), GSI clientId-ts-index, sparse GSI wamid-index, sparse GSI bundleId-ts-index (append-only record of everything that happened to a lead: messages both directions, delivery statuses, journey steps, tool calls, handoffs. The wamid index exists because a Meta status webhook carries a wamid and no leadId. No TTL — this is the audit record)
 - contact_messages — partition key: messageId, GSI recordType-createdAt-index (marketing-site contact form; no clientId/botId — these are messages to us, not leads for a client's bot)
 
 ## Environment Variables

@@ -14,6 +14,7 @@ const publishJourneyBundle = vi.fn()
 const pauseJourneyBundle = vi.fn()
 const deleteJourneyBundle = vi.fn()
 const createJourneyBundleFromTemplate = vi.fn()
+const getActiveJourneys = vi.fn()
 
 vi.mock('../services/api', () => ({
   getMyBots: (...args: unknown[]) => getMyBots(...args),
@@ -23,6 +24,7 @@ vi.mock('../services/api', () => ({
   pauseJourneyBundle: (...args: unknown[]) => pauseJourneyBundle(...args),
   deleteJourneyBundle: (...args: unknown[]) => deleteJourneyBundle(...args),
   createJourneyBundleFromTemplate: (...args: unknown[]) => createJourneyBundleFromTemplate(...args),
+  getActiveJourneys: (...args: unknown[]) => getActiveJourneys(...args),
 }))
 
 const toastShow = vi.fn()
@@ -81,10 +83,12 @@ beforeEach(() => {
   pauseJourneyBundle.mockReset()
   deleteJourneyBundle.mockReset()
   createJourneyBundleFromTemplate.mockReset()
+  getActiveJourneys.mockReset()
   toastShow.mockReset()
 
   getMyBots.mockResolvedValue({ success: true, data: [{ botId: 'bot-1', name: 'Riga sales bot' }] })
   getJourneyTemplates.mockResolvedValue({ success: true, data: [] })
+  getActiveJourneys.mockResolvedValue({ success: true, data: [] })
   publishJourneyBundle.mockResolvedValue({ success: true, data: bundle('published') })
   pauseJourneyBundle.mockResolvedValue({ success: true, data: bundle('paused') })
   deleteJourneyBundle.mockResolvedValue({ success: true, data: { message: 'Journey bundle deleted' } })
@@ -170,6 +174,93 @@ describe('pause, resume, publish are offered per status', () => {
       expect(toastShow).toHaveBeenCalledWith('Only a published journey can be paused', 'error')
     )
     expect(screen.getByText('Live')).toBeTruthy()
+  })
+})
+
+// The failure this exists for: 23 bots, one live journey, and the dropdown
+// defaulting to whichever botId sorts first — so the page opened on a bot with
+// nothing running and the live journey was invisible behind 22 other entries.
+describe('active across all bots', () => {
+  function twoBots() {
+    getMyBots.mockResolvedValue({
+      success: true,
+      data: [
+        { botId: 'bot-aaa', name: 'Quiet bot' },
+        { botId: 'bot-zzz', name: 'Busy bot' },
+      ],
+    })
+  }
+
+  it('names the live journey and the bot it runs on, without picking a bot first', async () => {
+    twoBots()
+    getActiveJourneys.mockResolvedValue({
+      success: true,
+      data: [{ ...bundle('published'), bundleId: 'live-1', botId: 'bot-zzz' }],
+    })
+    getJourneyBundles.mockResolvedValue({ success: true, data: [] })
+
+    render(
+      <MemoryRouter initialEntries={['/dashboard/journeys']}>
+        <JourneysPage />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('Active across all bots')).toBeTruthy()
+    expect(screen.getByText('1 of 2 bots')).toBeTruthy()
+    // Scoped to the strip's own row: the bot name also appears in the dropdown,
+    // which is now defaulted to this same bot.
+    expect(screen.getByText(/Busy bot · a new lead comes in/)).toBeTruthy()
+  })
+
+  // The core fix. bot-aaa sorts first, so the old code selected it; the live
+  // journey is on bot-zzz.
+  it('defaults the dropdown to a bot that has a live journey, not the first one', async () => {
+    twoBots()
+    getActiveJourneys.mockResolvedValue({
+      success: true,
+      data: [{ ...bundle('published'), bundleId: 'live-1', botId: 'bot-zzz' }],
+    })
+    getJourneyBundles.mockResolvedValue({ success: true, data: [] })
+
+    render(
+      <MemoryRouter initialEntries={['/dashboard/journeys']}>
+        <JourneysPage />
+      </MemoryRouter>
+    )
+
+    await waitFor(() => expect(getJourneyBundles).toHaveBeenCalledWith('bot-zzz'))
+    expect(getJourneyBundles).not.toHaveBeenCalledWith('bot-aaa')
+  })
+
+  it('falls back to the first bot when nothing is running anywhere', async () => {
+    twoBots()
+    getActiveJourneys.mockResolvedValue({ success: true, data: [] })
+    getJourneyBundles.mockResolvedValue({ success: true, data: [] })
+
+    render(
+      <MemoryRouter initialEntries={['/dashboard/journeys']}>
+        <JourneysPage />
+      </MemoryRouter>
+    )
+
+    await waitFor(() => expect(getJourneyBundles).toHaveBeenCalledWith('bot-aaa'))
+    expect(screen.queryByText('Active across all bots')).toBeNull()
+  })
+
+  // A failed index must cost the strip, not the page.
+  it('still renders the journey list when the active index fails', async () => {
+    twoBots()
+    getActiveJourneys.mockRejectedValue(new Error('boom'))
+    getJourneyBundles.mockResolvedValue({ success: true, data: [bundle('draft')] })
+
+    render(
+      <MemoryRouter initialEntries={['/dashboard/journeys']}>
+        <JourneysPage />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('Real estate lead qualification')).toBeTruthy()
+    expect(screen.queryByText('Active across all bots')).toBeNull()
   })
 })
 

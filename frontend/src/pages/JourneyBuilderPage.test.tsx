@@ -12,6 +12,7 @@ const updateJourneyBundle = vi.fn()
 const publishJourneyBundle = vi.fn()
 const createJourneyBundle = vi.fn()
 const pauseJourneyBundle = vi.fn()
+const getJourneyExecutions = vi.fn()
 
 vi.mock('../services/api', () => ({
   getJourneyBundle: (...args: unknown[]) => getJourneyBundle(...args),
@@ -19,6 +20,7 @@ vi.mock('../services/api', () => ({
   publishJourneyBundle: (...args: unknown[]) => publishJourneyBundle(...args),
   createJourneyBundle: (...args: unknown[]) => createJourneyBundle(...args),
   pauseJourneyBundle: (...args: unknown[]) => pauseJourneyBundle(...args),
+  getJourneyExecutions: (...args: unknown[]) => getJourneyExecutions(...args),
 }))
 
 const toastShow = vi.fn()
@@ -78,6 +80,8 @@ beforeEach(() => {
   publishJourneyBundle.mockReset()
   createJourneyBundle.mockReset()
   pauseJourneyBundle.mockReset()
+  getJourneyExecutions.mockReset()
+  getJourneyExecutions.mockResolvedValue({ success: true, data: [] })
   toastShow.mockReset()
   updateJourneyBundle.mockResolvedValue({ success: true, data: bundle('draft') })
   publishJourneyBundle.mockResolvedValue({ success: true, data: bundle('published') })
@@ -227,5 +231,24 @@ describe('pausing a live journey', () => {
 
     expect(await screen.findByText('Only a published journey can be paused')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Pause' })).toBeTruthy()
+  })
+})
+
+// The Activity tab is the read path's entry point. It is keyed by bundleId, so
+// it only makes sense on a journey that has actually been saved.
+describe('activity tab', () => {
+  it('loads this journey\'s runs when opened', async () => {
+    await renderBuilder('published')
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Activity' }))
+
+    await waitFor(() => expect(getJourneyExecutions).toHaveBeenCalledWith('bot-1', 'bundle-1'))
+  })
+
+  it('reports an empty journey as never run, not as broken', async () => {
+    await renderBuilder('published')
+    fireEvent.click(screen.getByRole('tab', { name: 'Activity' }))
+
+    expect(await screen.findByText('No leads have entered this journey yet')).toBeTruthy()
   })
 })
