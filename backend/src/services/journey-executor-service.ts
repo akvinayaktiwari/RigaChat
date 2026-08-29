@@ -16,7 +16,7 @@ import {
   sendWhatsAppMessageToLead,
   sendWhatsAppTemplateToLead,
 } from './whatsapp-service.js'
-import type { JourneyExecutorEvent, JourneyLead, WaitAndRecheckResult } from '../types/index.js'
+import type { JourneyExecutorEvent, JourneyLead, JourneyOutcome, WaitAndRecheckResult } from '../types/index.js'
 
 // The Lambda handler journey-compiler-service.ts's compiled Task states
 // actually invoke (via journeyExecutorLambdaArn) -- see backend/index.ts's
@@ -223,6 +223,65 @@ async function recordStep(event: JourneyExecutorEvent): Promise<void> {
   })
 }
 
+// The terminal event. Written by the compiler's synthetic __journey_* states,
+// which every exit from the state machine now routes through -- there is no
+// path that ends a journey without passing here.
+//
+// The whole point is the OUTCOME. journey_ended sat in LeadEventType for a
+// month with zero call sites, so a journey that finished cleanly and one that
+// crashed on its second step were indistinguishable in the data; a bare
+// "it ended" row would have kept them that way.
+async function handleJourneyEnded(event: JourneyExecutorEvent): Promise<{ ended: true; outcome: JourneyOutcome }> {
+  // Defensive: the outcome is static in the compiled Parameters, so an absent
+  // one means an execution started against an OLD state machine version that
+  // predates this feature. Recording it as 'completed' would be a lie, and
+  // dropping the event would leave the same blind spot -- so it fails loudly.
+  const outcome = event.outcome
+  if (!outcome) {
+    throw new Error('journey_ended received no outcome — the state machine predates the terminal-event compiler')
+  }
+
+  await appendLeadEvent({
+    leadId: event.leadId,
+    clientId: event.clientId,
+    botId: event.botId,
+    type: 'journey_ended',
+    bundleId: event.bundleId,
+    outcome,
+    ...(event.stepId ? { stepId: event.stepId } : {}),
+    ...(event.executionArn ? { executionArn: event.executionArn } : {}),
+    // Flattened to a string here rather than stored raw: `errorDetail` is what
+    // the timeline already renders for a failed WhatsApp status, so a failed
+    // journey reuses the same field and the same UI instead of inventing a
+    // second shape for "what went wrong".
+    ...(event.journeyError ? { errorDetail: summariseJourneyError(event.journeyError) } : {}),
+  })
+
+  return { ended: true, outcome }
+}
+
+// Step Functions hands a caught error as { Error, Cause }, where Cause is
+// usually a JSON string carrying the Lambda's own errorMessage. Read
+// defensively at every level: this runs on the failure path, and throwing here
+// would replace a recorded failure with an unrecorded one.
+function summariseJourneyError(raw: Record<string, unknown>): string {
+  const errorName = typeof raw.Error === 'string' ? raw.Error : 'UnknownError'
+  const cause = typeof raw.Cause === 'string' ? raw.Cause : undefined
+  if (!cause) return errorName
+
+  try {
+    const parsed: unknown = JSON.parse(cause)
+    if (parsed && typeof parsed === 'object' && 'errorMessage' in parsed) {
+      const message = (parsed as { errorMessage?: unknown }).errorMessage
+      if (typeof message === 'string') return `${errorName}: ${message}`
+    }
+  } catch {
+    // Cause is not always JSON (States.Timeout, States.Runtime and friends
+    // send a bare string). The raw text is the diagnostic either way.
+  }
+  return `${errorName}: ${cause}`.slice(0, 1000)
+}
+
 async function handleHumanHandoff(event: JourneyExecutorEvent): Promise<{ handedOff: true; notified: boolean }> {
   // The event is written FIRST and unconditionally. It is the durable record
   // that the agent stopped, and it has to survive a notification that never
@@ -343,5 +402,9 @@ export async function executeJourneyStep(event: JourneyExecutorEvent): Promise<R
     case 'wait_and_recheck_check':
       await recordStep(event)
       return { ...(await handleWaitAndRecheckCheck(event)) }
+    // No recordStep: the terminal event IS the record, and a generic
+    // journey_step row beside it would double the ending in the timeline.
+    case 'journey_ended':
+      return handleJourneyEnded(event)
   }
 }

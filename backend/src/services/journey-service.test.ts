@@ -27,6 +27,12 @@ vi.mock('../repositories/journey-repository.js', () => ({
 const getBotConfig = vi.fn()
 vi.mock('./bot-service.js', () => ({ getBotConfig }))
 
+const getBotsByClientId = vi.fn()
+vi.mock('../repositories/bot-repository.js', () => ({ getBotsByClientId }))
+
+const getEventsByBundleId = vi.fn()
+vi.mock('../repositories/lead-event-repository.js', () => ({ getEventsByBundleId }))
+
 const createOrUpdateStateMachine = vi.fn()
 const deleteStateMachine = vi.fn()
 vi.mock('../lib/step-functions.js', () => ({
@@ -65,6 +71,8 @@ const {
   JourneyTemplateNotFoundError,
   JourneyValidationError,
   pauseJourneyBundle,
+  summariseExecutions,
+  getActiveJourneys,
   publishJourneyBundle,
   updateJourneyBundle,
 } = await import('./journey-service.js')
@@ -98,6 +106,8 @@ beforeEach(() => {
   }))
   claimJourneyTrigger.mockResolvedValue(undefined)
   releaseJourneyTrigger.mockResolvedValue(undefined)
+  getBotsByClientId.mockReset()
+  getEventsByBundleId.mockReset()
   deleteStateMachine.mockResolvedValue(undefined)
   createOrUpdateStateMachine.mockResolvedValue({
     stateMachineArn: 'arn:aws:states:ap-south-1:1:stateMachine:sm',
@@ -623,5 +633,115 @@ describe('pauseJourneyBundle', () => {
       clientId: 'client-1',
     })
     expect(result).toMatchObject({ status: 'published' })
+  })
+})
+
+// The grouping is the only real logic in the executions read path, and it is
+// what turns "240 rows" into "12 runs, 3 still going, 1 failed".
+describe('summariseExecutions', () => {
+  const ev = (leadId: string, iso: string, type: string, extra: Record<string, unknown> = {}) =>
+    ({ leadId, ts: `${iso}#${leadId}-${type}`, clientId: 'client-1', botId: 'bot-1', type, bundleId: 'bundle-1', ...extra }) as never
+
+  it('groups events per lead and counts them', () => {
+    const out = summariseExecutions(
+      [
+        ev('lead-a', '2026-08-29T10:00:00.000Z', 'journey_started'),
+        ev('lead-a', '2026-08-29T10:01:00.000Z', 'message_out'),
+        ev('lead-b', '2026-08-29T09:00:00.000Z', 'journey_started'),
+      ],
+      'bundle-1'
+    )
+
+    expect(out).toHaveLength(2)
+    expect(out.find((e) => e.leadId === 'lead-a')?.eventCount).toBe(2)
+  })
+
+  // Absent a terminal event this is an INFERENCE, not a fact — a run that died
+  // before terminal events existed looks exactly the same. Inventing an outcome
+  // here would be the same lie the missing journey_ended write used to tell.
+  it('reports running when no terminal event exists', () => {
+    const out = summariseExecutions([ev('lead-a', '2026-08-29T10:00:00.000Z', 'journey_started')], 'bundle-1')
+    expect(out[0].status).toBe('running')
+  })
+
+  it('takes the outcome from the terminal event', () => {
+    const out = summariseExecutions(
+      [
+        ev('lead-a', '2026-08-29T10:00:00.000Z', 'journey_started'),
+        ev('lead-a', '2026-08-29T10:05:00.000Z', 'journey_ended', {
+          outcome: 'failed',
+          errorDetail: 'States.TaskFailed: boom',
+          executionArn: 'arn:exec-1',
+        }),
+      ],
+      'bundle-1'
+    )
+
+    expect(out[0]).toMatchObject({
+      status: 'failed',
+      errorDetail: 'States.TaskFailed: boom',
+      executionArn: 'arn:exec-1',
+      startedAt: '2026-08-29T10:00:00.000Z',
+      lastEventAt: '2026-08-29T10:05:00.000Z',
+    })
+  })
+
+  // getEventsByBundleId returns newest-first, so first/last must not depend on
+  // the order the caller happened to receive.
+  it('derives startedAt and lastEventAt regardless of input order', () => {
+    const out = summariseExecutions(
+      [
+        ev('lead-a', '2026-08-29T12:00:00.000Z', 'message_out'),
+        ev('lead-a', '2026-08-29T08:00:00.000Z', 'journey_started'),
+      ],
+      'bundle-1'
+    )
+
+    expect(out[0].startedAt).toBe('2026-08-29T08:00:00.000Z')
+    expect(out[0].lastEventAt).toBe('2026-08-29T12:00:00.000Z')
+  })
+
+  it('puts the most recently active run first', () => {
+    const out = summariseExecutions(
+      [
+        ev('old', '2026-08-01T00:00:00.000Z', 'journey_started'),
+        ev('new', '2026-08-29T00:00:00.000Z', 'journey_started'),
+      ],
+      'bundle-1'
+    )
+
+    expect(out.map((e) => e.leadId)).toEqual(['new', 'old'])
+  })
+})
+
+describe('getActiveJourneys', () => {
+  it('returns live and paused journeys across every bot, drafts excluded', async () => {
+    getBotsByClientId.mockResolvedValue([{ botId: 'bot-1' }, { botId: 'bot-2' }])
+    getJourneyBundlesByBotId.mockImplementation(async (botId: string) =>
+      botId === 'bot-1'
+        ? [
+            { ...publishedBundle, bundleId: 'live-1', clientId: 'client-1', status: 'published', updatedAt: '2026-08-02' },
+            { ...publishedBundle, bundleId: 'draft-1', clientId: 'client-1', status: 'draft', updatedAt: '2026-08-03' },
+          ]
+        : [{ ...publishedBundle, bundleId: 'paused-1', clientId: 'client-1', status: 'paused', updatedAt: '2026-08-05' }]
+    )
+
+    const out = await getActiveJourneys('client-1')
+
+    // Live before paused, drafts gone entirely.
+    expect(out.map((b) => b.bundleId)).toEqual(['live-1', 'paused-1'])
+  })
+
+  // The operator is using this to find what is running. One unreadable bot
+  // should cost that bot's row, not the whole index.
+  it('degrades to a partial answer when one bot fails to read', async () => {
+    getBotsByClientId.mockResolvedValue([{ botId: 'bot-1' }, { botId: 'bot-broken' }])
+    getJourneyBundlesByBotId.mockImplementation(async (botId: string) => {
+      if (botId === 'bot-broken') throw new Error('Dynamo unavailable')
+      return [{ ...publishedBundle, bundleId: 'live-1', clientId: 'client-1', status: 'published', updatedAt: '2026-08-02' }]
+    })
+
+    const out = await getActiveJourneys('client-1')
+    expect(out.map((b) => b.bundleId)).toEqual(['live-1'])
   })
 })

@@ -5,8 +5,10 @@ import {
   createJourneyBundle,
   createJourneyBundleFromTemplate,
   deleteJourneyBundle,
+  getActiveJourneys,
   getJourneyBundle,
   getJourneyBundles,
+  getJourneyExecutions,
   getJourneyTemplates,
   JourneyTemplateNotFoundError,
   JourneyValidationError,
@@ -20,6 +22,7 @@ import type {
   ApiResponse,
   JourneyBundle,
   JourneyDefinition,
+  JourneyExecutionSummary,
   JourneyTemplate,
 } from '../types/index.js'
 
@@ -108,6 +111,24 @@ journeyRoutes.get('/templates', requireAuth, (c) => {
   return c.json<ApiResponse<JourneyTemplate[]>>({ success: true, data: getJourneyTemplates() }, 200)
 })
 
+// MUST stay above GET '/:botId' for the same reason as '/templates': both match
+// a single path segment and Hono takes the first registered match, so declaring
+// this later would resolve /api/journeys/active as a bot whose id is "active".
+//
+// The cross-bot index. Answers "what is running right now" without making the
+// caller pick a bot first -- which the Journeys page cannot do, because it
+// defaults to whichever botId sorts first.
+journeyRoutes.get('/active', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+
+  try {
+    const bundles = await getActiveJourneys(clientId)
+    return c.json<ApiResponse<JourneyBundle[]>>({ success: true, data: bundles }, 200)
+  } catch (error) {
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
 // Clones a prebuilt agent into a client-owned bundle. Separate from POST '/'
 // because the two differ in what the client is trusted to supply: here the
 // journey and agent come from our own library, and the client only chooses
@@ -166,6 +187,30 @@ journeyRoutes.get('/:botId/:bundleId', requireAuth, async (c) => {
   try {
     const bundle = await getJourneyBundle(botId, bundleId, clientId)
     return c.json<ApiResponse<JourneyBundle>>({ success: true, data: bundle }, 200)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Journey bundle not found') {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+// Per-journey activity: every lead's run, newest first, derived from the events
+// the engine already writes. Registered above PATCH/DELETE on the same prefix
+// for readability only -- the method and the extra segment already disambiguate.
+journeyRoutes.get('/:botId/:bundleId/executions', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const botId = c.req.param('botId')
+  const bundleId = c.req.param('bundleId')
+
+  // Bounded, and clamped rather than trusted: the audit table has no TTL, so an
+  // unbounded limit from a query string is an unbounded read on a Lambda.
+  const requested = Number(c.req.query('limit'))
+  const limit = Number.isFinite(requested) ? Math.min(Math.max(Math.trunc(requested), 1), 500) : 200
+
+  try {
+    const executions = await getJourneyExecutions(botId, bundleId, clientId, limit)
+    return c.json<ApiResponse<JourneyExecutionSummary[]>>({ success: true, data: executions }, 200)
   } catch (error) {
     if (error instanceof Error && error.message === 'Journey bundle not found') {
       return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
