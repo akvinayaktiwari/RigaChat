@@ -182,14 +182,45 @@ EMAIL_LOGO_URL
 Backend:
   cd backend && npm install
   npm run dev       <- local dev
-  npm run build     <- compile TypeScript
-  npm run deploy    <- zip and push to Lambda
+  npm run build     <- typecheck + esbuild bundle to dist/index.js
+  npm test          <- vitest
 
 Frontend:
   cd frontend && npm install
   npm run dev       <- local dev server
-  npm run build     <- production build to /dist
-  npm run deploy    <- sync /dist to S3 + invalidate CloudFront
+  npm run build     <- production build to /dist (vite + prerender)
+  npm test          <- vitest
+
+## Deploying
+**Pushing to `main` deploys.** `.github/workflows/ci.yml` runs the checks and then
+`deploy-backend` + `deploy-frontend` on every push to main. That is the normal path —
+there is nothing to run by hand. Check it with `gh run list --branch main --limit 1`.
+
+There is NO `npm run deploy` in the frontend, and the backend's one is not the full
+deploy. Do not reach for either:
+  - `backend/scripts/deploy.js` (`cd backend && npm run deploy`) updates only
+    rigachat-api and rigachat-api-streaming. It does NOT touch rigachat-crawler,
+    which runs the same bundle, so using it alone leaves the crawler on stale code.
+  - the frontend has no deploy script at all.
+
+The manual fallback, for when CI is down, is the root script — 3 Lambdas, the widget
+and dashboard S3 buckets, and both CloudFront invalidations:
+  ./scripts/deploy.sh                 <- everything
+  ./scripts/deploy.sh --backend-only  <- 3 Lambdas only; needs no VITE_* values,
+                                         which is what makes it safe during a
+                                         GitHub outage (it cannot touch Lambda
+                                         Environment, only code + memory-size)
+
+The full run resolves every VITE_* from GitHub repo variables (or exported env
+vars) and ABORTS rather than guessing — a hardcoded default once shipped a login
+pointing at the retired domain. It needs `gh auth login` plus `jq`, and AWS creds
+for ap-south-1.
+
+Verifying a deploy landed (never trust the green check alone):
+  aws lambda get-function-configuration --function-name rigachat-api \
+    --region ap-south-1 --query LastModified
+  curl -o /dev/null -w '%{http_code}' -X POST "$VITE_API_URL/api/<a-guarded-route>"
+      # 401 = deployed and auth-guarded; 404 = the route is not there
 
 ## What NOT to Build in MVP
 - PDF upload (Phase 2)
