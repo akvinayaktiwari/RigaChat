@@ -7,7 +7,7 @@ vi.mock('./dynamo-client.js', async () => {
   return { dynamoClient: { send }, getTableName: actual.getTableName }
 })
 
-const { appendLeadEvent, getLeadEvents, getEventByWamid, getClientEvents } = await import(
+const { appendLeadEvent, getLeadEvents, getEventByWamid, getClientEvents, getEventsByBundleId } = await import(
   './lead-event-repository.js'
 )
 
@@ -178,5 +178,38 @@ describe('getClientEvents', () => {
     await getClientEvents('client-1')
 
     expect(send.mock.calls[0]?.[0].input.Limit).toBe(100)
+  })
+})
+
+describe('getEventsByBundleId', () => {
+  it('queries the sparse bundle index newest first', async () => {
+    send.mockResolvedValue({ Items: [] })
+
+    await getEventsByBundleId('bundle-1', 50)
+
+    const input = send.mock.calls[0]?.[0].input
+    expect(input.IndexName).toBe('bundleId-ts-index')
+    expect(input.KeyConditionExpression).toBe('bundleId = :bundleId')
+    expect(input.ScanIndexForward).toBe(false)
+    expect(input.Limit).toBe(50)
+  })
+
+  // The audit table has no TTL by design, so this query grows forever. An
+  // unbounded default would eventually be an unbounded read inside a Lambda.
+  it('bounds the read even when the caller passes no limit', async () => {
+    send.mockResolvedValue({ Items: [] })
+
+    await getEventsByBundleId('bundle-1')
+
+    expect(send.mock.calls[0]?.[0].input.Limit).toBe(200)
+  })
+
+  // Unlike the wamid lookup, this one throws rather than returning []: an empty
+  // executions list means "no lead ever entered this journey", and quietly
+  // returning that for a broken query would be a lie the operator acts on.
+  it('throws rather than reporting an empty journey when the query fails', async () => {
+    send.mockRejectedValue(new Error('index not ready'))
+
+    await expect(getEventsByBundleId('bundle-1')).rejects.toThrow(/index not ready/)
   })
 })

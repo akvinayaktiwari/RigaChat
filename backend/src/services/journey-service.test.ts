@@ -73,6 +73,7 @@ const {
   pauseJourneyBundle,
   summariseExecutions,
   getActiveJourneys,
+  getJourneyExecutions,
   publishJourneyBundle,
   updateJourneyBundle,
 } = await import('./journey-service.js')
@@ -743,5 +744,35 @@ describe('getActiveJourneys', () => {
 
     const out = await getActiveJourneys('client-1')
     expect(out.map((b) => b.bundleId)).toEqual(['live-1'])
+  })
+})
+
+describe('getJourneyExecutions — ownership', () => {
+  // SECURITY. The bundleId-ts GSI is partitioned by bundleId ALONE, with no
+  // clientId in the key. Without this check a caller who guessed or leaked a
+  // bundleId would read another client's lead activity straight out of the
+  // index. The ownership check must therefore run BEFORE the events are read,
+  // not as a filter afterwards.
+  it('refuses a bundle the caller does not own, and never touches the index', async () => {
+    getJourneyBundleById.mockResolvedValue({ ...publishedBundle, clientId: 'someone-else' })
+
+    await expect(getJourneyExecutions('bot-1', 'bundle-1', 'client-1')).rejects.toThrow('Journey bundle not found')
+    expect(getEventsByBundleId).not.toHaveBeenCalled()
+  })
+
+  it('refuses a bundle that does not exist', async () => {
+    getJourneyBundleById.mockResolvedValue(null)
+
+    await expect(getJourneyExecutions('bot-1', 'bundle-1', 'client-1')).rejects.toThrow('Journey bundle not found')
+    expect(getEventsByBundleId).not.toHaveBeenCalled()
+  })
+
+  it('reads the index once ownership is established, honouring the limit', async () => {
+    getJourneyBundleById.mockResolvedValue(publishedBundle)
+    getEventsByBundleId.mockResolvedValue([])
+
+    await getJourneyExecutions('bot-1', 'bundle-1', 'client-1', 25)
+
+    expect(getEventsByBundleId).toHaveBeenCalledWith('bundle-1', 25)
   })
 })
