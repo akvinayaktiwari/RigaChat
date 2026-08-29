@@ -11,12 +11,14 @@ const getJourneyBundle = vi.fn()
 const updateJourneyBundle = vi.fn()
 const publishJourneyBundle = vi.fn()
 const createJourneyBundle = vi.fn()
+const pauseJourneyBundle = vi.fn()
 
 vi.mock('../services/api', () => ({
   getJourneyBundle: (...args: unknown[]) => getJourneyBundle(...args),
   updateJourneyBundle: (...args: unknown[]) => updateJourneyBundle(...args),
   publishJourneyBundle: (...args: unknown[]) => publishJourneyBundle(...args),
   createJourneyBundle: (...args: unknown[]) => createJourneyBundle(...args),
+  pauseJourneyBundle: (...args: unknown[]) => pauseJourneyBundle(...args),
 }))
 
 const toastShow = vi.fn()
@@ -26,7 +28,7 @@ vi.mock('../components/Toast/Toast', () => ({
 
 const JourneyBuilderPage = (await import('./JourneyBuilderPage')).default
 
-function bundle(status: 'draft' | 'published'): JourneyBundle {
+function bundle(status: JourneyBundle['status']): JourneyBundle {
   return {
     bundleId: 'bundle-1',
     botId: 'bot-1',
@@ -56,7 +58,7 @@ function bundle(status: 'draft' | 'published'): JourneyBundle {
   }
 }
 
-async function renderBuilder(status: 'draft' | 'published') {
+async function renderBuilder(status: JourneyBundle['status']) {
   getJourneyBundle.mockResolvedValue({ success: true, data: bundle(status) })
 
   render(
@@ -75,9 +77,11 @@ beforeEach(() => {
   updateJourneyBundle.mockReset()
   publishJourneyBundle.mockReset()
   createJourneyBundle.mockReset()
+  pauseJourneyBundle.mockReset()
   toastShow.mockReset()
   updateJourneyBundle.mockResolvedValue({ success: true, data: bundle('draft') })
   publishJourneyBundle.mockResolvedValue({ success: true, data: bundle('published') })
+  pauseJourneyBundle.mockResolvedValue({ success: true, data: bundle('paused') })
 })
 
 // The behaviour under test is a real backend consequence, not a UI nicety:
@@ -151,5 +155,63 @@ describe('paths that must NOT be gated', () => {
 
     await waitFor(() => expect(publishJourneyBundle).toHaveBeenCalledTimes(1))
     expect(screen.queryByText('Saving will take this journey off duty')).toBeNull()
+  })
+})
+
+// Pause is the only way to take a live journey off the air without either
+// deleting it (which fails anyone mid-journey) or saving an edit (which drops
+// it to draft for an unrelated reason). These tests pin the three things that
+// make it usable: it is offered exactly when it applies, it does NOT save
+// first, and the state it leaves behind is visibly resumable.
+describe('pausing a live journey', () => {
+  it('offers Pause only on a published journey', async () => {
+    await renderBuilder('published')
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeTruthy()
+
+    cleanup()
+    await renderBuilder('draft')
+    expect(screen.queryByRole('button', { name: 'Pause' })).toBeNull()
+  })
+
+  // Saving first would release the trigger claim as a DRAFT edit, losing the
+  // paused-and-resumable state the operator actually asked for.
+  it('pauses without saving first', async () => {
+    await renderBuilder('published')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }))
+
+    await waitFor(() => expect(pauseJourneyBundle).toHaveBeenCalledWith('bot-1', 'bundle-1'))
+    expect(updateJourneyBundle).not.toHaveBeenCalled()
+  })
+
+  it('tells the operator that leads already in the journey still finish', async () => {
+    await renderBuilder('published')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }))
+
+    await waitFor(() =>
+      expect(toastShow).toHaveBeenCalledWith('Journey paused — leads already in it will finish', 'success')
+    )
+  })
+
+  it('shows the Paused badge and swaps Publish for Resume once paused', async () => {
+    await renderBuilder('published')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }))
+
+    expect(await screen.findByText('Paused')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Resume' })).toBeTruthy()
+    // Pause is gone: a paused bundle holds no trigger claim to release.
+    expect(screen.queryByRole('button', { name: 'Pause' })).toBeNull()
+  })
+
+  it('surfaces a failed pause instead of silently leaving it live', async () => {
+    pauseJourneyBundle.mockResolvedValue({ success: false, error: 'Only a published journey can be paused' })
+    await renderBuilder('published')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }))
+
+    expect(await screen.findByText('Only a published journey can be paused')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeTruthy()
   })
 })
