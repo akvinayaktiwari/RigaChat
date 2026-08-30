@@ -401,7 +401,106 @@ CTA secondary:    hover:bg-white/20 transition-colors
 
 Animated elements:
   Hero badge dot: animate-pulse (violet-500)
-  Widget glow orbs: static (no animation in design)
+  Widget glow orbs: drift (see Motion System below)
+```
+
+---
+
+## Motion System
+
+Added August 2026. The palette and type scale above are unchanged — this
+section only governs how things move.
+
+Implemented with `motion/react` (Framer Motion v12, the library's current
+package name). Do not add `framer-motion` as a separate dependency: it is the
+same library under its old name and installing both ships two copies.
+
+### Tokens
+
+All durations and curves live in
+`frontend/src/components/landing/motion-primitives.tsx`. Import them; never
+inline a duration. One duration reused everywhere is what makes a page feel
+mechanical.
+
+```
+EASE_OUT   cubic-bezier(0.22, 1, 0.36, 1)     travel — section reveals
+EASE_BACK  cubic-bezier(0.34, 1.56, 0.64, 1)  overshoot — cards, badges
+
+DURATION.fast  0.25s   badges, dots, small state flips
+DURATION.base  0.45s   the default reveal
+DURATION.slow  0.7s    hero-scale entrances only
+
+Reveal travel distance: 18px  (small enough to read as a fade, not a slide)
+Viewport trigger:       once, 25% visible, 80px early
+```
+
+### Primitives
+
+```
+<Reveal>       one element fades up on scroll into view
+<RevealGroup>  staggers its RevealItem children as one wave
+<RevealItem>   a single card inside a RevealGroup
+```
+
+Prefer `RevealGroup` over hand-tuned `delay` props: the stagger stays correct
+when cards are added or reordered, and the group shares one viewport observer
+instead of one per card.
+
+Keep a group to roughly 8 items. Past that the tail lands late enough to read
+as lag rather than choreography.
+
+### Stagger per section
+
+Tuned per section, not shared — the interval carries meaning:
+
+```
+Bento features    0.06s   8 cards; anything slower and the last one drags
+Integrations      0.08s
+Stats bar         0.08s
+Testimonials      0.09s
+Pricing           0.09s
+Roadmap pillars   0.09s
+System map        0.11s   deliberately slow — these five are a SEQUENCE,
+                          so the wave is the claim that a lead moves
+                          through them in order
+How it works      0.12s
+```
+
+### Decorative CSS primitives (index.css)
+
+```
+.aurora-drift          20s blob drift; -slow (26s) and -slower (32s)
+                       variants exist only so orbs never move in lockstep
+.tech-grid             56px violet grid at 0.04 alpha, radially masked
+.edge-glow             gradient hairline that fades in on hover/focus-within
+.cta-sheen             one-pass sheen, hover only
+```
+
+All four are decorative: they sit in `pointer-events:none` layers behind
+content, so none can affect text contrast or hit targets.
+
+### Reduced motion
+
+Non-negotiable, and the reason the primitives are components rather than
+utility classes. Under `prefers-reduced-motion: reduce`:
+
+  - `Reveal`/`RevealGroup`/`RevealItem` render the final state immediately —
+    not a shortened animation.
+  - Children are in the DOM either way, so crawlers and no-JS readers see the
+    content regardless of the media query.
+  - Stats counters get their final value on the first frame.
+  - `.aurora-drift` and `.cta-sheen` are switched off in index.css.
+  - `.edge-glow` is kept — it is a hover affordance, not motion. Only its
+    fade is dropped.
+
+### Rules
+
+```
+Do:    animate 1-2 key elements per viewport
+Do:    keep decorative motion slow (18s+) so it never competes with copy
+Don't: animate width/height — use transform and opacity
+Don't: parallax body copy
+Don't: put an always-on shimmer on the primary CTA; it fights the headline
 ```
 
 ---
