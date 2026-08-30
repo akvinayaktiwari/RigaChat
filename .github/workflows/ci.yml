@@ -324,19 +324,33 @@ jobs:
             --cache-control "public, max-age=3600" \
             --region ${{ secrets.AWS_REGION }}
 
-      - name: Sync dashboard assets to S3 (excluding index.html)
+      # Excludes "*.html", NOT "index.html". The old pattern only matched the
+      # root file, so every prerendered page (/blog/, /blog/<slug>/,
+      # /privacy-policy/, /terms-of-service/) shipped with a ONE-YEAR immutable
+      # cache header. Combined with --delete that bricks the page: a returning
+      # visitor replays their cached HTML, which asks for the hashed chunks the
+      # next deploy deleted, the lazy route 404s, and React renders a blank
+      # page -- for up to a year. That is what took /blog down.
+      - name: Sync hashed assets to S3 (immutable, never HTML)
         run: |
           aws s3 sync frontend/dist/ \
             s3://${{ secrets.S3_BUCKET_FRONTEND }} \
-            --exclude "index.html" \
+            --exclude "*.html" \
             --cache-control "public, max-age=31536000, immutable" \
             --delete \
             --region ${{ secrets.AWS_REGION }}
 
-      - name: Upload index.html with no-cache
+      # cp --recursive, not sync: sync skips files whose size and mtime match,
+      # which would leave the bad cache-control in place on any page whose
+      # content did not change. cp always rewrites the metadata.
+      - name: Upload every HTML entrypoint with no-cache
         run: |
-          aws s3 cp frontend/dist/index.html \
-            s3://${{ secrets.S3_BUCKET_FRONTEND }}/index.html \
+          aws s3 cp frontend/dist/ \
+            s3://${{ secrets.S3_BUCKET_FRONTEND }}/ \
+            --recursive \
+            --exclude "*" \
+            --include "*.html" \
+            --content-type "text/html; charset=utf-8" \
             --cache-control "no-cache, no-store, must-revalidate" \
             --region ${{ secrets.AWS_REGION }}
 

@@ -402,14 +402,28 @@ aws s3 cp frontend/dist/voice-widget.js \
   --region "$AWS_REGION"
 
 echo "==> Step 8: Deploying frontend to S3..."
+# Excludes "*.html", NOT "index.html". The old pattern only matched the root
+# file, so every prerendered page (/blog/, /blog/<slug>/, /privacy-policy/,
+# /terms-of-service/) shipped with a ONE-YEAR immutable cache header. Combined
+# with --delete that bricks the page: a returning visitor replays their cached
+# HTML, which asks for the hashed chunks this deploy just deleted, the lazy
+# route 404s, and React renders a blank page -- for up to a year. That is what
+# took /blog down. Keep these two steps in sync with .github/workflows/ci.yml,
+# which is the path that actually deploys.
 aws s3 sync frontend/dist/ s3://"$S3_BUCKET_FRONTEND" \
-  --exclude "index.html" \
+  --exclude "*.html" \
   --cache-control "public, max-age=31536000, immutable" \
   --delete \
   --region "$AWS_REGION"
 
-aws s3 cp frontend/dist/index.html \
-  s3://"$S3_BUCKET_FRONTEND"/index.html \
+# cp --recursive, not sync: sync skips files whose size and mtime match, which
+# would leave the bad cache-control in place on any page whose content did not
+# change. cp always rewrites the metadata.
+aws s3 cp frontend/dist/ s3://"$S3_BUCKET_FRONTEND"/ \
+  --recursive \
+  --exclude "*" \
+  --include "*.html" \
+  --content-type "text/html; charset=utf-8" \
   --cache-control "no-cache, no-store, must-revalidate" \
   --region "$AWS_REGION"
 
