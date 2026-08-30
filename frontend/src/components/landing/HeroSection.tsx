@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom'
+import { motion, useReducedMotion } from 'motion/react'
 import { ArrowRight, ChevronRight, Star } from 'lucide-react'
 import DemoChat from './DemoChat'
+import { DURATION, EASE_OUT, EASE_BACK } from './motion-primitives'
 
 interface HeroSectionProps {
   onOpenDemo: () => void
@@ -15,24 +17,52 @@ const AVATARS = [
 
 export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
   const navigate = useNavigate()
+  const reduced = useReducedMotion()
+
+  // The hero is above the fold, so it animates on mount rather than on scroll
+  // -- a whileInView trigger here would either fire instantly anyway or, worse,
+  // leave the headline invisible on a short viewport.
+  const container = reduced
+    ? {}
+    : {
+        initial: 'hidden',
+        animate: 'visible',
+        variants: { visible: { transition: { staggerChildren: 0.09, delayChildren: 0.05 } } },
+      }
+
+  const item = reduced
+    ? {}
+    : {
+        variants: {
+          hidden: { opacity: 0, y: 20 },
+          visible: { opacity: 1, y: 0, transition: { duration: DURATION.base, ease: EASE_OUT } },
+        },
+      }
 
   return (
     <section className="relative flex items-center pt-32 pb-20 px-4">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-32 left-1/4 w-96 h-96 bg-violet-200/30 rounded-full blur-3xl" />
-        <div className="absolute top-48 right-1/4 w-80 h-80 bg-pink-200/25 rounded-full blur-3xl" />
-        <div className="absolute bottom-32 left-1/3 w-64 h-64 bg-sky-200/20 rounded-full blur-3xl" />
+      <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+        <div className="tech-grid absolute inset-0" />
+        <div className="aurora-drift absolute top-32 left-1/4 w-96 h-96 bg-violet-200/30 rounded-full blur-3xl" />
+        <div className="aurora-drift aurora-drift-slow absolute top-48 right-1/4 w-80 h-80 bg-pink-200/25 rounded-full blur-3xl" />
+        <div className="aurora-drift aurora-drift-slower absolute bottom-32 left-1/3 w-64 h-64 bg-sky-200/20 rounded-full blur-3xl" />
+        {/* Cyan second-light. One small, low-alpha source is what separates
+            "purple gradient SaaS page" from something that reads as lit. */}
+        <div className="aurora-drift aurora-drift-slow absolute top-24 right-1/3 w-72 h-72 bg-cyan-200/20 rounded-full blur-3xl" />
       </div>
 
       <div className="relative max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
-        <div>
-          <div className="inline-flex items-center gap-2 bg-violet-50 border border-violet-100 text-violet-700 text-xs font-semibold px-3.5 py-1.5 rounded-full mb-6">
+        <motion.div {...container}>
+          <motion.div
+            {...item}
+            className="inline-flex items-center gap-2 bg-violet-50 border border-violet-100 text-violet-700 text-xs font-semibold px-3.5 py-1.5 rounded-full mb-6">
             <span className="w-1.5 h-1.5 bg-violet-500 rounded-full inline-block animate-pulse" />
             New: self-running follow-up journeys
             <ChevronRight className="w-3.5 h-3.5" />
-          </div>
+          </motion.div>
 
-          <h1
+          <motion.h1
+            {...item}
             className="text-5xl sm:text-6xl font-extrabold text-gray-900 leading-[1.1] tracking-tight mb-6"
             style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
           >
@@ -40,17 +70,17 @@ export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
             <span className="bg-linear-to-r from-violet-600 to-purple-500 bg-clip-text text-transparent">
               love to talk to.
             </span>
-          </h1>
+          </motion.h1>
 
-          <p className="text-lg text-gray-500 leading-relaxed mb-8 max-w-lg">
+          <motion.p {...item} className="text-lg text-gray-500 leading-relaxed mb-8 max-w-lg">
             Train on your website content, capture leads automatically, then let your agent follow up on WhatsApp until
             they book — all in one platform.
-          </p>
+          </motion.p>
 
-          <div className="flex flex-col sm:flex-row gap-3 mb-10">
+          <motion.div {...item} className="flex flex-col sm:flex-row gap-3 mb-10">
             <button
               onClick={() => navigate('/signup')}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-white font-semibold bg-linear-to-r from-violet-600 to-purple-500 px-6 py-3.5 rounded-xl hover:opacity-90 transition-opacity shadow-lg shadow-violet-200/70 text-sm"
+              className="cta-sheen w-full sm:w-auto inline-flex items-center justify-center gap-2 text-white font-semibold bg-linear-to-r from-violet-600 to-purple-500 px-6 py-3.5 rounded-xl hover:opacity-90 transition-opacity shadow-lg shadow-violet-200/70 hover:shadow-xl hover:shadow-violet-300/60 text-sm"
             >
               Start free — no card needed
               <ArrowRight className="w-4 h-4" />
@@ -61,17 +91,20 @@ export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
             >
               See it in action
             </button>
-          </div>
+          </motion.div>
 
-          <div className="flex items-center gap-3">
+          <motion.div {...item} className="flex items-center gap-3">
             <div className="flex -space-x-2">
-              {AVATARS.map((avatar) => (
-                <div
+              {AVATARS.map((avatar, i) => (
+                <motion.div
                   key={avatar.initial}
+                  initial={reduced ? false : { opacity: 0, scale: 0.5 }}
+                  animate={reduced ? undefined : { opacity: 1, scale: 1 }}
+                  transition={{ duration: DURATION.fast, delay: 0.55 + i * 0.07, ease: EASE_BACK }}
                   className={`w-8 h-8 rounded-full bg-linear-to-br ${avatar.gradient} border-2 border-white flex items-center justify-center text-white text-xs font-bold`}
                 >
                   {avatar.initial}
-                </div>
+                </motion.div>
               ))}
             </div>
             <div>
@@ -84,15 +117,21 @@ export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
                 Loved by <span className="text-gray-800 font-semibold">500+ businesses</span>
               </p>
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
         {/* id is the scroll target the walkthrough's "try the live agent" action
             hands off to, since this chat is the real streaming agent and the
             walkthrough is scripted. */}
-        <div id="hero-demo-chat" className="flex justify-center lg:justify-end mt-8 lg:mt-0 scroll-mt-28">
+        <motion.div
+          id="hero-demo-chat"
+          initial={reduced ? false : { opacity: 0, y: 28, scale: 0.97 }}
+          animate={reduced ? undefined : { opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: DURATION.slow, delay: 0.2, ease: EASE_OUT }}
+          className="flex justify-center lg:justify-end mt-8 lg:mt-0 scroll-mt-28"
+        >
           <DemoChat />
-        </div>
+        </motion.div>
       </div>
     </section>
   )

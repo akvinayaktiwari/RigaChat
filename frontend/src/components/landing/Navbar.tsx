@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { Menu, X, ArrowRight } from 'lucide-react'
 import VyostraLogo from '../VyostraLogo'
+import { DURATION, EASE_OUT } from './motion-primitives'
 
 interface NavbarProps {
   onOpenDemo: () => void
@@ -15,10 +17,30 @@ const NAV_LINKS = [
 
 export default function Navbar({ onOpenDemo }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+  const reduced = useReducedMotion()
+
+  // The bar tightens and deepens its blur once the hero is behind it. This is
+  // the one piece of scroll-linked motion on the page -- it earns its place by
+  // signalling position, which nothing else in the fixed chrome does.
+  useEffect(() => {
+    function onScroll() {
+      setScrolled(window.scrollY > 24)
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 flex justify-center px-4 pt-4">
-      <nav className="w-full max-w-6xl bg-white/80 backdrop-blur-xl border border-black/6 rounded-2xl shadow-lg shadow-black/4 px-5 py-3 flex items-center justify-between">
+      <nav
+        className={`w-full max-w-6xl backdrop-blur-xl border rounded-2xl flex items-center justify-between transition-all duration-300 ${
+          scrolled
+            ? 'bg-white/90 border-black/8 shadow-xl shadow-black/6 px-5 py-2.5'
+            : 'bg-white/80 border-black/6 shadow-lg shadow-black/4 px-5 py-3'
+        }`}
+      >
         <a href="/" className="flex items-center gap-2.5">
           <VyostraLogo size={36} animate={true} />
           <span
@@ -63,43 +85,51 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
         </button>
       </nav>
 
-      {mobileOpen && (
-        <div className="absolute top-full mt-2 left-4 right-4 bg-white/95 backdrop-blur-xl border border-black/6 rounded-2xl shadow-xl p-4 flex flex-col gap-3">
-          {NAV_LINKS.map((link) => (
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.div
+            initial={reduced ? false : { opacity: 0, y: -8 }}
+            animate={reduced ? undefined : { opacity: 1, y: 0 }}
+            exit={reduced ? undefined : { opacity: 0, y: -8 }}
+            transition={{ duration: DURATION.fast, ease: EASE_OUT }}
+            className="absolute top-full mt-2 left-4 right-4 bg-white/95 backdrop-blur-xl border border-black/6 rounded-2xl shadow-xl p-4 flex flex-col gap-3"
+          >
+            {NAV_LINKS.map((link) => (
+              <a
+                key={link.label}
+                href={link.href}
+                className="text-sm text-gray-700 font-medium py-2 border-b border-gray-50 last:border-0"
+                onClick={() => setMobileOpen(false)}
+              >
+                {link.label}
+              </a>
+            ))}
+            <button
+              onClick={() => {
+                setMobileOpen(false)
+                onOpenDemo()
+              }}
+              className="text-sm text-gray-700 font-medium py-2 text-left"
+            >
+              See it in action
+            </button>
             <a
-              key={link.label}
-              href={link.href}
-              className="text-sm text-gray-700 font-medium py-2 border-b border-gray-50 last:border-0"
+              href="/login"
+              className="text-sm text-gray-700 font-medium py-2 border-t border-gray-50"
               onClick={() => setMobileOpen(false)}
             >
-              {link.label}
+              Sign in
             </a>
-          ))}
-          <button
-            onClick={() => {
-              setMobileOpen(false)
-              onOpenDemo()
-            }}
-            className="text-sm text-gray-700 font-medium py-2 text-left"
-          >
-            See it in action
-          </button>
-          <a
-            href="/login"
-            className="text-sm text-gray-700 font-medium py-2 border-t border-gray-50"
-            onClick={() => setMobileOpen(false)}
-          >
-            Sign in
-          </a>
-          <a
-            href="/signup"
-            className="mt-1 text-sm font-semibold text-white bg-linear-to-r from-violet-600 to-purple-500 px-4 py-3 rounded-xl text-center"
-            onClick={() => setMobileOpen(false)}
-          >
-            Get started free
-          </a>
-        </div>
-      )}
+            <a
+              href="/signup"
+              className="mt-1 text-sm font-semibold text-white bg-linear-to-r from-violet-600 to-purple-500 px-4 py-3 rounded-xl text-center"
+              onClick={() => setMobileOpen(false)}
+            >
+              Get started free
+            </a>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   )
 }
