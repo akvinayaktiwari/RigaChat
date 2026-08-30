@@ -61,8 +61,13 @@ export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
             <ChevronRight className="w-3.5 h-3.5" />
           </motion.div>
 
-          <motion.h1
-            {...item}
+          {/* NOT part of the mount stagger. This h1 is the page's LCP element;
+              animating it in means the most important thing on the page is
+              invisible until motion/react hydrates, so a slow chunk or a failed
+              bundle shows a blank headline rather than an un-animated one.
+              design.md's own rule is 1-2 animated elements per viewport, and
+              this is the wrong one to spend it on. */}
+          <h1
             className="text-5xl sm:text-6xl font-extrabold text-gray-900 leading-[1.1] tracking-tight mb-6"
             style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
           >
@@ -70,7 +75,7 @@ export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
             <span className="bg-linear-to-r from-violet-600 to-purple-500 bg-clip-text text-transparent">
               love to talk to.
             </span>
-          </motion.h1>
+          </h1>
 
           <motion.p {...item} className="text-lg text-gray-500 leading-relaxed mb-8 max-w-lg">
             Train on your website content, capture leads automatically, then let your agent follow up on WhatsApp until

@@ -26,35 +26,11 @@ export const DURATION = {
 const TRAVEL = 18
 
 /** Fires once, slightly before the element is fully on screen. */
-export const VIEWPORT = { once: true, amount: 0.25, margin: '0px 0px -80px 0px' } as const
-
-type Direction = 'up' | 'down' | 'left' | 'right' | 'none'
-
-function offsetFor(direction: Direction): { x?: number; y?: number } {
-  switch (direction) {
-    case 'up':
-      return { y: TRAVEL }
-    case 'down':
-      return { y: -TRAVEL }
-    case 'left':
-      return { x: TRAVEL }
-    case 'right':
-      return { x: -TRAVEL }
-    case 'none':
-      return {}
-  }
-}
+const VIEWPORT = { once: true, amount: 0.25, margin: '0px 0px -80px 0px' } as const
 
 interface RevealProps {
   children: ReactNode
   className?: string
-  /** Which way the element travels in from. Defaults to 'up'. */
-  direction?: Direction
-  /** Seconds to hold before starting. Use sparingly -- see RevealGroup. */
-  delay?: number
-  duration?: number
-  /** Render as a <section> etc. instead of a <div>. */
-  as?: 'div' | 'section' | 'span' | 'li'
 }
 
 /**
@@ -64,31 +40,23 @@ interface RevealProps {
  * no transition at all -- not a shortened one. The content is always in the DOM
  * either way, so crawlers and no-JS readers see it regardless.
  */
-export function Reveal({
-  children,
-  className,
-  direction = 'up',
-  delay = 0,
-  duration = DURATION.base,
-  as = 'div',
-}: RevealProps) {
+export function Reveal({ children, className }: RevealProps) {
   const reduced = useReducedMotion()
-  const Component = motion[as]
 
   if (reduced) {
-    return <Component className={className}>{children}</Component>
+    return <motion.div className={className}>{children}</motion.div>
   }
 
   return (
-    <Component
+    <motion.div
       className={className}
-      initial={{ opacity: 0, ...offsetFor(direction) }}
-      whileInView={{ opacity: 1, x: 0, y: 0 }}
+      initial={{ opacity: 0, y: TRAVEL }}
+      whileInView={{ opacity: 1, y: 0 }}
       viewport={VIEWPORT}
-      transition={{ duration, delay, ease: EASE_OUT }}
+      transition={{ duration: DURATION.base, ease: EASE_OUT }}
     >
       {children}
-    </Component>
+    </motion.div>
   )
 }
 
@@ -97,8 +65,6 @@ interface RevealGroupProps {
   className?: string
   /** Seconds between each child. 0.06 keeps an 8-card grid under half a second. */
   stagger?: number
-  delay?: number
-  as?: 'div' | 'section' | 'ul'
 }
 
 /**
@@ -111,30 +77,23 @@ interface RevealGroupProps {
  * Keep groups to roughly 8 items. Past that the tail of the wave lands late
  * enough that it reads as lag rather than choreography.
  */
-export function RevealGroup({
-  children,
-  className,
-  stagger = 0.06,
-  delay = 0,
-  as = 'div',
-}: RevealGroupProps) {
+export function RevealGroup({ children, className, stagger = 0.06 }: RevealGroupProps) {
   const reduced = useReducedMotion()
-  const Component = motion[as]
 
   if (reduced) {
-    return <Component className={className}>{children}</Component>
+    return <motion.div className={className}>{children}</motion.div>
   }
 
   return (
-    <Component
+    <motion.div
       className={className}
       initial="hidden"
       whileInView="visible"
       viewport={VIEWPORT}
-      variants={{ visible: { transition: { staggerChildren: stagger, delayChildren: delay } } }}
+      variants={{ visible: { transition: { staggerChildren: stagger } } }}
     >
       {children}
-    </Component>
+    </motion.div>
   )
 }
 
@@ -151,21 +110,19 @@ const ITEM_VARIANTS: Variants = {
 interface RevealItemProps {
   children: ReactNode
   className?: string
-  as?: 'div' | 'li'
 }
 
 /** A single card in a `RevealGroup`. Inert on its own outside one. */
-export function RevealItem({ children, className, as = 'div' }: RevealItemProps) {
+export function RevealItem({ children, className }: RevealItemProps) {
   const reduced = useReducedMotion()
-  const Component = motion[as]
 
   if (reduced) {
-    return <Component className={className}>{children}</Component>
+    return <motion.div className={className}>{children}</motion.div>
   }
 
   return (
-    <Component className={className} variants={ITEM_VARIANTS}>
+    <motion.div className={className} variants={ITEM_VARIANTS}>
       {children}
-    </Component>
+    </motion.div>
   )
 }
