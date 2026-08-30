@@ -258,10 +258,146 @@ body {
   animation: roadmapSparkTravel 5s ease-in-out infinite;
 }
 
+/* ---------------------------------------------------------------------------
+   Landing "futuristic depth" layer
+   ---------------------------------------------------------------------------
+   Three decorative primitives that add depth to the landing page without
+   touching the palette: everything below is built from the existing violet
+   (--primary #7c3aed) plus one cyan second-light (#0891B2), which is the accent
+   the AI-Native UI profile pairs with this exact primary.
+
+   All three are decorative only. They sit in pointer-events:none layers behind
+   content, so none of them can affect text contrast or hit targets, and each
+   one is disabled under prefers-reduced-motion at the bottom of this file. */
+
+/* Slowly drifting aurora blob. Applied to the existing hero blur orbs, which
+   were static -- the drift is what turns them from a flat wash into depth.
+   Deliberately 18-24s: slow enough that it never pulls the eye away from the
+   headline, which is the one thing in the hero that should hold attention. */
+@keyframes auroraDrift {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    transform: translate3d(3%, -4%, 0) scale(1.08);
+  }
+  66% {
+    transform: translate3d(-3%, 3%, 0) scale(0.95);
+  }
+}
+
+.aurora-drift {
+  animation: auroraDrift 20s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Offsets so the three hero orbs never drift in lockstep, which would read as
+   the whole background sliding rather than as separate depth layers. */
+.aurora-drift-slow {
+  animation-duration: 26s;
+  animation-delay: -7s;
+}
+
+.aurora-drift-slower {
+  animation-duration: 32s;
+  animation-delay: -14s;
+}
+
+/* Faint technical grid, masked to fade out before it reaches the content.
+   Light-mode safe: at 0.04 alpha over white it registers as texture, not as
+   lines you can actually count. */
+.tech-grid {
+  background-image:
+    linear-gradient(to right, rgba(124, 58, 237, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(124, 58, 237, 0.04) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 20%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 20%, transparent 75%);
+}
+
+/* Gradient hairline that brightens on hover. The border itself is the
+   animation, so cards gain a light source without a transform -- which is what
+   keeps a 8-card bento grid from repainting on every pointer move. */
+.edge-glow {
+  position: relative;
+}
+
+.edge-glow::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.5), rgba(8, 145, 178, 0.35), transparent 60%);
+  /* Two-layer mask punches out the middle, leaving only the 1px ring painted. */
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+  opacity: 0;
+  transition: opacity 250ms ease;
+  pointer-events: none;
+}
+
+.edge-glow:hover::before,
+.edge-glow:focus-within::before {
+  opacity: 1;
+}
+
+/* One-pass sheen for the primary CTA. Runs on hover only -- an always-on
+   shimmer on the main button competes with the hero headline for attention. */
+@keyframes ctaSheen {
+  from {
+    transform: translateX(-120%) skewX(-20deg);
+  }
+  to {
+    transform: translateX(220%) skewX(-20deg);
+  }
+}
+
+.cta-sheen {
+  position: relative;
+  overflow: hidden;
+}
+
+.cta-sheen::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  transform: translateX(-120%) skewX(-20deg);
+  pointer-events: none;
+}
+
+.cta-sheen:hover::after {
+  animation: ctaSheen 900ms ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .roadmap-journeys-glow,
-  .roadmap-spark {
+  .roadmap-spark,
+  .aurora-drift,
+  .aurora-drift-slow,
+  .aurora-drift-slower {
     animation: none;
+  }
+
+  /* The sheen is pure decoration with no state to preserve, so it is removed
+     outright rather than shown in a "final" position. */
+  .cta-sheen::after {
+    display: none;
+  }
+
+  /* The edge glow stays -- it is a hover affordance, not motion. Only the
+     fade is dropped so it appears instantly. */
+  .edge-glow::before {
+    transition: none;
   }
 }
 
