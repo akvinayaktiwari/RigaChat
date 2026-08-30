@@ -56,6 +56,14 @@ interface MetaChangeValue {
   metadata?: { phone_number_id?: string; display_phone_number?: string }
   statuses?: MetaStatus[]
   messages?: MetaInboundMessage[]
+  // account_update only. `event` is the discriminator (PARTNER_ADDED,
+  // ACCOUNT_VIOLATION, ACCOUNT_RESTRICTION, DISABLED_UPDATE and friends);
+  // the rest of the payload varies by event, so it stays loosely typed until
+  // there is a handler that actually reads it.
+  event?: string
+  ban_info?: { waba_ban_state?: string; waba_ban_date?: string }
+  restriction_info?: { restriction_type?: string; expiration?: string }[]
+  phone_number?: string
 }
 
 interface MetaWhatsAppWebhookBody {
@@ -401,6 +409,27 @@ export async function processMetaWhatsAppWebhook(
     for (const change of entry.changes ?? []) {
       const value = change.value
       if (!value) continue
+
+      // Meta requires this subscription for Embedded Signup, and it is the only
+      // channel for anything that happens to a connection AFTER the popup
+      // closes -- a WABA getting banned or restricted, a number being removed,
+      // review outcomes. None of that arrives as a message or a status, so
+      // without this branch a client's account can be disabled and every
+      // symptom shows up as unexplained send failures days later.
+      //
+      // Logged rather than acted on: reacting correctly means per-event
+      // policy (disable the connection? notify the client? pause journeys?)
+      // and getting that wrong is worse than a loud log. The point today is
+      // that the signal stops being discarded.
+      if (change.field === 'account_update') {
+        console.warn(
+          `[wa-account-update] entry ${entry.id} event=${value.event ?? 'unknown'} ` +
+            `phone=${value.phone_number ?? 'n/a'} ` +
+            `ban=${value.ban_info?.waba_ban_state ?? 'none'} ` +
+            `restrictions=${value.restriction_info?.map((r) => r.restriction_type).join(',') || 'none'}`
+        )
+        continue
+      }
 
       if (value.statuses?.length) await logStatuses(value.statuses)
 
