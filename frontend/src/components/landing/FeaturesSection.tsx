@@ -1,4 +1,5 @@
 import { Database, Zap, BarChart3, MessageSquare, Globe, Shield, Mic, Route, type LucideIcon } from 'lucide-react'
+import { Reveal, RevealGroup, RevealItem } from './motion-primitives'
 
 interface BentoFeature {
   icon: LucideIcon
@@ -92,7 +93,7 @@ export default function FeaturesSection() {
   return (
     <section id="features" className="py-24 px-4">
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-14">
+        <Reveal className="text-center mb-14">
           <p className="text-sm font-semibold text-violet-600 uppercase tracking-widest mb-3">Features</p>
           <h2
             className="text-4xl sm:text-5xl font-extrabold text-gray-900 tracking-tight mb-4"
@@ -104,15 +105,15 @@ export default function FeaturesSection() {
           <p className="text-gray-500 text-lg max-w-xl mx-auto">
             From knowledge ingestion to automated follow-up — all the pieces your AI agent needs, assembled and ready.
           </p>
-        </div>
+        </Reveal>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <RevealGroup className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {BENTO_FEATURES.map((feature) => {
             const Icon = feature.icon
             return (
-              <div
+              <RevealItem
                 key={feature.title}
-                className={`relative group bg-linear-to-br ${feature.gradient} border border-black/5 rounded-2xl p-6 hover:shadow-lg hover:shadow-black/6 transition-all duration-300 ${feature.large ? 'lg:col-span-2 min-h-44' : 'min-h-36'}`}
+                className={`edge-glow relative group bg-linear-to-br ${feature.gradient} border border-black/5 rounded-2xl p-6 hover:shadow-lg hover:shadow-black/6 hover:-translate-y-0.5 transition-all duration-300 ${feature.large ? 'lg:col-span-2 min-h-44' : 'min-h-36'}`}
               >
                 <div
                   className={`w-10 h-10 ${feature.iconBg} rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform`}
@@ -126,10 +127,10 @@ export default function FeaturesSection() {
                   {feature.title}
                 </h3>
                 <p className="text-gray-500 text-sm leading-relaxed">{feature.description}</p>
-              </div>
+              </RevealItem>
             )
           })}
-        </div>
+        </RevealGroup>
       </div>
     </section>
   )

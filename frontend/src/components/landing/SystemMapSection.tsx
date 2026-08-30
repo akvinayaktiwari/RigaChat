@@ -11,6 +11,7 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { Reveal, RevealGroup, RevealItem } from './motion-primitives'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -87,7 +88,7 @@ export default function SystemMapSection() {
   return (
     <section id="how-a-lead-moves" className="py-20 px-4 bg-gray-50/60 border-y border-gray-100/80">
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-12">
+        <Reveal className="text-center mb-12">
           <p className="text-sm font-semibold text-violet-600 uppercase tracking-widest mb-3">The whole system</p>
           <h2 className="text-4xl sm:text-5xl font-extrabold text-gray-900 tracking-tight mb-4" style={JAKARTA_FONT}>
             What happens to a lead, <br className="hidden sm:block" />
@@ -96,10 +97,13 @@ export default function SystemMapSection() {
           <p className="text-gray-500 text-lg max-w-xl mx-auto">
             Not just a agent. Five stages, one platform, no Zapier in between.
           </p>
-        </div>
+        </Reveal>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-          <div className="relative bg-white border border-black/5 rounded-2xl p-6 flex flex-col">
+        {/* Stagger is intentionally slower here than in the bento grid: these
+            five cards are a sequence, so the wave IS the claim that a lead
+            moves through them in order. */}
+        <RevealGroup className="grid grid-cols-1 lg:grid-cols-5 gap-4" stagger={0.11}>
+          <RevealItem className="edge-glow relative bg-white border border-black/5 rounded-2xl p-6 flex flex-col">
             <div className="flex items-center gap-2.5 mb-4">
               <span className="text-xs font-extrabold text-gray-300" style={JAKARTA_FONT}>
                 01
@@ -126,12 +130,15 @@ export default function SystemMapSection() {
               Five doors, one pipeline. They all end up in the same place.
             </p>
             <FlowArrow />
-          </div>
+          </RevealItem>
 
           {STAGES.map((stage, i) => {
             const Icon = stage.icon
             return (
-              <div key={stage.step} className="relative bg-white border border-black/5 rounded-2xl p-6 flex flex-col">
+              <RevealItem
+                key={stage.step}
+                className="edge-glow relative bg-white border border-black/5 rounded-2xl p-6 flex flex-col"
+              >
                 <div className="flex items-center gap-2.5 mb-4">
                   <span className="text-xs font-extrabold text-gray-300" style={JAKARTA_FONT}>
                     {stage.step}
@@ -145,10 +152,10 @@ export default function SystemMapSection() {
                 </h3>
                 <p className="text-gray-500 text-xs leading-relaxed">{stage.body}</p>
                 {i < STAGES.length - 1 && <FlowArrow />}
-              </div>
+              </RevealItem>
             )
           })}
-        </div>
+        </RevealGroup>
       </div>
     </section>
   )

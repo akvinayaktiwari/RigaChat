@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react'
 import { CheckCircle } from 'lucide-react'
 import { WhatsAppIcon, ZohoIcon, HubSpotIcon, SalesforceIcon } from './BrandIcons'
+import { Reveal, RevealGroup, RevealItem } from './motion-primitives'
 
 interface Integration {
   name: string
@@ -75,7 +76,7 @@ export default function IntegrationsSection() {
   return (
     <section id="integrations" className="py-24 px-4 bg-gray-50/60">
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-14">
+        <Reveal className="text-center mb-14">
           <p className="text-sm font-semibold text-violet-600 uppercase tracking-widest mb-3">Integrations</p>
           <h2
             className="text-4xl sm:text-5xl font-extrabold text-gray-900 tracking-tight mb-4"
@@ -85,15 +86,15 @@ export default function IntegrationsSection() {
             existing stack
           </h2>
           <p className="text-gray-500 text-lg max-w-xl mx-auto">One OAuth click. Your tools stay in sync.</p>
-        </div>
+        </Reveal>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <RevealGroup className="grid grid-cols-1 sm:grid-cols-2 gap-5" stagger={0.08}>
           {INTEGRATIONS.map((integration) => {
             const Icon = integration.icon
             return (
-              <div
+              <RevealItem
                 key={integration.name}
-                className={`relative group bg-white border ${integration.border} rounded-2xl p-7 hover:shadow-xl hover:shadow-black/6 transition-all duration-300 overflow-hidden`}
+                className={`edge-glow relative group bg-white border ${integration.border} rounded-2xl p-7 hover:shadow-xl hover:shadow-black/6 hover:-translate-y-0.5 transition-all duration-300 overflow-hidden`}
               >
                 <div className={`absolute inset-0 bg-linear-to-br ${integration.bg} opacity-40 rounded-2xl`} />
                 <StatusBadge status={integration.status} />
@@ -119,10 +120,10 @@ export default function IntegrationsSection() {
                     ))}
                   </ul>
                 </div>
-              </div>
+              </RevealItem>
             )
           })}
-        </div>
+        </RevealGroup>
       </div>
     </section>
   )

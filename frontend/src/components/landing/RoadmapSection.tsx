@@ -1,4 +1,5 @@
 import { Activity, CheckCircle, Clock, Mic, Route, type LucideIcon } from 'lucide-react'
+import { Reveal, RevealGroup, RevealItem } from './motion-primitives'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -97,16 +98,16 @@ export default function RoadmapSection() {
     <section className="relative overflow-hidden bg-[#0d0d18] px-4 py-20">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -top-24 -left-24 h-[420px] w-[420px] rounded-full bg-violet-600/30 blur-3xl"
+        className="aurora-drift pointer-events-none absolute -top-24 -left-24 h-[420px] w-[420px] rounded-full bg-violet-600/30 blur-3xl"
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -top-16 -right-24 h-[380px] w-[380px] rounded-full bg-cyan-400/15 blur-3xl"
+        className="aurora-drift aurora-drift-slow pointer-events-none absolute -top-16 -right-24 h-[380px] w-[380px] rounded-full bg-cyan-400/15 blur-3xl"
       />
       <div aria-hidden="true" className="roadmap-dot-grid pointer-events-none absolute inset-0" />
 
       <div className="relative max-w-6xl mx-auto">
-        <div className="max-w-2xl mx-auto text-center mb-12 sm:mb-14">
+        <Reveal className="max-w-2xl mx-auto text-center mb-12 sm:mb-14">
           <div className="flex items-center justify-center gap-3 mb-4">
             <p className="text-sm font-semibold text-violet-400 uppercase tracking-widest">Journeys</p>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-300">
@@ -128,13 +129,13 @@ export default function RoadmapSection() {
             Capturing a lead is the easy half. A journey carries it forward — three building blocks you assemble once,
             then leave running.
           </p>
-        </div>
+        </Reveal>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <RevealGroup className="grid grid-cols-1 md:grid-cols-3 gap-5" stagger={0.09}>
           {PILLARS.map((pillar) => {
             const Icon = pillar.icon
             return (
-              <div
+              <RevealItem
                 key={pillar.title}
                 className={`relative rounded-2xl border p-6 backdrop-blur-xl transition-all duration-300 ${
                   pillar.elevated
@@ -166,12 +167,12 @@ export default function RoadmapSection() {
                   <p className="text-sm font-medium text-white/70 mb-2">{pillar.role}</p>
                   <p className="text-sm text-white/50 leading-relaxed">{pillar.description}</p>
                 </div>
-              </div>
+              </RevealItem>
             )
           })}
-        </div>
+        </RevealGroup>
 
-        <div className="mt-8 rounded-3xl border border-violet-400/20 bg-white/[0.03] p-6 sm:p-8">
+        <Reveal className="mt-8 rounded-3xl border border-violet-400/20 bg-white/[0.03] p-6 sm:p-8">
           <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
             <div className="flex items-center gap-2">
               <Activity className="w-5 h-5 text-violet-300" />
@@ -224,7 +225,7 @@ export default function RoadmapSection() {
               A lead replies &ldquo;STOP&rdquo; and the journey ends there — no further messages, ever.
             </div>
           </div>
-        </div>
+        </Reveal>
       </div>
     </section>
   )
