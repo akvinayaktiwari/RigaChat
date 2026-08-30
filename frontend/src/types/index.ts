@@ -397,6 +397,9 @@ export interface ConnectMetaWhatsAppInput {
   wabaId: string
   phoneNumberId: string
   notificationNumber: string
+  // Embedded Signup reports the owning business alongside the WABA. Optional
+  // because older payloads and the redirect path do not carry one.
+  businessId?: string
 }
 
 export interface MetaConnection {

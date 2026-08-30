@@ -177,6 +177,9 @@ interface ConnectMetaWhatsAppBody {
   wabaId: string
   phoneNumberId: string
   notificationNumber: string
+  // Optional because the redirect path never supplies one. Not validated below
+  // for the same reason -- a connection is still usable without it.
+  businessId?: string
 }
 
 // Meta's WhatsApp Embedded Signup is a JS SDK popup flow, not a redirect -

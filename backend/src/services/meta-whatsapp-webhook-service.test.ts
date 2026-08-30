@@ -531,3 +531,59 @@ describe('retry safety (D6)', () => {
     expect(handleInboundLeadMessage).toHaveBeenCalled()
   })
 })
+
+describe('processMetaWhatsAppWebhook account_update', () => {
+  const ACCOUNT_UPDATE_BODY = JSON.stringify({
+    object: 'whatsapp_business_account',
+    entry: [
+      {
+        id: 'waba-1',
+        changes: [
+          {
+            field: 'account_update',
+            value: {
+              event: 'ACCOUNT_VIOLATION',
+              phone_number: '919000000001',
+              ban_info: { waba_ban_state: 'SCHEDULE_FOR_DISABLE' },
+              restriction_info: [{ restriction_type: 'RESTRICTED_BIZ_INITIATED_MESSAGING' }],
+            },
+          },
+        ],
+      },
+    ],
+  })
+
+  it('logs the event instead of discarding it', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    await processMetaWhatsAppWebhook(ACCOUNT_UPDATE_BODY, sign(ACCOUNT_UPDATE_BODY))
+
+    const line = warn.mock.calls.map((c) => String(c[0])).find((c) => c.includes('[wa-account-update]'))
+    expect(line).toContain('ACCOUNT_VIOLATION')
+    expect(line).toContain('SCHEDULE_FOR_DISABLE')
+    expect(line).toContain('RESTRICTED_BIZ_INITIATED_MESSAGING')
+    warn.mockRestore()
+  })
+
+  // An account_update carries no messages. It must not fall through into the
+  // inbound path and be mistaken for one.
+  it('does not route an account_update into the inbound message path', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    await processMetaWhatsAppWebhook(ACCOUNT_UPDATE_BODY, sign(ACCOUNT_UPDATE_BODY))
+
+    expect(handleInboundLeadMessage).not.toHaveBeenCalled()
+    expect(recordInboundMessage).not.toHaveBeenCalled()
+    vi.mocked(console.warn).mockRestore?.()
+  })
+
+  it('still returns 200 so Meta does not retry', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const result = await processMetaWhatsAppWebhook(ACCOUNT_UPDATE_BODY, sign(ACCOUNT_UPDATE_BODY))
+
+    expect(result.status).toBe(200)
+    vi.mocked(console.warn).mockRestore?.()
+  })
+})
+

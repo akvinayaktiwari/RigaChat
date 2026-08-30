@@ -17,6 +17,12 @@ interface MetaSendResponse {
 
 interface MetaTokenResponse {
   access_token?: string
+  // Seconds until the business token dies. Embedded Signup configs built from
+  // the "60 Expiration Token" template issue ~60-day tokens, so this is ~5.2M
+  // and NOT the "never expires" a system user token gives you elsewhere.
+  // Meta omits it on some responses, which is why the caller treats a missing
+  // value as unknown rather than assuming permanence.
+  expires_in?: number
   error?: { message?: string }
 }
 
@@ -183,6 +189,10 @@ interface MetaPhoneListResponse {
 export interface MetaWhatsAppCredentialsExchange {
   accessToken: string
   displayPhoneNumber: string
+  // ISO timestamp, absent when Meta did not report expires_in. Stored on the
+  // connection so a token approaching death can be found BEFORE it takes a
+  // client's inbound and outbound with it.
+  tokenExpiresAt?: string
 }
 
 // Shared by sendMessage and sendTemplate: both hit the same /messages
@@ -242,7 +252,14 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
       throw new Error(`Meta phone number lookup failed: ${phoneData.error?.message ?? 'Unknown error'}`)
     }
 
-    return { accessToken: tokenData.access_token, displayPhoneNumber: phoneData.display_phone_number }
+    return {
+      accessToken: tokenData.access_token,
+      displayPhoneNumber: phoneData.display_phone_number,
+      tokenExpiresAt:
+        tokenData.expires_in === undefined
+          ? undefined
+          : new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
+    }
   }
 
   // The redirect-based alternative to Embedded Signup, mirroring the Lead Ads
@@ -495,6 +512,47 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
     }
 
     return (data.data ?? []).some((entry) => entry.whatsapp_business_api_data?.id === appId)
+  }
+
+  // Activates the number for Cloud API sending. THE step that was missing:
+  // exchanging the code and subscribing the WABA both succeed without it, the
+  // connection record looks complete, and then the first send fails -- the
+  // same shape of silent, late-surfacing failure as the missing
+  // subscribed_apps call above, one layer over.
+  //
+  // The PIN is the number's two-step verification PIN, and Meta binds it on
+  // FIRST registration. Re-registering later with a different PIN is
+  // rejected, which is why the caller must persist whatever it passed here
+  // rather than generating a fresh one per call.
+  //
+  // Requires whatsapp_business_management AND whatsapp_business_messaging on
+  // the token -- register is the one call in this flow that needs both.
+  async registerPhoneNumber(phoneNumberId: string, pin: string, accessToken: string): Promise<void> {
+    const response = await fetch(`${GRAPH_API_BASE}/${phoneNumberId}/register`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ messaging_product: 'whatsapp', pin }),
+    })
+    const data = (await response.json().catch(() => ({}))) as {
+      success?: boolean
+      error?: { message?: string; code?: number; error_user_msg?: string }
+    }
+
+    // Re-registering an already-live number with the SAME pin returns
+    // success:true, so idempotency needs no special case here. Nothing else is
+    // treated as success: the 133xxx registration codes are not documented on
+    // Meta's register reference, and guessing which of them means "already
+    // fine" risks reporting a connected number that cannot send -- the exact
+    // failure this call was added to close.
+    if (response.ok && data.success === true) return
+
+    throw new Error(
+      `Registering phone number ${phoneNumberId} failed: ` +
+        `${data.error?.error_user_msg ?? data.error?.message ?? `status ${response.status}`}`
+    )
   }
 
   // Template management is WABA-scoped, not phone-number-scoped, so these two

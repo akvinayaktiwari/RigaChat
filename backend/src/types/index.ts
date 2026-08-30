@@ -392,6 +392,34 @@ export interface MetaDirectWhatsAppConnection {
   // have no value here; treat `undefined` as "unknown, probably not subscribed"
   // and repair with scripts/subscribe-whatsapp-webhooks.ts.
   webhookSubscribed?: boolean
+
+  // Whether POST /{phoneNumberId}/register succeeded. Third member of the same
+  // family as `webhookSubscribed`: stored credentials make a connection able to
+  // SEND, subscribed_apps makes it able to RECEIVE, and this makes the number
+  // live for Cloud API at all. All three fail independently, and this is the
+  // one that fails while a real client is watching.
+  //
+  // Optional for the same reason webhookSubscribed is: connections written
+  // before the register call existed have no value. Treat `undefined` as
+  // "unknown, probably not registered".
+  registered?: boolean
+
+  // The two-step verification PIN passed to /register, encrypted. Persisted
+  // because Meta binds it on first registration and rejects a later register
+  // that presents a different one -- a re-register with a freshly generated PIN
+  // can never succeed, so the original has to survive.
+  twoStepPinEncrypted?: string
+
+  // When the business token dies. Embedded Signup configs built from the
+  // "60 Expiration Token" template issue ~60-day tokens, NOT permanent ones, so
+  // every client connection silently stops working two months after it is made
+  // unless something refreshes it.
+  //
+  // Recorded from the exchange even though no refresh path exists yet: a
+  // connection stored without it cannot be told apart from one that expires
+  // tomorrow, and there is no way to backfill it short of making every client
+  // reconnect. Same lesson as webhookSubscribed above, bought earlier.
+  tokenExpiresAt?: string
 }
 
 export type WhatsAppActiveProvider = 'gupshup' | 'meta_direct'
