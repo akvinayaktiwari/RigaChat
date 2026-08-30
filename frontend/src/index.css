@@ -276,13 +276,13 @@ body {
    headline, which is the one thing in the hero that should hold attention. */
 @keyframes auroraDrift {
   0%, 100% {
-    transform: translate3d(0, 0, 0) scale(1);
+    transform: translate3d(0, 0, 0);
   }
   33% {
-    transform: translate3d(3%, -4%, 0) scale(1.08);
+    transform: translate3d(3%, -4%, 0);
   }
   66% {
-    transform: translate3d(-3%, 3%, 0) scale(0.95);
+    transform: translate3d(-3%, 3%, 0);
   }
 }
 
@@ -382,9 +382,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .roadmap-journeys-glow,
   .roadmap-spark,
-  .aurora-drift,
-  .aurora-drift-slow,
-  .aurora-drift-slower {
+  .aurora-drift {
     animation: none;
   }
 
@@ -392,6 +390,12 @@ body {
      outright rather than shown in a "final" position. */
   .cta-sheen::after {
     display: none;
+  }
+
+  /* Release the compositor layers too. Clearing `animation` alone left ~9
+     promoted blur-3xl layers pinned for a user who asked for less motion. */
+  .aurora-drift {
+    will-change: auto;
   }
 
   /* The edge glow stays -- it is a hover affordance, not motion. Only the

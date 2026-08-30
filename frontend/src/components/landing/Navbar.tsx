@@ -35,7 +35,7 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 flex justify-center px-4 pt-4">
       <nav
-        className={`w-full max-w-6xl backdrop-blur-xl border rounded-2xl flex items-center justify-between transition-all duration-300 ${
+        className={`w-full max-w-6xl backdrop-blur-xl border rounded-2xl flex items-center justify-between transition-[background-color,border-color,box-shadow,padding] duration-300 motion-reduce:transition-none ${
           scrolled
             ? 'bg-white/90 border-black/8 shadow-xl shadow-black/6 px-5 py-2.5'
             : 'bg-white/80 border-black/6 shadow-lg shadow-black/4 px-5 py-3'

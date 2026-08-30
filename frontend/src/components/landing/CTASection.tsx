@@ -27,7 +27,7 @@ export default function CTASection({ onStartTrial, region }: CTASectionProps) {
 
           <div className="relative">
             <span className="inline-flex items-center gap-1.5 bg-white/15 border border-white/20 text-white text-xs font-semibold px-3.5 py-1.5 rounded-full mb-6">
-              <span className="w-1.5 h-1.5 bg-green-400 rounded-full inline-block animate-pulse" />
+              <span className="w-1.5 h-1.5 bg-green-400 rounded-full inline-block animate-pulse motion-reduce:animate-none" />
               14-day free trial · No credit card
             </span>
 
