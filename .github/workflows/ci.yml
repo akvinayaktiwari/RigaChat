@@ -354,10 +354,49 @@ jobs:
             --cache-control "no-cache, no-store, must-revalidate" \
             --region ${{ secrets.AWS_REGION }}
 
+      # Resolve the distribution from the domain users actually log in to,
+      # rather than trusting the stored id. Two distributions serve the
+      # rigachat-dashboard bucket: E24Z9D4G4FY8PH (the retired
+      # beepboop.drsyeta.in) and the one aliased to the live domain. The
+      # CLOUDFRONT_DISTRIBUTION_ID secret held the RETIRED one, so every
+      # frontend deploy uploaded to S3 and then invalidated a dead domain while
+      # the live site kept serving stale HTML -- and the workflow still went
+      # green. Measured 2026-08-30: the live distribution had not been
+      # invalidated in four days while the retired one was invalidated on
+      # every deploy.
+      #
+      # scripts/deploy.sh already resolves by alias for exactly this reason;
+      # that fix was never carried across to CI, which is the path that
+      # actually deploys. Same lookup here so the two cannot drift again.
+      #
+      # SITE_HOST comes from the login redirect, the one value that is
+      # definitionally the live domain: if it were wrong, login would already
+      # be broken and this deploy would not be the cause.
       - name: Invalidate dashboard CloudFront distribution
+        env:
+          VITE_COGNITO_REDIRECT_URI: ${{ vars.VITE_COGNITO_REDIRECT_URI }}
         run: |
+          set -euo pipefail
+          SITE_HOST="$(printf '%s' "$VITE_COGNITO_REDIRECT_URI" | sed -E 's#^https?://##; s#/.*$##')"
+          if [ -z "$SITE_HOST" ]; then
+            echo "::error::VITE_COGNITO_REDIRECT_URI is empty; cannot resolve the live distribution."
+            exit 1
+          fi
+          echo "Resolving the distribution serving ${SITE_HOST}..."
+          # Nested filter, not contains(Aliases.Items, ...): the widget
+          # distribution has no aliases, and contains() errors on its null
+          # Items rather than skipping it.
+          DIST_ID="$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?Aliases.Items[?@=='${SITE_HOST}']].Id | [0]" \
+            --output text 2>/dev/null || echo "None")"
+          if [ -z "$DIST_ID" ] || [ "$DIST_ID" = "None" ]; then
+            echo "::error::No CloudFront distribution is aliased to ${SITE_HOST}."
+            echo "::error::Refusing to invalidate a guessed distribution -- that is the bug this replaced."
+            exit 1
+          fi
+          echo "Invalidating ${DIST_ID} (${SITE_HOST})"
           aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --distribution-id "$DIST_ID" \
             --paths "/*"
 
       - name: Invalidate widget CloudFront distribution
