@@ -172,7 +172,7 @@ describe('storeMetaWhatsAppConnection webhook subscription', () => {
     decrypt.mockResolvedValue('424242')
     vi.mocked(getClientById).mockResolvedValue({
       clientId: 'client-1',
-      metaDirectWhatsAppConnection: { twoStepPinEncrypted: 'existing-cipher' },
+      metaDirectWhatsAppConnection: { phoneNumberId: 'phone-1', twoStepPinEncrypted: 'existing-cipher' },
     } as never)
 
     await storeMetaWhatsAppConnection('client-1', input)
@@ -187,6 +187,39 @@ describe('storeMetaWhatsAppConnection webhook subscription', () => {
   })
 
   it('mints a pin only when the client has none stored', async () => {
+    await storeMetaWhatsAppConnection('client-1', input)
+
+    expect(decrypt).not.toHaveBeenCalled()
+    expect(registerPhoneNumber).toHaveBeenCalledWith('phone-1', expect.stringMatching(/^\d{6}$/), 'tok')
+  })
+
+  // The dangerous case: a number that may already be live under a PIN nobody
+  // holds. Registering it with a fresh PIN cannot succeed, and repeated
+  // failures count against Meta's two-step attempt limit and can lock the
+  // number out. Doing nothing is strictly safer.
+  it('skips registration entirely when reconnecting a number with no stored pin', async () => {
+    vi.mocked(getClientById).mockResolvedValue({
+      clientId: 'client-1',
+      metaDirectWhatsAppConnection: { phoneNumberId: 'phone-1', registered: true },
+    } as never)
+
+    await storeMetaWhatsAppConnection('client-1', input)
+
+    expect(registerPhoneNumber).not.toHaveBeenCalled()
+    // The prior registration state is preserved, not downgraded to false.
+    expect(vi.mocked(updateClient).mock.calls[0]?.[1]).toMatchObject({
+      metaDirectWhatsAppConnection: { registered: true },
+    })
+  })
+
+  // The PIN belongs to a NUMBER, not a client. Replaying the old number's PIN
+  // at a new one would fail against Meta for no reason.
+  it('mints a fresh pin when the client switches to a different number', async () => {
+    vi.mocked(getClientById).mockResolvedValue({
+      clientId: 'client-1',
+      metaDirectWhatsAppConnection: { phoneNumberId: 'phone-OLD', twoStepPinEncrypted: 'old-cipher' },
+    } as never)
+
     await storeMetaWhatsAppConnection('client-1', input)
 
     expect(decrypt).not.toHaveBeenCalled()

@@ -223,29 +223,50 @@ export async function storeMetaWhatsAppConnection(
   const client = await getClientById(clientId)
 
   // Meta binds the PIN to the number on the first registration that SUCCEEDS,
-  // and rejects any later register presenting a different one. So a reconnect
-  // must re-present the PIN this client already has -- generating a fresh one
-  // would fail against Meta and, worse, overwrite the only value that could
-  // ever register this number, leaving it permanently unregisterable.
+  // and rejects any later register presenting a different one. Everything below
+  // follows from that single fact.
   //
-  // A new PIN is minted only when the client has none stored.
-  const existingPinEncrypted = client?.metaDirectWhatsAppConnection?.twoStepPinEncrypted
-  const twoStepPin = existingPinEncrypted ? await decrypt(existingPinEncrypted) : generateTwoStepPin()
+  // The stored PIN belongs to a specific NUMBER, not to the client -- a client
+  // switching to a different phone number must not have the old number's PIN
+  // replayed at the new one.
+  const existing = client?.metaDirectWhatsAppConnection
+  const isSameNumber = existing?.phoneNumberId === input.phoneNumberId
+  const existingPinEncrypted = isSameNumber ? existing?.twoStepPinEncrypted : undefined
 
-  let registered = false
-  try {
-    await metaWhatsAppProvider.registerPhoneNumber(input.phoneNumberId, twoStepPin, input.accessToken)
-    registered = true
-  } catch (error) {
-    console.error(
-      `[whatsapp] phone number ${input.phoneNumberId} connected for client ${clientId} but NOT registered -- ` +
-        `it cannot send until it is. Cause:`,
-      error
+  // Connections made before the PIN was stored are the dangerous case: the
+  // number may already be live under a PIN nobody holds. A fresh PIN cannot
+  // succeed there -- it can only fail, and repeated failures count against
+  // Meta's two-step attempt limit and can lock the number out entirely. Doing
+  // nothing is strictly safer than trying, so this path leaves the existing
+  // registration exactly as it found it.
+  const reconnectingWithoutStoredPin = isSameNumber && !existingPinEncrypted
+
+  let registered = existing?.registered ?? false
+  let twoStepPinEncrypted = existingPinEncrypted
+
+  if (reconnectingWithoutStoredPin) {
+    console.warn(
+      `[whatsapp] phone number ${input.phoneNumberId} for client ${clientId} reconnected with no stored ` +
+        `two-step PIN. Skipping /register: this connection predates PIN storage, so a new PIN cannot ` +
+        `succeed and retrying risks locking two-step verification. Existing registration left untouched.`
     )
+  } else {
+    const twoStepPin = existingPinEncrypted ? await decrypt(existingPinEncrypted) : generateTwoStepPin()
+    try {
+      await metaWhatsAppProvider.registerPhoneNumber(input.phoneNumberId, twoStepPin, input.accessToken)
+      registered = true
+    } catch (error) {
+      registered = false
+      console.error(
+        `[whatsapp] phone number ${input.phoneNumberId} connected for client ${clientId} but NOT registered -- ` +
+          `it cannot send until it is. Cause:`,
+        error
+      )
+    }
+    // Carries the SAME ciphertext through on the reconnect path, rather than
+    // re-encrypting into a different value.
+    twoStepPinEncrypted = existingPinEncrypted ?? (await encrypt(twoStepPin))
   }
-
-  // Re-encrypting the SAME pin, not a new one, on the reconnect path.
-  const twoStepPinEncrypted = existingPinEncrypted ?? (await encrypt(twoStepPin))
   // A brand-new client with no active Gupshup connection gets Meta Direct
   // set active automatically (nothing to switch from). A client who already
   // has Gupshup active keeps it active - connecting Meta alongside it does
@@ -271,7 +292,7 @@ export async function storeMetaWhatsAppConnection(
       connectedAt: new Date().toISOString(),
       webhookSubscribed,
       registered,
-      twoStepPinEncrypted,
+      ...(twoStepPinEncrypted ? { twoStepPinEncrypted } : {}),
       ...(input.tokenExpiresAt ? { tokenExpiresAt: input.tokenExpiresAt } : {}),
     },
     ...(hasActiveGupshup ? {} : { activeWhatsappProvider: 'meta_direct' }),
