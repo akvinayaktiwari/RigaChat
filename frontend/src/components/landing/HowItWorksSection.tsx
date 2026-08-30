@@ -43,9 +43,15 @@ export default function HowItWorksSection() {
           {/* The connector draws itself left-to-right as the steps land, so the
               line reads as the path between them rather than as a static rule
               that happened to be there first. */}
+          {/* Inset to 1/6 on each side, which is the centre of the first and
+              last column of a 3-column grid -- so the line spans 01 -> 03. It
+              was previously 1/3, which only ever connected 02 to 03 and read as
+              a stray rule growing out of the 02 badge. Sits at the badge's
+              vertical centre (56px tall, so 28px = top-7) and passes behind
+              them; the badges' ring-4 ring-white is what cuts it cleanly. */}
           <motion.div
             aria-hidden="true"
-            className="hidden md:block absolute top-10 left-1/3 right-1/3 h-px bg-linear-to-r from-transparent via-violet-300 to-transparent origin-left"
+            className="hidden md:block absolute top-7 left-[16.666%] right-[16.666%] h-px bg-linear-to-r from-transparent via-violet-300 to-transparent origin-left"
             initial={reduced ? false : { scaleX: 0, opacity: 0 }}
             whileInView={reduced ? undefined : { scaleX: 1, opacity: 1 }}
             viewport={{ once: true, amount: 0.5 }}
