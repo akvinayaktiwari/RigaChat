@@ -280,3 +280,42 @@ describe('MetaWhatsAppProvider.exchangeCodeForToken', () => {
     )
   })
 })
+
+describe('MetaWhatsAppProvider.registerPhoneNumber', () => {
+  it('posts messaging_product and the pin to the register endpoint', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ success: true }), { status: 200 }))
+
+    await metaWhatsAppProvider.registerPhoneNumber('phone-1', '123456', 'tok')
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('https://graph.facebook.com/v21.0/phone-1/register')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body as string)).toEqual({ messaging_product: 'whatsapp', pin: '123456' })
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok')
+  })
+
+  // A 200 that does not say success:true is a failure. Meta returns exactly
+  // {"success": true} here, so anything else means the number is not live --
+  // treating a bare 200 as success is how an unregistered number would get
+  // reported to a client as connected.
+  it('throws when the response is 200 without success:true', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }))
+
+    await expect(metaWhatsAppProvider.registerPhoneNumber('phone-1', '123456', 'tok')).rejects.toThrow(/phone-1/)
+  })
+
+  it('surfaces error_user_msg in preference to the generic message', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          error: { message: 'Invalid parameter', error_user_msg: 'Phone number needs to be verified first.' },
+        }),
+        { status: 400 }
+      )
+    )
+
+    await expect(metaWhatsAppProvider.registerPhoneNumber('phone-1', '123456', 'tok')).rejects.toThrow(
+      /Phone number needs to be verified first/
+    )
+  })
+})

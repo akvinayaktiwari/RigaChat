@@ -9,8 +9,9 @@ const getLastInboundMessageAt = vi.fn()
 vi.mock('../repositories/whatsapp-inbound-activity-repository.js', () => ({ getLastInboundMessageAt }))
 vi.mock('../providers/gupshup-provider.js', () => ({ gupshupProvider: {} }))
 const subscribeWabaToApp = vi.fn()
+const registerPhoneNumber = vi.fn()
 vi.mock('../providers/meta-whatsapp-provider.js', () => ({
-  metaWhatsAppProvider: { subscribeWabaToApp },
+  metaWhatsAppProvider: { subscribeWabaToApp, registerPhoneNumber },
 }))
 const encrypt = vi.fn()
 vi.mock('../lib/kms.js', () => ({ decrypt: vi.fn(), encrypt }))
@@ -79,7 +80,8 @@ describe('storeMetaWhatsAppConnection webhook subscription', () => {
   }
 
   beforeEach(() => {
-    subscribeWabaToApp.mockReset()
+    subscribeWabaToApp.mockReset().mockResolvedValue(undefined)
+    registerPhoneNumber.mockReset().mockResolvedValue(undefined)
     encrypt.mockReset().mockResolvedValue('cipher')
     vi.mocked(getClientById).mockReset().mockResolvedValue(null)
     vi.mocked(updateClient).mockReset().mockResolvedValue(undefined as never)
@@ -107,5 +109,74 @@ describe('storeMetaWhatsAppConnection webhook subscription', () => {
     expect(vi.mocked(updateClient).mock.calls[0]?.[1]).toMatchObject({
       metaDirectWhatsAppConnection: { connected: true, webhookSubscribed: false },
     })
+  })
+
+  it('registers the phone number with a 6-digit pin and records it', async () => {
+    await storeMetaWhatsAppConnection('client-1', input)
+
+    expect(registerPhoneNumber).toHaveBeenCalledWith('phone-1', expect.stringMatching(/^\d{6}$/), 'tok')
+    expect(vi.mocked(updateClient).mock.calls[0]?.[1]).toMatchObject({
+      metaDirectWhatsAppConnection: { registered: true, twoStepPinEncrypted: 'cipher' },
+    })
+  })
+
+  // Same contract as the subscribe failure above: a number that cannot send is
+  // degraded, not worthless, so the connection is still stored -- but the flag
+  // has to say so, or the first failed send is the only signal anyone gets.
+  it('still stores the connection when registration fails, flagged as unregistered', async () => {
+    registerPhoneNumber.mockRejectedValue(new Error('Phone number needs to be verified'))
+
+    await expect(storeMetaWhatsAppConnection('client-1', input)).resolves.toBeUndefined()
+
+    expect(vi.mocked(updateClient).mock.calls[0]?.[1]).toMatchObject({
+      metaDirectWhatsAppConnection: { connected: true, registered: false },
+    })
+  })
+
+  // The PIN must survive a failed registration: Meta binds it on the first
+  // register that succeeds, so a retry has to present the same value.
+  it('stores the pin even when registration fails', async () => {
+    registerPhoneNumber.mockRejectedValue(new Error('nope'))
+
+    await storeMetaWhatsAppConnection('client-1', input)
+
+    expect(vi.mocked(updateClient).mock.calls[0]?.[1]).toMatchObject({
+      metaDirectWhatsAppConnection: { twoStepPinEncrypted: 'cipher' },
+    })
+  })
+
+  it('prefers the Embedded Signup business id over the wabaId fallback', async () => {
+    await storeMetaWhatsAppConnection('client-1', { ...input, businessId: 'biz-9' })
+
+    expect(vi.mocked(updateClient).mock.calls[0]?.[1]).toMatchObject({
+      metaDirectWhatsAppConnection: { businessAccountId: 'biz-9' },
+    })
+  })
+
+  it('falls back to wabaId when no business id was reported', async () => {
+    await storeMetaWhatsAppConnection('client-1', input)
+
+    expect(vi.mocked(updateClient).mock.calls[0]?.[1]).toMatchObject({
+      metaDirectWhatsAppConnection: { businessAccountId: 'waba-1' },
+    })
+  })
+
+  it('records the token expiry when the exchange reported one', async () => {
+    await storeMetaWhatsAppConnection('client-1', { ...input, tokenExpiresAt: '2026-10-29T00:00:00.000Z' })
+
+    expect(vi.mocked(updateClient).mock.calls[0]?.[1]).toMatchObject({
+      metaDirectWhatsAppConnection: { tokenExpiresAt: '2026-10-29T00:00:00.000Z' },
+    })
+  })
+
+  // Absent rather than undefined: DynamoDB rejects an explicit undefined, and
+  // the redirect path genuinely has no expiry to report.
+  it('omits tokenExpiresAt entirely when none was reported', async () => {
+    await storeMetaWhatsAppConnection('client-1', input)
+
+    const stored = vi.mocked(updateClient).mock.calls[0]?.[1] as {
+      metaDirectWhatsAppConnection?: Record<string, unknown>
+    }
+    expect(stored.metaDirectWhatsAppConnection).not.toHaveProperty('tokenExpiresAt')
   })
 })

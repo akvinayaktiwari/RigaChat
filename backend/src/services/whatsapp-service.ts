@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto'
 import { gupshupProvider } from '../providers/gupshup-provider.js'
 import { metaWhatsAppProvider } from '../providers/meta-whatsapp-provider.js'
 import { decrypt, encrypt } from '../lib/kms.js'
@@ -155,6 +156,7 @@ interface ConnectMetaWhatsAppInput {
   wabaId: string
   phoneNumberId: string
   notificationNumber: string
+  businessId?: string
 }
 
 export interface StoreMetaWhatsAppConnectionInput {
@@ -163,6 +165,17 @@ export interface StoreMetaWhatsAppConnectionInput {
   notificationNumber: string
   accessToken: string
   displayPhoneNumber: string
+  // From the Embedded Signup FINISH payload. Absent on the seed script and the
+  // redirect path, which is why the stored record still falls back to wabaId.
+  businessId?: string
+  tokenExpiresAt?: string
+}
+
+// Meta requires a 6-digit two-step verification PIN at registration and binds
+// it to the number permanently. Random rather than fixed so one client's PIN
+// leaking cannot be replayed against another's number.
+function generateTwoStepPin(): string {
+  return String(randomInt(0, 1_000_000)).padStart(6, '0')
 }
 
 // Split out of connectMetaWhatsApp so the Embedded Signup path and the
@@ -201,6 +214,30 @@ export async function storeMetaWhatsAppConnection(
     )
   }
 
+  // Registration activates the number for Cloud API sending, and is tolerated
+  // failing for the same reason the subscribe above is: the caller is finishing
+  // an Embedded Signup popup with nowhere good to put an error, and a
+  // connection that can receive but not yet send is degraded rather than
+  // worthless. The flag is what keeps it from being degraded SILENTLY.
+  //
+  // The PIN is generated once and kept whatever the outcome. Meta binds it on
+  // the first registration that succeeds, so a retry has to present this same
+  // value -- discarding it on failure would make the number unregisterable.
+  const twoStepPin = generateTwoStepPin()
+  let registered = false
+  try {
+    await metaWhatsAppProvider.registerPhoneNumber(input.phoneNumberId, twoStepPin, input.accessToken)
+    registered = true
+  } catch (error) {
+    console.error(
+      `[whatsapp] phone number ${input.phoneNumberId} connected for client ${clientId} but NOT registered -- ` +
+        `it cannot send until it is. Retry with the stored twoStepPinEncrypted, not a new PIN. Cause:`,
+      error
+    )
+  }
+
+  const twoStepPinEncrypted = await encrypt(twoStepPin)
+
   const client = await getClientById(clientId)
   // A brand-new client with no active Gupshup connection gets Meta Direct
   // set active automatically (nothing to switch from). A client who already
@@ -215,23 +252,27 @@ export async function storeMetaWhatsAppConnection(
       connected: true,
       wabaId: input.wabaId,
       phoneNumberId: input.phoneNumberId,
-      // Meta distinguishes a WABA from the business that owns it; this
-      // implementation doesn't look up a separate business ID and reuses
-      // wabaId as a placeholder - needs verification against Meta's
-      // Embedded Signup docs (see design doc Open Question 3).
-      businessAccountId: input.wabaId,
+      // Meta distinguishes a WABA from the business that owns it. Embedded
+      // Signup reports the real one in its FINISH payload, so that is used when
+      // present. The wabaId fallback remains for the redirect path and the seed
+      // script, which never see a business_id -- those records stay wrong in
+      // the same way they always were, rather than newly wrong.
+      businessAccountId: input.businessId ?? input.wabaId,
       accessTokenEncrypted,
       displayPhoneNumber: input.displayPhoneNumber,
       notificationNumber: input.notificationNumber,
       connectedAt: new Date().toISOString(),
       webhookSubscribed,
+      registered,
+      twoStepPinEncrypted,
+      ...(input.tokenExpiresAt ? { tokenExpiresAt: input.tokenExpiresAt } : {}),
     },
     ...(hasActiveGupshup ? {} : { activeWhatsappProvider: 'meta_direct' }),
   })
 }
 
 export async function connectMetaWhatsApp(clientId: string, input: ConnectMetaWhatsAppInput): Promise<void> {
-  const { accessToken, displayPhoneNumber } = await metaWhatsAppProvider.exchangeCodeForCredentials(
+  const { accessToken, displayPhoneNumber, tokenExpiresAt } = await metaWhatsAppProvider.exchangeCodeForCredentials(
     input.code,
     input.phoneNumberId
   )
@@ -242,6 +283,8 @@ export async function connectMetaWhatsApp(clientId: string, input: ConnectMetaWh
     notificationNumber: input.notificationNumber,
     accessToken,
     displayPhoneNumber,
+    businessId: input.businessId,
+    tokenExpiresAt,
   })
 }
 
