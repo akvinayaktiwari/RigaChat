@@ -875,8 +875,17 @@ This is also the evidence the field-mapping UI item above was waiting for.
 
 **Context:** The webhook routing table's exact payload shape is still unverified against real Meta Cloud API webhooks (should reuse the `meta_page_lookup` atomic-claim pattern from `meta-lead-repository.ts` as the model, per the design doc's Premise 6). Re-verify whether this is still needed before building — if the Agents/Journeys pilot (the intended consumer) hasn't started within a few months of PR #1 shipping, treat the routing-table shape as provisional and re-check it against whatever that work actually needs.
 
+**Partial progress (2026-08-30, branch `feat/whatsapp-embedded-signup-register`):** piece (3) is
+half done. The connection record now carries `tokenExpiresAt`, populated from the exchange's
+`expires_in` — Embedded Signup configs built from the "60 Expiration Token" template issue
+~60-day tokens, not permanent ones. Recording it was done ahead of any refresh path precisely
+because it cannot be backfilled: a connection stored without it is indistinguishable from one
+expiring tomorrow, short of making every client reconnect. **Still missing: the refresh itself.**
+Without it every client connection silently stops working ~60 days after it is made. This is the
+one piece that must land before real clients are onboarded. Pieces (1) and (2) are untouched.
+
 **Effort:** M
-**Priority:** P2
+**Priority:** P2 — but the token-refresh half is P1 once the first client connects.
 **Depends on:** PR #1 (WhatsApp Meta Direct provider + Embedded Signup) shipped and proven first.
 
 ### [RESOLVED 2026-08-20] Design the Journey step-list data model + Step Functions compiler
