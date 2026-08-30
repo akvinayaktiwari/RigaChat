@@ -713,7 +713,8 @@ export default function WhatsApp() {
                   <button
                     type="button"
                     onClick={handleMetaConnect}
-                    className="text-xs text-gray-500 underline hover:text-gray-700 transition-colors"
+                    disabled={metaConnecting}
+                    className="text-xs text-gray-500 underline hover:text-gray-700 transition-colors disabled:opacity-50"
                   >
                     Already set up through an older link? Use the previous flow
                   </button>

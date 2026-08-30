@@ -319,3 +319,53 @@ describe('MetaWhatsAppProvider.registerPhoneNumber', () => {
     )
   })
 })
+
+describe('MetaWhatsAppProvider.exchangeCodeForCredentials', () => {
+  const OLD_ENV = { ...process.env }
+
+  beforeEach(() => {
+    process.env.META_APP_ID = 'app-1'
+    process.env.META_APP_SECRET = 'secret-1'
+  })
+
+  afterEach(() => {
+    process.env = { ...OLD_ENV }
+  })
+
+  // The whole reason expires_in is read: Embedded Signup issues ~60-day tokens,
+  // so a connection stored without an expiry cannot be told apart from one that
+  // dies tomorrow.
+  it('converts expires_in into an absolute tokenExpiresAt', async () => {
+    vi.setSystemTime(new Date('2026-08-30T00:00:00.000Z'))
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: 'tok', expires_in: 5184000 }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ display_phone_number: '+91 70070 28001' }), { status: 200 }))
+
+    const result = await metaWhatsAppProvider.exchangeCodeForCredentials('code-1', 'phone-1')
+
+    expect(result.accessToken).toBe('tok')
+    expect(result.tokenExpiresAt).toBe('2026-10-29T00:00:00.000Z')
+    vi.useRealTimers()
+  })
+
+  // Absent, not fabricated. A guessed expiry is worse than a known-unknown:
+  // it would make a permanent token look like it expires.
+  it('leaves tokenExpiresAt undefined when Meta reports no expires_in', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: 'tok' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ display_phone_number: '+91 70070 28001' }), { status: 200 }))
+
+    const result = await metaWhatsAppProvider.exchangeCodeForCredentials('code-1', 'phone-1')
+
+    expect(result.tokenExpiresAt).toBeUndefined()
+  })
+
+  it('throws when the token exchange returns no access_token', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: { message: 'Code expired' } }), { status: 400 })
+    )
+
+    await expect(metaWhatsAppProvider.exchangeCodeForCredentials('code-1', 'phone-1')).rejects.toThrow(/Code expired/)
+  })
+})
+

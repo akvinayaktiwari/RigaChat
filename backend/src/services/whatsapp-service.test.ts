@@ -14,7 +14,8 @@ vi.mock('../providers/meta-whatsapp-provider.js', () => ({
   metaWhatsAppProvider: { subscribeWabaToApp, registerPhoneNumber },
 }))
 const encrypt = vi.fn()
-vi.mock('../lib/kms.js', () => ({ decrypt: vi.fn(), encrypt }))
+const decrypt = vi.fn()
+vi.mock('../lib/kms.js', () => ({ decrypt, encrypt }))
 vi.mock('../repositories/client-repository.js', () => ({
   clearActiveWhatsappProvider: vi.fn(),
   getClientById: vi.fn(),
@@ -82,6 +83,7 @@ describe('storeMetaWhatsAppConnection webhook subscription', () => {
   beforeEach(() => {
     subscribeWabaToApp.mockReset().mockResolvedValue(undefined)
     registerPhoneNumber.mockReset().mockResolvedValue(undefined)
+    decrypt.mockReset()
     encrypt.mockReset().mockResolvedValue('cipher')
     vi.mocked(getClientById).mockReset().mockResolvedValue(null)
     vi.mocked(updateClient).mockReset().mockResolvedValue(undefined as never)
@@ -159,6 +161,36 @@ describe('storeMetaWhatsAppConnection webhook subscription', () => {
     expect(vi.mocked(updateClient).mock.calls[0]?.[1]).toMatchObject({
       metaDirectWhatsAppConnection: { businessAccountId: 'waba-1' },
     })
+  })
+
+  // REGRESSION: a reconnect used to mint a FRESH pin and write it over the
+  // stored one. Meta binds the pin on the first successful registration and
+  // rejects any later register presenting a different one, so that both failed
+  // against Meta and destroyed the only value that could ever register the
+  // number -- leaving it permanently unregisterable.
+  it('reuses the stored pin on reconnect instead of minting a new one', async () => {
+    decrypt.mockResolvedValue('424242')
+    vi.mocked(getClientById).mockResolvedValue({
+      clientId: 'client-1',
+      metaDirectWhatsAppConnection: { twoStepPinEncrypted: 'existing-cipher' },
+    } as never)
+
+    await storeMetaWhatsAppConnection('client-1', input)
+
+    expect(decrypt).toHaveBeenCalledWith('existing-cipher')
+    expect(registerPhoneNumber).toHaveBeenCalledWith('phone-1', '424242', 'tok')
+    // The stored ciphertext is carried over verbatim, never re-encrypted into
+    // a different value.
+    expect(vi.mocked(updateClient).mock.calls[0]?.[1]).toMatchObject({
+      metaDirectWhatsAppConnection: { twoStepPinEncrypted: 'existing-cipher' },
+    })
+  })
+
+  it('mints a pin only when the client has none stored', async () => {
+    await storeMetaWhatsAppConnection('client-1', input)
+
+    expect(decrypt).not.toHaveBeenCalled()
+    expect(registerPhoneNumber).toHaveBeenCalledWith('phone-1', expect.stringMatching(/^\d{6}$/), 'tok')
   })
 
   it('records the token expiry when the exchange reported one', async () => {

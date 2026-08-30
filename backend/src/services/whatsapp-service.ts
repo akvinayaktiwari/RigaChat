@@ -220,10 +220,18 @@ export async function storeMetaWhatsAppConnection(
   // connection that can receive but not yet send is degraded rather than
   // worthless. The flag is what keeps it from being degraded SILENTLY.
   //
-  // The PIN is generated once and kept whatever the outcome. Meta binds it on
-  // the first registration that succeeds, so a retry has to present this same
-  // value -- discarding it on failure would make the number unregisterable.
-  const twoStepPin = generateTwoStepPin()
+  const client = await getClientById(clientId)
+
+  // Meta binds the PIN to the number on the first registration that SUCCEEDS,
+  // and rejects any later register presenting a different one. So a reconnect
+  // must re-present the PIN this client already has -- generating a fresh one
+  // would fail against Meta and, worse, overwrite the only value that could
+  // ever register this number, leaving it permanently unregisterable.
+  //
+  // A new PIN is minted only when the client has none stored.
+  const existingPinEncrypted = client?.metaDirectWhatsAppConnection?.twoStepPinEncrypted
+  const twoStepPin = existingPinEncrypted ? await decrypt(existingPinEncrypted) : generateTwoStepPin()
+
   let registered = false
   try {
     await metaWhatsAppProvider.registerPhoneNumber(input.phoneNumberId, twoStepPin, input.accessToken)
@@ -231,14 +239,13 @@ export async function storeMetaWhatsAppConnection(
   } catch (error) {
     console.error(
       `[whatsapp] phone number ${input.phoneNumberId} connected for client ${clientId} but NOT registered -- ` +
-        `it cannot send until it is. Retry with the stored twoStepPinEncrypted, not a new PIN. Cause:`,
+        `it cannot send until it is. Cause:`,
       error
     )
   }
 
-  const twoStepPinEncrypted = await encrypt(twoStepPin)
-
-  const client = await getClientById(clientId)
+  // Re-encrypting the SAME pin, not a new one, on the reconnect path.
+  const twoStepPinEncrypted = existingPinEncrypted ?? (await encrypt(twoStepPin))
   // A brand-new client with no active Gupshup connection gets Meta Direct
   // set active automatically (nothing to switch from). A client who already
   // has Gupshup active keeps it active - connecting Meta alongside it does
