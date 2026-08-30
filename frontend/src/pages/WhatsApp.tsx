@@ -91,6 +91,11 @@ function loadFacebookSdk(): Promise<void> {
 interface EmbeddedSignupSessionData {
   phone_number_id?: string
   waba_id?: string
+  // The business that OWNS the WABA -- a different id, and the only place it
+  // is ever offered. Dropping it means the connection record stores the wabaId
+  // in its place, which cannot be corrected later without every client
+  // reconnecting.
+  business_id?: string
   // Present on CANCEL: the step the user bailed out on. The single most
   // useful field for diagnosing a failed signup, and it used to be dropped.
   current_step?: string
@@ -356,6 +361,7 @@ export default function WhatsApp() {
         code,
         wabaId: sessionData.waba_id,
         phoneNumberId: sessionData.phone_number_id,
+        businessId: sessionData.business_id,
         notificationNumber: metaNotificationNumber.trim(),
       })
 
@@ -688,27 +694,28 @@ export default function WhatsApp() {
                 />
               </div>
               <div className="space-y-2">
+                {/* Embedded Signup is the primary path as of the 2504667890053340
+                    login configuration. That config issues a SYSTEM-USER token,
+                    which cannot call me/businesses -- so the redirect flow below
+                    can no longer discover a WABA and is kept only for accounts
+                    that predate the switch. Swapping these two back would break
+                    every new connection. */}
                 <button
                   ref={metaConnectButtonRef}
                   type="button"
-                  onClick={handleMetaConnect}
-                  className="inline-flex items-center justify-center bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity"
+                  onClick={handleMetaConnectPopup}
+                  disabled={metaConnecting}
+                  className="inline-flex items-center justify-center bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity disabled:opacity-50"
                 >
-                  Connect with Meta
+                  {metaConnecting ? 'Opening Meta...' : 'Connect with Meta'}
                 </button>
-                {/* Embedded Signup fallback. Kept reachable rather than
-                    removed: Meta requires the popup flow for businesses that
-                    still need a WhatsApp account CREATED (the redirect flow
-                    can only connect one that already exists), so this is the
-                    path a brand-new client needs. */}
                 <div>
                   <button
                     type="button"
-                    onClick={handleMetaConnectPopup}
-                    disabled={metaConnecting}
-                    className="text-xs text-gray-500 underline hover:text-gray-700 transition-colors disabled:opacity-50"
+                    onClick={handleMetaConnect}
+                    className="text-xs text-gray-500 underline hover:text-gray-700 transition-colors"
                   >
-                    {metaConnecting ? 'Opening Meta...' : "Don't have a WhatsApp Business account yet? Set one up"}
+                    Already set up through an older link? Use the previous flow
                   </button>
                 </div>
               </div>
