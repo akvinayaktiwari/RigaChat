@@ -875,18 +875,62 @@ This is also the evidence the field-mapping UI item above was waiting for.
 
 **Context:** The webhook routing table's exact payload shape is still unverified against real Meta Cloud API webhooks (should reuse the `meta_page_lookup` atomic-claim pattern from `meta-lead-repository.ts` as the model, per the design doc's Premise 6). Re-verify whether this is still needed before building — if the Agents/Journeys pilot (the intended consumer) hasn't started within a few months of PR #1 shipping, treat the routing-table shape as provisional and re-check it against whatever that work actually needs.
 
-**Partial progress (2026-08-30, branch `feat/whatsapp-embedded-signup-register`):** piece (3) is
-half done. The connection record now carries `tokenExpiresAt`, populated from the exchange's
-`expires_in` — Embedded Signup configs built from the "60 Expiration Token" template issue
-~60-day tokens, not permanent ones. Recording it was done ahead of any refresh path precisely
-because it cannot be backfilled: a connection stored without it is indistinguishable from one
-expiring tomorrow, short of making every client reconnect. **Still missing: the refresh itself.**
-Without it every client connection silently stops working ~60 days after it is made. This is the
-one piece that must land before real clients are onboarded. Pieces (1) and (2) are untouched.
+**Piece (3) — token lifecycle — is RESOLVED (2026-08-30), by configuration, not code.**
 
-**Effort:** M
-**Priority:** P2 — but the token-refresh half is P1 once the first client connects.
+There is no refresh path and there does not need to be one. Meta's business integration system
+user tokens carry **no refresh token** — unlike `CalComConnection`, `MetaDirectWhatsAppConnection`
+has no `refreshTokenEncrypted`, so `cal-com-service.ts`'s `getValidAccessToken()` refresh-on-read
+pattern cannot be copied here. There is nothing to refresh WITH.
+
+What resolved it instead: per Meta's Facebook Login for Business docs, these tokens
+*"default to never expire for the common offline server-to-server communication."* The 60-day
+window is **opt-in** — it is what the `set_token_expires_in_60_days` flag does, and it is what the
+"WhatsApp Embedded Signup Configuration With 60 Expiration Token" template (which Meta's own
+WhatsApp docs recommend) selects. Token expiration turned out to be editable on an existing
+configuration, unlike login variation. Config `2504667890053340` was switched to never-expire on
+2026-08-30, so newly issued tokens do not expire and the ~60-day silent-death failure mode is gone.
+
+**Two things about this that are easy to get wrong later:**
+
+1. **The setting is not retroactive.** It governs tokens at ISSUE time. A token minted under the
+   60-day setting keeps its 60-day life no matter what the config says afterwards — fixing such a
+   connection means reconnecting it, not re-reading the config.
+2. **`tokenExpiresAt` being absent is correct, not a bug.** A never-expiring token comes back with
+   no `expires_in`, so `exchangeCodeForCredentials` leaves `tokenExpiresAt` undefined and the field
+   is omitted from the record. It is deliberately never fabricated — see the test
+   "leaves tokenExpiresAt undefined when Meta reports no expires_in". An ABSENT expiry means
+   permanent; a PRESENT one means the connection was made under an expiring config and is on a
+   clock. The field stays because it is the only way to tell those two apart, and because it
+   cannot be backfilled onto connections made without it.
+
+**Still open in this item:** pieces (1) webhook routing / phone-number lookup and (2)
+disconnect/migration UX are untouched.
+
+**Effort:** M → S (piece 3 no longer needs building)
+**Priority:** P2
 **Depends on:** PR #1 (WhatsApp Meta Direct provider + Embedded Signup) shipped and proven first.
+
+### The one existing meta_direct connection is on a token that dies ~mid-October
+
+**What:** `clients` has exactly one record with a `metaDirectWhatsAppConnection`
+(`f163ed8a-…d8d7`, `connectedAt` 2026-08-15). It predates every field added on
+2026-08-30: no `tokenExpiresAt`, no `registered`, no `twoStepPinEncrypted`.
+
+**Why it needs action:** its token was issued under the OLD login configuration
+(`1063430079829327`), which was the General / **user access token** variation. A long-lived user
+token expires on its own roughly 60 days out — about **2026-10-14**. Switching config
+`2504667890053340` to never-expire does NOT help it: expiry is fixed at issue time. When that
+token dies, sends and inbound both stop with no warning.
+
+**The fix is a disconnect + reconnect through Embedded Signup**, not a repair script. Reconnecting
+WITHOUT disconnecting first hits the deliberate guard in `storeMetaWhatsAppConnection`: the record
+has no stored PIN, so `reconnectingWithoutStoredPin` fires and `/register` is skipped on purpose
+(a fresh PIN against a possibly-already-bound number can lock out two-step verification). Disconnect
+clears the record, so the fresh connect mints a PIN and registers normally. One action yields a
+never-expiring token, `registered: true`, a stored PIN, and the real `businessId`.
+
+**Effort:** S (minutes, manual)
+**Priority:** P1 before 2026-10-14, or P0 the moment this connection is used for anything real.
 
 ### [RESOLVED 2026-08-20] Design the Journey step-list data model + Step Functions compiler
 
