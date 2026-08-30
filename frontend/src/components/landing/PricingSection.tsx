@@ -1,4 +1,5 @@
 import { Check } from 'lucide-react'
+import { Reveal, RevealGroup, RevealItem } from './motion-primitives'
 import { PRICING_TIERS, formatPrice } from '../../lib/pricingTiers'
 import type { BillableTier, Region } from '../../lib/pricingTiers'
 
@@ -26,7 +27,7 @@ export default function PricingSection({
   return (
     <section id="plans" className="py-24 px-4">
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-14">
+        <Reveal className="text-center mb-14">
           <p className="text-sm font-semibold text-violet-600 uppercase tracking-widest mb-3">Pricing</p>
           <h2
             className="text-4xl sm:text-5xl font-extrabold text-gray-900 tracking-tight mb-4"
@@ -58,9 +59,9 @@ export default function PricingSection({
               🌍 International ($)
             </button>
           </div>
-        </div>
+        </Reveal>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <RevealGroup className="grid grid-cols-1 md:grid-cols-3 gap-5" stagger={0.09}>
           {PRICING_TIERS.map((plan) => {
             const isMostPopular = plan.tier === MOST_POPULAR_TIER
             const ctaClasses = `w-full flex items-center justify-center gap-2 font-semibold px-4 py-2.5 rounded-xl text-sm transition-opacity ${
@@ -70,10 +71,12 @@ export default function PricingSection({
             }`
 
             return (
-              <div
+              <RevealItem
                 key={plan.tier}
-                className={`relative bg-white rounded-2xl border p-6 shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-black/6 ${
-                  isMostPopular ? 'border-violet-400 ring-2 ring-violet-100' : 'border-black/5'
+                className={`edge-glow relative bg-white rounded-2xl border p-6 shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-black/6 hover:-translate-y-0.5 ${
+                  isMostPopular
+                    ? 'border-violet-400 ring-2 ring-violet-100 md:-translate-y-2 shadow-lg shadow-violet-200/40'
+                    : 'border-black/5'
                 }`}
               >
                 {isMostPopular && (
@@ -115,10 +118,10 @@ export default function PricingSection({
                     Contact us
                   </a>
                 )}
-              </div>
+              </RevealItem>
             )
           })}
-        </div>
+        </RevealGroup>
       </div>
     </section>
   )

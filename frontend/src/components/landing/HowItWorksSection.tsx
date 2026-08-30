@@ -1,3 +1,6 @@
+import { motion, useReducedMotion } from 'motion/react'
+import { Reveal, RevealGroup, RevealItem, DURATION, EASE_OUT } from './motion-primitives'
+
 const STEPS = [
   {
     step: '01',
@@ -20,10 +23,12 @@ const STEPS = [
 ]
 
 export default function HowItWorksSection() {
+  const reduced = useReducedMotion()
+
   return (
     <section id="how-it-works" className="py-24 px-4">
       <div className="max-w-5xl mx-auto">
-        <div className="text-center mb-16">
+        <Reveal className="text-center mb-16">
           <p className="text-sm font-semibold text-violet-600 uppercase tracking-widest mb-3">How it works</p>
           <h2
             className="text-4xl sm:text-5xl font-extrabold text-gray-900 tracking-tight"
@@ -32,14 +37,24 @@ export default function HowItWorksSection() {
             From zero to live <br className="hidden sm:block" />
             in three steps
           </h2>
-        </div>
+        </Reveal>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
-          <div className="hidden md:block absolute top-10 left-1/3 right-1/3 h-px bg-linear-to-r from-transparent via-violet-200 to-transparent" />
+        <RevealGroup className="grid grid-cols-1 md:grid-cols-3 gap-8 relative" stagger={0.12}>
+          {/* The connector draws itself left-to-right as the steps land, so the
+              line reads as the path between them rather than as a static rule
+              that happened to be there first. */}
+          <motion.div
+            aria-hidden="true"
+            className="hidden md:block absolute top-10 left-1/3 right-1/3 h-px bg-linear-to-r from-transparent via-violet-300 to-transparent origin-left"
+            initial={reduced ? false : { scaleX: 0, opacity: 0 }}
+            whileInView={reduced ? undefined : { scaleX: 1, opacity: 1 }}
+            viewport={{ once: true, amount: 0.5 }}
+            transition={{ duration: DURATION.slow, delay: 0.25, ease: EASE_OUT }}
+          />
 
           {STEPS.map((item, i) => (
-            <div key={item.step} className="relative">
-              <div className="w-14 h-14 rounded-2xl bg-linear-to-br from-violet-600 to-purple-500 flex items-center justify-center mb-5 shadow-lg shadow-violet-200/60">
+            <RevealItem key={item.step} className="relative">
+              <div className="w-14 h-14 rounded-2xl bg-linear-to-br from-violet-600 to-purple-500 flex items-center justify-center mb-5 shadow-lg shadow-violet-200/60 ring-4 ring-white">
                 <span
                   className="text-white font-extrabold text-sm"
                   style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
@@ -61,9 +76,9 @@ export default function HowItWorksSection() {
                   <div className="w-px h-8 bg-violet-200" />
                 </div>
               )}
-            </div>
+            </RevealItem>
           ))}
-        </div>
+        </RevealGroup>
       </div>
     </section>
   )

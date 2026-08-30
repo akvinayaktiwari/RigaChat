@@ -1,4 +1,5 @@
 import { ArrowRight } from 'lucide-react'
+import { Reveal } from './motion-primitives'
 import { PRICING_TIERS, formatPrice } from '../../lib/pricingTiers'
 import type { Region } from '../../lib/pricingTiers'
 
@@ -15,15 +16,18 @@ export default function CTASection({ onStartTrial, region }: CTASectionProps) {
   return (
     <section id="pricing" className="py-24 px-4">
       <div className="max-w-4xl mx-auto">
-        <div className="relative bg-linear-to-br from-violet-600 via-purple-600 to-indigo-600 rounded-3xl px-8 py-16 text-center overflow-hidden shadow-2xl shadow-violet-300/40">
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute -top-20 -right-20 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
-            <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-purple-400/20 rounded-full blur-3xl" />
+        <Reveal className="relative bg-linear-to-br from-violet-600 via-purple-600 to-indigo-600 rounded-3xl px-8 py-16 text-center overflow-hidden shadow-2xl shadow-violet-300/40">
+          <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
+            <div className="aurora-drift absolute -top-20 -right-20 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
+            <div className="aurora-drift aurora-drift-slow absolute -bottom-20 -left-20 w-64 h-64 bg-purple-400/20 rounded-full blur-3xl" />
+            {/* Same cyan second-light as the hero, closing the page on the
+                colour it opened with. */}
+            <div className="aurora-drift aurora-drift-slower absolute top-1/2 left-1/2 w-72 h-72 -translate-x-1/2 -translate-y-1/2 bg-cyan-400/10 rounded-full blur-3xl" />
           </div>
 
           <div className="relative">
             <span className="inline-flex items-center gap-1.5 bg-white/15 border border-white/20 text-white text-xs font-semibold px-3.5 py-1.5 rounded-full mb-6">
-              <span className="w-1.5 h-1.5 bg-green-400 rounded-full inline-block" />
+              <span className="w-1.5 h-1.5 bg-green-400 rounded-full inline-block animate-pulse" />
               14-day free trial · No credit card
             </span>
 
@@ -43,7 +47,7 @@ export default function CTASection({ onStartTrial, region }: CTASectionProps) {
               <button
                 type="button"
                 onClick={onStartTrial}
-                className="inline-flex items-center justify-center gap-2 bg-white text-violet-700 font-bold px-7 py-4 rounded-xl hover:bg-gray-50 transition-colors shadow-lg text-sm"
+                className="cta-sheen inline-flex items-center justify-center gap-2 bg-white text-violet-700 font-bold px-7 py-4 rounded-xl hover:bg-gray-50 transition-all hover:shadow-xl shadow-lg text-sm"
               >
                 Start free trial
                 <ArrowRight className="w-4 h-4" />
@@ -60,7 +64,7 @@ export default function CTASection({ onStartTrial, region }: CTASectionProps) {
               Plans from {formatPrice(LOWEST_TIER.pricing[region], region)}/mo · Cancel anytime
             </p>
           </div>
-        </div>
+        </Reveal>
       </div>
     </section>
   )

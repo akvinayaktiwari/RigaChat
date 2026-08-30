@@ -1,4 +1,5 @@
 import { Star } from 'lucide-react'
+import { Reveal, RevealGroup, RevealItem } from './motion-primitives'
 
 // TODO: replace with real customer testimonials
 const TESTIMONIALS = [
@@ -31,7 +32,7 @@ export default function TestimonialsSection() {
   return (
     <section className="py-24 px-4 bg-gray-50/60">
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-14">
+        <Reveal className="text-center mb-14">
           <p className="text-sm font-semibold text-violet-600 uppercase tracking-widest mb-3">Testimonials</p>
           <h2
             className="text-4xl sm:text-5xl font-extrabold text-gray-900 tracking-tight"
@@ -40,13 +41,13 @@ export default function TestimonialsSection() {
             Teams that already <br className="hidden sm:block" />
             switched
           </h2>
-        </div>
+        </Reveal>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <RevealGroup className="grid grid-cols-1 md:grid-cols-3 gap-5" stagger={0.09}>
           {TESTIMONIALS.map((t) => (
-            <div
+            <RevealItem
               key={t.author}
-              className="bg-white border border-black/5 rounded-2xl p-6 hover:shadow-lg hover:shadow-black/5 transition-all duration-300"
+              className="edge-glow bg-white border border-black/5 rounded-2xl p-6 hover:shadow-lg hover:shadow-black/5 hover:-translate-y-0.5 transition-all duration-300"
             >
               <div className="flex gap-0.5 mb-5">
                 {[...Array(5)].map((_, i) => (
@@ -65,9 +66,9 @@ export default function TestimonialsSection() {
                   <p className="text-xs text-gray-500">{t.role}</p>
                 </div>
               </div>
-            </div>
+            </RevealItem>
           ))}
-        </div>
+        </RevealGroup>
       </div>
     </section>
   )
