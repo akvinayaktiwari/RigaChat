@@ -29,10 +29,20 @@ const COUNT_DURATION_MS = 1400
  * would have to be parsed back apart on every frame, and '3 min' has no single
  * correct parse.
  */
-function useCountUp(target: number, active: boolean): number {
-  const [current, setCurrent] = useState(active ? target : 0)
+function useCountUp(target: number, active: boolean, reduced: boolean): number {
+  const [current, setCurrent] = useState(reduced ? target : 0)
 
   useEffect(() => {
+    // Reduced motion gets the final value and NO animation -- not a shortened
+    // one. `reduced` has to stay a separate signal from `active`: collapsing
+    // them (active = reduced || inView) still let this effect schedule a frame,
+    // which snapped the seeded value back to 0 and counted up anyway, doing
+    // the exact opposite of what the preference asks for.
+    if (reduced) {
+      setCurrent(target)
+      return
+    }
+
     if (!active) return
 
     let frame = 0
@@ -54,8 +64,8 @@ function useCountUp(target: number, active: boolean): number {
   return current
 }
 
-function StatValue({ stat, active }: { stat: Stat; active: boolean }) {
-  const current = useCountUp(stat.value, active)
+function StatValue({ stat, active, reduced }: { stat: Stat; active: boolean; reduced: boolean }) {
+  const current = useCountUp(stat.value, active, reduced)
 
   return (
     <p
@@ -74,9 +84,9 @@ export default function StatsBar() {
   const reduced = useReducedMotion()
   const inView = useInView(sectionRef, { once: true, amount: 0.5 })
 
-  // Under reduced motion the counters are handed their final value from the
-  // first render instead of ticking to it.
-  const counting = reduced ? true : inView
+  // `reduced` and `inView` stay separate signals all the way down. Folding
+  // them into one boolean here is what broke the reduced-motion path: it made
+  // the counter "active", which is what schedules the animation.
 
   return (
     <section ref={sectionRef} className="py-12 px-4 border-y border-gray-100/80 relative overflow-hidden">
@@ -90,7 +100,7 @@ export default function StatsBar() {
       <RevealGroup className="max-w-5xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-8" stagger={0.08}>
         {STATS.map((stat) => (
           <RevealItem key={stat.label} className="text-center">
-            <StatValue stat={stat} active={counting} />
+            <StatValue stat={stat} active={inView} reduced={reduced ?? false} />
             <p className="text-sm text-gray-500">{stat.label}</p>
           </RevealItem>
         ))}

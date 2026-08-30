@@ -6,6 +6,10 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     environment: 'jsdom',
+    // jsdom has neither IntersectionObserver nor matchMedia; the landing
+    // components need both. Without this the reduced-motion branches are
+    // untestable, which is how the StatsBar count-up bug shipped uncaught.
+    setupFiles: ['./src/test-setup.ts'],
     // Threads, not vitest's default "forks" pool. Under forks on macOS this
     // suite takes ~906s and reports 6 files as failed -- but the failures are
     // "Failed to start forks worker" / "Timeout waiting for worker to respond",
