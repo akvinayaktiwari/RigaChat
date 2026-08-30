@@ -442,9 +442,13 @@ Viewport trigger:       once, 25% visible, 80px early
 <RevealItem>   a single card inside a RevealGroup
 ```
 
-Prefer `RevealGroup` over hand-tuned `delay` props: the stagger stays correct
-when cards are added or reordered, and the group shares one viewport observer
-instead of one per card.
+The primitives take `className` and, on `RevealGroup`, `stagger`. Nothing else.
+An earlier version carried `direction`, `as`, `delay` and `duration`; no call
+site ever passed any of them, so they were removed. Add one back at the moment a
+section genuinely needs it, not before.
+
+`RevealGroup` shares one viewport observer across its children, so the stagger
+stays correct when cards are added or reordered.
 
 Keep a group to roughly 8 items. Past that the tail lands late enough to read
 as lag rather than choreography.
@@ -488,7 +492,11 @@ utility classes. Under `prefers-reduced-motion: reduce`:
     not a shortened animation.
   - Children are in the DOM either way, so crawlers and no-JS readers see the
     content regardless of the media query.
-  - Stats counters get their final value on the first frame.
+  - Stats counters get their final value on the first frame and never request
+    an animation frame at all. This is enforced by a test: `reduced` is a
+    separate signal from `inView`, because folding them into one boolean is
+    exactly the bug that made the counter animate under reduced motion while
+    appearing correct to a coarse check.
   - `.aurora-drift` and `.cta-sheen` are switched off in index.css.
   - `.edge-glow` is kept — it is a hover affordance, not motion. Only its
     fade is dropped.
@@ -501,6 +509,12 @@ Do:    keep decorative motion slow (18s+) so it never competes with copy
 Don't: animate width/height — use transform and opacity
 Don't: parallax body copy
 Don't: put an always-on shimmer on the primary CTA; it fights the headline
+Don't: animate the LCP element. The hero h1 renders at its final state so a
+       slow or failed bundle shows a headline, not a blank space.
+Don't: animate scale on a blurred layer -- it re-rasterizes the filter every
+       frame. Drift with translate only.
+Do:    pair every Tailwind animate-* with motion-reduce:animate-none. The
+       reduced-motion block in index.css only covers the hand-written classes.
 ```
 
 ---
