@@ -1,4 +1,4 @@
-import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 
 const TABLE_NAME = (): string => getTableName('whatsapp_inbound_activity')
@@ -120,6 +120,18 @@ export async function consumeResumeAllowance(
   } catch (error) {
     throw new Error(
       `Failed to consume resume allowance for lead ${leadId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
+// Erasure only. Dropping this row also closes the lead's 24h session window,
+// which is correct: there is no longer a lead to hold a conversation with.
+export async function deleteInboundActivity(leadId: string): Promise<void> {
+  try {
+    await dynamoClient.send(new DeleteCommand({ TableName: TABLE_NAME(), Key: { leadId } }))
+  } catch (error) {
+    throw new Error(
+      `Failed to delete WhatsApp activity for lead ${leadId}: ${error instanceof Error ? error.message : String(error)}`
     )
   }
 }

@@ -167,3 +167,15 @@ export async function removePageClientMapping(pageId: string): Promise<void> {
     )
   }
 }
+
+// Erasure only. Keyed by (clientId, leadId) -- the third of three key shapes
+// across the lead tables, which is why eraseLead has to branch on LeadRef.
+export async function deleteMetaLead(clientId: string, leadId: string): Promise<void> {
+  try {
+    await dynamoClient.send(new DeleteCommand({ TableName: LEADS_TABLE_NAME(), Key: { clientId, leadId } }))
+  } catch (error) {
+    throw new Error(
+      `Failed to delete Meta lead ${leadId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}

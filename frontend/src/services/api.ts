@@ -31,6 +31,7 @@ import type {
   NotificationPreferences,
   MetaDeletionRequestStatus,
   LeadState,
+  LeadErasureReport,
   LeadStatePatch,
   MetaConnection,
   MetaDirectWhatsAppConnection,
@@ -282,6 +283,24 @@ export function updateLeadState(
   patch: LeadStatePatch
 ): Promise<ApiResponse<LeadState>> {
   return apiClient<LeadState>('/api/leads/state', 'PATCH', { leadRef, ...patch })
+}
+
+// Archive: hidden from the inbox, everything kept, fully reversible.
+export function setLeadArchived(leadRef: LeadRef, archived: boolean): Promise<ApiResponse<LeadState>> {
+  return apiClient<LeadState>('/api/leads/archive', 'POST', { leadRef, archived })
+}
+
+// IRREVERSIBLE. Deletes the lead, its message history and its CRM state, and
+// stops any journey still running for them. The LeadRef travels as query params
+// (like /detail and /events) rather than a body, because DELETE bodies are
+// widely mishandled and this is the one call where losing a parameter must not
+// be able to mean something else. confirmLeadId is echoed back deliberately:
+// the backend rejects the call unless it matches, which is a guard against a UI
+// wiring the wrong row into an irreversible action.
+export function eraseLead(leadRef: LeadRef): Promise<ApiResponse<LeadErasureReport>> {
+  const params = new URLSearchParams(leadRefToQuery(leadRef))
+  params.set('confirmLeadId', leadRef.leadId)
+  return apiClient<LeadErasureReport>(`/api/leads?${params.toString()}`, 'DELETE')
 }
 
 export function addLeadNote(leadRef: LeadRef, body: string): Promise<ApiResponse<LeadState>> {

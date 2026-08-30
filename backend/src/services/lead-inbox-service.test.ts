@@ -36,6 +36,7 @@ const {
   getUnifiedInbox,
   getUnifiedLeadDetail,
   updateLeadStateForClient,
+  setLeadArchivedForClient,
 } = await import('./lead-inbox-service.js')
 
 const NOW = '2026-08-07T12:00:00.000Z'
@@ -646,5 +647,71 @@ describe('pagination with a corrupt date', () => {
     expect(new Set(seen).size).toBe(10)
     // Sorted last, so a corrupt row is not the first thing an operator sees.
     expect(seen[seen.length - 1]).toBe('corrupt')
+  })
+})
+
+// Archiving is the everyday half of lead deletion: hide it, keep everything.
+describe('archiving a lead', () => {
+  it('keeps an archived lead out of the inbox', async () => {
+    getLeadsByClientId.mockResolvedValue([chatLead('c1', '2026-08-01T00:00:00.000Z')])
+    getLeadStatesForClient.mockResolvedValue([
+      { leadId: 'c1', clientId: CLIENT, status: 'new', notes: [], archivedAt: '2026-08-29T00:00:00.000Z' },
+    ])
+
+    expect((await getUnifiedInbox(CLIENT)).leads).toHaveLength(0)
+  })
+
+  it('shows it again on request, so a mistake is recoverable', async () => {
+    getLeadsByClientId.mockResolvedValue([chatLead('c1', '2026-08-01T00:00:00.000Z')])
+    getLeadStatesForClient.mockResolvedValue([
+      { leadId: 'c1', clientId: CLIENT, status: 'new', notes: [], archivedAt: '2026-08-29T00:00:00.000Z' },
+    ])
+
+    expect((await getUnifiedInbox(CLIENT, { includeArchived: true })).leads).toHaveLength(1)
+  })
+
+  it('leaves un-archived leads alone', async () => {
+    getLeadsByClientId.mockResolvedValue([chatLead('c1', '2026-08-01T00:00:00.000Z')])
+    getLeadStatesForClient.mockResolvedValue([{ leadId: 'c1', clientId: CLIENT, status: 'new', notes: [] }])
+
+    expect((await getUnifiedInbox(CLIENT)).leads).toHaveLength(1)
+  })
+
+  it('stamps who archived it and when', async () => {
+    getLeadById.mockResolvedValue({ leadId: 'c1', clientId: CLIENT, botId: 'bot-1' })
+    upsertLeadState.mockResolvedValue({ leadId: 'c1' })
+
+    await setLeadArchivedForClient({ source: 'chat', botId: 'bot-1', leadId: 'c1' }, CLIENT, true, 'operator-1')
+
+    expect(upsertLeadState).toHaveBeenCalledWith('c1', CLIENT, {
+      archivedAt: expect.any(String),
+      archivedBy: 'operator-1',
+    })
+  })
+
+  // Explicitly-undefined is a REMOVE in the patch layer, so unarchiving leaves
+  // no trace rather than a lingering archived:false to reason about.
+  it('clears both fields on unarchive', async () => {
+    getLeadById.mockResolvedValue({ leadId: 'c1', clientId: CLIENT, botId: 'bot-1' })
+    upsertLeadState.mockResolvedValue({ leadId: 'c1' })
+
+    await setLeadArchivedForClient({ source: 'chat', botId: 'bot-1', leadId: 'c1' }, CLIENT, false, 'operator-1')
+
+    expect(upsertLeadState).toHaveBeenCalledWith('c1', CLIENT, {
+      archivedAt: undefined,
+      archivedBy: undefined,
+    })
+  })
+
+  // /state stamps lastTouchedAt because changing a status means working the
+  // lead. Archiving is the opposite claim, and bumping it would push a lead you
+  // just dismissed UP the urgency sort if it were ever unarchived.
+  it('does not count as touching the lead', async () => {
+    getLeadById.mockResolvedValue({ leadId: 'c1', clientId: CLIENT, botId: 'bot-1' })
+    upsertLeadState.mockResolvedValue({ leadId: 'c1' })
+
+    await setLeadArchivedForClient({ source: 'chat', botId: 'bot-1', leadId: 'c1' }, CLIENT, true, 'operator-1')
+
+    expect(upsertLeadState.mock.calls[0][2]).not.toHaveProperty('lastTouchedAt')
   })
 })

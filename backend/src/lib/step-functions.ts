@@ -6,6 +6,7 @@ import {
   SendTaskSuccessCommand,
   SFNClient,
   StartExecutionCommand,
+  StopExecutionCommand,
   UpdateStateMachineCommand,
 } from '@aws-sdk/client-sfn'
 
@@ -299,5 +300,37 @@ export async function deleteStateMachine(stateMachineArn: string): Promise<void>
   } catch (error) {
     if (error instanceof Error && error.name === 'StateMachineDoesNotExist') return
     throw error
+  }
+}
+
+// Stops one execution, and treats "it was not running" as success.
+//
+// Used by lead erasure: a journey still messaging someone whose data is being
+// deleted has to be stopped, not left to discover the lead is gone. Deriving
+// the execution arn from the state machine arn rather than rebuilding it from
+// region/account keeps the one authoritative copy of those values in the
+// bundle record, where publishing already put them.
+export function executionArnFor(stateMachineArn: string, executionName: string): string {
+  // arn:aws:states:REGION:ACCOUNT:stateMachine:NAME  ->
+  // arn:aws:states:REGION:ACCOUNT:execution:NAME:EXECUTION
+  const base = stateMachineArn.replace(':stateMachine:', ':execution:')
+  // A version arn (…:stateMachine:NAME:3) must lose its version suffix: an
+  // execution arn names the machine, never the version it started against.
+  const withoutVersion = base.replace(/:\d+$/, '')
+  return `${withoutVersion}:${executionName}`
+}
+
+export async function stopExecution(executionArn: string, cause: string): Promise<boolean> {
+  try {
+    await client.send(new StopExecutionCommand({ executionArn, cause, error: 'LeadErased' }))
+    return true
+  } catch (error) {
+    // ExecutionDoesNotExist is the normal case: most leads have no running
+    // journey, and a finished one cannot be stopped. Neither is a failure of
+    // the erasure, so they must not abort it.
+    const name = error instanceof Error ? error.name : ''
+    if (name === 'ExecutionDoesNotExist' || name === 'ExecutionLimitExceeded') return false
+    console.error(`[step-functions] failed to stop ${executionArn}:`, error)
+    return false
   }
 }
