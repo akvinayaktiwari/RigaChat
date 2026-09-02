@@ -78,6 +78,64 @@ reaches a client with a large lead history, not before the app ships.
 **Priority:** P2
 **Depends on:** None.
 
+## Per-resource connections — WhatsApp numbers and Meta Pages
+
+**Design:** `docs/designs/per-resource-connections.md` (written 2026-09-02).
+Specced, **not started**, no GitHub issue filed yet.
+
+Every external connection on `ClientRecord` is a singleton while we sell an
+`agency` plan. Two consequences, both silent:
+
+- A client can connect exactly **one** Facebook Page and does not choose which —
+  `meta-provider.ts:229` takes `data[0]`. Leads from every other Page are dropped
+  permanently at `meta-lead-service.ts:344` (logged, `markProcessed`, 200 — so
+  Meta never redelivers). Most clients admin multiple Pages.
+- A client can connect exactly **one** WhatsApp number, so all their agents
+  resolve to the same identity. The agent-binding layer is already built for the
+  plural case (`agent-service.ts:35,184`, `inbound-agent-resolution-service.ts`);
+  it just has nothing to distinguish.
+
+Plus a cost bug on the same path: **every inbound WhatsApp message runs a full
+paginated Scan of the `clients` table** (`meta-whatsapp-webhook-service.ts:251-252`
+→ `client-repository.ts:226-248`, a function written for weekly reports). Fixed by
+the same registry table.
+
+> ⚠️ **`types/index.ts:1027-1033` is stale and misleading.** It claims no
+> per-agent WhatsApp `resourceId` exists. It does — see `agent-service.ts:35`
+> (`CLAIMABLE_CHANNELS` includes `whatsapp` since 2026-08-16) and `:184`. Delete
+> that comment as part of W1.
+
+**Children:** W1 (registry + kill the Scan), W2 (multi-number discovery +
+picker), W3 (per-agent number in the UI), M1 (Page registry + backfill), M2
+(`/me/accounts` pagination), M3 (Page picker + multi-connect + **post-connect
+Page management**), M4 (source Page on the lead — **also touches vyostra-mobile**,
+type re-copy + SHA bump), M5 (token-expiry state + grant-drift reconciliation).
+
+**Updated 2026-09-02** after connecting the "First PinCode" account surfaced this
+live: multiple Pages were approved on Meta's side, exactly one was connected.
+Verified in production — `meta_page_lookup` holds 3 rows for 3 clients, one Page
+each. Two decisions added to the design doc:
+- **D8** — store the long-lived Meta user token (encrypted). Without it, adding a
+  Page after the initial connect means a Facebook redirect every time, because
+  `/me/accounts` needs that token and `meta-provider.ts:229` currently throws it
+  away.
+- **D9** — the picker pre-selects every Page Meta returned. The client already
+  answered this question on Meta's consent screen.
+And one new finding, **F10**: Meta holds Page grants at the *Meta-user* level, so
+one admin connecting several of our clients can silently overwrite an earlier
+grant — our row survives, the leads stop. M5 covers it; M3 must ship
+`lastVerifiedAt` so M5 needs no migration.
+
+Start with **W1**: independent, invisible to clients, and the only one fixing a
+bug that already costs money on every message. Smallest useful cut is `W1 + M1`
+(~4 days) — both silent-loss bugs and the Scan, no UI work.
+
+Gupshup is explicitly out of scope (being deprecated).
+
+**Effort:** ~11.5 days total (W1 ~2d, W2 ~2d, W3 ~1d, M1 ~2d, M2 ~1d, M3 ~2.5d, M4 ~1d)
+**Priority:** P1
+**Depends on:** None.
+
 ## Frontend
 
 ### The frontend talks to two different API hosts, and OAuth state cookies fall through the gap
