@@ -83,6 +83,10 @@ async function main(): Promise<void> {
     await setPageClientMapping(conn.pageId, client.clientId, {
       pageName: conn.pageName,
       pageAccessTokenEncrypted: conn.pageAccessTokenEncrypted,
+      // Preserve the real connection date. setPageClientMapping is a Put, so
+      // omitting this resets it to now -- rewriting history for three
+      // customers and reshuffling the GSI sort order for nothing.
+      connectedAt: existing?.connectedAt ?? conn.connectedAt,
     })
     console.log(`  wrote page ${conn.pageId} ("${conn.pageName}") -> ${client.clientId}`)
     written += 1

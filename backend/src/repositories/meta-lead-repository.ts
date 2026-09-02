@@ -120,7 +120,7 @@ export class MetaPageConflictError extends Error {
 export async function setPageClientMapping(
   pageId: string,
   clientId: string,
-  page?: { pageName: string; pageAccessTokenEncrypted: string }
+  page?: { pageName: string; pageAccessTokenEncrypted: string; connectedAt?: string }
 ): Promise<void> {
   const now = new Date().toISOString()
   try {
@@ -133,7 +133,11 @@ export async function setPageClientMapping(
         Item: {
           pageId,
           clientId,
-          connectedAt: now,
+          // This is a Put, so it REPLACES the whole item. An existing
+          // connectedAt therefore has to be passed back in or it is silently
+          // reset to now -- which would destroy the real connection date and,
+          // since connectedAt is the GSI sort key, reorder the client's list.
+          connectedAt: page?.connectedAt ?? now,
           lastVerifiedAt: now,
           ...(page ? { pageName: page.pageName, pageAccessTokenEncrypted: page.pageAccessTokenEncrypted } : {}),
         },
