@@ -1,5 +1,12 @@
 import { v4 as uuidv4 } from 'uuid'
-import { BatchGetCommand, DeleteCommand, GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
+import {
+  BatchGetCommand,
+  DeleteCommand,
+  GetCommand,
+  PutCommand,
+  QueryCommand,
+  UpdateCommand,
+} from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import { updatePartialFields } from '../lib/dynamo-update.js'
 import type { MetaLead, MetaPageRegistration } from '../types/index.js'
@@ -123,26 +130,46 @@ export async function setPageClientMapping(
   page?: { pageName: string; pageAccessTokenEncrypted: string; connectedAt?: string }
 ): Promise<void> {
   const now = new Date().toISOString()
+
+  // An Update with if_not_exists, NOT a Put.
+  //
+  // Put replaces the whole item, so every caller had to remember to thread
+  // connectedAt back in or silently reset it to now -- and connectedAt is the
+  // GSI sort key, so resetting it also reorders the client's Page list. The
+  // backfill got that wrong once and was caught before it ran; connectMetaPages
+  // got it wrong again on the re-connect path, where a client retrying Connect
+  // on an already-owned Page rewrote their real connection date. Guarding it
+  // here means no future caller can reintroduce it.
+  const sets = [
+    'clientId = :clientId',
+    'connectedAt = if_not_exists(connectedAt, :connectedAt)',
+    'lastVerifiedAt = :lastVerifiedAt',
+  ]
+  const values: Record<string, string> = {
+    ':clientId': clientId,
+    ':connectedAt': page?.connectedAt ?? now,
+    ':lastVerifiedAt': now,
+  }
+
+  // Optional so the pre-registry single-Page connect path keeps working
+  // unchanged; once that path is gone they are always present.
+  if (page) {
+    sets.push('pageName = :pageName', 'pageAccessTokenEncrypted = :pageAccessTokenEncrypted')
+    values[':pageName'] = page.pageName
+    values[':pageAccessTokenEncrypted'] = page.pageAccessTokenEncrypted
+  }
+
   try {
     await dynamoClient.send(
-      new PutCommand({
+      new UpdateCommand({
         TableName: PAGE_LOOKUP_TABLE_NAME(),
-        // pageName and the token are optional so the pre-M1 single-Page connect
-        // path keeps working unchanged during the soak week. Once M3 is the only
-        // writer they are always present.
-        Item: {
-          pageId,
-          clientId,
-          // This is a Put, so it REPLACES the whole item. An existing
-          // connectedAt therefore has to be passed back in or it is silently
-          // reset to now -- which would destroy the real connection date and,
-          // since connectedAt is the GSI sort key, reorder the client's list.
-          connectedAt: page?.connectedAt ?? now,
-          lastVerifiedAt: now,
-          ...(page ? { pageName: page.pageName, pageAccessTokenEncrypted: page.pageAccessTokenEncrypted } : {}),
-        },
+        Key: { pageId },
+        UpdateExpression: `SET ${sets.join(', ')}`,
+        // The atomic claim, unchanged: a plain read-then-write leaves a window
+        // where two clients completing OAuth for the same Page concurrently
+        // both pass the read check. This lets DynamoDB reject the loser.
         ConditionExpression: 'attribute_not_exists(pageId) OR clientId = :clientId',
-        ExpressionAttributeValues: { ':clientId': clientId },
+        ExpressionAttributeValues: values,
       })
     )
   } catch (error) {

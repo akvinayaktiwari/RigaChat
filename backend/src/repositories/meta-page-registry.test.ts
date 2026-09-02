@@ -38,36 +38,49 @@ describe('setPageClientMapping', () => {
     })
 
     const input = send.mock.calls[0][0].input
-    expect(input.Item).toMatchObject({
-      pageId: 'page-1',
-      clientId: 'client-1',
-      pageName: 'Skyline Homes',
-      pageAccessTokenEncrypted: 'enc-page-1',
+    expect(input.Key).toEqual({ pageId: 'page-1' })
+    expect(input.ExpressionAttributeValues).toMatchObject({
+      ':clientId': 'client-1',
+      ':pageName': 'Skyline Homes',
+      ':pageAccessTokenEncrypted': 'enc-page-1',
     })
-    expect(input.Item.connectedAt).toEqual(expect.any(String))
-    // Ships from day one so the M5 grant-drift pass needs no migration.
-    expect(input.Item.lastVerifiedAt).toEqual(expect.any(String))
+    // Ships from day one so the grant-drift pass needs no migration.
+    expect(input.UpdateExpression).toContain('lastVerifiedAt = :lastVerifiedAt')
   })
 
   it('still writes a bare mapping when no Page detail is supplied', async () => {
-    // The pre-M1 single-Page connect path calls this with two arguments and must
-    // keep working unchanged through the soak week.
+    // The pre-registry single-Page connect path calls this with two arguments
+    // and must keep working unchanged.
     send.mockResolvedValue({})
 
     await setPageClientMapping('page-1', 'client-1')
 
-    const item = send.mock.calls[0][0].input.Item
-    expect(item).toMatchObject({ pageId: 'page-1', clientId: 'client-1' })
-    expect(item.pageName).toBeUndefined()
-    expect(item.pageAccessTokenEncrypted).toBeUndefined()
+    const input = send.mock.calls[0][0].input
+    expect(input.UpdateExpression).not.toContain('pageName')
+    expect(input.UpdateExpression).not.toContain('pageAccessTokenEncrypted')
+    expect(input.ExpressionAttributeValues[':clientId']).toBe('client-1')
   })
 
-  // The backfill is a Put, and a Put REPLACES the whole item. Passing only the
-  // name and token silently reset connectedAt to now, which would have rewritten
-  // three customers' real connection dates and -- since connectedAt is the GSI
-  // sort key -- reshuffled every client's Page list. Caught before the backfill
-  // ran; this is the guard so it cannot come back.
-  it('preserves an existing connectedAt instead of resetting it to now', async () => {
+  // The original bug: this was a Put, and a Put REPLACES the item, so any
+  // caller that forgot to thread connectedAt back in silently reset it to now
+  // -- rewriting the real connection date and, since connectedAt is the GSI
+  // sort key, reordering the client's Page list. The backfill got it wrong
+  // once, then connectMetaPages got it wrong again on the re-connect path.
+  // if_not_exists moves the guarantee into the write itself so no caller can
+  // reintroduce it.
+  it('cannot reset an existing connectedAt, whatever the caller passes', async () => {
+    send.mockResolvedValue({})
+
+    await setPageClientMapping('page-1', 'client-1', {
+      pageName: 'Skyline Homes',
+      pageAccessTokenEncrypted: 'enc-page-1',
+    })
+
+    const input = send.mock.calls[0][0].input
+    expect(input.UpdateExpression).toContain('connectedAt = if_not_exists(connectedAt, :connectedAt)')
+  })
+
+  it('uses the supplied connectedAt only when the row has none', async () => {
     send.mockResolvedValue({})
 
     await setPageClientMapping('page-1', 'client-1', {
@@ -76,10 +89,12 @@ describe('setPageClientMapping', () => {
       connectedAt: '2026-08-15T11:46:51.648Z',
     })
 
-    expect(send.mock.calls[0][0].input.Item.connectedAt).toBe('2026-08-15T11:46:51.648Z')
+    expect(send.mock.calls[0][0].input.ExpressionAttributeValues[':connectedAt']).toBe(
+      '2026-08-15T11:46:51.648Z'
+    )
   })
 
-  it('stamps a fresh connectedAt for a genuinely new connection', async () => {
+  it('stamps now as the fallback for a genuinely new connection', async () => {
     send.mockResolvedValue({})
     const before = new Date().toISOString()
 
@@ -88,14 +103,13 @@ describe('setPageClientMapping', () => {
       pageAccessTokenEncrypted: 'enc-page-1',
     })
 
-    const written = send.mock.calls[0][0].input.Item.connectedAt as string
+    const written = send.mock.calls[0][0].input.ExpressionAttributeValues[':connectedAt'] as string
     expect(written >= before).toBe(true)
   })
 
-  it('always refreshes lastVerifiedAt, even when preserving connectedAt', async () => {
+  it('always refreshes lastVerifiedAt, even while preserving connectedAt', async () => {
     // The two dates answer different questions: when the client connected the
-    // Page, and when we last confirmed Meta still grants it. A backfill is a
-    // fresh confirmation even though it is not a fresh connection.
+    // Page, and when we last confirmed Meta still grants it.
     send.mockResolvedValue({})
 
     await setPageClientMapping('page-1', 'client-1', {
@@ -104,9 +118,9 @@ describe('setPageClientMapping', () => {
       connectedAt: '2026-08-15T11:46:51.648Z',
     })
 
-    const item = send.mock.calls[0][0].input.Item
-    expect(item.lastVerifiedAt).not.toBe('2026-08-15T11:46:51.648Z')
-    expect(item.lastVerifiedAt).toEqual(expect.any(String))
+    const values = send.mock.calls[0][0].input.ExpressionAttributeValues
+    expect(values[':lastVerifiedAt']).not.toBe('2026-08-15T11:46:51.648Z')
+    expect(values[':lastVerifiedAt']).toEqual(expect.any(String))
   })
 
   it('keeps the atomic claim that one Page maps to at most one client', async () => {
@@ -117,9 +131,9 @@ describe('setPageClientMapping', () => {
 
     await setPageClientMapping('page-1', 'client-1')
 
-    const input = send.mock.calls[0][0].input
-    expect(input.ConditionExpression).toBe('attribute_not_exists(pageId) OR clientId = :clientId')
-    expect(input.ExpressionAttributeValues).toEqual({ ':clientId': 'client-1' })
+    expect(send.mock.calls[0][0].input.ConditionExpression).toBe(
+      'attribute_not_exists(pageId) OR clientId = :clientId'
+    )
   })
 
   it('surfaces a losing claim as MetaPageConflictError, not a generic failure', async () => {
