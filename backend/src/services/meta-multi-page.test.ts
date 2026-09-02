@@ -38,6 +38,9 @@ const removePageClientMapping = vi.fn<(pageId: string) => Promise<void>>()
 const listPagesForClient = vi.fn<(clientId: string) => Promise<PageRow[]>>()
 const getPageRegistration = vi.fn<(pageId: string) => Promise<PageRow | null>>()
 const getClientIdForPage = vi.fn<(pageId: string) => Promise<string | null>>()
+// Batched: the picker asks about every Page the person administers at once, so
+// one BatchGet replaced a point read per Page.
+const getClientIdsForPages = vi.fn<(pageIds: string[]) => Promise<Map<string, string>>>()
 
 class MetaPageConflictError extends Error {}
 
@@ -47,6 +50,7 @@ vi.mock('../repositories/meta-lead-repository.js', () => ({
   listPagesForClient,
   getPageRegistration,
   getClientIdForPage,
+  getClientIdsForPages,
   createMetaLead: async () => ({}),
   getMetaLeadsByClientId: async () => [],
   updateMetaLeadSyncStatus: async () => undefined,
@@ -91,6 +95,7 @@ beforeEach(() => {
   updateClient.mockResolvedValue(undefined)
   listPagesForClient.mockResolvedValue([])
   getClientIdForPage.mockResolvedValue(null)
+  getClientIdsForPages.mockResolvedValue(new Map())
   getPageRegistration.mockResolvedValue(null)
   setPageClientMapping.mockResolvedValue(undefined)
 })
@@ -187,9 +192,7 @@ describe('connectMetaPages', () => {
 describe('listSelectablePages', () => {
   it('marks the client own Pages connected and other accounts Pages unavailable', async () => {
     listPagesForClient.mockResolvedValue([{ pageId: 'page-1', clientId: 'client-1' }])
-    getClientIdForPage.mockImplementation(async (pageId: string) =>
-      pageId === 'page-3' ? 'someone-else' : null
-    )
+    getClientIdsForPages.mockResolvedValue(new Map([['page-3', 'someone-else']]))
 
     const pages = await listSelectablePages('client-1')
 
@@ -322,5 +325,85 @@ describe('listSelectablePages token expiry via Graph rejection', () => {
     fetchAllManageablePages.mockRejectedValue(new Error('network blip'))
 
     await expect(listSelectablePages('client-1')).rejects.toThrow('network blip')
+  })
+})
+
+describe('disconnect-all when a Page fails', () => {
+  beforeEach(() => {
+    listPagesForClient.mockResolvedValue([
+      { pageId: 'page-1', clientId: 'client-1' },
+      { pageId: 'page-2', clientId: 'client-1' },
+    ])
+    getPageRegistration.mockImplementation(async (pageId: string) => ({ pageId, clientId: 'client-1' }))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  // The dangerous version of this bug: a sequential loop threw on Page 1, so
+  // updateClient never ran and we kept a live Meta user token for a client who
+  // had just asked us to disconnect. Silent, and indefinite.
+  it('still deletes the stored user token when one Page cannot be removed', async () => {
+    removePageClientMapping.mockImplementation(async (pageId: string) => {
+      if (pageId === 'page-1') throw new Error('ddb down')
+    })
+
+    await expect(disconnectAllMetaPages('client-1')).rejects.toThrow(/could not be removed/)
+
+    expect(updateClient).toHaveBeenCalledWith('client-1', { metaUserTokenEncrypted: undefined })
+  })
+
+  it('removes the Pages that can be removed rather than stopping at the first failure', async () => {
+    removePageClientMapping.mockImplementation(async (pageId: string) => {
+      if (pageId === 'page-1') throw new Error('ddb down')
+    })
+
+    await expect(disconnectAllMetaPages('client-1')).rejects.toThrow()
+
+    expect(removePageClientMapping).toHaveBeenCalledWith('page-2')
+  })
+
+  it('tells the client how many Pages are still attached', async () => {
+    removePageClientMapping.mockImplementation(async (pageId: string) => {
+      if (pageId === 'page-1') throw new Error('ddb down')
+    })
+
+    await expect(disconnectAllMetaPages('client-1')).rejects.toThrow('1 of 2 Page(s) could not be removed')
+  })
+})
+
+describe('connecting a batch concurrently', () => {
+  // Concurrency must not reorder the result: the connected and skipped lists
+  // are read by a human against the order they picked.
+  it('reports Pages in the order they were selected, not the order Graph replied', async () => {
+    const many = Array.from({ length: 12 }, (_, i) => page(i + 1))
+    fetchAllManageablePages.mockResolvedValue(many)
+    // Later Pages resolve first, so an order-naive implementation shuffles.
+    subscribePageToWebhook.mockImplementation(async (pageId: string) => {
+      const n = Number(pageId.split('-')[1])
+      await new Promise((resolve) => setTimeout(resolve, (12 - n) * 2))
+    })
+
+    const result = await connectMetaPages('client-1', many.map((p) => p.pageId))
+
+    expect(result.connected.map((p) => p.pageId)).toEqual(many.map((p) => p.pageId))
+  })
+
+  it('does not put the whole batch in flight at once', async () => {
+    const many = Array.from({ length: 12 }, (_, i) => page(i + 1))
+    fetchAllManageablePages.mockResolvedValue(many)
+
+    let inFlight = 0
+    let peak = 0
+    subscribePageToWebhook.mockImplementation(async () => {
+      inFlight += 1
+      peak = Math.max(peak, inFlight)
+      await new Promise((resolve) => setTimeout(resolve, 1))
+      inFlight -= 1
+    })
+
+    await connectMetaPages('client-1', many.map((p) => p.pageId))
+
+    // Bounded: 25 simultaneous Graph calls trades a Lambda timeout for a rate limit.
+    expect(peak).toBeLessThanOrEqual(5)
+    expect(peak).toBeGreaterThan(1)
   })
 })

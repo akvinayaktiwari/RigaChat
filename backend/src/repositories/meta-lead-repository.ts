@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid'
-import { DeleteCommand, GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
+import { BatchGetCommand, DeleteCommand, GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import { updatePartialFields } from '../lib/dynamo-update.js'
 import type { MetaLead, MetaPageRegistration } from '../types/index.js'
@@ -209,6 +209,57 @@ export async function listPagesForClient(clientId: string): Promise<MetaPageRegi
       `Failed to list Meta pages for client ${clientId}: ${error instanceof Error ? error.message : String(error)}`
     )
   }
+}
+
+// Ownership for many Pages in one round trip.
+//
+// The picker asks "who owns each of these?" for every Page the person
+// administers -- which for an agency account is hundreds. One GetItem per Page
+// answered that with hundreds of concurrent reads on every picker open; this
+// answers it in ceil(n/100) calls instead.
+const BATCH_GET_MAX_KEYS = 100
+const BATCH_GET_MAX_RETRIES = 3
+
+export async function getClientIdsForPages(pageIds: string[]): Promise<Map<string, string>> {
+  const owners = new Map<string, string>()
+  if (pageIds.length === 0) return owners
+
+  // Duplicates would be rejected by DynamoDB as a validation error, not
+  // silently tolerated.
+  const unique = [...new Set(pageIds)]
+
+  try {
+    for (let i = 0; i < unique.length; i += BATCH_GET_MAX_KEYS) {
+      let keys = unique.slice(i, i + BATCH_GET_MAX_KEYS).map((pageId) => ({ pageId }))
+
+      // BatchGetItem is allowed to return UnprocessedKeys under throttling and
+      // still succeed. Treating the first response as complete is how a Page
+      // silently reads back as unowned -- which would show it selectable, and
+      // let the atomic claim reject it only after the client hit Connect.
+      for (let attempt = 0; keys.length > 0 && attempt <= BATCH_GET_MAX_RETRIES; attempt += 1) {
+        const table = PAGE_LOOKUP_TABLE_NAME()
+        const result = await dynamoClient.send(
+          new BatchGetCommand({ RequestItems: { [table]: { Keys: keys } } })
+        )
+
+        for (const item of result.Responses?.[table] ?? []) {
+          const row = item as { pageId?: string; clientId?: string }
+          if (row.pageId && row.clientId) owners.set(row.pageId, row.clientId)
+        }
+
+        keys = (result.UnprocessedKeys?.[table]?.Keys ?? []) as { pageId: string }[]
+        if (keys.length > 0 && attempt === BATCH_GET_MAX_RETRIES) {
+          throw new Error(`${keys.length} key(s) still unprocessed after ${BATCH_GET_MAX_RETRIES} retries`)
+        }
+      }
+    }
+  } catch (error) {
+    throw new Error(
+      `Failed to look up Meta page owners: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+
+  return owners
 }
 
 export async function removePageClientMapping(pageId: string): Promise<void> {

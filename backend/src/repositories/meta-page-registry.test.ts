@@ -13,6 +13,7 @@ const {
   getPageRegistration,
   listPagesForClient,
   getClientIdForPage,
+  getClientIdsForPages,
   removePageClientMapping,
   MetaPageConflictError,
 } = await import('./meta-lead-repository.js')
@@ -221,5 +222,97 @@ describe('removePageClientMapping', () => {
     send.mockRejectedValue(new Error('ProvisionedThroughputExceededException'))
 
     await expect(removePageClientMapping('page-1')).rejects.toThrow(/Failed to remove Meta page mapping page-1/)
+  })
+})
+
+describe('failure wrapping', () => {
+  // Without the pageId/clientId in the message, a throttled read in production
+  // is an anonymous "Failed" line with nothing to grep for.
+  it('names the page when the registration read fails', async () => {
+    send.mockRejectedValue(new Error('ProvisionedThroughputExceededException'))
+
+    await expect(getPageRegistration('page-1')).rejects.toThrow(
+      /Failed to read Meta page registration page-1/
+    )
+  })
+
+  it('names the client when the page list fails', async () => {
+    send.mockRejectedValue(new Error('ResourceNotFoundException'))
+
+    await expect(listPagesForClient('client-1')).rejects.toThrow(
+      /Failed to list Meta pages for client client-1/
+    )
+  })
+})
+
+describe('getClientIdsForPages', () => {
+  it('answers for many pages in one request instead of one read each', async () => {
+    send.mockResolvedValue({
+      Responses: {
+        'test-meta-page-lookup': [
+          { pageId: 'page-1', clientId: 'client-1' },
+          { pageId: 'page-2', clientId: 'client-2' },
+        ],
+      },
+    })
+
+    const owners = await getClientIdsForPages(['page-1', 'page-2'])
+
+    expect(send).toHaveBeenCalledTimes(1)
+    expect(owners.get('page-1')).toBe('client-1')
+    expect(owners.get('page-2')).toBe('client-2')
+  })
+
+  it('makes no request at all for an empty list', async () => {
+    await expect(getClientIdsForPages([])).resolves.toEqual(new Map())
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it('de-duplicates keys, which DynamoDB rejects outright', async () => {
+    send.mockResolvedValue({ Responses: { 'test-meta-page-lookup': [] } })
+
+    await getClientIdsForPages(['page-1', 'page-1'])
+
+    expect(send.mock.calls[0][0].input.RequestItems['test-meta-page-lookup'].Keys).toEqual([
+      { pageId: 'page-1' },
+    ])
+  })
+
+  it('splits past the 100-key BatchGet limit', async () => {
+    send.mockResolvedValue({ Responses: { 'test-meta-page-lookup': [] } })
+
+    await getClientIdsForPages(Array.from({ length: 150 }, (_, i) => `page-${i}`))
+
+    expect(send).toHaveBeenCalledTimes(2)
+    expect(send.mock.calls[0][0].input.RequestItems['test-meta-page-lookup'].Keys).toHaveLength(100)
+    expect(send.mock.calls[1][0].input.RequestItems['test-meta-page-lookup'].Keys).toHaveLength(50)
+  })
+
+  // BatchGetItem can return UnprocessedKeys and still succeed. Treating the
+  // first response as complete is how a Page reads back as unowned -- shown as
+  // selectable, then rejected by the atomic claim after the client hit Connect.
+  it('retries the keys DynamoDB did not process', async () => {
+    send
+      .mockResolvedValueOnce({
+        Responses: { 'test-meta-page-lookup': [{ pageId: 'page-1', clientId: 'client-1' }] },
+        UnprocessedKeys: { 'test-meta-page-lookup': { Keys: [{ pageId: 'page-2' }] } },
+      })
+      .mockResolvedValueOnce({
+        Responses: { 'test-meta-page-lookup': [{ pageId: 'page-2', clientId: 'client-2' }] },
+      })
+
+    const owners = await getClientIdsForPages(['page-1', 'page-2'])
+
+    expect(send).toHaveBeenCalledTimes(2)
+    expect(owners.get('page-2')).toBe('client-2')
+  })
+
+  it('gives up loudly rather than reporting a Page as unowned', async () => {
+    send.mockResolvedValue({
+      Responses: { 'test-meta-page-lookup': [] },
+      UnprocessedKeys: { 'test-meta-page-lookup': { Keys: [{ pageId: 'page-2' }] } },
+    })
+
+    await expect(getClientIdsForPages(['page-2'])).rejects.toThrow(/still unprocessed/)
   })
 })
