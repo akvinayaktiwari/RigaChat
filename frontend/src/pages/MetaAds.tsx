@@ -1,8 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Check, Megaphone, TriangleAlert, X } from 'lucide-react'
 import { useToast } from '../components/Toast/Toast'
-import { connectMeta, disconnectMeta, getMetaLeads, getMetaStatus } from '../services/api'
-import type { MetaConnection, MetaLead } from '../types/index'
+import {
+  connectMeta,
+  disconnectMeta,
+  disconnectMetaPage,
+  getConnectedMetaPages,
+  getMetaLeads,
+  getMetaStatus,
+} from '../services/api'
+import MetaPagePicker from '../components/MetaPagePicker'
+import type { MetaConnectPagesResult, MetaConnection, MetaLead, MetaPageSummary } from '../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -56,6 +64,50 @@ export default function MetaAds() {
   // instructions were vanishing before a client could finish them. The panel
   // also sits next to the button they need to press again.
   const [connectError, setConnectError] = useState<string | null>(null)
+  // #28: a client can connect many Pages. `pages` is the source of truth for
+  // what is connected; `status` stays only for the legacy single-Page record
+  // during M3's soak week.
+  const [pages, setPages] = useState<MetaPageSummary[]>([])
+  const [pagesLoading, setPagesLoading] = useState(true)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [tokenExpired, setTokenExpired] = useState(false)
+  const [partial, setPartial] = useState<MetaConnectPagesResult | null>(null)
+  const [removingPageId, setRemovingPageId] = useState<string | null>(null)
+
+  function loadPages(): void {
+    setPagesLoading(true)
+    getConnectedMetaPages()
+      .then((res) => setPages(res.success && res.data ? res.data : []))
+      .finally(() => setPagesLoading(false))
+  }
+
+  useEffect(loadPages, [])
+
+  async function handleRemovePage(page: MetaPageSummary): Promise<void> {
+    // Confirm states the consequence in lead terms, not API terms.
+    const ok = window.confirm(
+      `Disconnect ${page.pageName}? Leads from this Page will stop arriving. Existing leads are kept.`
+    )
+    if (!ok) return
+
+    setRemovingPageId(page.pageId)
+    try {
+      const res = await disconnectMetaPage(page.pageId)
+      if (res.success) {
+        toast.show(`${page.pageName} disconnected`, 'success')
+        loadPages()
+      } else {
+        toast.show(res.error ?? 'Could not disconnect that Page.', 'error')
+      }
+    } catch {
+      // Without this a network failure was an unhandled rejection and the row
+      // just stopped spinning, leaving the Page looking connected with no word
+      // either way. handleDisconnect already catches; this now matches.
+      toast.show('Could not reach the server. That Page is still connected.', 'error')
+    } finally {
+      setRemovingPageId(null)
+    }
+  }
 
   useEffect(() => {
     async function load() {
@@ -79,7 +131,13 @@ export default function MetaAds() {
 
     const params = new URLSearchParams(window.location.search)
     const metaParam = params.get('meta')
-    if (metaParam === 'connected') {
+    if (metaParam === 'select_pages') {
+      // OAuth is done and the user token is stored; the Pages themselves are
+      // chosen here rather than picked for them by array order.
+      setTokenExpired(false)
+      setPickerOpen(true)
+      window.history.replaceState({}, '', '/dashboard/meta-ads')
+    } else if (metaParam === 'connected') {
       toast.show('Meta Ads connected successfully', 'success')
       window.history.replaceState({}, '', '/dashboard/meta-ads')
     } else if (metaParam === 'error') {
@@ -113,7 +171,18 @@ export default function MetaAds() {
     }
   }
 
-  const isConnected = status !== 'loading' && status !== null && status.connected
+  // Connected means "has at least one Page", not "has the legacy single-Page
+  // record". The multi-Page flow never writes metaConnection, so reading that
+  // here would show "Not Connected" beside a list of connected Pages.
+  const isConnected = pages.length > 0 || (status !== 'loading' && status !== null && status.connected)
+
+  // A client connected before the Page registry existed has a live
+  // metaConnection and zero registry rows until the backfill reaches them.
+  // Without this the header badge said "Connected" while the panel directly
+  // below said "No Pages connected yet" and offered to connect -- for an
+  // account whose leads were arriving normally the whole time.
+  const legacyOnlyConnection =
+    pages.length === 0 && status !== 'loading' && status !== null && status.connected
 
   return (
     <div className="space-y-8">
@@ -137,7 +206,7 @@ export default function MetaAds() {
               <h4 className="font-bold text-lg text-gray-900" style={JAKARTA_FONT}>
                 Facebook Page Connection
               </h4>
-              <p className="text-xs text-gray-500">One Page connected at a time — disconnect to switch Pages.</p>
+              <p className="text-xs text-gray-500">Connect the Facebook Pages your ads run from.</p>
             </div>
           </div>
           {status !== 'loading' && (
@@ -178,33 +247,157 @@ export default function MetaAds() {
           </div>
         )}
 
-        {status === 'loading' ? (
-          <div className="h-24 bg-gray-100 rounded-xl animate-pulse" />
-        ) : isConnected && status ? (
-          <div className="space-y-4">
-            <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Connected Page</p>
-              <p className="text-gray-900 font-medium mt-1">{status.pageName}</p>
-            </div>
+        {/* Partial success uses a focusable summary, not a toast: a toast with no
+            focus target and no per-Page detail is the documented anti-pattern,
+            and this message names something the client may need to act on. */}
+        {partial && partial.skipped.length > 0 && (
+          <div
+            role="alert"
+            tabIndex={-1}
+            ref={(el) => el?.focus()}
+            aria-labelledby="meta-partial-title"
+            className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4"
+          >
+            <h3 id="meta-partial-title" className="font-semibold text-amber-900 text-sm" style={JAKARTA_FONT}>
+              Connected {partial.connected.length} of{' '}
+              {partial.connected.length + partial.skipped.length} Pages
+            </h3>
+            <ul className="mt-2 space-y-1 text-sm text-amber-800">
+              {partial.skipped.map((s) => (
+                <li key={s.pageId}>
+                  {s.pageName} —{' '}
+                  {s.reason === 'already_connected_to_another_account'
+                    ? 'already connected to another account'
+                    : 'Meta refused the webhook subscription; try again'}
+                </li>
+              ))}
+            </ul>
             <button
               type="button"
-              onClick={handleDisconnect}
-              disabled={disconnecting}
-              className="text-red-600 font-medium px-3 py-2 rounded-xl text-sm hover:bg-red-50 transition-colors disabled:opacity-50"
+              onClick={() => setPartial(null)}
+              className="mt-3 text-amber-900 font-medium text-sm underline"
             >
-              {disconnecting ? 'Disconnecting...' : 'Disconnect'}
+              Dismiss
             </button>
           </div>
+        )}
+
+        {/* Expiry is NOT the empty state. Rendering it as "no Pages" would tell
+            the client their Pages are gone, when every connected Page is still
+            receiving leads -- only Page management needs the user token. */}
+        {tokenExpired && (
+          <div role="alert" className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <p className="text-sm text-amber-900">
+              Your Facebook connection expired. Reconnect to manage Pages. Leads from
+              already-connected Pages are unaffected.
+            </p>
+            <button
+              type="button"
+              onClick={handleConnect}
+              className="mt-3 inline-flex items-center gap-2 bg-white border border-amber-300 text-amber-900 font-medium px-3 py-2 rounded-xl text-sm hover:bg-amber-100 transition-colors"
+            >
+              Reconnect
+            </button>
+          </div>
+        )}
+
+        {pagesLoading ? (
+          <div className="space-y-2">
+            {[0, 1].map((i) => (
+              <div key={i} className="h-[52px] bg-gray-100 rounded-xl animate-pulse" />
+            ))}
+          </div>
+        ) : pages.length > 0 || legacyOnlyConnection ? (
+          <div className="space-y-4">
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">
+                Connected Pages ({pages.length})
+              </p>
+              {pages.length === 0 && (
+                // The legacy-connection case: leads are arriving, but this
+                // account predates the per-Page registry so there is no row to
+                // list yet. Saying so beats an empty list under a "Connected"
+                // badge.
+                <p className="mt-2 text-sm text-gray-500">
+                  Your Facebook connection is active and leads are arriving. Choose Add Pages to see
+                  every Page on this account and manage them individually.
+                </p>
+              )}
+              <ul className="mt-2 divide-y divide-gray-50">
+                {pages.map((page) => (
+                  <li key={page.pageId} className="flex items-center justify-between gap-4 py-3 min-h-[52px]">
+                    <div className="min-w-0">
+                      <p className="text-base text-gray-900 truncate">{page.pageName}</p>
+                      <p className="text-xs text-gray-400">{page.pageId}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemovePage(page)}
+                      disabled={removingPageId === page.pageId}
+                      className="text-red-600 font-medium px-3 py-2 rounded-xl text-sm hover:bg-red-50 transition-colors disabled:opacity-50 shrink-0"
+                    >
+                      {removingPageId === page.pageId ? 'Disconnecting...' : 'Disconnect'}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                className="inline-flex items-center justify-center gap-2 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity"
+              >
+                Add Pages
+              </button>
+              <button
+                type="button"
+                onClick={handleDisconnect}
+                disabled={disconnecting}
+                className="text-red-600 font-medium px-3 py-2 rounded-xl text-sm hover:bg-red-50 transition-colors disabled:opacity-50"
+              >
+                {disconnecting ? 'Disconnecting...' : 'Disconnect all'}
+              </button>
+            </div>
+          </div>
         ) : (
-          <button
-            type="button"
-            onClick={handleConnect}
-            className="inline-flex items-center justify-center gap-2 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity"
-          >
-            Connect with Facebook
-          </button>
+          <div>
+            <p className="text-sm text-gray-500 mb-3">
+              No Pages connected yet. Connect the Facebook Pages your ads run from and their
+              leads will appear in your inbox.
+            </p>
+            <button
+              type="button"
+              onClick={handleConnect}
+              className="inline-flex items-center justify-center gap-2 bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity"
+            >
+              Connect with Facebook
+            </button>
+          </div>
         )}
       </section>
+
+      {pickerOpen && (
+        <MetaPagePicker
+          onClose={() => setPickerOpen(false)}
+          onTokenExpired={() => {
+            setPickerOpen(false)
+            setTokenExpired(true)
+          }}
+          onConnected={(result) => {
+            setPickerOpen(false)
+            setPartial(result)
+            loadPages()
+            if (result.connected.length > 0) {
+              toast.show(
+                `Connected ${result.connected.length} Page${result.connected.length === 1 ? '' : 's'}`,
+                'success'
+              )
+            }
+          }}
+        />
+      )}
 
       <section className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
         <div className="border-b border-gray-50 px-6 py-4">

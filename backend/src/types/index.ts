@@ -369,6 +369,85 @@ export interface MetaConnection {
   connectedAt: string
 }
 
+/**
+ * One connected Facebook Page, keyed by pageId in `meta_page_lookup`.
+ *
+ * The Page's access token lives HERE and not on ClientRecord, and that is the
+ * whole point: a client can connect many Pages, and the token that signs for a
+ * lead has to be reachable from the pageId the webhook delivered. Hanging the
+ * token off the client instead made "which token signs for this Page?"
+ * unanswerable past the first one -- an array on ClientRecord would not have
+ * fixed it, only moved it.
+ */
+export interface MetaPageRegistration {
+  pageId: string
+  clientId: string
+  /**
+   * Optional because rows written before the registry existed carry only
+   * pageId/clientId/connectedAt, and the backfill deliberately SKIPS any row
+   * whose source connection had no name or token rather than inventing one.
+   * Typing these as required made the repository's cast a lie and let
+   * `undefined` reach the dashboard where a string was promised.
+   */
+  pageName?: string
+  pageAccessTokenEncrypted?: string
+  connectedAt: string
+  /**
+   * Last time we confirmed with Meta that this Page is still granted to the
+   * app. Meta holds Page grants against the Meta USER, not against our
+   * clientId, so one admin connecting several of our clients can silently
+   * overwrite an earlier grant -- our row survives while the leads stop.
+   * Nothing reconciles that yet (M5); this field ships now so M5 needs no
+   * migration.
+   */
+  lastVerifiedAt?: string
+}
+
+/** A registration without its token, safe to return over the API. */
+export type MetaPageSummary = Omit<MetaPageRegistration, 'pageAccessTokenEncrypted'>
+
+/** One Page as offered to the client in the picker. */
+export interface MetaSelectablePage {
+  pageId: string
+  pageName: string
+  /** Already connected to THIS client -- shown checked and disabled. */
+  connected: boolean
+  /**
+   * Connected to a DIFFERENT client. Shown disabled with a reason, before the
+   * client submits, because a conflict explained up front costs nothing and a
+   * conflict explained in an error costs a support round trip.
+   */
+  unavailable: boolean
+}
+
+/** Why a Page in a multi-connect request did not connect. */
+export interface MetaPageSkipped {
+  pageId: string
+  pageName: string
+  reason: 'already_connected_to_another_account' | 'subscribe_failed'
+}
+
+/**
+ * A multi-connect can partially succeed, deliberately. One Page owned by
+ * another account must not block the other 24 -- failing the batch would
+ * punish the client for something they cannot see or fix.
+ */
+/**
+ * The picker's payload. `maxPerBatch` travels with the Pages so the client cap
+ * cannot drift from the server's: the server rejects anything over it, and a
+ * client hard-coding a larger number would let someone compose a selection that
+ * is refused only after they hit Connect.
+ */
+export interface MetaSelectablePagesResult {
+  pages: MetaSelectablePage[]
+  maxPerBatch: number
+}
+
+export interface MetaConnectPagesResult {
+  connected: MetaPageSummary[]
+  skipped: MetaPageSkipped[]
+}
+
 export interface MetaDirectWhatsAppConnection {
   provider: 'meta_direct'
   connected: boolean
@@ -462,6 +541,19 @@ export interface ClientRecord {
   metaDirectWhatsAppConnection?: MetaDirectWhatsAppConnection
   activeWhatsappProvider?: WhatsAppActiveProvider
   metaConnection?: MetaConnection
+  /**
+   * Long-lived Meta USER token, encrypted. Distinct from a Page token: this one
+   * lists which Pages the person administers, which is what makes adding a Page
+   * weeks after the initial connect an ordinary authenticated call instead of
+   * another trip through Facebook (decision D8).
+   *
+   * Meta expires these around 60 days. That expiry is a first-class UI state --
+   * it must never render as "you have no Pages", which reads as data loss.
+   *
+   * Deleted on disconnect-all: holding a live credential for a customer who
+   * believes they disconnected is not defensible.
+   */
+  metaUserTokenEncrypted?: string
   calComConnection?: CalComConnection
   notificationPreferences?: NotificationPreferences
   createdAt: string

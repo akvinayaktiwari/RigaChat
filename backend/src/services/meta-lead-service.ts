@@ -1,7 +1,12 @@
 // Re-exported so existing importers keep working now that the class lives
 // with the rest of the connect failures.
 export { MetaPageAlreadyConnectedError } from '../lib/meta-connect-errors.js'
-import { MetaPageAlreadyConnectedError } from '../lib/meta-connect-errors.js'
+import {
+  MetaPageAlreadyConnectedError,
+  MetaPagesLookupError,
+  MetaTooManyPagesError,
+  MetaUserTokenExpiredError,
+} from '../lib/meta-connect-errors.js'
 import { metaProvider } from '../providers/meta-provider.js'
 import { mapMetaFieldData } from '../lib/meta-field-mapping.js'
 import type { MetaFieldDatum } from '../lib/meta-field-mapping.js'
@@ -14,6 +19,9 @@ import { getClientById, removeClientMetaConnection, updateClient } from '../repo
 import {
   createMetaLead,
   getClientIdForPage,
+  getClientIdsForPages,
+  getPageRegistration,
+  listPagesForClient,
   getMetaLeadsByClientId,
   MetaPageConflictError,
   removePageClientMapping,
@@ -29,7 +37,11 @@ import {
 import { getContactNotificationAddress, sendEmail } from '../repositories/email-repository.js'
 import type {
   ClientRecord,
+  MetaConnectPagesResult,
   MetaFormQuestion,
+  MetaPageSkipped,
+  MetaPageSummary,
+  MetaSelectablePage,
   FormField,
   MetaConnection,
   MetaDeletionRequest,
@@ -219,6 +231,280 @@ export async function disconnectMetaAds(clientId: string): Promise<void> {
   await removeClientMetaConnection(clientId)
 }
 
+
+// ---------------------------------------------------------------------------
+// M3 -- multi-Page connect and management (issue #28)
+// ---------------------------------------------------------------------------
+
+// A batch size, not a product ceiling. Each Page costs a webhook subscription
+// round trip and the Lambda has 60 seconds; a client with 60 Pages connects
+// them in three passes rather than being told 25 is all they may ever have.
+export const MAX_PAGES_PER_CONNECT = 25
+
+// Each Page costs a Graph round trip, so 25 of them one after another is a
+// real chance of spending the Lambda's whole 60s budget and timing out
+// mid-batch -- leaving some Pages claimed and subscribed and the rest not,
+// with nothing to roll them back. Bounded rather than unbounded: firing all 25
+// at once only trades the timeout risk for a Graph rate-limit risk.
+const PAGE_WORK_CONCURRENCY = 5
+
+/**
+ * Runs `work` over `items` with at most `limit` in flight, preserving input
+ * order in the result. Order matters here because the connected/skipped lists
+ * are read back by a human in the dashboard.
+ */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  work: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let next = 0
+
+  async function runner(): Promise<void> {
+    while (next < items.length) {
+      const index = next
+      next += 1
+      const item = items[index]
+      if (item === undefined) return
+      results[index] = await work(item)
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, runner))
+  return results
+}
+
+/** Exchanges the OAuth code and KEEPS the user token, so Pages stay manageable. */
+export async function beginMetaConnection(clientId: string, code: string): Promise<void> {
+  const userToken = await metaProvider.exchangeCodeForLongLivedUserToken(code)
+  await updateClient(clientId, { metaUserTokenEncrypted: await encrypt(userToken) })
+}
+
+async function requireUserToken(clientId: string): Promise<string> {
+  const client = await getClientById(clientId)
+  if (!client?.metaUserTokenEncrypted) {
+    throw new MetaUserTokenExpiredError()
+  }
+  return decrypt(client.metaUserTokenEncrypted)
+}
+
+/**
+ * Graph rejecting the token is the expiry case, and it must surface as
+ * "reconnect" rather than as an empty Page list or a generic 500.
+ *
+ * Shared by both callers deliberately: connectMetaPages fetched without this
+ * and turned an expiry between opening the picker and pressing Connect into a
+ * 500, which the dashboard renders as "could not reach Meta" with no way back.
+ * The token can be minutes from expiry while the picker sits open.
+ */
+async function fetchPagesOrExpired(
+  userToken: string
+): Promise<Awaited<ReturnType<typeof metaProvider.fetchAllManageablePages>>> {
+  try {
+    return await metaProvider.fetchAllManageablePages(userToken)
+  } catch (error) {
+    if (error instanceof MetaPagesLookupError) {
+      throw new MetaUserTokenExpiredError()
+    }
+    throw error
+  }
+}
+
+/**
+ * Every Page this person administers, marked with what we already know.
+ *
+ * Served from the stored user token, so this is the SAME endpoint whether the
+ * client is finishing their first connect or adding a Page three weeks later.
+ * That is the whole point of keeping the token.
+ */
+export async function listSelectablePages(clientId: string): Promise<MetaSelectablePage[]> {
+  const userToken = await requireUserToken(clientId)
+
+  const pages = await fetchPagesOrExpired(userToken)
+
+  const mine = new Set((await listPagesForClient(clientId)).map((p) => p.pageId))
+
+  // One batched read for everything we do not already own, rather than a point
+  // read per Page. An agency administering 300 Pages opened 300 concurrent
+  // DynamoDB reads on every picker open.
+  const owners = await getClientIdsForPages(pages.filter((p) => !mine.has(p.pageId)).map((p) => p.pageId))
+
+  return pages.map((page) => {
+    const owner = mine.has(page.pageId) ? clientId : (owners.get(page.pageId) ?? null)
+    return {
+      pageId: page.pageId,
+      pageName: page.pageName,
+      connected: owner === clientId,
+      unavailable: Boolean(owner) && owner !== clientId,
+    }
+  })
+}
+
+/**
+ * Connects a selected set of Pages.
+ *
+ * Partial success is deliberate: a Page claimed by another account is SKIPPED
+ * with a reason, never fatal. Failing the whole batch would let one conflicting
+ * Page block 24 legitimate ones, punishing the client for something they can
+ * neither see nor fix.
+ */
+export async function connectMetaPages(
+  clientId: string,
+  pageIds: string[]
+): Promise<MetaConnectPagesResult> {
+  if (pageIds.length > MAX_PAGES_PER_CONNECT) {
+    throw new MetaTooManyPagesError(pageIds.length, MAX_PAGES_PER_CONNECT)
+  }
+
+  const userToken = await requireUserToken(clientId)
+  const available = await fetchPagesOrExpired(userToken)
+  const wanted = available.filter((p) => pageIds.includes(p.pageId))
+
+  type PageOutcome = { connected: MetaPageSummary } | { skipped: MetaPageSkipped }
+
+  const outcomes = await mapWithConcurrency<typeof wanted[number], PageOutcome>(
+    wanted,
+    PAGE_WORK_CONCURRENCY,
+    async (page) => {
+      // Claim first, exactly as the single-Page path does: the atomic condition
+      // is the real guarantee, and claiming before any other write means a lost
+      // race never leaves a half-connected Page behind.
+      try {
+        await setPageClientMapping(page.pageId, clientId, {
+          pageName: page.pageName,
+          pageAccessTokenEncrypted: await encrypt(page.pageAccessToken),
+        })
+      } catch (error) {
+        if (error instanceof MetaPageConflictError) {
+          return {
+            skipped: {
+              pageId: page.pageId,
+              pageName: page.pageName,
+              reason: 'already_connected_to_another_account',
+            },
+          }
+        }
+        throw error
+      }
+
+      // Without this subscription Meta never delivers a single leadgen event for
+      // the Page, and the failure is invisible: the dashboard says connected and
+      // no lead ever arrives. Release the claim rather than leave that state.
+      try {
+        await metaProvider.subscribePageToWebhook(page.pageId, page.pageAccessToken)
+      } catch (error) {
+        console.error(`[meta-connect] subscribe failed for page ${page.pageId}:`, error)
+        await removePageClientMapping(page.pageId)
+        return { skipped: { pageId: page.pageId, pageName: page.pageName, reason: 'subscribe_failed' } }
+      }
+
+      const now = new Date().toISOString()
+      return {
+        connected: {
+          pageId: page.pageId,
+          clientId,
+          pageName: page.pageName,
+          connectedAt: now,
+          lastVerifiedAt: now,
+        },
+      }
+    }
+  )
+
+  const connected: MetaPageSummary[] = []
+  const skipped: MetaPageSkipped[] = []
+  for (const outcome of outcomes) {
+    if ('connected' in outcome) connected.push(outcome.connected)
+    else skipped.push(outcome.skipped)
+  }
+
+  return { connected, skipped }
+}
+
+/** The client's connected Pages, without their tokens. */
+export async function listConnectedPages(clientId: string): Promise<MetaPageSummary[]> {
+  const rows = await listPagesForClient(clientId)
+  return rows.map(({ pageAccessTokenEncrypted: _omit, ...summary }) => ({
+    ...summary,
+    // A pre-registry row the backfill skipped has no name. Falling back to the
+    // pageId keeps the dashboard showing SOMETHING identifiable rather than the
+    // literal string "undefined", which is what shipped when this type claimed
+    // pageName was always present.
+    pageName: summary.pageName ?? summary.pageId,
+    lastVerifiedAt: summary.lastVerifiedAt ?? summary.connectedAt,
+  }))
+}
+
+/** Disconnects ONE Page, leaving the client's others untouched. */
+export async function disconnectMetaPage(clientId: string, pageId: string): Promise<void> {
+  const registration = await getPageRegistration(pageId)
+
+  // Only touch a row that still belongs to this client. Otherwise a stale local
+  // view would let one tenant delete another tenant's live lead routing.
+  if (!registration || registration.clientId !== clientId) return
+
+  if (registration.pageAccessTokenEncrypted) {
+    try {
+      await metaProvider.unsubscribePageFromWebhook(
+        pageId,
+        await decrypt(registration.pageAccessTokenEncrypted)
+      )
+    } catch (error) {
+      // Best effort: a Page whose token was already revoked cannot be
+      // unsubscribed, and that must not stop the client removing it.
+      console.warn(`[meta-disconnect] unsubscribe failed for page ${pageId}:`, error)
+    }
+  }
+
+  await removePageClientMapping(pageId)
+}
+
+/** Disconnects every Page AND drops the stored user token. */
+export async function disconnectAllMetaPages(clientId: string): Promise<void> {
+  const pages = await listPagesForClient(clientId)
+
+  // allSettled over a sequential loop for two reasons. One Page failing must
+  // not abort the rest -- and, more importantly, must not skip the token
+  // deletion below. A loop that threw on Page 1 left the client told
+  // "disconnected" while we kept a live credential that can still enumerate
+  // their Facebook assets.
+  const results = await Promise.allSettled(
+    pages.map((page) => disconnectMetaPage(clientId, page.pageId))
+  )
+  const failures = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+  for (const failure of failures) {
+    console.error('[meta-disconnect] page removal failed:', failure.reason)
+  }
+
+  // A connect running in another tab can land a Page AFTER the snapshot above
+  // and before the token is deleted below. That Page would stay registered and
+  // stay subscribed -- and because it carries its own Page token, its leads
+  // keep arriving long after the client was told everything was disconnected.
+  // One re-sweep closes the window; the Page token is what makes this matter,
+  // since deleting the user token does not stop it.
+  const stragglers = await listPagesForClient(clientId)
+  if (stragglers.length > 0) {
+    console.warn(`[meta-disconnect] ${stragglers.length} Page(s) appeared mid-disconnect for ${clientId}`)
+    await Promise.allSettled(stragglers.map((page) => disconnectMetaPage(clientId, page.pageId)))
+  }
+
+  // "Disconnect" has to mean disconnected. Keeping a live credential that can
+  // enumerate someone's Facebook assets after they asked us to stop is not
+  // something a customer would expect, and not defensible in a review. This
+  // runs even when some Pages failed above, deliberately.
+  await updateClient(clientId, { metaUserTokenEncrypted: undefined })
+  await removeClientMetaConnection(clientId)
+
+  // Reported only after the credential is gone, so the client sees the truth:
+  // the account is disconnected, but these Pages need another look.
+  if (failures.length > 0) {
+    throw new Error(
+      `Disconnected the account, but ${failures.length} of ${pages.length} Page(s) could not be removed. Try again, or remove them individually.`
+    )
+  }
+}
+
 export async function getMetaStatus(clientId: string): Promise<Omit<MetaConnection, 'pageAccessTokenEncrypted'> | null> {
   const client = await getClientById(clientId)
   if (!client?.metaConnection) return null
@@ -314,24 +600,52 @@ async function processSingleLeadgenEvent(
     return { retryable: false }
   }
 
-  const clientId = await getClientIdForPage(pageId)
-  if (!clientId) {
+  const registration = await getPageRegistration(pageId)
+  if (!registration) {
     console.log(`Meta webhook: no client mapped for page ${pageId}, ignoring`, { leadgenId })
     await markProcessed(key, 'meta', 'leadgen')
     return { retryable: false }
   }
 
+  const clientId = registration.clientId
   const client = await getClientById(clientId)
-  if (!client?.metaConnection?.connected) {
-    console.log(`Meta webhook: client ${clientId} has no active Meta connection, ignoring`, { leadgenId })
+  if (!client) {
+    console.log(`Meta webhook: client ${clientId} no longer exists, ignoring`, { leadgenId })
     await markProcessed(key, 'meta', 'leadgen')
     return { retryable: false }
   }
 
+  // The REGISTRATION is the connection, not client.metaConnection. The row is
+  // written only after the Page's webhook subscription succeeds and is deleted
+  // on disconnect, so reaching this line already means "this Page is connected
+  // to this client". Gating on client.metaConnection.connected instead would
+  // drop every lead for a client connected through the multi-Page picker, which
+  // never writes that field -- the same silent lead loss this whole change set
+  // exists to end, one layer up.
+  //
+  // Rows written before the registry carry no token of their own, so fall back
+  // to the client's single connection for them; the backfill removes that case
+  // and the fallback goes with metaConnection after the soak week.
+  const pageAccessTokenEncrypted =
+    registration.pageAccessTokenEncrypted ?? client.metaConnection?.pageAccessTokenEncrypted
+  if (!pageAccessTokenEncrypted) {
+    // Unrecoverable without a reconnect, so do not let Meta redeliver for 36
+    // hours against a token we do not have. Loud, because a connected Page with
+    // no token is a broken connection the client cannot see.
+    console.error(`Meta webhook: no access token for page ${pageId}, ignoring`, { leadgenId, clientId })
+    await markProcessed(key, 'meta', 'leadgen')
+    return { retryable: false }
+  }
+
+  // The Page's own name, from the row the webhook's pageId resolved to. Reading
+  // it off client.metaConnection would label a lead from any Page with whichever
+  // Page happened to connect first.
+  const pageLabel = registration.pageName ?? client.metaConnection?.pageName ?? pageId
+
   let fieldData: MetaFieldDatum[]
   let pageAccessToken: string
   try {
-    pageAccessToken = await decrypt(client.metaConnection.pageAccessTokenEncrypted)
+    pageAccessToken = await decrypt(pageAccessTokenEncrypted)
     fieldData = await metaProvider.fetchLeadFieldData(leadgenId, pageAccessToken)
   } catch (error) {
     // NOT marked processed -- a transient Graph API failure should let
@@ -438,7 +752,7 @@ async function processSingleLeadgenEvent(
     leadId: metaLead.leadId,
     botId: pageId,
     leadRef: { source: 'meta', pageId, leadId: metaLead.leadId },
-    source: `Meta Lead Ads (${client.metaConnection.pageName})`,
+    source: `Meta Lead Ads (${pageLabel})`,
     ...(mapped.name ? { name: mapped.name } : {}),
     ...(mapped.phone ? { phone: mapped.phone } : {}),
     interest,
