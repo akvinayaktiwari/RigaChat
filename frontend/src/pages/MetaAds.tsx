@@ -99,6 +99,11 @@ export default function MetaAds() {
       } else {
         toast.show(res.error ?? 'Could not disconnect that Page.', 'error')
       }
+    } catch {
+      // Without this a network failure was an unhandled rejection and the row
+      // just stopped spinning, leaving the Page looking connected with no word
+      // either way. handleDisconnect already catches; this now matches.
+      toast.show('Could not reach the server. That Page is still connected.', 'error')
     } finally {
       setRemovingPageId(null)
     }
@@ -171,6 +176,14 @@ export default function MetaAds() {
   // here would show "Not Connected" beside a list of connected Pages.
   const isConnected = pages.length > 0 || (status !== 'loading' && status !== null && status.connected)
 
+  // A client connected before the Page registry existed has a live
+  // metaConnection and zero registry rows until the backfill reaches them.
+  // Without this the header badge said "Connected" while the panel directly
+  // below said "No Pages connected yet" and offered to connect -- for an
+  // account whose leads were arriving normally the whole time.
+  const legacyOnlyConnection =
+    pages.length === 0 && status !== 'loading' && status !== null && status.connected
+
   return (
     <div className="space-y-8">
       <div>
@@ -193,7 +206,7 @@ export default function MetaAds() {
               <h4 className="font-bold text-lg text-gray-900" style={JAKARTA_FONT}>
                 Facebook Page Connection
               </h4>
-              <p className="text-xs text-gray-500">One Page connected at a time — disconnect to switch Pages.</p>
+              <p className="text-xs text-gray-500">Connect the Facebook Pages your ads run from.</p>
             </div>
           </div>
           {status !== 'loading' && (
@@ -294,12 +307,22 @@ export default function MetaAds() {
               <div key={i} className="h-[52px] bg-gray-100 rounded-xl animate-pulse" />
             ))}
           </div>
-        ) : pages.length > 0 ? (
+        ) : pages.length > 0 || legacyOnlyConnection ? (
           <div className="space-y-4">
             <div>
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">
                 Connected Pages ({pages.length})
               </p>
+              {pages.length === 0 && (
+                // The legacy-connection case: leads are arriving, but this
+                // account predates the per-Page registry so there is no row to
+                // list yet. Saying so beats an empty list under a "Connected"
+                // badge.
+                <p className="mt-2 text-sm text-gray-500">
+                  Your Facebook connection is active and leads are arriving. Choose Add Pages to see
+                  every Page on this account and manage them individually.
+                </p>
+              )}
               <ul className="mt-2 divide-y divide-gray-50">
                 {pages.map((page) => (
                   <li key={page.pageId} className="flex items-center justify-between gap-4 py-3 min-h-[52px]">

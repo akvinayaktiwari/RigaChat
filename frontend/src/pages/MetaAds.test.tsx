@@ -267,3 +267,57 @@ describe('picker callbacks surfaced by MetaAds', () => {
     expect(connectMeta).toHaveBeenCalled()
   })
 })
+
+describe('a connection that predates the Page registry', () => {
+  // The backfill has not reached this client, so GET /meta/pages returns [] while
+  // metaConnection is live and leads are arriving. Branching the panel on
+  // pages.length alone put "No Pages connected yet" and a Connect button
+  // directly under a "Connected" badge, for a working account.
+  beforeEach(() => {
+    getMetaStatus.mockResolvedValue({
+      success: true,
+      data: { connected: true, pageId: 'page-1', pageName: 'Skyline Homes' },
+    })
+    getConnectedMetaPages.mockResolvedValue({ success: true, data: [] })
+  })
+
+  it('does not offer to connect an account that is already connected', async () => {
+    render(<MetaAds />)
+
+    await waitFor(() => expect(screen.getByText('Connected')).toBeTruthy())
+    expect(screen.queryByText(/No Pages connected yet/)).toBeNull()
+  })
+
+  it('says the connection is live rather than showing an empty list', async () => {
+    render(<MetaAds />)
+
+    await waitFor(() =>
+      expect(screen.getByText(/Your Facebook connection is active and leads are arriving/)).toBeTruthy()
+    )
+  })
+
+  it('still offers Add Pages so they can reach the picker', async () => {
+    render(<MetaAds />)
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add Pages' })).toBeTruthy())
+  })
+})
+
+describe('per-Page disconnect when the network fails', () => {
+  it('tells the client the Page is still connected instead of failing silently', async () => {
+    // A rejected promise here was an unhandled rejection: the row stopped
+    // spinning and nothing was said either way.
+    getConnectedMetaPages.mockResolvedValue({ success: true, data: [page(1)] })
+    disconnectMetaPage.mockRejectedValue(new Error('network down'))
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    render(<MetaAds />)
+    await waitFor(() => expect(screen.getByText('Page 1')).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }))
+
+    await waitFor(() =>
+      expect(toastShow).toHaveBeenCalledWith(expect.stringContaining('still connected'), 'error')
+    )
+  })
+})
