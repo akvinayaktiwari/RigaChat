@@ -81,7 +81,14 @@ reaches a client with a large lead history, not before the app ships.
 ## Per-resource connections — WhatsApp numbers and Meta Pages
 
 **Design:** `docs/designs/per-resource-connections.md` (written 2026-09-02).
-Specced, **not started**, no GitHub issue filed yet.
+**Issues filed 2026-09-02** for the Meta half: #26 (M2 pagination), #27 (M1 Page
+registry + backfill), #28 (M3 picker + multi-connect + post-connect management).
+Build order is M2 -> M1 -> M3. The WhatsApp half (W1-W3) and M4/M5 are still
+unfiled. Not started.
+
+> Issue bodies are **anonymised** — the repo is public. The real client/Page
+> mapping lives in the local spec archive under
+> `~/.gstack/projects/akvinayaktiwari-RigaChat/specs/`.
 
 Every external connection on `ClientRecord` is a singleton while we sell an
 `agency` plan. Two consequences, both silent:
