@@ -45,7 +45,20 @@ export default function MetaPagePicker({ onClose, onConnected, onTokenExpired }:
         // Every connectable Page starts selected: the client already answered
         // "which Pages?" on Meta's own consent screen, and asking again is what
         // produced the bug where approved Pages went unconnected.
-        setSelected(new Set(res.data.filter((p) => !p.connected && !p.unavailable).map((p) => p.pageId)))
+        //
+        // Capped at MAX_PER_BATCH on load too, not just in toggle(). Without
+        // the slice, a client with 30 Pages opened the picker already holding
+        // an invalid selection and only found out when the server rejected it
+        // -- the exact "compose an invalid request, get rejected after" flow
+        // the live cap exists to prevent.
+        setSelected(
+          new Set(
+            res.data
+              .filter((p) => !p.connected && !p.unavailable)
+              .slice(0, MAX_PER_BATCH)
+              .map((p) => p.pageId)
+          )
+        )
       })
       .catch(() => {
         if (!cancelled) setLoadError('Could not reach Meta. Try again shortly.')
