@@ -82,7 +82,22 @@ interface MetaPageEntry {
 interface MetaPagesResponse {
   data?: MetaPageEntry[]
   error?: { message?: string }
+  // Graph returns an absolute URL here, already carrying the access token and
+  // the cursor. Following it verbatim is Meta's documented pagination contract;
+  // rebuilding it from `after` by hand is how the token gets dropped.
+  paging?: { next?: string }
 }
+
+// /me/accounts returns 25 per page by default and we never asked for more, so an
+// agency admin'ing 40 Pages was shown 25 and silently lost 15. 100 is Graph's
+// practical maximum for this edge.
+const PAGES_FETCH_LIMIT = 100
+
+// Two independent stops so a pathological or hostile `paging.next` chain cannot
+// spin the Lambda until it times out. Neither should ever fire: 10 hops at 100
+// per hop is 1000 Pages, and no real admin has 500.
+const MAX_PAGE_HOPS = 10
+const MAX_PAGES_COLLECTED = 500
 
 export interface MetaPageCredentials {
   pageId: string
@@ -200,6 +215,63 @@ export class MetaProvider {
     }
 
     return data.access_token
+  }
+
+  // Every Page the user administers, following Graph's cursor to the end.
+  //
+  // The caller decides what to do with them; this function's only job is to
+  // return ALL of them. exchangeCodeForPageCredentials below still takes
+  // data[0] -- that is the bug this unblocks, not one this fixes. M3 replaces
+  // that caller (issue #28); until then nothing calls this.
+  //
+  // Errors propagate rather than returning a partial list: a caller that asked
+  // for "all Pages" and silently got some of them would reintroduce exactly the
+  // silent-truncation failure this exists to remove. The two safety stops are
+  // the deliberate exception, and they log.
+  async fetchAllManageablePages(userToken: string): Promise<MetaPageCredentials[]> {
+    const params = new URLSearchParams({
+      access_token: userToken,
+      fields: 'id,name,access_token',
+      limit: String(PAGES_FETCH_LIMIT),
+    })
+
+    let nextUrl: string | undefined = `${GRAPH_API_BASE}/me/accounts?${params.toString()}`
+    const pages: MetaPageCredentials[] = []
+    let hops = 0
+
+    while (nextUrl) {
+      if (hops >= MAX_PAGE_HOPS) {
+        console.warn(
+          `[meta] /me/accounts pagination stopped at ${MAX_PAGE_HOPS} hops with ${pages.length} Pages collected; ` +
+            `returning a partial list. If this is a real account, raise MAX_PAGE_HOPS.`
+        )
+        break
+      }
+
+      const response = await fetch(nextUrl)
+      const body = (await response.json()) as MetaPagesResponse
+      hops += 1
+
+      if (body.error) {
+        throw new MetaPagesLookupError(body.error.message ?? 'Unknown error')
+      }
+
+      for (const entry of body.data ?? []) {
+        pages.push({ pageId: entry.id, pageName: entry.name, pageAccessToken: entry.access_token })
+
+        if (pages.length >= MAX_PAGES_COLLECTED) {
+          console.warn(
+            `[meta] /me/accounts pagination stopped at ${MAX_PAGES_COLLECTED} Pages after ${hops} hops; ` +
+              `returning a partial list.`
+          )
+          return pages
+        }
+      }
+
+      nextUrl = body.paging?.next
+    }
+
+    return pages
   }
 
   // Step 3 of three: a Page's Lead Ads data is only readable with a PAGE access

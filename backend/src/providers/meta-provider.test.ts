@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MetaMisconfiguredError, MetaTokenExchangeError } from '../lib/meta-connect-errors.js'
+import { MetaMisconfiguredError, MetaPagesLookupError, MetaTokenExchangeError } from '../lib/meta-connect-errors.js'
 import { metaProvider } from './meta-provider.js'
 
 // getOAuthUrl is the last thing that runs before we hand a client to Facebook.
@@ -164,5 +164,120 @@ describe('exchangeCodeForPageCredentials', () => {
     // Stopped at the failed exchange -- it must not go on to mint a Page token
     // from a token it already knows is short-lived.
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+})
+
+// /me/accounts is paginated and we never asked for more than Meta's default 25.
+// An agency admin'ing 40 Pages was shown 25 and silently lost 15 -- the same
+// silent-truncation class as taking data[0], one layer up. These tests exist so
+// the Page picker built on top of this (issue #28) is never wrong about what a
+// client actually administers.
+describe('fetchAllManageablePages', () => {
+  function mockFetchSequence(responses: unknown[]): ReturnType<typeof vi.fn> {
+    const fetchMock = vi.fn()
+    for (const body of responses) {
+      fetchMock.mockResolvedValueOnce({ json: async () => body } as unknown as Response)
+    }
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+
+  const page = (n: number) => ({ id: `page-${n}`, name: `Page ${n}`, access_token: `tok-${n}` })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('returns every Page from a single unpaginated response', async () => {
+    const fetchMock = mockFetchSequence([{ data: [page(1), page(2)] }])
+
+    const result = await metaProvider.fetchAllManageablePages('user-token')
+
+    expect(result).toEqual([
+      { pageId: 'page-1', pageName: 'Page 1', pageAccessToken: 'tok-1' },
+      { pageId: 'page-2', pageName: 'Page 2', pageAccessToken: 'tok-2' },
+    ])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('asks Graph for 100 per page rather than accepting the default 25', async () => {
+    const fetchMock = mockFetchSequence([{ data: [] }])
+
+    await metaProvider.fetchAllManageablePages('user-token')
+
+    const url = new URL(fetchMock.mock.calls[0][0] as string)
+    expect(url.searchParams.get('limit')).toBe('100')
+    expect(url.searchParams.get('access_token')).toBe('user-token')
+  })
+
+  it('follows paging.next to the end and preserves order', async () => {
+    const fetchMock = mockFetchSequence([
+      { data: [page(1)], paging: { next: 'https://graph.example/next-1' } },
+      { data: [page(2)], paging: { next: 'https://graph.example/next-2' } },
+      { data: [page(3)] },
+    ])
+
+    const result = await metaProvider.fetchAllManageablePages('user-token')
+
+    expect(result.map((p) => p.pageId)).toEqual(['page-1', 'page-2', 'page-3'])
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    // The cursor URL is followed verbatim -- it already carries the token.
+    expect(fetchMock.mock.calls[1][0]).toBe('https://graph.example/next-1')
+    expect(fetchMock.mock.calls[2][0]).toBe('https://graph.example/next-2')
+  })
+
+  it('stops after 10 hops and returns what it collected instead of throwing', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    // 12 pages of cursor, all with a next -- an endless chain.
+    const endless = Array.from({ length: 12 }, (_, i) => ({
+      data: [page(i)],
+      paging: { next: `https://graph.example/next-${i}` },
+    }))
+    const fetchMock = mockFetchSequence(endless)
+
+    const result = await metaProvider.fetchAllManageablePages('user-token')
+
+    expect(fetchMock).toHaveBeenCalledTimes(10)
+    expect(result).toHaveLength(10)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('10 hops'))
+  })
+
+  it('stops at 500 Pages and returns what it collected instead of throwing', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const bigPage = Array.from({ length: 300 }, (_, i) => page(i))
+    mockFetchSequence([
+      { data: bigPage, paging: { next: 'https://graph.example/next-1' } },
+      { data: bigPage, paging: { next: 'https://graph.example/next-2' } },
+    ])
+
+    const result = await metaProvider.fetchAllManageablePages('user-token')
+
+    expect(result).toHaveLength(500)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('500 Pages'))
+  })
+
+  it('throws on a Graph error mid-chain rather than returning a partial list', async () => {
+    // Returning the first page silently would be the exact silent-truncation
+    // bug this function exists to remove, so a mid-chain failure must be loud.
+    mockFetchSequence([
+      { data: [page(1)], paging: { next: 'https://graph.example/next-1' } },
+      { error: { message: 'Invalid OAuth access token' } },
+    ])
+
+    await expect(metaProvider.fetchAllManageablePages('user-token')).rejects.toThrow(
+      MetaPagesLookupError
+    )
+  })
+
+  it('returns an empty array when the user administers no Pages', async () => {
+    // Not an error here: "this account has no Pages" is a decision for the
+    // caller to surface, and exchangeCodeForPageCredentials still throws
+    // MetaNoPagesError for the single-Page connect path.
+    mockFetchSequence([{ data: [] }])
+
+    const result = await metaProvider.fetchAllManageablePages('user-token')
+
+    expect(result).toEqual([])
   })
 })
