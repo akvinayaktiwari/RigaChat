@@ -236,9 +236,10 @@ export class MetaProvider {
   // Every Page the user administers, following Graph's cursor to the end.
   //
   // The caller decides what to do with them; this function's only job is to
-  // return ALL of them. exchangeCodeForPageCredentials below still takes
-  // data[0] -- that is the bug this unblocks, not one this fixes. M3 replaces
-  // that caller (issue #28); until then nothing calls this.
+  // return ALL of them. listSelectablePages and connectMetaPages are the
+  // callers. exchangeCodeForPageCredentials below still takes data[0] -- that
+  // is the original bug, and it survives only as the rollback path now that
+  // nothing routes to it.
   //
   // Errors propagate rather than returning a partial list: a caller that asked
   // for "all Pages" and silently got some of them would reintroduce exactly the

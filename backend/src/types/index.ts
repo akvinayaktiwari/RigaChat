@@ -382,8 +382,15 @@ export interface MetaConnection {
 export interface MetaPageRegistration {
   pageId: string
   clientId: string
-  pageName: string
-  pageAccessTokenEncrypted: string
+  /**
+   * Optional because rows written before the registry existed carry only
+   * pageId/clientId/connectedAt, and the backfill deliberately SKIPS any row
+   * whose source connection had no name or token rather than inventing one.
+   * Typing these as required made the repository's cast a lie and let
+   * `undefined` reach the dashboard where a string was promised.
+   */
+  pageName?: string
+  pageAccessTokenEncrypted?: string
   connectedAt: string
   /**
    * Last time we confirmed with Meta that this Page is still granted to the
@@ -393,7 +400,7 @@ export interface MetaPageRegistration {
    * Nothing reconciles that yet (M5); this field ships now so M5 needs no
    * migration.
    */
-  lastVerifiedAt: string
+  lastVerifiedAt?: string
 }
 
 /** A registration without its token, safe to return over the API. */
@@ -425,6 +432,17 @@ export interface MetaPageSkipped {
  * another account must not block the other 24 -- failing the batch would
  * punish the client for something they cannot see or fix.
  */
+/**
+ * The picker's payload. `maxPerBatch` travels with the Pages so the client cap
+ * cannot drift from the server's: the server rejects anything over it, and a
+ * client hard-coding a larger number would let someone compose a selection that
+ * is refused only after they hit Connect.
+ */
+export interface MetaSelectablePagesResult {
+  pages: MetaSelectablePage[]
+  maxPerBatch: number
+}
+
 export interface MetaConnectPagesResult {
   connected: MetaPageSummary[]
   skipped: MetaPageSkipped[]
