@@ -369,6 +369,36 @@ export interface MetaConnection {
   connectedAt: string
 }
 
+/**
+ * One connected Facebook Page, keyed by pageId in `meta_page_lookup`.
+ *
+ * The Page's access token lives HERE and not on ClientRecord, and that is the
+ * whole point: a client can connect many Pages, and the token that signs for a
+ * lead has to be reachable from the pageId the webhook delivered. Hanging the
+ * token off the client instead made "which token signs for this Page?"
+ * unanswerable past the first one -- an array on ClientRecord would not have
+ * fixed it, only moved it.
+ */
+export interface MetaPageRegistration {
+  pageId: string
+  clientId: string
+  pageName: string
+  pageAccessTokenEncrypted: string
+  connectedAt: string
+  /**
+   * Last time we confirmed with Meta that this Page is still granted to the
+   * app. Meta holds Page grants against the Meta USER, not against our
+   * clientId, so one admin connecting several of our clients can silently
+   * overwrite an earlier grant -- our row survives while the leads stop.
+   * Nothing reconciles that yet (M5); this field ships now so M5 needs no
+   * migration.
+   */
+  lastVerifiedAt: string
+}
+
+/** A registration without its token, safe to return over the API. */
+export type MetaPageSummary = Omit<MetaPageRegistration, 'pageAccessTokenEncrypted'>
+
 export interface MetaDirectWhatsAppConnection {
   provider: 'meta_direct'
   connected: boolean

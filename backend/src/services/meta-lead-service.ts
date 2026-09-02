@@ -14,6 +14,7 @@ import { getClientById, removeClientMetaConnection, updateClient } from '../repo
 import {
   createMetaLead,
   getClientIdForPage,
+  getPageRegistration,
   getMetaLeadsByClientId,
   MetaPageConflictError,
   removePageClientMapping,
@@ -314,13 +315,14 @@ async function processSingleLeadgenEvent(
     return { retryable: false }
   }
 
-  const clientId = await getClientIdForPage(pageId)
-  if (!clientId) {
+  const registration = await getPageRegistration(pageId)
+  if (!registration) {
     console.log(`Meta webhook: no client mapped for page ${pageId}, ignoring`, { leadgenId })
     await markProcessed(key, 'meta', 'leadgen')
     return { retryable: false }
   }
 
+  const clientId = registration.clientId
   const client = await getClientById(clientId)
   if (!client?.metaConnection?.connected) {
     console.log(`Meta webhook: client ${clientId} has no active Meta connection, ignoring`, { leadgenId })
@@ -331,7 +333,15 @@ async function processSingleLeadgenEvent(
   let fieldData: MetaFieldDatum[]
   let pageAccessToken: string
   try {
-    pageAccessToken = await decrypt(client.metaConnection.pageAccessTokenEncrypted)
+    // THIS Page's token, reached from the pageId the webhook delivered -- not
+    // the client's single connection token, which is only ever right for
+    // whichever Page happened to be connected first. Rows written before M1
+    // have no token of their own, so fall back to the client connection for
+    // them; the backfill removes that case and the fallback goes with
+    // metaConnection after M3's soak week.
+    pageAccessToken = await decrypt(
+      registration.pageAccessTokenEncrypted ?? client.metaConnection.pageAccessTokenEncrypted
+    )
     fieldData = await metaProvider.fetchLeadFieldData(leadgenId, pageAccessToken)
   } catch (error) {
     // NOT marked processed -- a transient Graph API failure should let

@@ -56,6 +56,17 @@ const createMetaLead = vi.fn(async (_input: SavedMetaLead) => ({ leadId: 'lead-1
 vi.mock('../repositories/meta-lead-repository.js', () => ({
   createMetaLead: (input: SavedMetaLead) => createMetaLead(input),
   getClientIdForPage: async () => 'client-1',
+  // M1: the lead path now resolves the whole registration from the pageId, so
+  // the token it decrypts belongs to THAT Page rather than to the client.
+  getPageRegistration: async () => ({
+    pageId: 'page-1',
+    clientId: 'client-1',
+    pageName: 'Skyline Homes',
+    pageAccessTokenEncrypted: 'enc-page-1',
+    connectedAt: '2026-01-01T00:00:00.000Z',
+    lastVerifiedAt: '2026-01-01T00:00:00.000Z',
+  }),
+  listPagesForClient: async () => [],
   getMetaLeadsByClientId: async () => [],
   MetaPageConflictError: class extends Error {},
   removePageClientMapping: async () => undefined,

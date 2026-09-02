@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { DeleteCommand, GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import { updatePartialFields } from '../lib/dynamo-update.js'
-import type { MetaLead } from '../types/index.js'
+import type { MetaLead, MetaPageRegistration } from '../types/index.js'
 
 const LEADS_TABLE_NAME = (): string => getTableName('meta_leads')
 const PAGE_LOOKUP_TABLE_NAME = (): string => getTableName('meta_page_lookup')
@@ -117,12 +117,26 @@ export class MetaPageConflictError extends Error {
 // window where two clients completing OAuth for the same Page concurrently
 // could both pass the read check before either writes. This condition lets
 // DynamoDB itself reject the losing write instead.
-export async function setPageClientMapping(pageId: string, clientId: string): Promise<void> {
+export async function setPageClientMapping(
+  pageId: string,
+  clientId: string,
+  page?: { pageName: string; pageAccessTokenEncrypted: string }
+): Promise<void> {
+  const now = new Date().toISOString()
   try {
     await dynamoClient.send(
       new PutCommand({
         TableName: PAGE_LOOKUP_TABLE_NAME(),
-        Item: { pageId, clientId, connectedAt: new Date().toISOString() },
+        // pageName and the token are optional so the pre-M1 single-Page connect
+        // path keeps working unchanged during the soak week. Once M3 is the only
+        // writer they are always present.
+        Item: {
+          pageId,
+          clientId,
+          connectedAt: now,
+          lastVerifiedAt: now,
+          ...(page ? { pageName: page.pageName, pageAccessTokenEncrypted: page.pageAccessTokenEncrypted } : {}),
+        },
         ConditionExpression: 'attribute_not_exists(pageId) OR clientId = :clientId',
         ExpressionAttributeValues: { ':clientId': clientId },
       })
@@ -149,6 +163,46 @@ export async function getClientIdForPage(pageId: string): Promise<string | null>
   } catch (error) {
     throw new Error(
       `Failed to look up client for Meta page ${pageId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
+// The whole registration, including the Page's own access token. This is the
+// read that makes multi-Page possible: the webhook hands us a pageId and this
+// answers "whose Page, and which token signs for it" in one point read.
+export async function getPageRegistration(pageId: string): Promise<MetaPageRegistration | null> {
+  try {
+    const result = await dynamoClient.send(
+      new GetCommand({
+        TableName: PAGE_LOOKUP_TABLE_NAME(),
+        Key: { pageId },
+      })
+    )
+    if (!result.Item) return null
+    return result.Item as MetaPageRegistration
+  } catch (error) {
+    throw new Error(
+      `Failed to read Meta page registration ${pageId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
+// Query on the GSI, never a Scan. The inbound WhatsApp path already pays for a
+// full-table Scan per message (see W1); this one does not repeat that mistake.
+export async function listPagesForClient(clientId: string): Promise<MetaPageRegistration[]> {
+  try {
+    const result = await dynamoClient.send(
+      new QueryCommand({
+        TableName: PAGE_LOOKUP_TABLE_NAME(),
+        IndexName: 'clientId-connectedAt-index',
+        KeyConditionExpression: 'clientId = :clientId',
+        ExpressionAttributeValues: { ':clientId': clientId },
+      })
+    )
+    return (result.Items ?? []) as MetaPageRegistration[]
+  } catch (error) {
+    throw new Error(
+      `Failed to list Meta pages for client ${clientId}: ${error instanceof Error ? error.message : String(error)}`
     )
   }
 }
