@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { useState } from 'react'
+import type React from 'react'
 import MetaPagePicker from './MetaPagePicker'
 import type { MetaSelectablePage } from '../types/index'
 
@@ -256,5 +258,40 @@ describe('the batch cap comes from the server', () => {
     renderPicker()
 
     await waitFor(() => expect(liveCount()).toContain('25 selected'))
+  })
+})
+
+describe('focus survives an unrelated re-render', () => {
+  // Callers pass onClose as an inline arrow, so it is a new function on every
+  // parent render. An effect that depends on it re-runs each time: focus is
+  // restored outside the dialog and then yanked back to the first control,
+  // while the user is halfway down a 25-row list.
+  it('does not steal focus back to the first row when the parent re-renders', async () => {
+    getSelectableMetaPages.mockResolvedValue({
+      success: true,
+      data: { pages: [page(1), page(2), page(3)], maxPerBatch: 25 },
+    })
+
+    function Host(): React.ReactElement {
+      const [, force] = useState(0)
+      rerenderHost = () => force((n) => n + 1)
+      // A fresh arrow each render, exactly as MetaAds and Modal do it.
+      return (
+        <MetaPagePicker onClose={() => {}} onConnected={() => {}} onTokenExpired={() => {}} />
+      )
+    }
+    let rerenderHost: () => void = () => {}
+
+    render(<Host />)
+    await waitFor(() => expect(liveCount()).toContain('3 selected'))
+
+    const boxes = screen.getAllByRole('checkbox') as HTMLInputElement[]
+    const third = boxes[2]!
+    third.focus()
+    expect(document.activeElement).toBe(third)
+
+    act(() => rerenderHost())
+
+    expect(document.activeElement).toBe(third)
   })
 })

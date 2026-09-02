@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
 
 const FOCUSABLE_SELECTOR = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
 
@@ -15,6 +15,15 @@ const FOCUSABLE_SELECTOR = 'button, [href], input, select, textarea, [tabindex]:
  * rather than one having the behaviour and the other only the attribute.
  */
 export function useDialogFocus(ref: RefObject<HTMLElement | null>, onClose: () => void, isOpen = true): void {
+  // Callers pass `onClose` as an inline arrow, so its identity changes on every
+  // parent render. Depending on it directly would tear down and re-run this
+  // effect each time -- restoring focus outside the dialog and then yanking it
+  // back to the first control, on renders that have nothing to do with the
+  // dialog. Held in a ref so the effect runs once per open and still calls the
+  // current callback.
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
   useEffect(() => {
     if (!isOpen) return
 
@@ -25,7 +34,7 @@ export function useDialogFocus(ref: RefObject<HTMLElement | null>, onClose: () =
 
     function handleKeyDown(e: KeyboardEvent): void {
       if (e.key === 'Escape') {
-        onClose()
+        onCloseRef.current()
         return
       }
       if (e.key !== 'Tab') return
@@ -53,5 +62,5 @@ export function useDialogFocus(ref: RefObject<HTMLElement | null>, onClose: () =
       document.removeEventListener('keydown', handleKeyDown)
       previouslyFocused?.focus?.()
     }
-  }, [ref, onClose, isOpen])
+  }, [ref, isOpen])
 }
