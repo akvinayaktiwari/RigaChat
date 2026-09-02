@@ -37,10 +37,8 @@ import {
 } from '../services/whatsapp-service.js'
 import {
   beginMetaConnection,
-  connectMetaAds,
   connectMetaPages,
   disconnectAllMetaPages,
-  disconnectMetaAds,
   disconnectMetaPage,
   listConnectedPages,
   listSelectablePages,

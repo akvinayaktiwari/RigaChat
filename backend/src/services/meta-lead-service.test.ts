@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { MetaPageRegistration } from '../types/index.js'
 
 // Every collaborator is mocked: this file is about ONE decision -- what happens
 // when Meta answers the field_data fetch with an empty array -- and that
@@ -53,19 +54,28 @@ interface SavedMetaLead {
   customFields: string
 }
 const createMetaLead = vi.fn(async (_input: SavedMetaLead) => ({ leadId: 'lead-1', clientId: 'client-1' }))
+// M1: the lead path now resolves the whole registration from the pageId, so
+// the token it decrypts belongs to THAT Page rather than to the client. A
+// vi.fn (not an inline arrow) so individual tests can override it to exercise
+// the "no client mapped" and "pre-M1 row with no own token" branches.
+//
+// Typed explicitly rather than inferred from the default row: inference pins
+// the return to a fully-populated registration, so the very overrides this
+// mock exists for (null, and a pre-M1 row with no token) stop typechecking --
+// which `npm test` never notices, because only `npm run build` runs tsc.
+type RegistrationMock = Partial<MetaPageRegistration> & { pageId: string; clientId: string }
+const getPageRegistration = vi.fn<(pageId: string) => Promise<RegistrationMock | null>>(async () => ({
+  pageId: 'page-1',
+  clientId: 'client-1',
+  pageName: 'Skyline Homes',
+  pageAccessTokenEncrypted: 'enc-page-1',
+  connectedAt: '2026-01-01T00:00:00.000Z',
+  lastVerifiedAt: '2026-01-01T00:00:00.000Z',
+}))
 vi.mock('../repositories/meta-lead-repository.js', () => ({
   createMetaLead: (input: SavedMetaLead) => createMetaLead(input),
   getClientIdForPage: async () => 'client-1',
-  // M1: the lead path now resolves the whole registration from the pageId, so
-  // the token it decrypts belongs to THAT Page rather than to the client.
-  getPageRegistration: async () => ({
-    pageId: 'page-1',
-    clientId: 'client-1',
-    pageName: 'Skyline Homes',
-    pageAccessTokenEncrypted: 'enc-page-1',
-    connectedAt: '2026-01-01T00:00:00.000Z',
-    lastVerifiedAt: '2026-01-01T00:00:00.000Z',
-  }),
+  getPageRegistration: (pageId: string) => getPageRegistration(pageId),
   listPagesForClient: async () => [],
   getMetaLeadsByClientId: async () => [],
   MetaPageConflictError: class extends Error {},
@@ -74,18 +84,25 @@ vi.mock('../repositories/meta-lead-repository.js', () => ({
   updateMetaLeadSyncStatus: async () => undefined,
 }))
 
+// A vi.fn, not an inline arrow, so a test can hand back a client with NO
+// metaConnection -- which is every client connected through the multi-Page
+// picker, since that path only ever writes metaUserTokenEncrypted.
+const getClientById = vi.fn(async () => ({
+  clientId: 'client-1',
+  metaConnection: { connected: true, pageName: 'Skyline Homes', pageAccessTokenEncrypted: 'enc' },
+}) as Record<string, unknown> | null)
 vi.mock('../repositories/client-repository.js', () => ({
-  getClientById: async () => ({
-    clientId: 'client-1',
-    metaConnection: { connected: true, pageName: 'Skyline Homes', pageAccessTokenEncrypted: 'enc' },
-  }),
+  getClientById: (...args: unknown[]) => getClientById(...(args as [])),
   removeClientMetaConnection: async () => undefined,
   updateClient: async () => undefined,
 }))
 
 vi.mock('../lib/kms.js', () => ({ decrypt: async () => 'page-token', encrypt: async () => 'enc' }))
 vi.mock('./crm-service.js', () => ({ getProvider: () => null, syncLeadToCRMWithRetry: async () => ({ success: true }) }))
-vi.mock('./lead-notification-service.js', () => ({ sendLeadNotification: async () => ({ notified: true }) }))
+const sendLeadNotification = vi.fn(async (_input: { source: string }) => ({ notified: true }))
+vi.mock('./lead-notification-service.js', () => ({
+  sendLeadNotification: (input: { source: string }) => sendLeadNotification(input),
+}))
 vi.mock('./journey-ignition-service.js', () => ({ igniteJourneysForLead: async () => ({ status: 'started' }) }))
 vi.mock('../repositories/meta-deletion-request-repository.js', () => ({
   createMetaDeletionRequest: async () => undefined,
@@ -134,6 +151,19 @@ beforeEach(() => {
     pageName: 'Skyline Homes',
     pageAccessToken: 'page-token',
   })
+  getPageRegistration.mockResolvedValue({
+    pageId: 'page-1',
+    clientId: 'client-1',
+    pageName: 'Skyline Homes',
+    pageAccessTokenEncrypted: 'enc-page-1',
+    connectedAt: '2026-01-01T00:00:00.000Z',
+    lastVerifiedAt: '2026-01-01T00:00:00.000Z',
+  })
+  getClientById.mockResolvedValue({
+    clientId: 'client-1',
+    metaConnection: { connected: true, pageName: 'Skyline Homes', pageAccessTokenEncrypted: 'enc' },
+  })
+  sendLeadNotification.mockResolvedValue({ notified: true })
 })
 
 describe('empty field_data from the Graph API', () => {
@@ -321,5 +351,108 @@ describe('form schema prewarm on connect', () => {
     await connectMetaAds('client-1', 'oauth-code')
 
     expect(order).toEqual(['subscribe', 'prewarm'])
+  })
+})
+
+describe('webhook routing by Page registration', () => {
+  it('ignores and marks processed a leadgen event for a Page nobody has connected', async () => {
+    getPageRegistration.mockResolvedValue(null)
+
+    const result = await processMetaLeadWebhook(payload, 'sha256=sig')
+
+    expect(result.status).toBe(200)
+    expect(createMetaLead).not.toHaveBeenCalled()
+    expect(fetchLeadFieldData).not.toHaveBeenCalled()
+    expect(markProcessed).toHaveBeenCalledTimes(1)
+  })
+
+  it('falls back to the client-level token for a pre-M1 row with no Page-own token', async () => {
+    // The backfill removes this case; until then a row written before M1 has
+    // no pageAccessTokenEncrypted of its own.
+    getPageRegistration.mockResolvedValue({
+      pageId: 'page-1',
+      clientId: 'client-1',
+      connectedAt: '2026-01-01T00:00:00.000Z',
+      lastVerifiedAt: '2026-01-01T00:00:00.000Z',
+    })
+    fetchLeadFieldData.mockResolvedValue([{ name: 'full_name', values: ['Ravi Kumar'] }])
+
+    const result = await processMetaLeadWebhook(payload, 'sha256=sig')
+
+    expect(result.status).toBe(200)
+    // decrypt is mocked to always resolve 'page-token' regardless of input, so
+    // this asserts the call actually went through (the client fallback token,
+    // 'enc') rather than throwing on an undefined registration token.
+    expect(fetchLeadFieldData).toHaveBeenCalledWith('lead-gen-1', 'page-token')
+    expect(createMetaLead).toHaveBeenCalledTimes(1)
+  })
+})
+
+// The multi-Page connect path writes metaUserTokenEncrypted and a registry row.
+// It never writes client.metaConnection -- so a gate on metaConnection.connected
+// drops every lead these clients ever receive, marks it processed so Meta's
+// 36-hour redelivery never retries, and reports nothing anywhere. That is the
+// same silent lead loss the per-Page registry exists to end, one layer up.
+describe('a client connected through the multi-Page picker', () => {
+  beforeEach(() => {
+    fetchLeadFieldData.mockResolvedValue([
+      { name: 'full_name', values: ['Ravi Kumar'] },
+      { name: 'phone_number', values: ['+919876543210'] },
+    ])
+    // Exactly what beginMetaConnection leaves behind: a user token, no
+    // metaConnection at all.
+    getClientById.mockResolvedValue({ clientId: 'client-1', metaUserTokenEncrypted: 'enc-user' })
+  })
+
+  it('still creates the lead, with no metaConnection anywhere on the client', async () => {
+    const result = await processMetaLeadWebhook(payload, 'sha256=sig')
+
+    expect(result.status).toBe(200)
+    expect(createMetaLead).toHaveBeenCalledTimes(1)
+    expect(createMetaLead.mock.calls[0][0].name).toBe('Ravi Kumar')
+  })
+
+  it('does not mark the event processed as if the client were disconnected', async () => {
+    await processMetaLeadWebhook(payload, 'sha256=sig')
+
+    // One markProcessed, at the END of a successful save -- not the early
+    // "no active Meta connection" bail that discards the lead.
+    expect(markProcessed).toHaveBeenCalledTimes(1)
+    expect(createMetaLead).toHaveBeenCalled()
+  })
+
+  it("names the Page the lead actually came from, not whichever connected first", async () => {
+    getPageRegistration.mockResolvedValue({
+      pageId: 'page-1',
+      clientId: 'client-1',
+      pageName: 'Harbour View Residences',
+      pageAccessTokenEncrypted: 'enc-page-1',
+      connectedAt: '2026-01-01T00:00:00.000Z',
+      lastVerifiedAt: '2026-01-01T00:00:00.000Z',
+    })
+
+    await processMetaLeadWebhook(payload, 'sha256=sig')
+
+    expect(sendLeadNotification.mock.calls[0][0].source).toBe('Meta Lead Ads (Harbour View Residences)')
+  })
+
+  it('drops the lead loudly, not silently, when the Page has no token at all', async () => {
+    // Unrecoverable without a reconnect: retrying for 36 hours against a token
+    // we do not have helps nobody, but it must not pass as a normal no-op.
+    getPageRegistration.mockResolvedValue({
+      pageId: 'page-1',
+      clientId: 'client-1',
+      pageName: 'Skyline Homes',
+      connectedAt: '2026-01-01T00:00:00.000Z',
+      lastVerifiedAt: '2026-01-01T00:00:00.000Z',
+    })
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const result = await processMetaLeadWebhook(payload, 'sha256=sig')
+
+    expect(result.status).toBe(200)
+    expect(createMetaLead).not.toHaveBeenCalled()
+    expect(error).toHaveBeenCalled()
+    error.mockRestore()
   })
 })

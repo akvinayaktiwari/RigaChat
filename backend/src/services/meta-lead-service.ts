@@ -508,24 +508,43 @@ async function processSingleLeadgenEvent(
 
   const clientId = registration.clientId
   const client = await getClientById(clientId)
-  if (!client?.metaConnection?.connected) {
-    console.log(`Meta webhook: client ${clientId} has no active Meta connection, ignoring`, { leadgenId })
+  if (!client) {
+    console.log(`Meta webhook: client ${clientId} no longer exists, ignoring`, { leadgenId })
     await markProcessed(key, 'meta', 'leadgen')
     return { retryable: false }
   }
 
+  // The REGISTRATION is the connection, not client.metaConnection. The row is
+  // written only after the Page's webhook subscription succeeds and is deleted
+  // on disconnect, so reaching this line already means "this Page is connected
+  // to this client". Gating on client.metaConnection.connected instead would
+  // drop every lead for a client connected through the multi-Page picker, which
+  // never writes that field -- the same silent lead loss this whole change set
+  // exists to end, one layer up.
+  //
+  // Rows written before the registry carry no token of their own, so fall back
+  // to the client's single connection for them; the backfill removes that case
+  // and the fallback goes with metaConnection after the soak week.
+  const pageAccessTokenEncrypted =
+    registration.pageAccessTokenEncrypted ?? client.metaConnection?.pageAccessTokenEncrypted
+  if (!pageAccessTokenEncrypted) {
+    // Unrecoverable without a reconnect, so do not let Meta redeliver for 36
+    // hours against a token we do not have. Loud, because a connected Page with
+    // no token is a broken connection the client cannot see.
+    console.error(`Meta webhook: no access token for page ${pageId}, ignoring`, { leadgenId, clientId })
+    await markProcessed(key, 'meta', 'leadgen')
+    return { retryable: false }
+  }
+
+  // The Page's own name, from the row the webhook's pageId resolved to. Reading
+  // it off client.metaConnection would label a lead from any Page with whichever
+  // Page happened to connect first.
+  const pageLabel = registration.pageName ?? client.metaConnection?.pageName ?? pageId
+
   let fieldData: MetaFieldDatum[]
   let pageAccessToken: string
   try {
-    // THIS Page's token, reached from the pageId the webhook delivered -- not
-    // the client's single connection token, which is only ever right for
-    // whichever Page happened to be connected first. Rows written before M1
-    // have no token of their own, so fall back to the client connection for
-    // them; the backfill removes that case and the fallback goes with
-    // metaConnection after M3's soak week.
-    pageAccessToken = await decrypt(
-      registration.pageAccessTokenEncrypted ?? client.metaConnection.pageAccessTokenEncrypted
-    )
+    pageAccessToken = await decrypt(pageAccessTokenEncrypted)
     fieldData = await metaProvider.fetchLeadFieldData(leadgenId, pageAccessToken)
   } catch (error) {
     // NOT marked processed -- a transient Graph API failure should let
@@ -632,7 +651,7 @@ async function processSingleLeadgenEvent(
     leadId: metaLead.leadId,
     botId: pageId,
     leadRef: { source: 'meta', pageId, leadId: metaLead.leadId },
-    source: `Meta Lead Ads (${client.metaConnection.pageName})`,
+    source: `Meta Lead Ads (${pageLabel})`,
     ...(mapped.name ? { name: mapped.name } : {}),
     ...(mapped.phone ? { phone: mapped.phone } : {}),
     interest,
