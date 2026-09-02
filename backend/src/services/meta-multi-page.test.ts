@@ -407,3 +407,58 @@ describe('connecting a batch concurrently', () => {
     expect(peak).toBeGreaterThan(1)
   })
 })
+
+describe('the user token expiring mid-flow', () => {
+  // The picker can sit open while a ~60-day token reaches its last minute. If
+  // Connect then surfaces a generic 500, the dashboard says "could not reach
+  // Meta" and offers no way back -- defeating the expired-vs-empty distinction
+  // the rest of this work exists to draw.
+  it('reports Connect against a dead token as reconnect, not a server error', async () => {
+    fetchAllManageablePages.mockRejectedValue(new MetaPagesLookupError('token invalid'))
+
+    await expect(connectMetaPages('client-1', ['page-1'])).rejects.toBeInstanceOf(
+      MetaUserTokenExpiredError
+    )
+  })
+
+  it('claims nothing when the token dies before the batch starts', async () => {
+    fetchAllManageablePages.mockRejectedValue(new MetaPagesLookupError('token invalid'))
+
+    await expect(connectMetaPages('client-1', ['page-1'])).rejects.toThrow()
+
+    expect(setPageClientMapping).not.toHaveBeenCalled()
+  })
+})
+
+describe('a Page landing mid-disconnect', () => {
+  // A connect running in another tab can register a Page after disconnect-all
+  // snapshots the list. That Page carries its OWN token, so deleting the user
+  // token does not stop its leads: it would keep delivering indefinitely to a
+  // client who was told everything was disconnected.
+  it('sweeps up a Page that appeared after the first pass', async () => {
+    listPagesForClient
+      .mockResolvedValueOnce([{ pageId: 'page-1', clientId: 'client-1' }])
+      .mockResolvedValueOnce([{ pageId: 'page-9', clientId: 'client-1' }])
+      .mockResolvedValue([])
+    getPageRegistration.mockImplementation(async (pageId: string) => ({ pageId, clientId: 'client-1' }))
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    await disconnectAllMetaPages('client-1')
+
+    expect(removePageClientMapping).toHaveBeenCalledWith('page-1')
+    expect(removePageClientMapping).toHaveBeenCalledWith('page-9')
+  })
+
+  it('still deletes the user token after the sweep', async () => {
+    listPagesForClient
+      .mockResolvedValueOnce([{ pageId: 'page-1', clientId: 'client-1' }])
+      .mockResolvedValueOnce([{ pageId: 'page-9', clientId: 'client-1' }])
+      .mockResolvedValue([])
+    getPageRegistration.mockImplementation(async (pageId: string) => ({ pageId, clientId: 'client-1' }))
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    await disconnectAllMetaPages('client-1')
+
+    expect(updateClient).toHaveBeenCalledWith('client-1', { metaUserTokenEncrypted: undefined })
+  })
+})

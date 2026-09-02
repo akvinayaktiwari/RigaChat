@@ -290,6 +290,28 @@ async function requireUserToken(clientId: string): Promise<string> {
 }
 
 /**
+ * Graph rejecting the token is the expiry case, and it must surface as
+ * "reconnect" rather than as an empty Page list or a generic 500.
+ *
+ * Shared by both callers deliberately: connectMetaPages fetched without this
+ * and turned an expiry between opening the picker and pressing Connect into a
+ * 500, which the dashboard renders as "could not reach Meta" with no way back.
+ * The token can be minutes from expiry while the picker sits open.
+ */
+async function fetchPagesOrExpired(
+  userToken: string
+): Promise<Awaited<ReturnType<typeof metaProvider.fetchAllManageablePages>>> {
+  try {
+    return await metaProvider.fetchAllManageablePages(userToken)
+  } catch (error) {
+    if (error instanceof MetaPagesLookupError) {
+      throw new MetaUserTokenExpiredError()
+    }
+    throw error
+  }
+}
+
+/**
  * Every Page this person administers, marked with what we already know.
  *
  * Served from the stored user token, so this is the SAME endpoint whether the
@@ -299,17 +321,7 @@ async function requireUserToken(clientId: string): Promise<string> {
 export async function listSelectablePages(clientId: string): Promise<MetaSelectablePage[]> {
   const userToken = await requireUserToken(clientId)
 
-  let pages: Awaited<ReturnType<typeof metaProvider.fetchAllManageablePages>>
-  try {
-    pages = await metaProvider.fetchAllManageablePages(userToken)
-  } catch (error) {
-    // Graph rejecting the token is the expiry case, and it must surface as
-    // "reconnect", never as an empty Page list.
-    if (error instanceof MetaPagesLookupError) {
-      throw new MetaUserTokenExpiredError()
-    }
-    throw error
-  }
+  const pages = await fetchPagesOrExpired(userToken)
 
   const mine = new Set((await listPagesForClient(clientId)).map((p) => p.pageId))
 
@@ -346,7 +358,7 @@ export async function connectMetaPages(
   }
 
   const userToken = await requireUserToken(clientId)
-  const available = await metaProvider.fetchAllManageablePages(userToken)
+  const available = await fetchPagesOrExpired(userToken)
   const wanted = available.filter((p) => pageIds.includes(p.pageId))
 
   type PageOutcome = { connected: MetaPageSummary } | { skipped: MetaPageSkipped }
@@ -463,6 +475,18 @@ export async function disconnectAllMetaPages(clientId: string): Promise<void> {
   const failures = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
   for (const failure of failures) {
     console.error('[meta-disconnect] page removal failed:', failure.reason)
+  }
+
+  // A connect running in another tab can land a Page AFTER the snapshot above
+  // and before the token is deleted below. That Page would stay registered and
+  // stay subscribed -- and because it carries its own Page token, its leads
+  // keep arriving long after the client was told everything was disconnected.
+  // One re-sweep closes the window; the Page token is what makes this matter,
+  // since deleting the user token does not stop it.
+  const stragglers = await listPagesForClient(clientId)
+  if (stragglers.length > 0) {
+    console.warn(`[meta-disconnect] ${stragglers.length} Page(s) appeared mid-disconnect for ${clientId}`)
+    await Promise.allSettled(stragglers.map((page) => disconnectMetaPage(clientId, page.pageId)))
   }
 
   // "Disconnect" has to mean disconnected. Keeping a live credential that can
