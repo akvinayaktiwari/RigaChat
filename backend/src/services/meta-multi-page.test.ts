@@ -69,10 +69,14 @@ vi.mock('../lib/kms.js', () => ({
 const {
   connectMetaPages,
   listSelectablePages,
+  listConnectedPages,
   disconnectMetaPage,
   disconnectAllMetaPages,
+  beginMetaConnection,
 } = await import('./meta-lead-service.js')
-const { MetaTooManyPagesError, MetaUserTokenExpiredError } = await import('../lib/meta-connect-errors.js')
+const { MetaTooManyPagesError, MetaUserTokenExpiredError, MetaPagesLookupError } = await import(
+  '../lib/meta-connect-errors.js'
+)
 
 const page = (n: number) => ({ pageId: `page-${n}`, pageName: `Page ${n}`, pageAccessToken: `tok-${n}` })
 
@@ -272,5 +276,51 @@ describe('disconnect', () => {
     expect(removePageClientMapping).toHaveBeenCalledWith('page-1')
     expect(removePageClientMapping).toHaveBeenCalledWith('page-2')
     expect(updateClient).toHaveBeenCalledWith('client-1', { metaUserTokenEncrypted: undefined })
+  })
+})
+
+describe('beginMetaConnection', () => {
+  it('exchanges the code and stores the encrypted long-lived user token', async () => {
+    exchangeCodeForLongLivedUserToken.mockResolvedValue('fresh-user-token')
+
+    await beginMetaConnection('client-1', 'auth-code')
+
+    expect(exchangeCodeForLongLivedUserToken).toHaveBeenCalledWith('auth-code')
+    expect(updateClient).toHaveBeenCalledWith('client-1', { metaUserTokenEncrypted: 'enc(fresh-user-token)' })
+  })
+})
+
+describe('listConnectedPages', () => {
+  it('returns the client Pages without their access tokens', async () => {
+    listPagesForClient.mockResolvedValue([
+      { pageId: 'page-1', clientId: 'client-1', pageName: 'Page 1', pageAccessTokenEncrypted: 'enc-tok-1' },
+    ])
+
+    const result = await listConnectedPages('client-1')
+
+    expect(result).toEqual([{ pageId: 'page-1', clientId: 'client-1', pageName: 'Page 1' }])
+    expect(result[0]).not.toHaveProperty('pageAccessTokenEncrypted')
+  })
+
+  it('returns an empty list for a client with no Pages', async () => {
+    listPagesForClient.mockResolvedValue([])
+
+    await expect(listConnectedPages('client-1')).resolves.toEqual([])
+  })
+})
+
+describe('listSelectablePages token expiry via Graph rejection', () => {
+  it('translates a Graph lookup failure into MetaUserTokenExpiredError, not a 500', async () => {
+    // The stored token can still be present but no longer valid on Meta's
+    // side -- Graph rejecting it must read the same as a missing token.
+    fetchAllManageablePages.mockRejectedValue(new MetaPagesLookupError('Error validating access token'))
+
+    await expect(listSelectablePages('client-1')).rejects.toBeInstanceOf(MetaUserTokenExpiredError)
+  })
+
+  it('propagates a non-lookup error from fetchAllManageablePages as-is', async () => {
+    fetchAllManageablePages.mockRejectedValue(new Error('network blip'))
+
+    await expect(listSelectablePages('client-1')).rejects.toThrow('network blip')
   })
 })

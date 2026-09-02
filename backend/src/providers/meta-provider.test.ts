@@ -281,3 +281,93 @@ describe('fetchAllManageablePages', () => {
     expect(result).toEqual([])
   })
 })
+
+// Steps 1+2 only, stopping at the long-lived USER token so meta-lead-service
+// can keep it and manage Pages later without another OAuth round trip
+// (decision D8). exchangeCodeForPageCredentials above does the same two
+// exchanges and then discards the user token -- this is the version that
+// doesn't throw it away.
+describe('exchangeCodeForLongLivedUserToken', () => {
+  function mockFetchSequence(responses: unknown[]): ReturnType<typeof vi.fn> {
+    const fetchMock = vi.fn()
+    for (const body of responses) {
+      fetchMock.mockResolvedValueOnce({ json: async () => body } as unknown as Response)
+    }
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+
+  beforeEach(() => {
+    process.env.META_APP_SECRET = 'app-secret'
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('returns the long-lived user token without fetching Pages', async () => {
+    const fetchMock = mockFetchSequence([
+      { access_token: 'short-lived-token' },
+      { access_token: 'long-lived-user-token' },
+    ])
+
+    const token = await metaProvider.exchangeCodeForLongLivedUserToken('auth-code')
+
+    expect(token).toBe('long-lived-user-token')
+    // Only the two token exchanges -- no /me/accounts call, unlike
+    // exchangeCodeForPageCredentials.
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('throws MetaTokenExchangeError when the short-lived exchange fails', async () => {
+    mockFetchSequence([{ error: { message: 'Invalid verification code' } }])
+
+    await expect(metaProvider.exchangeCodeForLongLivedUserToken('bad-code')).rejects.toBeInstanceOf(
+      MetaTokenExchangeError
+    )
+  })
+
+  it('throws MetaTokenExchangeError when the long-lived exchange fails', async () => {
+    mockFetchSequence([
+      { access_token: 'short-lived-token' },
+      { error: { message: 'Session has expired' } },
+    ])
+
+    await expect(metaProvider.exchangeCodeForLongLivedUserToken('auth-code')).rejects.toThrow(
+      /Long-lived token exchange failed/
+    )
+  })
+})
+
+// The mirror of subscribePageToWebhook, called on disconnect so Meta actually
+// stops delivering leadgen events instead of them landing as "no client
+// mapped for page" and being discarded forever.
+describe('unsubscribePageFromWebhook', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('calls the Graph unsubscribe endpoint with DELETE and the Page token', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({ success: true }) } as unknown as Response)
+    vi.stubGlobal('fetch', fetchMock)
+
+    await metaProvider.unsubscribePageFromWebhook('page-1', 'page-token')
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toContain('/page-1/subscribed_apps')
+    expect(url).toContain('access_token=page-token')
+    expect(init.method).toBe('DELETE')
+  })
+
+  it('throws when Graph reports failure', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ json: async () => ({ success: false, error: { message: 'Invalid token' } }) } as unknown as Response)
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(metaProvider.unsubscribePageFromWebhook('page-1', 'revoked-token')).rejects.toThrow(
+      /Failed to unsubscribe Page page-1.*Invalid token/
+    )
+  })
+})

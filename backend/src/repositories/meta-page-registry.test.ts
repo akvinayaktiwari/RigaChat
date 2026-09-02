@@ -8,8 +8,14 @@ vi.mock('./dynamo-client.js', () => ({
   getTableName: () => 'test-meta-page-lookup',
 }))
 
-const { setPageClientMapping, getPageRegistration, listPagesForClient, MetaPageConflictError } =
-  await import('./meta-lead-repository.js')
+const {
+  setPageClientMapping,
+  getPageRegistration,
+  listPagesForClient,
+  getClientIdForPage,
+  removePageClientMapping,
+  MetaPageConflictError,
+} = await import('./meta-lead-repository.js')
 
 function conditionalCheckFailed(): Error {
   const err = new Error('The conditional request failed')
@@ -171,5 +177,49 @@ describe('listPagesForClient', () => {
     send.mockResolvedValue({})
 
     await expect(listPagesForClient('client-none')).resolves.toEqual([])
+  })
+})
+
+describe('getClientIdForPage', () => {
+  it('returns the owning clientId for a known Page', async () => {
+    send.mockResolvedValue({ Item: { pageId: 'page-1', clientId: 'client-1' } })
+
+    await expect(getClientIdForPage('page-1')).resolves.toBe('client-1')
+  })
+
+  it('returns null for an unmapped Page rather than throwing', async () => {
+    // Routine on the shared webhook: a leadgen event for a Page nobody has
+    // connected is not an error condition.
+    send.mockResolvedValue({})
+
+    await expect(getClientIdForPage('page-unknown')).resolves.toBeNull()
+  })
+
+  it('reads the base table by pageId, not the GSI', async () => {
+    send.mockResolvedValue({ Item: { pageId: 'page-1', clientId: 'client-1' } })
+
+    await getClientIdForPage('page-1')
+
+    const call = send.mock.calls[0][0]
+    expect(call.constructor.name).toBe('GetCommand')
+    expect(call.input.Key).toEqual({ pageId: 'page-1' })
+  })
+})
+
+describe('removePageClientMapping', () => {
+  it('deletes the Page row by pageId', async () => {
+    send.mockResolvedValue({})
+
+    await removePageClientMapping('page-1')
+
+    const call = send.mock.calls[0][0]
+    expect(call.constructor.name).toBe('DeleteCommand')
+    expect(call.input.Key).toEqual({ pageId: 'page-1' })
+  })
+
+  it('wraps a DynamoDB failure with the pageId for diagnosability', async () => {
+    send.mockRejectedValue(new Error('ProvisionedThroughputExceededException'))
+
+    await expect(removePageClientMapping('page-1')).rejects.toThrow(/Failed to remove Meta page mapping page-1/)
   })
 })
