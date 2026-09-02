@@ -34,6 +34,9 @@ import type {
   LeadErasureReport,
   LeadStatePatch,
   MetaConnection,
+  MetaConnectPagesResult,
+  MetaPageSummary,
+  MetaSelectablePage,
   MetaDirectWhatsAppConnection,
   MetaLead,
   PaymentRecord,
@@ -660,6 +663,28 @@ export function connectMeta(): void {
 
 export function disconnectMeta(): Promise<ApiResponse<{ success: boolean }>> {
   return apiClient<{ success: boolean }>('/api/integrations/meta/disconnect', 'DELETE')
+}
+
+// The Pages this client has connected. Plural since #28 -- a client can admin
+// many Pages and Meta's consent screen already grants all the ones they picked.
+export function getConnectedMetaPages(): Promise<ApiResponse<MetaPageSummary[]>> {
+  return apiClient<MetaPageSummary[]>('/api/integrations/meta/pages')
+}
+
+// Every Page the client administers, live from Meta via the stored user token.
+// Returns 409 when that token has expired -- the caller must render "reconnect",
+// never an empty list, which would read as "your Pages are gone".
+export function getSelectableMetaPages(): Promise<ApiResponse<MetaSelectablePage[]>> {
+  return apiClient<MetaSelectablePage[]>('/api/integrations/meta/pages/available')
+}
+
+// Can partially succeed: `skipped` names Pages claimed by another account.
+export function connectMetaPages(pageIds: string[]): Promise<ApiResponse<MetaConnectPagesResult>> {
+  return apiClient<MetaConnectPagesResult>('/api/integrations/meta/pages', 'POST', { pageIds })
+}
+
+export function disconnectMetaPage(pageId: string): Promise<ApiResponse<{ success: boolean }>> {
+  return apiClient<{ success: boolean }>(`/api/integrations/meta/pages/${encodeURIComponent(pageId)}`, 'DELETE')
 }
 
 export function getMetaLeads(): Promise<ApiResponse<MetaLead[]>> {

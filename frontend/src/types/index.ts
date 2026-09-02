@@ -402,6 +402,36 @@ export interface ConnectMetaWhatsAppInput {
   businessId?: string
 }
 
+export interface MetaPageSummary {
+  pageId: string
+  clientId: string
+  pageName: string
+  connectedAt: string
+  lastVerifiedAt: string
+}
+
+/** One Page as offered in the picker, with what we already know about it. */
+export interface MetaSelectablePage {
+  pageId: string
+  pageName: string
+  /** Already connected to this client -- shown checked and disabled. */
+  connected: boolean
+  /** Connected to a different client -- shown disabled, with the reason, before submit. */
+  unavailable: boolean
+}
+
+export interface MetaPageSkipped {
+  pageId: string
+  pageName: string
+  reason: 'already_connected_to_another_account' | 'subscribe_failed'
+}
+
+/** A multi-connect can partially succeed: one taken Page must not block the rest. */
+export interface MetaConnectPagesResult {
+  connected: MetaPageSummary[]
+  skipped: MetaPageSkipped[]
+}
+
 export interface MetaConnection {
   provider: 'meta'
   connected: boolean
