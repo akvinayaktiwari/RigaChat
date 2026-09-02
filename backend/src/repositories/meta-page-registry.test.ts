@@ -55,6 +55,53 @@ describe('setPageClientMapping', () => {
     expect(item.pageAccessTokenEncrypted).toBeUndefined()
   })
 
+  // The backfill is a Put, and a Put REPLACES the whole item. Passing only the
+  // name and token silently reset connectedAt to now, which would have rewritten
+  // three customers' real connection dates and -- since connectedAt is the GSI
+  // sort key -- reshuffled every client's Page list. Caught before the backfill
+  // ran; this is the guard so it cannot come back.
+  it('preserves an existing connectedAt instead of resetting it to now', async () => {
+    send.mockResolvedValue({})
+
+    await setPageClientMapping('page-1', 'client-1', {
+      pageName: 'Skyline Homes',
+      pageAccessTokenEncrypted: 'enc-page-1',
+      connectedAt: '2026-08-15T11:46:51.648Z',
+    })
+
+    expect(send.mock.calls[0][0].input.Item.connectedAt).toBe('2026-08-15T11:46:51.648Z')
+  })
+
+  it('stamps a fresh connectedAt for a genuinely new connection', async () => {
+    send.mockResolvedValue({})
+    const before = new Date().toISOString()
+
+    await setPageClientMapping('page-1', 'client-1', {
+      pageName: 'Skyline Homes',
+      pageAccessTokenEncrypted: 'enc-page-1',
+    })
+
+    const written = send.mock.calls[0][0].input.Item.connectedAt as string
+    expect(written >= before).toBe(true)
+  })
+
+  it('always refreshes lastVerifiedAt, even when preserving connectedAt', async () => {
+    // The two dates answer different questions: when the client connected the
+    // Page, and when we last confirmed Meta still grants it. A backfill is a
+    // fresh confirmation even though it is not a fresh connection.
+    send.mockResolvedValue({})
+
+    await setPageClientMapping('page-1', 'client-1', {
+      pageName: 'Skyline Homes',
+      pageAccessTokenEncrypted: 'enc-page-1',
+      connectedAt: '2026-08-15T11:46:51.648Z',
+    })
+
+    const item = send.mock.calls[0][0].input.Item
+    expect(item.lastVerifiedAt).not.toBe('2026-08-15T11:46:51.648Z')
+    expect(item.lastVerifiedAt).toEqual(expect.any(String))
+  })
+
   it('keeps the atomic claim that one Page maps to at most one client', async () => {
     // A plain read-then-write has a race window where two clients completing
     // OAuth for the same Page concurrently both pass the read check. This
