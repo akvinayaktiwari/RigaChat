@@ -38,6 +38,7 @@ import {
 import {
   beginMetaConnection,
   connectMetaPages,
+  MAX_PAGES_PER_CONNECT,
   disconnectAllMetaPages,
   disconnectMetaPage,
   listConnectedPages,
@@ -54,7 +55,7 @@ import type {
   MetaDirectWhatsAppConnection,
   MetaLead,
   MetaPageSummary,
-  MetaSelectablePage,
+  MetaSelectablePagesResult,
   WhatsAppConnection,
 } from '../types/index.js'
 
@@ -443,7 +444,10 @@ integrationRoutes.get('/meta/pages/available', requireAuth, async (c) => {
 
   try {
     const pages = await listSelectablePages(clientId)
-    return c.json<ApiResponse<MetaSelectablePage[]>>({ success: true, data: pages }, 200)
+    return c.json<ApiResponse<MetaSelectablePagesResult>>(
+      { success: true, data: { pages, maxPerBatch: MAX_PAGES_PER_CONNECT } },
+      200
+    )
   } catch (error) {
     // An expired user token is a distinct, actionable state -- 409 so the UI
     // can offer "reconnect" instead of rendering an empty Page list, which

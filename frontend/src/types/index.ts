@@ -427,6 +427,13 @@ export interface MetaPageSkipped {
 }
 
 /** A multi-connect can partially succeed: one taken Page must not block the rest. */
+// maxPerBatch comes from the server so the picker's cap cannot drift from the
+// cap the server actually enforces.
+export interface MetaSelectablePagesResult {
+  pages: MetaSelectablePage[]
+  maxPerBatch: number
+}
+
 export interface MetaConnectPagesResult {
   connected: MetaPageSummary[]
   skipped: MetaPageSkipped[]

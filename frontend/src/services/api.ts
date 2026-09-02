@@ -36,7 +36,7 @@ import type {
   MetaConnection,
   MetaConnectPagesResult,
   MetaPageSummary,
-  MetaSelectablePage,
+  MetaSelectablePagesResult,
   MetaDirectWhatsAppConnection,
   MetaLead,
   PaymentRecord,
@@ -674,8 +674,8 @@ export function getConnectedMetaPages(): Promise<ApiResponse<MetaPageSummary[]>>
 // Every Page the client administers, live from Meta via the stored user token.
 // Returns 409 when that token has expired -- the caller must render "reconnect",
 // never an empty list, which would read as "your Pages are gone".
-export function getSelectableMetaPages(): Promise<ApiResponse<MetaSelectablePage[]>> {
-  return apiClient<MetaSelectablePage[]>('/api/integrations/meta/pages/available')
+export function getSelectableMetaPages(): Promise<ApiResponse<MetaSelectablePagesResult>> {
+  return apiClient<MetaSelectablePagesResult>('/api/integrations/meta/pages/available')
 }
 
 // Can partially succeed: `skipped` names Pages claimed by another account.

@@ -57,6 +57,25 @@ DELETE /api/leads              -> IRREVERSIBLE. Erases the lead and everything k
                                   lead_events, journey_executions, journey_pending_replies,
                                   whatsapp_inbound_activity) and stops any journey still running for them. LeadRef
                                   travels as QUERY PARAMS, plus confirmLeadId which must equal leadId (auth required)
+GET  /api/integrations/meta/callback -> OAuth return. Stores the long-lived Meta USER token and redirects to
+                                  ?meta=select_pages. It no longer auto-connects a single Page -- that silently
+                                  connected data[0] and dropped every other Page the client had approved (no auth;
+                                  the OAuth state param carries the clientId)
+GET  /api/integrations/meta/pages/available -> every Page this person administers, each marked connected /
+                                  unavailable (claimed by another account). Returns {pages, maxPerBatch} -- the cap
+                                  travels with the payload so the client's cap cannot drift above the server's.
+                                  409 when the stored user token has expired, which is NOT the same as an empty
+                                  list and must never render as one (auth required)
+GET  /api/integrations/meta/pages -> the client's connected Pages, tokens stripped (auth required)
+POST /api/integrations/meta/pages -> connect a selected set. PARTIAL SUCCESS is a 200: the body's `skipped` names
+                                  each Page that was passed over and why, because failing the batch would let one
+                                  conflicting Page block 24 legitimate ones. 400 over maxPerBatch or on an empty
+                                  selection, 409 on an expired user token (auth required)
+DELETE /api/integrations/meta/pages/:pageId -> disconnect ONE Page, unsubscribing its webhook. Refuses a Page owned
+                                  by another client (auth required)
+DELETE /api/integrations/meta/disconnect -> disconnect-all: every Page row AND the stored user token, so
+                                  "disconnected" means we no longer hold a credential that can enumerate their
+                                  Facebook assets (auth required)
 POST /api/kb                -> add knowledge base entry + embed it
 GET  /api/kb                -> fetch all KB entries (auth required)
 GET  /api/journeys/templates             -> list the prebuilt agent library (auth required; code-defined seeds, identical for every client)
@@ -140,6 +159,11 @@ interface KnowledgeBaseEntry {
 - clients — partition key: clientId
 - bots — partition key: clientId, sort key: botId
 - leads — partition key: botId, sort key: createdAt
+- meta_page_lookup — partition key: pageId, GSI clientId-connectedAt-index (one row per connected Facebook Page:
+  its owning clientId, its own encrypted Page access token, connectedAt and lastVerifiedAt. The row IS the
+  connection -- written only after the Page's webhook subscription succeeds, deleted on disconnect -- so the leadgen
+  webhook gates on it, NOT on the client's legacy single `metaConnection` field. pageId is the partition key because
+  a webhook arrives carrying a pageId and no clientId)
 - meta_leads — partition key: clientId, sort key: leadId, GSI clientId-createdAt-index (NOT partitioned by pageId — pageId is an attribute and a discriminator on LeadRef, never an address)
 - conversations — partition key: botId, sort key: conversationId
 - knowledge_base — partition key: botId, sort key: entryId
