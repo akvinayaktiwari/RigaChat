@@ -1,4 +1,8 @@
-import { failureReasonOf } from '../lib/meta-connect-errors.js'
+import {
+  failureReasonOf,
+  MetaTooManyPagesError,
+  MetaUserTokenExpiredError,
+} from '../lib/meta-connect-errors.js'
 import { Hono, type Context } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { requireAuth, requireAuthFromQuery } from '../lib/cognito.js'
@@ -32,8 +36,14 @@ import {
   connectMetaWhatsAppViaOAuth,
 } from '../services/whatsapp-service.js'
 import {
+  beginMetaConnection,
   connectMetaAds,
+  connectMetaPages,
+  disconnectAllMetaPages,
   disconnectMetaAds,
+  disconnectMetaPage,
+  listConnectedPages,
+  listSelectablePages,
   getMetaLeadsForClient,
   getMetaStatus,
 } from '../services/meta-lead-service.js'
@@ -42,8 +52,11 @@ import type {
   CalComConnection,
   CRMConnection,
   MetaConnection,
+  MetaConnectPagesResult,
   MetaDirectWhatsAppConnection,
   MetaLead,
+  MetaPageSummary,
+  MetaSelectablePage,
   WhatsAppConnection,
 } from '../types/index.js'
 
@@ -398,8 +411,12 @@ integrationRoutes.get('/meta/callback', async (c) => {
   const clientId = state.split(':')[0]
 
   try {
-    await connectMetaAds(clientId, code)
-    return c.redirect(`${FRONTEND_URL}/dashboard/meta-ads?meta=connected`)
+    // M3: store the long-lived USER token and hand off to the picker rather
+    // than silently connecting whichever Page Graph happened to list first.
+    // The client approved a set of Pages on Meta's own consent screen; the
+    // picker is where they see that set honoured.
+    await beginMetaConnection(clientId, code)
+    return c.redirect(`${FRONTEND_URL}/dashboard/meta-ads?meta=select_pages`)
   } catch (error) {
     // The real message still goes to the logs; the client gets a reason code
     // the dashboard turns into something they can act on.
@@ -412,7 +429,75 @@ integrationRoutes.delete('/meta/disconnect', requireAuth, async (c) => {
   const clientId = c.get('user').sub
 
   try {
-    await disconnectMetaAds(clientId)
+    // Disconnect-all: every Page row AND the stored user token.
+    await disconnectAllMetaPages(clientId)
+    return c.json<ApiResponse<{ success: boolean }>>({ success: true, data: { success: true } }, 200)
+  } catch (error) {
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+// Every Page the client administers, with what we already know about each.
+// Served from the stored user token, so this is the same endpoint whether they
+// are finishing their first connect or adding a Page weeks later.
+integrationRoutes.get('/meta/pages/available', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+
+  try {
+    const pages = await listSelectablePages(clientId)
+    return c.json<ApiResponse<MetaSelectablePage[]>>({ success: true, data: pages }, 200)
+  } catch (error) {
+    // An expired user token is a distinct, actionable state -- 409 so the UI
+    // can offer "reconnect" instead of rendering an empty Page list, which
+    // would read as "your Pages are gone".
+    if (error instanceof MetaUserTokenExpiredError) {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 409)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+integrationRoutes.get('/meta/pages', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+
+  try {
+    const pages = await listConnectedPages(clientId)
+    return c.json<ApiResponse<MetaPageSummary[]>>({ success: true, data: pages }, 200)
+  } catch (error) {
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+integrationRoutes.post('/meta/pages', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const body = await c.req.json<{ pageIds?: unknown }>().catch(() => ({ pageIds: undefined }))
+
+  const pageIds = Array.isArray(body.pageIds) ? body.pageIds.filter((v): v is string => typeof v === 'string') : []
+  if (pageIds.length === 0) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'Select at least one Page.' }, 400)
+  }
+
+  try {
+    const result = await connectMetaPages(clientId, pageIds)
+    // 200 even with skips: this is a partial success, not a failure. The body
+    // names what was skipped and why so the UI can say so plainly.
+    return c.json<ApiResponse<MetaConnectPagesResult>>({ success: true, data: result }, 200)
+  } catch (error) {
+    if (error instanceof MetaTooManyPagesError) {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 400)
+    }
+    if (error instanceof MetaUserTokenExpiredError) {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 409)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+integrationRoutes.delete('/meta/pages/:pageId', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+
+  try {
+    await disconnectMetaPage(clientId, c.req.param('pageId'))
     return c.json<ApiResponse<{ success: boolean }>>({ success: true, data: { success: true } }, 200)
   } catch (error) {
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)

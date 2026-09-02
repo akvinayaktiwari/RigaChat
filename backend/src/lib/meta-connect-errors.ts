@@ -23,6 +23,8 @@ export type MetaConnectFailureReason =
   | 'permission_declined'
   | 'misconfigured'
   | 'auth_failed'
+  | 'user_token_expired'
+  | 'too_many_pages'
 
 export class MetaConnectError extends Error {
   readonly reason: MetaConnectFailureReason
@@ -97,4 +99,33 @@ export class MetaMisconfiguredError extends MetaConnectError {
 // from the classes above precisely so the generic bucket stays small.
 export function failureReasonOf(error: unknown): MetaConnectFailureReason {
   return error instanceof MetaConnectError ? error.reason : 'auth_failed'
+}
+
+/**
+ * The stored long-lived user token has expired (~60 days) or been revoked.
+ *
+ * Its own error type because the UI must distinguish it from "this account has
+ * no Pages". Rendering an expired token as an empty list tells the client their
+ * Pages are gone, when in fact every connected Page is still receiving leads --
+ * only Page *management* needs the user token.
+ */
+export class MetaUserTokenExpiredError extends MetaConnectError {
+  constructor() {
+    super('user_token_expired', 'Your Facebook connection expired. Reconnect to manage Pages.')
+    this.name = 'MetaUserTokenExpiredError'
+  }
+}
+
+/**
+ * More Pages selected in one request than we will process at once.
+ *
+ * A batch size, not a product limit: a client with 60 Pages connects them in
+ * three passes. The cap exists because each Page costs a webhook subscription
+ * call and the Lambda has a 60-second budget.
+ */
+export class MetaTooManyPagesError extends MetaConnectError {
+  constructor(requested: number, max: number) {
+    super('too_many_pages', `Selected ${requested} Pages; ${max} is the maximum per batch.`)
+    this.name = 'MetaTooManyPagesError'
+  }
 }

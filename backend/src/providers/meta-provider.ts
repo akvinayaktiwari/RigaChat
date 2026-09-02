@@ -217,6 +217,22 @@ export class MetaProvider {
     return data.access_token
   }
 
+  // Steps 1+2 of three, stopping at the long-lived USER token instead of
+  // pushing on to a single Page.
+  //
+  // exchangeCodeForPageCredentials below does the same two exchanges and then
+  // throws the user token away, which is why adding a Page later needed a whole
+  // new OAuth round trip. Keeping it is what makes Page management an ordinary
+  // authenticated call (decision D8).
+  async exchangeCodeForLongLivedUserToken(code: string): Promise<string> {
+    const clientId = requireEnv('META_APP_ID')
+    const clientSecret = requireEnv('META_APP_SECRET')
+    const redirectUri = requireEnv('META_REDIRECT_URI')
+
+    const shortLivedToken = await this.exchangeCodeForUserToken(clientId, clientSecret, redirectUri, code)
+    return this.exchangeForLongLivedUserToken(clientId, clientSecret, shortLivedToken)
+  }
+
   // Every Page the user administers, following Graph's cursor to the end.
   //
   // The caller decides what to do with them; this function's only job is to
@@ -397,6 +413,30 @@ export class MetaProvider {
   // opted this app into their updates via this call, using that Page's own
   // access token. Skipping this leaves a Page connected with no webhook
   // deliveries ever arriving, silently indistinguishable from "no ads yet."
+  // The mirror of subscribePageToWebhook. Disconnecting a Page without this
+  // leaves Meta still delivering its leadgen events to our shared webhook,
+  // where they land as "no client mapped for page" and are marked processed --
+  // i.e. silently discarded forever. Unsubscribing is what makes a disconnect
+  // actually stop the traffic rather than just stop reading it.
+  //
+  // Deliberately best-effort at the call site: a Page whose token has already
+  // been revoked cannot be unsubscribed, and that must not block the client
+  // from removing it from their account.
+  async unsubscribePageFromWebhook(pageId: string, pageAccessToken: string): Promise<void> {
+    const params = new URLSearchParams({ access_token: pageAccessToken })
+
+    const response = await fetch(`${GRAPH_API_BASE}/${pageId}/subscribed_apps?${params.toString()}`, {
+      method: 'DELETE',
+    })
+    const data = (await response.json()) as { success?: boolean; error?: { message?: string } }
+
+    if (!data.success) {
+      throw new Error(
+        `Failed to unsubscribe Page ${pageId} from leadgen webhook: ${data.error?.message ?? 'Unknown error'}`
+      )
+    }
+  }
+
   async subscribePageToWebhook(pageId: string, pageAccessToken: string): Promise<void> {
     const params = new URLSearchParams({
       subscribed_fields: 'leadgen',

@@ -399,6 +399,37 @@ export interface MetaPageRegistration {
 /** A registration without its token, safe to return over the API. */
 export type MetaPageSummary = Omit<MetaPageRegistration, 'pageAccessTokenEncrypted'>
 
+/** One Page as offered to the client in the picker. */
+export interface MetaSelectablePage {
+  pageId: string
+  pageName: string
+  /** Already connected to THIS client -- shown checked and disabled. */
+  connected: boolean
+  /**
+   * Connected to a DIFFERENT client. Shown disabled with a reason, before the
+   * client submits, because a conflict explained up front costs nothing and a
+   * conflict explained in an error costs a support round trip.
+   */
+  unavailable: boolean
+}
+
+/** Why a Page in a multi-connect request did not connect. */
+export interface MetaPageSkipped {
+  pageId: string
+  pageName: string
+  reason: 'already_connected_to_another_account' | 'subscribe_failed'
+}
+
+/**
+ * A multi-connect can partially succeed, deliberately. One Page owned by
+ * another account must not block the other 24 -- failing the batch would
+ * punish the client for something they cannot see or fix.
+ */
+export interface MetaConnectPagesResult {
+  connected: MetaPageSummary[]
+  skipped: MetaPageSkipped[]
+}
+
 export interface MetaDirectWhatsAppConnection {
   provider: 'meta_direct'
   connected: boolean
@@ -492,6 +523,19 @@ export interface ClientRecord {
   metaDirectWhatsAppConnection?: MetaDirectWhatsAppConnection
   activeWhatsappProvider?: WhatsAppActiveProvider
   metaConnection?: MetaConnection
+  /**
+   * Long-lived Meta USER token, encrypted. Distinct from a Page token: this one
+   * lists which Pages the person administers, which is what makes adding a Page
+   * weeks after the initial connect an ordinary authenticated call instead of
+   * another trip through Facebook (decision D8).
+   *
+   * Meta expires these around 60 days. That expiry is a first-class UI state --
+   * it must never render as "you have no Pages", which reads as data loss.
+   *
+   * Deleted on disconnect-all: holding a live credential for a customer who
+   * believes they disconnected is not defensible.
+   */
+  metaUserTokenEncrypted?: string
   calComConnection?: CalComConnection
   notificationPreferences?: NotificationPreferences
   createdAt: string
