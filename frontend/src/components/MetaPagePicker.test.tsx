@@ -44,11 +44,64 @@ function renderPicker(overrides: Partial<Parameters<typeof MetaPagePicker>[0]> =
 }
 
 describe('MetaPagePicker', () => {
+  it('surfaces a rejected connect instead of silently resetting', async () => {
+    // try/finally with no catch made this an unhandled rejection: the spinner
+    // stopped, the selection stayed on screen, and the client was told nothing.
+    getSelectableMetaPages.mockResolvedValue({ success: true, data: { pages: [page(1)], maxPerBatch: 25 } })
+    connectMetaPages.mockRejectedValue(new Error('network down'))
+
+    renderPicker()
+    await waitFor(() => expect(liveCount()).toContain('1 selected'))
+
+    fireEvent.click(screen.getByRole('button', { name: /connect/i }))
+
+    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy())
+    expect(screen.getByText(/were not connected/)).toBeTruthy()
+  })
+
+  it('closes on Escape, so the dialog is not a keyboard trap', async () => {
+    // aria-modal="true" is a claim about the page behind being inert. Without a
+    // key handler it is only an attribute.
+    getSelectableMetaPages.mockResolvedValue({ success: true, data: { pages: [page(1)], maxPerBatch: 25 } })
+
+    const props = renderPicker()
+    await waitFor(() => expect(liveCount()).toContain('1 selected'))
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(props.onClose).toHaveBeenCalled()
+  })
+
+  it('moves focus into the dialog on open', async () => {
+    getSelectableMetaPages.mockResolvedValue({ success: true, data: { pages: [page(1)], maxPerBatch: 25 } })
+
+    renderPicker()
+    await waitFor(() => expect(liveCount()).toContain('1 selected'))
+
+    const dialog = screen.getByRole('dialog')
+    expect(dialog.contains(document.activeElement)).toBe(true)
+  })
+
+  it('tells a screen reader WHY a row is disabled at the cap', async () => {
+    // The cap explanation lives in the footer, which a screen reader never
+    // reaches from the checkbox. Without this the row is just "dimmed".
+    const many = Array.from({ length: 30 }, (_, i) => page(i))
+    getSelectableMetaPages.mockResolvedValue({ success: true, data: { pages: many, maxPerBatch: 25 } })
+
+    renderPicker()
+    await waitFor(() => expect(liveCount()).toContain('25 selected'))
+
+    const boxes = screen.getAllByRole('checkbox') as HTMLInputElement[]
+    const capped = boxes.find((b) => !b.checked)
+    expect(capped?.getAttribute('aria-describedby')).toBe('meta-picker-cap-reason')
+    expect(document.getElementById('meta-picker-cap-reason')?.textContent).toMatch(/deselect a Page/)
+  })
+
   it('pre-selects every connectable Page', async () => {
     // The client already answered "which Pages?" on Meta's consent screen.
     // Asking again is what produced the original bug, where Pages they approved
     // silently went unconnected.
-    getSelectableMetaPages.mockResolvedValue({ success: true, data: [page(1), page(2), page(3)] })
+    getSelectableMetaPages.mockResolvedValue({ success: true, data: { pages: [page(1), page(2), page(3)], maxPerBatch: 25 } })
 
     renderPicker()
 
@@ -58,7 +111,7 @@ describe('MetaPagePicker', () => {
   it('does not pre-select a Page already connected to another account', async () => {
     getSelectableMetaPages.mockResolvedValue({
       success: true,
-      data: [page(1), page(2, { unavailable: true })],
+      data: { pages: [page(1), page(2, { unavailable: true })], maxPerBatch: 25 },
     })
 
     renderPicker()
@@ -70,7 +123,7 @@ describe('MetaPagePicker', () => {
   it('disables a Page owned by another account so the conflict is visible before submit', async () => {
     // A conflict explained up front costs nothing. The same conflict explained
     // in an error after submitting costs a support round trip.
-    getSelectableMetaPages.mockResolvedValue({ success: true, data: [page(1, { unavailable: true })] })
+    getSelectableMetaPages.mockResolvedValue({ success: true, data: { pages: [page(1, { unavailable: true })], maxPerBatch: 25 } })
 
     renderPicker()
 
@@ -80,7 +133,7 @@ describe('MetaPagePicker', () => {
   })
 
   it('shows an already-connected Page as checked and disabled', async () => {
-    getSelectableMetaPages.mockResolvedValue({ success: true, data: [page(1, { connected: true })] })
+    getSelectableMetaPages.mockResolvedValue({ success: true, data: { pages: [page(1, { connected: true })], maxPerBatch: 25 } })
 
     renderPicker()
 
@@ -93,7 +146,7 @@ describe('MetaPagePicker', () => {
   })
 
   it('lets a client deselect a Page and connects only the rest', async () => {
-    getSelectableMetaPages.mockResolvedValue({ success: true, data: [page(1), page(2)] })
+    getSelectableMetaPages.mockResolvedValue({ success: true, data: { pages: [page(1), page(2)], maxPerBatch: 25 } })
     connectMetaPages.mockResolvedValue({ success: true, data: { connected: [], skipped: [] } })
 
     renderPicker()
@@ -111,7 +164,7 @@ describe('MetaPagePicker', () => {
     // The cap is enforced live, not on submit: a client should never compose an
     // invalid request and then be rejected for it.
     const many = Array.from({ length: 30 }, (_, i) => page(i))
-    getSelectableMetaPages.mockResolvedValue({ success: true, data: many })
+    getSelectableMetaPages.mockResolvedValue({ success: true, data: { pages: many, maxPerBatch: 25 } })
 
     renderPicker()
 
@@ -141,7 +194,7 @@ describe('MetaPagePicker', () => {
       connected: [{ pageId: 'page-1' }],
       skipped: [{ pageId: 'page-2', pageName: 'Page 2', reason: 'already_connected_to_another_account' }],
     }
-    getSelectableMetaPages.mockResolvedValue({ success: true, data: [page(1), page(2)] })
+    getSelectableMetaPages.mockResolvedValue({ success: true, data: { pages: [page(1), page(2)], maxPerBatch: 25 } })
     connectMetaPages.mockResolvedValue({ success: true, data: result })
 
     const props = renderPicker()
@@ -153,7 +206,7 @@ describe('MetaPagePicker', () => {
   })
 
   it('cannot submit with nothing selected', async () => {
-    getSelectableMetaPages.mockResolvedValue({ success: true, data: [page(1)] })
+    getSelectableMetaPages.mockResolvedValue({ success: true, data: { pages: [page(1)], maxPerBatch: 25 } })
 
     renderPicker()
     await waitFor(() => expect(liveCount()).toContain('1 selected'))
@@ -165,7 +218,7 @@ describe('MetaPagePicker', () => {
   })
 
   it('tells a client with no Pages what to do rather than showing a blank panel', async () => {
-    getSelectableMetaPages.mockResolvedValue({ success: true, data: [] })
+    getSelectableMetaPages.mockResolvedValue({ success: true, data: { pages: [], maxPerBatch: 25 } })
 
     renderPicker()
 
@@ -179,5 +232,29 @@ describe('MetaPagePicker', () => {
 
     await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy())
     expect(screen.getByText('Graph is down')).toBeTruthy()
+  })
+})
+
+describe('the batch cap comes from the server', () => {
+  it('honours a smaller cap than the local default without a redeploy', async () => {
+    // The cap is enforced server-side. Hard-coding a copy in the client is how
+    // the two drift, and a client-side cap ABOVE the server's lets someone
+    // compose a selection that is only refused after they hit Connect.
+    const many = Array.from({ length: 30 }, (_, i) => page(i))
+    getSelectableMetaPages.mockResolvedValue({ success: true, data: { pages: many, maxPerBatch: 3 } })
+
+    renderPicker()
+
+    await waitFor(() => expect(liveCount()).toContain('3 selected'))
+    expect(liveCount()).toContain('3 is the maximum per batch')
+  })
+
+  it('falls back to 25 if the server omits the cap', async () => {
+    const many = Array.from({ length: 30 }, (_, i) => page(i))
+    getSelectableMetaPages.mockResolvedValue({ success: true, data: { pages: many, maxPerBatch: 0 } })
+
+    renderPicker()
+
+    await waitFor(() => expect(liveCount()).toContain('25 selected'))
   })
 })
