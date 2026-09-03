@@ -147,7 +147,11 @@ export type LeadEventType =
   | 'journey_ended'
   | 'state_change'
 
-export type LeadEventChannel = 'whatsapp' | 'web_widget'
+// 'voice' is a live phone call through the relay. It shares the lead_events
+// stream with the other channels on purpose: a lead who WhatsApps on Tuesday
+// and calls on Thursday is ONE conversation, and anything summarising history
+// (journeys, the CRM detail view, notification-service) should see both.
+export type LeadEventChannel = 'whatsapp' | 'web_widget' | 'voice'
 
 export type MessageSendMode = 'template' | 'free_text'
 
@@ -753,6 +757,38 @@ export interface MetaLead {
   crmExternalId?: string
   crmSyncError?: string
   crmSyncAttempts?: number
+}
+
+// A lead whose first contact with this client was an inbound phone call.
+//
+// Its own source rather than a chat lead that arrived by phone: a voice agent
+// need not have a linked chatbot (the kb_only agent ships today and has no
+// botId), so there is often no bots-table partition to put it in -- and
+// collapsing the two would make "how many leads did the phone line produce"
+// unanswerable, which is the number that justifies the whole feature.
+//
+// Only written for a caller who matched NO existing lead. A returning caller
+// attaches to whatever lead they already are (see voice-lead-service), so this
+// table holds first contacts, not calls. Calls are lead_events.
+export interface VoiceLead {
+  leadId: string
+  agentId: string
+  clientId: string
+  source: 'voice'
+  // Caller ID, E.164. The only contact detail a phone call gives you for free,
+  // and the join key that lets a later WhatsApp message land on this same lead.
+  phone: string
+  name?: string
+  email?: string
+  propertyInterest?: string
+  budgetRange?: string
+  // The DID they dialled. Kept because a client running two numbers (a listing
+  // ad vs. a hoarding) needs to know which one produced the lead, and the
+  // lookup row it came from can be reassigned or released later.
+  dialledNumber: string
+  callId: string
+  createdAt: string
+  updatedAt?: string
 }
 
 export interface CreateFormLeadInput {
@@ -1417,7 +1453,7 @@ export interface JourneyBundle {
 // look reasonable and would have mis-scoped RAG retrieval (rule #5).
 // -------------------------------------------------------------------------
 
-export type LeadSource = 'chat' | 'form' | 'meta'
+export type LeadSource = 'chat' | 'form' | 'meta' | 'voice'
 
 // Why a lead sits where it does in the urgency-ordered inbox. Server-computed
 // and sent on the wire so a client can explain the queue without recomputing
@@ -1437,6 +1473,10 @@ export type LeadRef =
   | { source: 'chat'; botId: string; leadId: string }
   | { source: 'form'; formId: string; leadId: string }
   | { source: 'meta'; pageId: string; leadId: string }
+  // agentId is the voice agent that answered, and like meta's pageId it is a
+  // discriminator rather than an address -- voice_leads is partitioned by
+  // clientId, exactly as meta_leads is, for the same reason.
+  | { source: 'voice'; agentId: string; leadId: string }
 
 // ---------------------------------------------------------------------------
 // Mobile app: device registry and readiness. Added 2026-08-26.

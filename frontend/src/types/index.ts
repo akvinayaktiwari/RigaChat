@@ -65,12 +65,13 @@ export interface Lead {
 // source up front -- the three lead tables have three different partition keys.
 // ---------------------------------------------------------------------------
 
-export type LeadSource = 'chat' | 'form' | 'meta'
+export type LeadSource = 'chat' | 'form' | 'meta' | 'voice'
 
 export type LeadRef =
   | { source: 'chat'; botId: string; leadId: string }
   | { source: 'form'; formId: string; leadId: string }
   | { source: 'meta'; pageId: string; leadId: string }
+  | { source: 'voice'; agentId: string; leadId: string }
 
 export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'closed'
 
