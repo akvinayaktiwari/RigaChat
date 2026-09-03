@@ -3,6 +3,13 @@ import WebSocket from 'ws'
 import type { VoiceAgentVoice, VoiceCallLog } from '../types/index.js'
 import { generateToken } from './auth.js'
 import { writeVoiceCallLog } from '../repositories/voice-repository.js'
+import {
+  recordCallLifecycle,
+  recordCallToolUse,
+  recordCallTurn,
+  resolveCallLead,
+  type CallIdentity,
+} from '../services/voice-lead-service.js'
 
 const REALTIME_MODEL = 'gpt-realtime'
 const REALTIME_URL = `wss://api.openai.com/v1/realtime?model=${REALTIME_MODEL}`
@@ -35,6 +42,12 @@ const KNOWLEDGE_BASE_TOOL = {
 // Shared by both session.update send sites so they can never drift out of sync.
 const REALTIME_TOOLS = [KNOWLEDGE_BASE_TOOL]
 
+// Without this the model transcribes only its OWN speech: the caller's half of
+// every conversation is never written down. Tolerable while the transcript was
+// a live subtitle in a browser widget; not tolerable once the call becomes a
+// CRM record, where "what did they actually ask for" is the entire value.
+const TRANSCRIPTION = { model: 'whisper-1' }
+
 const apiKey = process.env.OPENAI_API_KEY
 
 if (!apiKey) {
@@ -66,6 +79,13 @@ export interface VoiceAgentConfig {
   // run until someone noticed. Tolerable while every call started with a user
   // clicking a widget; not tolerable once a public phone number can start one.
   maxSessionMinutes?: 5 | 10 | 15
+  // Telephony only. Absent for a browser call, which has no caller ID and
+  // therefore no identity to join on -- so a browser session records no lead,
+  // exactly as it did before. Present means: resolve who this is and write the
+  // conversation into the shared lead_events stream.
+  callerPhone?: string
+  dialledNumber?: string
+  linkedBotId?: string
 }
 
 interface OpenAIResponseUsage {
@@ -84,6 +104,7 @@ interface OpenAIRealtimeEvent {
   name?: string
   arguments?: string
   call_id?: string
+  transcript?: string
 }
 
 interface VoiceContext {
@@ -112,6 +133,9 @@ export class VoiceSession {
   private fallbackVoice: VoiceAgentVoice
   private fallbackInstructions: string
   private context: VoiceContext = {}
+  private identity: CallIdentity | null = null
+  private identityPending: Promise<void> | null = null
+  private agentUtterance = ''
 
   constructor(clientWs: ClientTransport, agentConfig: VoiceAgentConfig) {
     this.clientWs = clientWs
@@ -130,6 +154,10 @@ export class VoiceSession {
         Authorization: `Bearer ${apiKey}`,
       },
     })
+
+    if (agentConfig.callerPhone !== undefined) {
+      this.identityPending = this.resolveIdentity(agentConfig)
+    }
 
     if (agentConfig.maxSessionMinutes) {
       this.durationTimeout = setTimeout(
@@ -185,6 +213,7 @@ export class VoiceSession {
             audio: {
               input: {
                 format: { type: 'audio/pcm', rate: 24000 },
+                transcription: TRANSCRIPTION,
                 turn_detection: {
                   type: 'server_vad',
                   threshold: 0.5,
@@ -218,6 +247,7 @@ export class VoiceSession {
           audio: {
             input: {
               format: { type: 'audio/pcm', rate: 24000 },
+              transcription: TRANSCRIPTION,
               turn_detection: {
                 type: 'server_vad',
                 threshold: 0.5,
@@ -260,6 +290,55 @@ export class VoiceSession {
     }
     if (this.clientWs.readyState === WebSocket.OPEN || this.clientWs.readyState === WebSocket.CONNECTING) {
       this.clientWs.close()
+    }
+  }
+
+  // Resolved once, at the start, and awaited by every write. Doing it lazily on
+  // the first transcript would race: two turns arriving together would each see
+  // no identity and create their own lead for the same caller.
+  //
+  // A failure here is logged and swallowed. Losing the CRM record of a call is
+  // bad; dropping the call itself because DynamoDB was briefly unavailable is
+  // worse, and the caller is on the line either way.
+  private async resolveIdentity(agentConfig: VoiceAgentConfig): Promise<void> {
+    try {
+      this.identity = await resolveCallLead({
+        clientId: this.clientId,
+        agentId: this.agentId,
+        callerPhone: agentConfig.callerPhone ?? '',
+        dialledNumber: agentConfig.dialledNumber ?? '',
+        callId: this.callId,
+        linkedBotId: agentConfig.linkedBotId,
+      })
+
+      await recordCallLifecycle({
+        identity: this.identity,
+        clientId: this.clientId,
+        body: this.identity.isNewLead
+          ? `Inbound call to ${agentConfig.dialledNumber ?? 'unknown number'}`
+          : `Inbound call to ${agentConfig.dialledNumber ?? 'unknown number'} (returning contact)`,
+      })
+    } catch (error) {
+      console.error(
+        '[VoiceRelay] Failed to resolve call identity:',
+        error instanceof Error ? error.message : error
+      )
+    }
+  }
+
+  // Every lead write funnels through here so none of them can run before the
+  // identity exists, and none of them can take a live call down.
+  private async withIdentity(write: (identity: CallIdentity) => Promise<void>): Promise<void> {
+    if (!this.identityPending) return
+    try {
+      await this.identityPending
+      if (!this.identity) return
+      await write(this.identity)
+    } catch (error) {
+      console.error(
+        '[VoiceRelay] Failed to record call activity:',
+        error instanceof Error ? error.message : error
+      )
     }
   }
 
@@ -357,6 +436,7 @@ export class VoiceSession {
       }
       this.isAgentSpeaking = false
       this.currentResponseId = null
+      this.flushAgentUtterance()
       return
     }
 
@@ -366,7 +446,21 @@ export class VoiceSession {
     }
 
     if (event.type === 'response.output_audio_transcript.delta' && event.delta?.transcript) {
+      // Accumulated rather than written per delta: a delta is a word fragment,
+      // and fifty rows saying "the", "unit", "is" is not a transcript anyone
+      // can read. Flushed as one turn on response.done below.
+      this.agentUtterance += event.delta.transcript
       this.sendToClient({ type: 'transcript', text: event.delta.transcript })
+      return
+    }
+
+    // The caller's half. Requires TRANSCRIPTION to be set in session.update --
+    // without it this event never fires and only the agent is ever recorded.
+    if (event.type === 'conversation.item.input_audio_transcription.completed' && event.transcript) {
+      const callerText = event.transcript
+      void this.withIdentity((identity) =>
+        recordCallTurn({ identity, clientId: this.clientId, role: 'caller', text: callerText })
+      )
       return
     }
 
@@ -396,7 +490,21 @@ export class VoiceSession {
     }
     this.isAgentSpeaking = false
     this.currentResponseId = null
+    // The caller interrupted, but the agent did say something before being cut
+    // off and the caller heard it. Dropping it would leave a transcript where
+    // the caller answers a question nobody asked.
+    this.flushAgentUtterance()
     this.sendToClient({ type: 'barge-in' })
+  }
+
+  private flushAgentUtterance(): void {
+    const utterance = this.agentUtterance.trim()
+    this.agentUtterance = ''
+    if (!utterance) return
+
+    void this.withIdentity((identity) =>
+      recordCallTurn({ identity, clientId: this.clientId, role: 'agent', text: utterance })
+    )
   }
 
   private async handleToolCall(event: OpenAIRealtimeEvent): Promise<void> {
@@ -407,6 +515,9 @@ export class VoiceSession {
       console.log('[VoiceRelay] Fetching RAG chunks for query:', query)
       chunks = await this.fetchRagChunks(query)
       console.log('[VoiceRelay] RAG chunks received:', chunks.length, 'chunks')
+      void this.withIdentity((identity) =>
+        recordCallToolUse({ identity, clientId: this.clientId, query, resultCount: chunks.length })
+      )
     } catch (error) {
       console.log('[VoiceRelay] Tool call failed:', error)
       console.error('[VoiceRelay] Tool call failed:', error instanceof Error ? error.message : error)

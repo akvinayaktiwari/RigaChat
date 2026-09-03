@@ -68,6 +68,7 @@ interface VoiceAgentRecord {
   voice: VoiceAgentVoice
   greetingMessage: string
   systemPrompt?: string
+  botId?: string
   maxSessionDuration?: VoiceAgent['maxSessionDuration']
 }
 
@@ -212,7 +213,20 @@ async function handlePlivoAnswer(req: http.IncomingMessage, res: http.ServerResp
   // control the URL we hand it, and the token expires in five minutes -- so a
   // leaked stream URL is not a standing door into a client's agent.
   const streamToken = generateToken(mapping.agentId, authSecret as string)
-  const streamUrl = `wss://${publicHost}/plivo/stream?agentId=${encodeURIComponent(mapping.agentId)}&token=${encodeURIComponent(streamToken)}`
+  // The caller's number and the DID travel on the stream URL because Plivo's
+  // media stream carries neither, and they are what the CRM record is built
+  // from. TRUST BOUNDARY, stated plainly: the HMAC token binds only the
+  // agentId, so these two are not themselves signed. The URL is minted here and
+  // handed to Plivo over TLS, so forging them means already holding a valid,
+  // unexpired token for that agent -- but a forged `from` would attach a call
+  // to the wrong lead, so widening the token to cover them is the right fix
+  // when the auth helper is next touched.
+  const callerPhone = params.From ?? ''
+  const streamUrl =
+    `wss://${publicHost}/plivo/stream?agentId=${encodeURIComponent(mapping.agentId)}` +
+    `&token=${encodeURIComponent(streamToken)}` +
+    `&from=${encodeURIComponent(callerPhone)}` +
+    `&to=${encodeURIComponent(dialledNumber)}`
 
   console.log(`[VoiceRelay] Answering call to ${dialledNumber} with agent ${mapping.agentId}`)
   sendXml(res, buildStreamXml({ streamUrl }))
@@ -309,6 +323,16 @@ wss.on('connection', async (ws: WebSocket, req) => {
     instructions: buildInstructions(agent),
     firstMessage: agent.greetingMessage,
     maxSessionMinutes: agent.maxSessionDuration,
+    // Only telephony carries these, and their presence is what tells
+    // VoiceSession to resolve an identity and write a CRM record. A browser
+    // call has no caller ID to join on and records no lead, exactly as before.
+    ...(isPlivoStream
+      ? {
+          callerPhone: url.searchParams.get('from') ?? '',
+          dialledNumber: url.searchParams.get('to') ?? '',
+          linkedBotId: agent.botId,
+        }
+      : {}),
   }
 
   // The only difference between the two transports: telephony wraps the socket
