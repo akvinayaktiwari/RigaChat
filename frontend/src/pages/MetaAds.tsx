@@ -302,7 +302,9 @@ export default function MetaAds() {
                   {s.pageName} —{' '}
                   {s.reason === 'already_connected_to_another_account'
                     ? 'already connected to another account'
-                    : 'Meta refused the webhook subscription; try again'}
+                    : s.reason === 'batch_budget_exceeded'
+                      ? 'not attempted — press Add Pages again to finish these'
+                      : 'Meta refused the webhook subscription; try again'}
                 </li>
               ))}
             </ul>

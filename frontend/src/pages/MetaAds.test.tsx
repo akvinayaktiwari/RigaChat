@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { MetaConnectPagesResult, MetaPageSummary } from '../types/index'
 
 // frontend vitest runs without globals, so @testing-library's auto-cleanup never
@@ -380,5 +380,25 @@ describe('the background subscription repair', () => {
     await waitFor(() => expect(screen.getByText('Page 1')).toBeTruthy())
 
     expect(toastShow).not.toHaveBeenCalled()
+  })
+})
+
+describe('a batch that ran out of Lambda time', () => {
+  it('says the rest were not attempted, not that they failed', async () => {
+    // "Meta refused the subscription" would be a lie and would send the client
+    // looking for a problem on Facebook's side. Nothing was attempted, and
+    // pressing Connect again is all it takes.
+    window.history.replaceState({}, '', '/dashboard/meta-ads?meta=select_pages')
+
+    render(<MetaAds />)
+    await waitFor(() => expect(screen.getByTestId('meta-page-picker')).toBeTruthy())
+
+    pickerProps.onConnected?.({
+      connected: [page(1)],
+      skipped: [{ pageId: 'page-2', pageName: 'Page 2', reason: 'batch_budget_exceeded' }],
+    })
+
+    await waitFor(() => expect(screen.getByText(/not attempted/)).toBeTruthy())
+    expect(screen.getByText(/press Add Pages again/)).toBeTruthy()
   })
 })
