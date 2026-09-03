@@ -43,6 +43,18 @@ if (!apiKey) {
   )
 }
 
+// The surface VoiceSession actually uses from its client-side socket. Narrower
+// than a full WebSocket on purpose: it is the whole contract a transport must
+// satisfy, so the Plivo adapter implements four members rather than faking a
+// WebSocket, and the compiler enforces the boundary instead of a cast hiding it.
+// The numeric readyState is ws's (OPEN === 1), shared rather than re-invented.
+export interface ClientTransport {
+  readyState: number
+  on(event: 'message', listener: (data: WebSocket.RawData) => void): void
+  send(data: string): void
+  close(): void
+}
+
 export interface VoiceAgentConfig {
   agentId: string
   clientId: string
@@ -76,7 +88,7 @@ interface VoiceContext {
 }
 
 export class VoiceSession {
-  private browserWs: WebSocket
+  private clientWs: ClientTransport
   private openaiWs: WebSocket
   private agentId: string
   private clientId: string
@@ -92,13 +104,20 @@ export class VoiceSession {
   private sessionUpdateSent = false
   private contextTimeout: NodeJS.Timeout | null = null
   private fallbackVoice: VoiceAgentVoice
+  private fallbackInstructions: string
   private context: VoiceContext = {}
 
-  constructor(browserWs: WebSocket, agentConfig: VoiceAgentConfig) {
-    this.browserWs = browserWs
+  constructor(clientWs: ClientTransport, agentConfig: VoiceAgentConfig) {
+    this.clientWs = clientWs
     this.agentId = agentConfig.agentId
     this.clientId = agentConfig.clientId
     this.fallbackVoice = agentConfig.voice
+    // agentConfig.instructions was previously accepted and ignored: every path
+    // fell back to the generic FALLBACK_INSTRUCTIONS, so a browser whose context
+    // message was slow or lost answered as an anonymous assistant instead of the
+    // client's agent. A phone call has no context message at all, which turns
+    // that latent bug into the normal case.
+    this.fallbackInstructions = agentConfig.instructions || FALLBACK_INSTRUCTIONS
 
     this.openaiWs = new WebSocket(REALTIME_URL, {
       headers: {
@@ -110,12 +129,12 @@ export class VoiceSession {
       this.openaiReady = true
 
       if (this.contextReceived) {
-        this.sendSessionUpdate(this.context.instructions ?? FALLBACK_INSTRUCTIONS, this.context.voice ?? this.fallbackVoice)
+        this.sendSessionUpdate(this.context.instructions ?? this.fallbackInstructions, this.context.voice ?? this.fallbackVoice)
       }
 
       this.contextTimeout = setTimeout(() => {
         if (!this.sessionUpdateSent) {
-          this.sendSessionUpdate(FALLBACK_INSTRUCTIONS, this.fallbackVoice)
+          this.sendSessionUpdate(this.fallbackInstructions, this.fallbackVoice)
         }
       }, CONTEXT_TIMEOUT_MS)
     })
@@ -128,8 +147,8 @@ export class VoiceSession {
       console.error('[VoiceRelay] OpenAI socket error:', err.message)
     })
 
-    this.browserWs.on('message', (data: WebSocket.RawData) => {
-      this.handleBrowserMessage(data)
+    this.clientWs.on('message', (data: WebSocket.RawData) => {
+      this.handleClientMessage(data)
     })
   }
 
@@ -143,7 +162,7 @@ export class VoiceSession {
           type: 'session.update',
           session: {
             type: 'realtime',
-            instructions: context.instructions ?? FALLBACK_INSTRUCTIONS,
+            instructions: context.instructions ?? this.fallbackInstructions,
             tools: REALTIME_TOOLS,
             audio: {
               input: {
@@ -216,8 +235,8 @@ export class VoiceSession {
     if (this.openaiWs.readyState === WebSocket.OPEN || this.openaiWs.readyState === WebSocket.CONNECTING) {
       this.openaiWs.close()
     }
-    if (this.browserWs.readyState === WebSocket.OPEN || this.browserWs.readyState === WebSocket.CONNECTING) {
-      this.browserWs.close()
+    if (this.clientWs.readyState === WebSocket.OPEN || this.clientWs.readyState === WebSocket.CONNECTING) {
+      this.clientWs.close()
     }
   }
 
@@ -242,7 +261,7 @@ export class VoiceSession {
     await writeVoiceCallLog(log)
   }
 
-  private handleBrowserMessage(data: WebSocket.RawData): void {
+  private handleClientMessage(data: WebSocket.RawData): void {
     let message: { type: string; data?: string; instructions?: string; voice?: VoiceAgentVoice; botName?: string }
     try {
       message = JSON.parse(data.toString())
@@ -268,7 +287,18 @@ export class VoiceSession {
     }
 
     if (message.type === 'ping') {
-      this.sendToBrowser({ type: 'pong' })
+      this.sendToClient({ type: 'pong' })
+      return
+    }
+
+    // A caller who dialled a number expects to be greeted; silence on answer
+    // reads as a dead line. The browser widget does not need this (the user
+    // clicked to start and speaks first), so it is a transport-driven trigger
+    // rather than something the session does unconditionally.
+    if (message.type === 'greet') {
+      if (this.openaiWs.readyState === WebSocket.OPEN) {
+        this.openaiWs.send(JSON.stringify({ type: 'response.create' }))
+      }
       return
     }
 
@@ -308,12 +338,12 @@ export class VoiceSession {
     }
 
     if (event.type === 'response.output_audio.delta' && event.delta) {
-      this.sendToBrowser({ type: 'audio', data: event.delta })
+      this.sendToClient({ type: 'audio', data: event.delta })
       return
     }
 
     if (event.type === 'response.output_audio_transcript.delta' && event.delta?.transcript) {
-      this.sendToBrowser({ type: 'transcript', text: event.delta.transcript })
+      this.sendToClient({ type: 'transcript', text: event.delta.transcript })
       return
     }
 
@@ -332,7 +362,7 @@ export class VoiceSession {
 
     if (event.type === 'error') {
       console.error('[VoiceRelay] OpenAI error event:', event.error?.message)
-      this.sendToBrowser({ type: 'error', message: event.error?.message ?? 'Unknown error' })
+      this.sendToClient({ type: 'error', message: event.error?.message ?? 'Unknown error' })
     }
   }
 
@@ -343,7 +373,7 @@ export class VoiceSession {
     }
     this.isAgentSpeaking = false
     this.currentResponseId = null
-    this.sendToBrowser({ type: 'barge-in' })
+    this.sendToClient({ type: 'barge-in' })
   }
 
   private async handleToolCall(event: OpenAIRealtimeEvent): Promise<void> {
@@ -400,9 +430,9 @@ export class VoiceSession {
     }
   }
 
-  private sendToBrowser(payload: unknown): void {
-    if (this.browserWs.readyState === WebSocket.OPEN) {
-      this.browserWs.send(JSON.stringify(payload))
+  private sendToClient(payload: unknown): void {
+    if (this.clientWs.readyState === WebSocket.OPEN) {
+      this.clientWs.send(JSON.stringify(payload))
     }
   }
 }
