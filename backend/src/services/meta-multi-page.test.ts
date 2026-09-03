@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // The bug this file exists for: exchangeCodeForPageCredentials took
 // pagesData.data?.[0], so a client who approved several Pages on Meta's own
@@ -563,5 +563,69 @@ describe('repairing a Page that is claimed but not subscribed', () => {
 
     expect(markPageVerified).not.toHaveBeenCalled()
     expect(report.unrepairable).toEqual(['page-1'])
+  })
+})
+
+describe('running out of Lambda time mid-batch', () => {
+  // The 60s limit used to be a cliff. A kill lands wherever it lands, and the
+  // dangerous spot is between the claim and the webhook subscription: the Page
+  // reads Connected and receives nothing, and the rollback died with the
+  // process. Checked instead, the deadline becomes an outcome the client can
+  // act on.
+  afterEach(() => vi.restoreAllMocks())
+
+  function clockThatJumps(afterCalls: number, jumpMs: number): void {
+    const realNow = Date.now()
+    let calls = 0
+    vi.spyOn(Date, 'now').mockImplementation(() => {
+      calls += 1
+      return calls > afterCalls ? realNow + jumpMs : realNow
+    })
+  }
+
+  it('reports the Pages it never got to, rather than being killed holding them', async () => {
+    const many = Array.from({ length: 10 }, (_, i) => page(i + 1))
+    fetchAllManageablePages.mockResolvedValue(many)
+    clockThatJumps(3, 50_000)
+
+    const result = await connectMetaPages('client-1', many.map((p) => p.pageId))
+
+    const outOfTime = result.skipped.filter((p) => p.reason === 'batch_budget_exceeded')
+    expect(outOfTime.length).toBeGreaterThan(0)
+    expect(result.connected.length + result.skipped.length).toBe(10)
+  })
+
+  it('never claims a Page it does not go on to subscribe', async () => {
+    // The whole point of checking BEFORE the claim rather than between the two.
+    const many = Array.from({ length: 10 }, (_, i) => page(i + 1))
+    fetchAllManageablePages.mockResolvedValue(many)
+    clockThatJumps(3, 50_000)
+
+    await connectMetaPages('client-1', many.map((p) => p.pageId))
+
+    expect(setPageClientMapping.mock.calls.length).toBe(subscribePageToWebhook.mock.calls.length)
+  })
+
+  it('leaves the skipped Pages untouched so a retry picks them up', async () => {
+    const many = Array.from({ length: 10 }, (_, i) => page(i + 1))
+    fetchAllManageablePages.mockResolvedValue(many)
+    clockThatJumps(3, 50_000)
+
+    const result = await connectMetaPages('client-1', many.map((p) => p.pageId))
+
+    const outOfTime = result.skipped.filter((p) => p.reason === 'batch_budget_exceeded')
+    for (const skipped of outOfTime) {
+      expect(setPageClientMapping).not.toHaveBeenCalledWith(skipped.pageId, 'client-1', expect.anything())
+    }
+  })
+
+  it('does not fire the deadline on a batch that finishes in time', async () => {
+    const many = Array.from({ length: 10 }, (_, i) => page(i + 1))
+    fetchAllManageablePages.mockResolvedValue(many)
+
+    const result = await connectMetaPages('client-1', many.map((p) => p.pageId))
+
+    expect(result.connected).toHaveLength(10)
+    expect(result.skipped).toEqual([])
   })
 })

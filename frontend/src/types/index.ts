@@ -423,7 +423,13 @@ export interface MetaSelectablePage {
 export interface MetaPageSkipped {
   pageId: string
   pageName: string
-  reason: 'already_connected_to_another_account' | 'subscribe_failed'
+  /**
+   * `batch_budget_exceeded` is not a failure: the Page was never attempted,
+   * because the batch ran out of Lambda time first. Pressing Connect again
+   * picks it up. It exists so running out of time is a reported outcome rather
+   * than a process kill that strands a half-written batch.
+   */
+  reason: 'already_connected_to_another_account' | 'subscribe_failed' | 'batch_budget_exceeded'
 }
 
 /** A multi-connect can partially succeed: one taken Page must not block the rest. */

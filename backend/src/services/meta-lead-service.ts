@@ -254,6 +254,16 @@ const PAGE_WORK_CONCURRENCY = 5
 // so the log says "80% of budget" rather than an unanchored millisecond count.
 const LAMBDA_BUDGET_MS = 60_000
 
+// Stop starting new Pages past this point.
+//
+// The 60s limit used to be a cliff: the batch either finished or the process
+// was killed mid-Page, and a kill lands between the claim and the webhook
+// subscription -- leaving a Page that reads Connected and receives nothing,
+// with the rollback killed alongside it. Checked instead of hoped for, running
+// out of time becomes a reported outcome the client can act on. The 15s margin
+// covers the Page already in flight plus the response.
+const BATCH_DEADLINE_MS = 45_000
+
 /**
  * Runs `work` over `items` with at most `limit` in flight, preserving input
  * order in the result. Order matters here because the connected/skipped lists
@@ -374,6 +384,13 @@ export async function connectMetaPages(
     wanted,
     PAGE_WORK_CONCURRENCY,
     async (page) => {
+      // Checked before the claim, never between the claim and the subscribe:
+      // stopping in that gap would create exactly the state this guard exists
+      // to prevent.
+      if (Date.now() - startedAt > BATCH_DEADLINE_MS) {
+        return { skipped: { pageId: page.pageId, pageName: page.pageName, reason: 'batch_budget_exceeded' } }
+      }
+
       // Claim first, exactly as the single-Page path does: the atomic condition
       // is the real guarantee, and claiming before any other write means a lost
       // race never leaves a half-connected Page behind.
@@ -435,6 +452,13 @@ export async function connectMetaPages(
       `(concurrency ${PAGE_WORK_CONCURRENCY}, ${connected.length} connected, ${skipped.length} skipped, ` +
       `${Math.round(elapsedMs / Math.max(wanted.length, 1))}ms/page, budget ${LAMBDA_BUDGET_MS}ms)`
   )
+  const ranOutOfTime = skipped.filter((p) => p.reason === 'batch_budget_exceeded').length
+  if (ranOutOfTime > 0) {
+    console.warn(
+      `[meta-connect] deadline hit after ${elapsedMs}ms: ${ranOutOfTime} page(s) not attempted. ` +
+        `The client can reconnect them; nothing was left half-written.`
+    )
+  }
   if (elapsedMs > LAMBDA_BUDGET_MS * 0.5) {
     console.warn(
       `[meta-connect] batch used ${Math.round((elapsedMs / LAMBDA_BUDGET_MS) * 100)}% of the Lambda budget ` +
