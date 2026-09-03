@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Check, Megaphone, TriangleAlert, X } from 'lucide-react'
 import { useToast } from '../components/Toast/Toast'
 import {
@@ -108,6 +108,41 @@ export default function MetaAds() {
   // about the gap. A 3s toast is the wrong surface for that, and this file
   // already made that call once.
   const [repaired, setRepaired] = useState<MetaPageRepaired[] | null>(null)
+  // null = every Page. Client-side because MetaLead already carries pageId, so
+  // filtering needs no round trip and no backend change.
+  const [pageFilter, setPageFilter] = useState<string | null>(null)
+
+  // Every Page that has leads OR is connected. The union matters: leads from a
+  // Page the client later disconnected still exist and still need a home, and
+  // dropping them from the filter would make them unreachable.
+  const leadPageIds = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const lead of leads) counts.set(lead.pageId, (counts.get(lead.pageId) ?? 0) + 1)
+    return counts
+  }, [leads])
+
+  const pageNameOf = useMemo(() => {
+    const names = new Map(pages.map((p) => [p.pageId, p.pageName]))
+    // A disconnected Page has no name to show. Saying so beats printing a bare
+    // 15-digit id at a client who has never seen one.
+    return (pageId: string): string => names.get(pageId) ?? 'Disconnected Page'
+  }, [pages])
+
+  const filterablePages = useMemo(() => {
+    const ids = new Set<string>([...pages.map((p) => p.pageId), ...leadPageIds.keys()])
+    return [...ids]
+      .map((pageId) => ({ pageId, pageName: pageNameOf(pageId), count: leadPageIds.get(pageId) ?? 0 }))
+      .sort((a, b) => b.count - a.count || a.pageName.localeCompare(b.pageName))
+  }, [pages, leadPageIds, pageNameOf])
+
+  const visibleLeads = useMemo(
+    () => (pageFilter === null ? leads : leads.filter((l) => l.pageId === pageFilter)),
+    [leads, pageFilter]
+  )
+
+  // A filter over one Page is decoration. Only offer it once there is a choice
+  // to make.
+  const showPageFilter = filterablePages.length > 1
 
   function loadPages(): void {
     setPagesLoading(true)
@@ -505,12 +540,78 @@ export default function MetaAds() {
 
       <section className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
         <div className="border-b border-gray-50 px-6 py-4">
-          <h4 className="font-bold text-gray-900 text-sm">Recent Meta Leads</h4>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h4 className="font-bold text-gray-900 text-sm">Recent Meta Leads</h4>
+            {/* One atomic status carrying MEANING, not a bare number: a screen
+                reader hearing "12" alone learns nothing about what changed. */}
+            <p role="status" aria-atomic="true" className="text-xs text-gray-500">
+              {leadsLoading
+                ? ''
+                : pageFilter === null
+                  ? `${leads.length} lead${leads.length === 1 ? '' : 's'} from every Page`
+                  : `${visibleLeads.length} lead${visibleLeads.length === 1 ? '' : 's'} from ${pageNameOf(pageFilter)}`}
+            </p>
+          </div>
+
+          {showPageFilter && !leadsLoading && (
+            // flex-wrap, never a clipped single row: a client with a dozen Pages
+            // would otherwise lose every chip past the fold, with no way to
+            // reach them.
+            <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Filter leads by Page">
+              <button
+                type="button"
+                onClick={() => setPageFilter(null)}
+                aria-pressed={pageFilter === null}
+                className={`min-h-[44px] px-3 rounded-full text-xs font-semibold border transition-colors ${
+                  pageFilter === null
+                    ? 'bg-violet-600 text-white border-violet-600'
+                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                All Pages ({leads.length})
+              </button>
+              {filterablePages.map((p) => (
+                <button
+                  key={p.pageId}
+                  type="button"
+                  onClick={() => setPageFilter(p.pageId)}
+                  aria-pressed={pageFilter === p.pageId}
+                  title={p.pageName}
+                  className={`min-h-[44px] max-w-full px-3 rounded-full text-xs font-semibold border transition-colors truncate ${
+                    pageFilter === p.pageId
+                      ? 'bg-violet-600 text-white border-violet-600'
+                      : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  {p.pageName} ({p.count})
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {leadsLoading ? (
           <div className="p-6">
             <div className="h-32 bg-gray-100 rounded-xl animate-pulse" />
+          </div>
+        ) : visibleLeads.length === 0 && pageFilter !== null ? (
+          // Distinct from "no leads at all": this Page simply has none yet, and
+          // the way out is one button rather than a dead end.
+          <div className="flex flex-col items-center justify-center text-center py-12 gap-3">
+            <p className="text-sm font-semibold text-gray-900">
+              No leads from {pageNameOf(pageFilter)} yet
+            </p>
+            <p className="text-sm text-gray-500 max-w-md">
+              Leads from your other Pages are still here. This Page has not received a Lead Ads
+              submission yet.
+            </p>
+            <button
+              type="button"
+              onClick={() => setPageFilter(null)}
+              className="text-violet-700 font-semibold text-sm underline"
+            >
+              Show every Page
+            </button>
           </div>
         ) : leads.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center py-12 gap-2">
@@ -523,7 +624,7 @@ export default function MetaAds() {
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
-            {leads.map((lead) => {
+            {visibleLeads.map((lead) => {
               const fields = parseCustomFields(lead.customFields)
               const extraFields = Object.entries(fields)
 
@@ -531,6 +632,12 @@ export default function MetaAds() {
                 <div key={lead.leadId} className="px-6 py-4 flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <p className="font-semibold text-gray-900 text-sm">{lead.name || 'Unknown name'}</p>
+                    {/* Which Page this came from. With one Page it was implicit;
+                        with several, an unattributed lead cannot be followed up
+                        -- the client does not know which campaign it answers. */}
+                    {showPageFilter && (
+                      <p className="text-xs text-violet-700 mt-0.5 truncate">{pageNameOf(lead.pageId)}</p>
+                    )}
                     <p className="text-xs text-gray-500 mt-0.5">
                       {[lead.phone, lead.email].filter(Boolean).join(' · ') || 'No contact info'}
                     </p>
