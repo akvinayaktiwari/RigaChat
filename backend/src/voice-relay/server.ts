@@ -11,11 +11,13 @@ import { PlivoAudioAdapter } from './transports/plivo-audio-adapter.js'
 import {
   buildRejectXml,
   buildStreamXml,
+  buildTransferXml,
   extractDialledNumber,
   parseFormBody,
   verifyPlivoSignature,
 } from './transports/plivo-webhook.js'
 import { getAgentForPhoneNumber } from '../repositories/voice-phone-lookup-repository.js'
+import { transferCall } from '../providers/plivo-call-provider.js'
 
 const PORT = 3100
 
@@ -33,6 +35,10 @@ const authSecret = process.env.VOICE_AUTH_SECRET
 // public phone number is an unauthenticated door to a metered OpenAI session,
 // so it must be switched on deliberately rather than by default.
 const plivoAuthToken = process.env.PLIVO_AUTH_TOKEN
+// Only needed to CONTROL a call (transferring one). Its absence disables
+// transfer while leaving inbound answering fully working, so a deployment that
+// has not set it degrades to notify-and-callback rather than failing calls.
+const plivoAuthId = process.env.PLIVO_AUTH_ID
 const publicHost = process.env.VOICE_RELAY_PUBLIC_HOST
 
 // The ceiling that stops one number from starving the process that also serves
@@ -69,6 +75,7 @@ interface VoiceAgentRecord {
   greetingMessage: string
   systemPrompt?: string
   botId?: string
+  handoffNumber?: string
   maxSessionDuration?: VoiceAgent['maxSessionDuration']
 }
 
@@ -226,7 +233,8 @@ async function handlePlivoAnswer(req: http.IncomingMessage, res: http.ServerResp
     `wss://${publicHost}/plivo/stream?agentId=${encodeURIComponent(mapping.agentId)}` +
     `&token=${encodeURIComponent(streamToken)}` +
     `&from=${encodeURIComponent(callerPhone)}` +
-    `&to=${encodeURIComponent(dialledNumber)}`
+    `&to=${encodeURIComponent(dialledNumber)}` +
+    `&callUuid=${encodeURIComponent(params.CallUUID ?? '')}`
 
   console.log(`[VoiceRelay] Answering call to ${dialledNumber} with agent ${mapping.agentId}`)
   sendXml(res, buildStreamXml({ streamUrl }))
@@ -236,6 +244,34 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/') {
     res.writeHead(200, { 'Content-Type': 'text/plain' })
     res.end('ok')
+    return
+  }
+
+  // Fetched by Plivo once a transfer is accepted. GET, because that is what the
+  // transfer request asks Plivo to use, and it returns XML rather than acting:
+  // the side effect already happened when the transfer was requested.
+  if (req.method === 'GET' && (req.url ?? '').startsWith('/plivo/transfer')) {
+    if (!telephonyEnabled) {
+      res.writeHead(503)
+      res.end('Telephony not configured')
+      return
+    }
+
+    const url = new URL(req.url ?? '', `https://${publicHost}`)
+    const token = url.searchParams.get('token') ?? ''
+    const toNumber = url.searchParams.get('to') ?? ''
+
+    // Signed with the same short-lived HMAC the stream uses. Without this the
+    // endpoint is an open relay: anyone could make our number dial any number
+    // they like, at our expense.
+    const { valid } = validateToken(token, authSecret as string)
+    if (!valid || !toNumber) {
+      console.warn('[VoiceRelay] Rejected transfer XML request with an invalid token or target')
+      sendXml(res, buildRejectXml('Sorry, we are unable to connect your call.'), 403)
+      return
+    }
+
+    sendXml(res, buildTransferXml({ toNumber }))
     return
   }
 
@@ -291,6 +327,45 @@ function authenticate(ws: WebSocket, url: URL): string | null {
   return agentId
 }
 
+// Supplied to the session ONLY when a transfer could actually be honoured: the
+// agent has a handoff number, we hold call-control credentials, and we know
+// which call to move. Absent, the session tells the caller someone will ring
+// back instead of promising a transfer it cannot perform -- which is the
+// difference between a graceful fallback and a lie.
+function buildTransferCapability(
+  agent: VoiceAgentRecord,
+  callUuid: string
+): { transferToHuman?: () => Promise<boolean> } {
+  if (!agent.handoffNumber || !plivoAuthId || !plivoAuthToken || !callUuid) {
+    if (agent.handoffNumber && !plivoAuthId) {
+      console.warn(
+        `[VoiceRelay] Agent ${agent.agentId} has a handoff number but PLIVO_AUTH_ID is unset; transfer disabled`
+      )
+    }
+    return {}
+  }
+
+  const handoffNumber = agent.handoffNumber
+
+  return {
+    transferToHuman: async () => {
+      // Freshly minted per transfer, and short-lived like every other token
+      // here: the URL is handed to Plivo, and a long-lived one would be a
+      // standing instruction to dial a number at our expense.
+      const token = generateToken(agent.agentId, authSecret as string)
+      const transferUrl =
+        `https://${publicHost}/plivo/transfer?token=${encodeURIComponent(token)}` +
+        `&to=${encodeURIComponent(handoffNumber)}`
+
+      return transferCall({
+        credentials: { authId: plivoAuthId, authToken: plivoAuthToken },
+        callUuid,
+        transferUrl,
+      })
+    },
+  }
+}
+
 wss.on('connection', async (ws: WebSocket, req) => {
   const url = new URL(req.url ?? '', `http://${req.headers.host}`)
   const isPlivoStream = url.pathname === '/plivo/stream'
@@ -331,6 +406,7 @@ wss.on('connection', async (ws: WebSocket, req) => {
           callerPhone: url.searchParams.get('from') ?? '',
           dialledNumber: url.searchParams.get('to') ?? '',
           linkedBotId: agent.botId,
+          ...buildTransferCapability(agent, url.searchParams.get('callUuid') ?? ''),
         }
       : {}),
   }

@@ -817,6 +817,12 @@ export interface VoiceAgent {
   brandColor: string
   widgetPosition: 'bottom-left' | 'bottom-right' | 'bottom-center'
   maxSessionDuration: 5 | 10 | 15
+  // Where a live call goes when the caller asks for a person. Absent means the
+  // handoff still happens -- the event is recorded and staff are alerted -- but
+  // the caller is told someone will ring back rather than being put through.
+  // Opt-in on purpose: transferring to an unattended number is worse than not
+  // offering, because the caller waits through ringing before being dropped.
+  handoffNumber?: string
   isEnabled: boolean
   // True once this agent's own websiteUrl has been crawled, chunked, and
   // embedded into its Pinecone namespace (see feat/voice-agent-rag) — or

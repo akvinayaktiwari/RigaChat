@@ -111,6 +111,11 @@ export interface VoiceAgentConfig {
   callerPhone?: string
   dialledNumber?: string
   linkedBotId?: string
+  // Present only when a live transfer is actually possible: the agent has a
+  // handoff number, Plivo call-control credentials exist, and we know the call
+  // UUID. VoiceSession deliberately does not know what a Plivo is -- it asks
+  // for a transfer and is told whether it worked.
+  transferToHuman?: () => Promise<boolean>
 }
 
 interface OpenAIResponseUsage {
@@ -161,7 +166,8 @@ export class VoiceSession {
   private identity: CallIdentity | null = null
   private identityPending: Promise<void> | null = null
   private agentUtterance = ''
-  private hangUpAfterResponse = false
+  private pendingAction: 'none' | 'hangup' | 'transfer' = 'none'
+  private transferToHuman?: () => Promise<boolean>
 
   constructor(clientWs: ClientTransport, agentConfig: VoiceAgentConfig) {
     this.clientWs = clientWs
@@ -174,6 +180,7 @@ export class VoiceSession {
     // client's agent. A phone call has no context message at all, which turns
     // that latent bug into the normal case.
     this.fallbackInstructions = agentConfig.instructions || FALLBACK_INSTRUCTIONS
+    this.transferToHuman = agentConfig.transferToHuman
 
     this.openaiWs = new WebSocket(REALTIME_URL, {
       headers: {
@@ -464,12 +471,11 @@ export class VoiceSession {
       this.currentResponseId = null
       this.flushAgentUtterance()
 
-      // Ends the call only AFTER the closing line has been spoken. Hanging up
-      // when the tool fires would cut the caller off mid-sentence, which reads
-      // as the agent dropping the call precisely when they asked for help.
-      if (this.hangUpAfterResponse) {
-        console.log(`[VoiceRelay] Ending call ${this.callId} after handoff`)
-        this.cleanup()
+      // Acted on only AFTER the closing line has been spoken. Doing either
+      // when the tool fires would cut the caller off mid-sentence, at the exact
+      // moment they asked for help.
+      if (this.pendingAction !== 'none') {
+        void this.runPendingAction()
       }
       return
     }
@@ -546,6 +552,55 @@ export class VoiceSession {
     )
   }
 
+  private async runPendingAction(): Promise<void> {
+    const action = this.pendingAction
+    this.pendingAction = 'none'
+
+    if (action === 'hangup') {
+      console.log(`[VoiceRelay] Ending call ${this.callId} after handoff`)
+      this.cleanup()
+      return
+    }
+
+    if (action !== 'transfer' || !this.transferToHuman) return
+
+    const transferred = await this.transferToHuman()
+    if (transferred) {
+      // The caller's leg has moved to the staff number, so this media stream is
+      // finished. cleanup() writes the call log; Plivo tears the socket down.
+      console.log(`[VoiceRelay] Call ${this.callId} transferred to a human`)
+      this.cleanup()
+      return
+    }
+
+    // The agent has ALREADY told the caller it is putting them through, and the
+    // transfer did not happen. Saying nothing now leaves them holding a line
+    // that goes nowhere, so walk it back out loud before hanging up.
+    console.error(`[VoiceRelay] Transfer failed on call ${this.callId}; falling back to a callback`)
+    this.pendingAction = 'hangup'
+
+    if (this.openaiWs.readyState === WebSocket.OPEN) {
+      this.openaiWs.send(
+        JSON.stringify({
+          type: 'conversation.item.create',
+          item: {
+            type: 'message',
+            role: 'system',
+            content: [
+              {
+                type: 'input_text',
+                text:
+                  'The transfer could not be completed. Apologise briefly, tell the caller the team ' +
+                  'has been notified and will call them back shortly, thank them, and say goodbye.',
+              },
+            ],
+          },
+        })
+      )
+      this.openaiWs.send(JSON.stringify({ type: 'response.create' }))
+    }
+  }
+
   private async handleHandoffRequest(event: OpenAIRealtimeEvent): Promise<void> {
     let reason = 'The caller asked to speak to a person.'
     try {
@@ -569,14 +624,20 @@ export class VoiceSession {
       }
     })
 
-    // What the model says next is grounded in whether anyone was actually
-    // reached. Promising a callback that no alert was sent for is worse than
-    // saying nothing -- the caller hangs up satisfied and nobody ever rings.
-    const output = notified
-      ? 'A team member has been notified and will call back shortly. Tell the caller this, thank them, and say goodbye.'
-      : 'Tell the caller you will pass this on and that someone will get back to them, thank them, and say goodbye.'
-
-    this.hangUpAfterResponse = true
+    // What the model says next is grounded in what will ACTUALLY happen.
+    // Promising a callback nobody was alerted about, or a transfer that cannot
+    // be attempted, is worse than saying nothing -- the caller hangs up
+    // satisfied and nothing follows.
+    let output: string
+    if (this.transferToHuman) {
+      this.pendingAction = 'transfer'
+      output = 'Tell the caller you are putting them through to a colleague now. One short sentence.'
+    } else {
+      this.pendingAction = 'hangup'
+      output = notified
+        ? 'A team member has been notified and will call back shortly. Tell the caller this, thank them, and say goodbye.'
+        : 'Tell the caller you will pass this on and that someone will get back to them, thank them, and say goodbye.'
+    }
 
     if (this.openaiWs.readyState === WebSocket.OPEN) {
       this.openaiWs.send(
