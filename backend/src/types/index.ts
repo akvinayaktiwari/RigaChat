@@ -391,6 +391,23 @@ export interface MetaPageRegistration {
    */
   pageName?: string
   pageAccessTokenEncrypted?: string
+  /**
+   * Running totals kept ON the Page row, incremented as leads arrive.
+   *
+   * Not derived from the leads list: that endpoint returns only the 50 most
+   * recent, so a count taken from it silently understates once a client passes
+   * 50 leads. Counting properly instead would mean reading every lead for the
+   * client on each dashboard load -- meta_leads has no pageId index -- so the
+   * number is maintained at write time and read for free from a row the Pages
+   * list already fetches.
+   */
+  leadCount?: number
+  /**
+   * When this Page last produced a lead. The number that actually matters on a
+   * management screen: a Page that broke three days ago still shows a healthy
+   * cumulative count, and only recency reveals it has gone quiet.
+   */
+  lastLeadAt?: string
   connectedAt: string
   /**
    * Last time we confirmed with Meta that this Page is still granted to the
