@@ -80,8 +80,7 @@ async function resolveAndRecordInboundMessage(event: GupshupIncomingMessage): Pr
     }
     logInboundMatch('gupshup-inbound', event.payload.source, match)
 
-    const matchingLead = match.lead
-    await recordInboundMessage(matchingLead.leadId)
+    await recordInboundMessage(match.leadId)
 
     // Same reason as the Meta path: Gupshup delivers a quick-reply tap with the
     // label under `title`, not `text`, so reading `text` alone turns a real
@@ -91,9 +90,9 @@ async function resolveAndRecordInboundMessage(event: GupshupIncomingMessage): Pr
     // The agent turn deliberately does not run on this provider (see #11), but
     // the timeline should not have a hole for the one client still on Gupshup.
     await appendLeadEvent({
-      leadId: matchingLead.leadId,
+      leadId: match.leadId,
       clientId,
-      botId: matchingLead.botId,
+      botId: match.botId,
       type: 'message_in',
       channel: 'whatsapp',
       body: inbound.text,
@@ -104,16 +103,16 @@ async function resolveAndRecordInboundMessage(event: GupshupIncomingMessage): Pr
     // stops it. Still best-effort -- handleInboundLeadMessage never throws --
     // so a journey-layer problem cannot turn a received message into a 500 and
     // make Gupshup redeliver it.
-    const outcome = await handleInboundLeadMessage(matchingLead.leadId, inbound.text)
+    const outcome = await handleInboundLeadMessage(match.leadId, inbound.text)
     if (outcome.handled !== 'no_pending_journey') {
-      console.log(`[journey-reply] lead ${matchingLead.leadId}: ${JSON.stringify(outcome)}`)
+      console.log(`[journey-reply] lead ${match.leadId}: ${JSON.stringify(outcome)}`)
     } else if (match.candidateCount > 1) {
       // See the same branch in meta-whatsapp-webhook-service.ts: "several
       // leads matched AND nothing was waiting" is the signature of choosing
       // the wrong one, so that pair is worth a line even though the common
       // no-journey case is not.
       console.log(
-        `[gupshup-inbound] chose lead ${matchingLead.leadId} from ${match.candidateCount} matches and it had no parked journey`
+        `[gupshup-inbound] chose lead ${match.leadId} from ${match.candidateCount} matches and it had no parked journey`
       )
     }
   } catch (error) {

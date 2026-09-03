@@ -82,7 +82,10 @@ beforeEach(() => {
   ])
   recordInboundMessage.mockReset().mockResolvedValue(undefined)
   matchLeadForInboundMessage.mockReset().mockResolvedValue({
-    lead: { leadId: 'lead-1', botId: 'bot-1', phone: '919000000001' },
+    leadId: 'lead-1',
+    botId: 'bot-1',
+    leadRef: { source: 'chat', botId: 'bot-1', leadId: 'lead-1' },
+    journeyLead: { leadId: 'lead-1', clientId: 'client-1', source: 'chat', phone: '919000000001' },
     candidateCount: 1,
     reason: 'only_match',
   })

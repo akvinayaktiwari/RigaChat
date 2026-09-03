@@ -12,6 +12,13 @@ vi.mock('../providers/razorpay-provider.js', () => ({ razorpayProvider: {} }))
 vi.mock('./entitlement-service.js', () => ({ invalidateEntitlementsCache: vi.fn() }))
 const getLeadsForClient = vi.fn()
 vi.mock('./lead-service.js', () => ({ getLeadsForClient }))
+
+// The inbound matcher searches every lead source now, and reads the chosen
+// candidate back through the source-agnostic path.
+const getVoiceLeadsByClientId = vi.fn()
+vi.mock('../repositories/voice-lead-repository.js', () => ({ getVoiceLeadsByClientId }))
+const readJourneyLead = vi.fn()
+vi.mock('./lead-resolution-service.js', () => ({ readJourneyLead }))
 const getClientIdForGupshupApp = vi.fn()
 vi.mock('../repositories/gupshup-app-lookup-repository.js', () => ({ getClientIdForGupshupApp }))
 const recordInboundMessage = vi.fn()
@@ -69,7 +76,13 @@ function incomingMessage(app: string | undefined, source: string) {
 
 describe('logGupshupWebhookEvent (inbound message resolution)', () => {
   beforeEach(() => {
-    getLeadsForClient.mockReset()
+    getLeadsForClient.mockReset().mockResolvedValue([])
+    getVoiceLeadsByClientId.mockReset().mockResolvedValue([])
+    readJourneyLead.mockReset().mockImplementation(async (ref: { leadId: string }) => ({
+      leadId: ref.leadId,
+      clientId: 'client-1',
+      source: 'chat',
+    }))
     getClientIdForGupshupApp.mockReset()
     recordInboundMessage.mockReset()
   })
