@@ -13,6 +13,7 @@ const disconnectMetaPage = vi.fn()
 const getConnectedMetaPages = vi.fn()
 const getMetaLeads = vi.fn()
 const getMetaStatus = vi.fn()
+const verifyMetaPageSubscriptions = vi.fn()
 
 vi.mock('../services/api', () => ({
   connectMeta: (...a: unknown[]) => connectMeta(...a),
@@ -21,6 +22,7 @@ vi.mock('../services/api', () => ({
   getConnectedMetaPages: (...a: unknown[]) => getConnectedMetaPages(...a),
   getMetaLeads: (...a: unknown[]) => getMetaLeads(...a),
   getMetaStatus: (...a: unknown[]) => getMetaStatus(...a),
+  verifyMetaPageSubscriptions: (...a: unknown[]) => verifyMetaPageSubscriptions(...a),
 }))
 
 const toastShow = vi.fn()
@@ -58,6 +60,10 @@ beforeEach(() => {
   getMetaStatus.mockResolvedValue({ success: true, data: null })
   getMetaLeads.mockResolvedValue({ success: true, data: [] })
   getConnectedMetaPages.mockResolvedValue({ success: true, data: [] })
+  verifyMetaPageSubscriptions.mockResolvedValue({
+    success: true,
+    data: { checked: 0, repaired: [], unrepairable: [] },
+  })
   window.history.replaceState({}, '', '/dashboard/meta-ads')
 })
 
@@ -319,5 +325,60 @@ describe('per-Page disconnect when the network fails', () => {
     await waitFor(() =>
       expect(toastShow).toHaveBeenCalledWith(expect.stringContaining('still connected'), 'error')
     )
+  })
+})
+
+describe('the background subscription repair', () => {
+  it('says nothing when there was nothing to repair', async () => {
+    // The common case. A client reading their leads should not be told about a
+    // maintenance pass that found everything healthy.
+    getConnectedMetaPages.mockResolvedValue({ success: true, data: [page(1)] })
+
+    render(<MetaAds />)
+    await waitFor(() => expect(screen.getByText('Page 1')).toBeTruthy())
+
+    expect(toastShow).not.toHaveBeenCalled()
+  })
+
+  it('tells the client in lead terms when it fixed a Page', async () => {
+    getConnectedMetaPages.mockResolvedValue({ success: true, data: [page(1)] })
+    verifyMetaPageSubscriptions.mockResolvedValue({
+      success: true,
+      data: { checked: 1, repaired: ['page-1'], unrepairable: [] },
+    })
+
+    render(<MetaAds />)
+
+    await waitFor(() =>
+      expect(toastShow).toHaveBeenCalledWith(
+        expect.stringContaining('stopped receiving leads'),
+        'success'
+      )
+    )
+  })
+
+  it('says Page, not Pages, when it repaired exactly one', async () => {
+    getConnectedMetaPages.mockResolvedValue({ success: true, data: [page(1)] })
+    verifyMetaPageSubscriptions.mockResolvedValue({
+      success: true,
+      data: { checked: 1, repaired: ['page-1'], unrepairable: [] },
+    })
+
+    render(<MetaAds />)
+
+    await waitFor(() =>
+      expect(toastShow).toHaveBeenCalledWith(expect.stringContaining('1 Page that'), 'success')
+    )
+  })
+
+  it('stays silent when the repair pass itself fails', async () => {
+    // A background repair failing is not the client's problem to action.
+    getConnectedMetaPages.mockResolvedValue({ success: true, data: [page(1)] })
+    verifyMetaPageSubscriptions.mockRejectedValue(new Error('network down'))
+
+    render(<MetaAds />)
+    await waitFor(() => expect(screen.getByText('Page 1')).toBeTruthy())
+
+    expect(toastShow).not.toHaveBeenCalled()
   })
 })

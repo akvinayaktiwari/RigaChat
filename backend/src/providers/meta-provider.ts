@@ -423,6 +423,39 @@ export class MetaProvider {
   // Deliberately best-effort at the call site: a Page whose token has already
   // been revoked cannot be unsubscribed, and that must not block the client
   // from removing it from their account.
+  /**
+   * Is this Page actually subscribed to our leadgen webhook?
+   *
+   * The state worth detecting is a Page that is claimed in our registry but not
+   * subscribed at Meta: the dashboard shows it connected and not one lead ever
+   * arrives. connectMetaPages rolls the claim back when subscribe THROWS, but a
+   * Lambda timeout kills the rollback with the process, so the only way to find
+   * that Page again is to ask Meta.
+   *
+   * Reads subscribed_fields rather than mere presence: an app row with the
+   * leadgen field missing is subscribed to something else and still delivers
+   * nothing.
+   */
+  async isPageSubscribedToLeadgen(pageId: string, pageAccessToken: string): Promise<boolean> {
+    const params = new URLSearchParams({ access_token: pageAccessToken })
+
+    const response = await fetch(`${GRAPH_API_BASE}/${pageId}/subscribed_apps?${params.toString()}`)
+    const data = (await response.json()) as {
+      data?: { subscribed_fields?: string[] }[]
+      error?: { message?: string }
+    }
+
+    if (data.error) {
+      throw new Error(
+        `Failed to read webhook subscription for Page ${pageId}: ${data.error.message ?? 'Unknown error'}`
+      )
+    }
+
+    // The token is the Page's own, so Graph returns only apps this token can
+    // see -- in practice ours. Any entry carrying leadgen means subscribed.
+    return (data.data ?? []).some((app) => (app.subscribed_fields ?? []).includes('leadgen'))
+  }
+
   async unsubscribePageFromWebhook(pageId: string, pageAccessToken: string): Promise<void> {
     const params = new URLSearchParams({ access_token: pageAccessToken })
 

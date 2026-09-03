@@ -6,6 +6,7 @@ import {
   disconnectMeta,
   disconnectMetaPage,
   getConnectedMetaPages,
+  verifyMetaPageSubscriptions,
   getMetaLeads,
   getMetaStatus,
 } from '../services/api'
@@ -82,6 +83,39 @@ export default function MetaAds() {
   }
 
   useEffect(loadPages, [])
+
+  // Repairs Pages that are claimed but not actually subscribed at Meta -- the
+  // state a timed-out connect leaves behind, where this page says "Connected"
+  // and not one lead ever arrives. The client cannot see it and retrying makes
+  // it worse, because the picker shows the Page already ticked.
+  //
+  // Runs once on load and stays silent unless it actually fixed something:
+  // server-side staleness gating means the usual answer costs no Graph calls.
+  useEffect(() => {
+    let cancelled = false
+
+    verifyMetaPageSubscriptions()
+      .then((res) => {
+        if (cancelled || !res.success || !res.data) return
+        if (res.data.repaired.length === 0) return
+
+        const n = res.data.repaired.length
+        toast.show(
+          `Reconnected ${n} Page${n === 1 ? '' : 's'} that had stopped receiving leads`,
+          'success'
+        )
+        loadPages()
+      })
+      // Silent on failure by design: this is a background repair, and a client
+      // who came to read their leads should not be handed an error about a
+      // maintenance pass they never asked for.
+      .catch(() => {})
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function handleRemovePage(page: MetaPageSummary): Promise<void> {
     // Confirm states the consequence in lead terms, not API terms.

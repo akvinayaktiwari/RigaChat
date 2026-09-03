@@ -434,6 +434,13 @@ export interface MetaSelectablePagesResult {
   maxPerBatch: number
 }
 
+/** Result of a webhook-subscription reconciliation pass over the client's Pages. */
+export interface MetaSubscriptionReport {
+  checked: number
+  repaired: string[]
+  unrepairable: string[]
+}
+
 export interface MetaConnectPagesResult {
   connected: MetaPageSummary[]
   skipped: MetaPageSkipped[]

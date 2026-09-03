@@ -37,6 +37,7 @@ import type {
   MetaConnectPagesResult,
   MetaPageSummary,
   MetaSelectablePagesResult,
+  MetaSubscriptionReport,
   MetaDirectWhatsAppConnection,
   MetaLead,
   PaymentRecord,
@@ -676,6 +677,14 @@ export function getConnectedMetaPages(): Promise<ApiResponse<MetaPageSummary[]>>
 // never an empty list, which would read as "your Pages are gone".
 export function getSelectableMetaPages(): Promise<ApiResponse<MetaSelectablePagesResult>> {
   return apiClient<MetaSelectablePagesResult>('/api/integrations/meta/pages/available')
+}
+
+// Repairs Pages that are claimed in our registry but not actually subscribed at
+// Meta -- the state a timed-out connect leaves behind, where the dashboard says
+// Connected and no lead ever arrives. Staleness-gated server-side, so the usual
+// answer is checked: 0 with no Graph calls at all.
+export function verifyMetaPageSubscriptions(): Promise<ApiResponse<MetaSubscriptionReport>> {
+  return apiClient<MetaSubscriptionReport>('/api/integrations/meta/pages/verify', 'POST')
 }
 
 // Can partially succeed: `skipped` names Pages claimed by another account.

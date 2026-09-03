@@ -2,6 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MetaMisconfiguredError, MetaPagesLookupError, MetaTokenExchangeError } from '../lib/meta-connect-errors.js'
 import { metaProvider } from './meta-provider.js'
 
+// Shared by every describe that stubs Graph. It was defined identically three
+// times over; module scope means the next suite reuses it instead of adding a
+// fourth copy.
+function mockFetchSequence(responses: unknown[]): ReturnType<typeof vi.fn> {
+  const fetchMock = vi.fn()
+  for (const body of responses) {
+    fetchMock.mockResolvedValueOnce({ json: async () => body } as unknown as Response)
+  }
+  vi.stubGlobal('fetch', fetchMock)
+  return fetchMock
+}
+
 // getOAuthUrl is the last thing that runs before we hand a client to Facebook.
 // Anything wrong that it does not catch surfaces on Meta's domain, after the
 // client has left the dashboard, with nothing in our logs.
@@ -108,15 +120,6 @@ describe('getOAuthUrl', () => {
 // and nothing in the dashboard to distinguish it from Meta breaking. These tests
 // exist because that failure is invisible until it is a production incident.
 describe('exchangeCodeForPageCredentials', () => {
-  function mockFetchSequence(responses: unknown[]): ReturnType<typeof vi.fn> {
-    const fetchMock = vi.fn()
-    for (const body of responses) {
-      fetchMock.mockResolvedValueOnce({ json: async () => body } as unknown as Response)
-    }
-    vi.stubGlobal('fetch', fetchMock)
-    return fetchMock
-  }
-
   beforeEach(() => {
     process.env.META_APP_SECRET = 'app-secret'
   })
@@ -173,15 +176,6 @@ describe('exchangeCodeForPageCredentials', () => {
 // the Page picker built on top of this (issue #28) is never wrong about what a
 // client actually administers.
 describe('fetchAllManageablePages', () => {
-  function mockFetchSequence(responses: unknown[]): ReturnType<typeof vi.fn> {
-    const fetchMock = vi.fn()
-    for (const body of responses) {
-      fetchMock.mockResolvedValueOnce({ json: async () => body } as unknown as Response)
-    }
-    vi.stubGlobal('fetch', fetchMock)
-    return fetchMock
-  }
-
   const page = (n: number) => ({ id: `page-${n}`, name: `Page ${n}`, access_token: `tok-${n}` })
 
   afterEach(() => {
@@ -288,15 +282,6 @@ describe('fetchAllManageablePages', () => {
 // exchanges and then discards the user token -- this is the version that
 // doesn't throw it away.
 describe('exchangeCodeForLongLivedUserToken', () => {
-  function mockFetchSequence(responses: unknown[]): ReturnType<typeof vi.fn> {
-    const fetchMock = vi.fn()
-    for (const body of responses) {
-      fetchMock.mockResolvedValueOnce({ json: async () => body } as unknown as Response)
-    }
-    vi.stubGlobal('fetch', fetchMock)
-    return fetchMock
-  }
-
   beforeEach(() => {
     process.env.META_APP_SECRET = 'app-secret'
   })
@@ -369,5 +354,47 @@ describe('unsubscribePageFromWebhook', () => {
     await expect(metaProvider.unsubscribePageFromWebhook('page-1', 'revoked-token')).rejects.toThrow(
       /Failed to unsubscribe Page page-1.*Invalid token/
     )
+  })
+})
+
+describe('isPageSubscribedToLeadgen', () => {
+  it('reports a Page carrying the leadgen field as subscribed', async () => {
+    mockFetchSequence([{ data: [{ subscribed_fields: ['leadgen', 'messages'] }] }])
+
+    await expect(metaProvider.isPageSubscribedToLeadgen('page-1', 'tok-1')).resolves.toBe(true)
+  })
+
+  // The subtle one: an app row exists, so a presence check would call this
+  // healthy, but without the leadgen field Meta delivers no lead events at all.
+  it('reports a subscription without the leadgen field as NOT subscribed', async () => {
+    mockFetchSequence([{ data: [{ subscribed_fields: ['messages'] }] }])
+
+    await expect(metaProvider.isPageSubscribedToLeadgen('page-1', 'tok-1')).resolves.toBe(false)
+  })
+
+  it('reports an empty app list as not subscribed', async () => {
+    mockFetchSequence([{ data: [] }])
+
+    await expect(metaProvider.isPageSubscribedToLeadgen('page-1', 'tok-1')).resolves.toBe(false)
+  })
+
+  it('throws rather than reporting false when Graph errors', async () => {
+    // Reporting false here would make the caller re-subscribe a Page that may
+    // be perfectly healthy, on every pass, forever.
+    mockFetchSequence([{ error: { message: 'Invalid OAuth access token' } }])
+
+    await expect(metaProvider.isPageSubscribedToLeadgen('page-1', 'tok-1')).rejects.toThrow(
+      /Invalid OAuth access token/
+    )
+  })
+
+  it('reads with the Page own token', async () => {
+    const fetchMock = mockFetchSequence([{ data: [] }])
+
+    await metaProvider.isPageSubscribedToLeadgen('page-1', 'tok-1')
+
+    const url = String(fetchMock.mock.calls[0]?.[0])
+    expect(url).toContain('/page-1/subscribed_apps')
+    expect(url).toContain('access_token=tok-1')
   })
 })

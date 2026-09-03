@@ -73,6 +73,11 @@ POST /api/integrations/meta/pages -> connect a selected set. PARTIAL SUCCESS is 
                                   selection, 409 on an expired user token (auth required)
 DELETE /api/integrations/meta/pages/:pageId -> disconnect ONE Page, unsubscribing its webhook. Refuses a Page owned
                                   by another client (auth required)
+POST /api/integrations/meta/pages/verify -> re-checks each connected Page is genuinely subscribed at Meta and
+                                  re-subscribes any that are not. Repairs the claimed-but-unsubscribed state a
+                                  timed-out connect leaves behind, where the dashboard says Connected and no lead
+                                  ever arrives. Staleness-gated on lastVerifiedAt (12h), so the usual call makes
+                                  zero Graph calls. POST because it repairs rather than reports (auth required)
 DELETE /api/integrations/meta/disconnect -> disconnect-all: every Page row AND the stored user token, so
                                   "disconnected" means we no longer hold a credential that can enumerate their
                                   Facebook assets (auth required)

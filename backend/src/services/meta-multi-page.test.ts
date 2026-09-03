@@ -14,6 +14,7 @@ interface ProviderPage {
 const fetchAllManageablePages = vi.fn<(token: string) => Promise<ProviderPage[]>>()
 const subscribePageToWebhook = vi.fn<(pageId: string, token: string) => Promise<void>>()
 const unsubscribePageFromWebhook = vi.fn<(pageId: string, token: string) => Promise<void>>()
+const isPageSubscribedToLeadgen = vi.fn<(pageId: string, token: string) => Promise<boolean>>()
 const exchangeCodeForLongLivedUserToken = vi.fn<(code: string) => Promise<string>>()
 
 vi.mock('../providers/meta-provider.js', () => ({
@@ -21,6 +22,7 @@ vi.mock('../providers/meta-provider.js', () => ({
     fetchAllManageablePages,
     subscribePageToWebhook,
     unsubscribePageFromWebhook,
+    isPageSubscribedToLeadgen,
     exchangeCodeForLongLivedUserToken,
   },
 }))
@@ -41,6 +43,7 @@ const getClientIdForPage = vi.fn<(pageId: string) => Promise<string | null>>()
 // Batched: the picker asks about every Page the person administers at once, so
 // one BatchGet replaced a point read per Page.
 const getClientIdsForPages = vi.fn<(pageIds: string[]) => Promise<Map<string, string>>>()
+const markPageVerified = vi.fn<(pageId: string) => Promise<void>>()
 
 class MetaPageConflictError extends Error {}
 
@@ -51,6 +54,7 @@ vi.mock('../repositories/meta-lead-repository.js', () => ({
   getPageRegistration,
   getClientIdForPage,
   getClientIdsForPages,
+  markPageVerified,
   createMetaLead: async () => ({}),
   getMetaLeadsByClientId: async () => [],
   updateMetaLeadSyncStatus: async () => undefined,
@@ -77,6 +81,7 @@ const {
   disconnectMetaPage,
   disconnectAllMetaPages,
   beginMetaConnection,
+  reconcilePageSubscriptions,
 } = await import('./meta-lead-service.js')
 const { MetaTooManyPagesError, MetaUserTokenExpiredError, MetaPagesLookupError } = await import(
   '../lib/meta-connect-errors.js'
@@ -96,6 +101,8 @@ beforeEach(() => {
   listPagesForClient.mockResolvedValue([])
   getClientIdForPage.mockResolvedValue(null)
   getClientIdsForPages.mockResolvedValue(new Map())
+  markPageVerified.mockResolvedValue(undefined)
+  isPageSubscribedToLeadgen.mockResolvedValue(true)
   getPageRegistration.mockResolvedValue(null)
   setPageClientMapping.mockResolvedValue(undefined)
 })
@@ -460,5 +467,101 @@ describe('a Page landing mid-disconnect', () => {
     await disconnectAllMetaPages('client-1')
 
     expect(updateClient).toHaveBeenCalledWith('client-1', { metaUserTokenEncrypted: undefined })
+  })
+})
+
+describe('repairing a Page that is claimed but not subscribed', () => {
+  const STALE = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const FRESH = new Date().toISOString()
+
+  function owned(pageId: string, lastVerifiedAt: string) {
+    return { pageId, clientId: 'client-1', pageAccessTokenEncrypted: `enc-${pageId}`, lastVerifiedAt }
+  }
+
+  beforeEach(() => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  // The state a Lambda timeout leaves behind: connectMetaPages claims the Page,
+  // then the process dies before subscribing AND before the rollback. The
+  // dashboard shows "Connected" and not one lead ever arrives.
+  it('re-subscribes a Page Meta says is not subscribed', async () => {
+    listPagesForClient.mockResolvedValue([owned('page-1', STALE)])
+    isPageSubscribedToLeadgen.mockResolvedValue(false)
+
+    const report = await reconcilePageSubscriptions('client-1')
+
+    expect(subscribePageToWebhook).toHaveBeenCalledWith('page-1', 'page-1')
+    expect(report.repaired).toEqual(['page-1'])
+  })
+
+  it('leaves a healthy Page alone', async () => {
+    listPagesForClient.mockResolvedValue([owned('page-1', STALE)])
+    isPageSubscribedToLeadgen.mockResolvedValue(true)
+
+    const report = await reconcilePageSubscriptions('client-1')
+
+    expect(subscribePageToWebhook).not.toHaveBeenCalled()
+    expect(report.repaired).toEqual([])
+    expect(markPageVerified).toHaveBeenCalledWith('page-1')
+  })
+
+  // Bounded cost: one Graph call per Page would otherwise land on every
+  // dashboard load.
+  it('makes no Graph call for a Page checked recently', async () => {
+    listPagesForClient.mockResolvedValue([owned('page-1', FRESH)])
+
+    const report = await reconcilePageSubscriptions('client-1')
+
+    expect(isPageSubscribedToLeadgen).not.toHaveBeenCalled()
+    expect(report.checked).toBe(0)
+  })
+
+  it('checks a Page that has never been verified', async () => {
+    listPagesForClient.mockResolvedValue([
+      { pageId: 'page-1', clientId: 'client-1', pageAccessTokenEncrypted: 'enc-page-1' },
+    ])
+
+    await reconcilePageSubscriptions('client-1')
+
+    expect(isPageSubscribedToLeadgen).toHaveBeenCalled()
+  })
+
+  it('skips a pre-registry row that has no token to authenticate with', async () => {
+    listPagesForClient.mockResolvedValue([{ pageId: 'page-1', clientId: 'client-1' }])
+
+    const report = await reconcilePageSubscriptions('client-1')
+
+    expect(isPageSubscribedToLeadgen).not.toHaveBeenCalled()
+    expect(report.checked).toBe(0)
+  })
+
+  // This runs alongside a normal dashboard read. One unreachable Page must not
+  // take the whole page down.
+  it('reports a Page it cannot check instead of throwing', async () => {
+    listPagesForClient.mockResolvedValue([owned('page-1', STALE), owned('page-2', STALE)])
+    isPageSubscribedToLeadgen.mockImplementation(async (pageId: string) => {
+      if (pageId === 'page-1') throw new Error('graph down')
+      return true
+    })
+
+    const report = await reconcilePageSubscriptions('client-1')
+
+    expect(report.unrepairable).toEqual(['page-1'])
+    expect(markPageVerified).toHaveBeenCalledWith('page-2')
+  })
+
+  it('does not mark a Page verified when re-subscribing it failed', async () => {
+    // Otherwise the failure resets the staleness clock and the broken Page goes
+    // unchecked for another twelve hours.
+    listPagesForClient.mockResolvedValue([owned('page-1', STALE)])
+    isPageSubscribedToLeadgen.mockResolvedValue(false)
+    subscribePageToWebhook.mockRejectedValue(new Error('graph down'))
+
+    const report = await reconcilePageSubscriptions('client-1')
+
+    expect(markPageVerified).not.toHaveBeenCalled()
+    expect(report.unrepairable).toEqual(['page-1'])
   })
 })

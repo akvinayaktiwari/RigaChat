@@ -21,6 +21,7 @@ import {
   getClientIdForPage,
   getClientIdsForPages,
   getPageRegistration,
+  markPageVerified,
   listPagesForClient,
   getMetaLeadsByClientId,
   MetaPageConflictError,
@@ -42,6 +43,7 @@ import type {
   MetaPageSkipped,
   MetaPageSummary,
   MetaSelectablePage,
+  MetaSubscriptionReport,
   FormField,
   MetaConnection,
   MetaDeletionRequest,
@@ -248,6 +250,10 @@ export const MAX_PAGES_PER_CONNECT = 25
 // at once only trades the timeout risk for a Graph rate-limit risk.
 const PAGE_WORK_CONCURRENCY = 5
 
+// The deployed Lambda timeout. Used only to judge how close a batch came to it,
+// so the log says "80% of budget" rather than an unanchored millisecond count.
+const LAMBDA_BUDGET_MS = 60_000
+
 /**
  * Runs `work` over `items` with at most `limit` in flight, preserving input
  * order in the result. Order matters here because the connected/skipped lists
@@ -357,6 +363,7 @@ export async function connectMetaPages(
     throw new MetaTooManyPagesError(pageIds.length, MAX_PAGES_PER_CONNECT)
   }
 
+  const startedAt = Date.now()
   const userToken = await requireUserToken(clientId)
   const available = await fetchPagesOrExpired(userToken)
   const wanted = available.filter((p) => pageIds.includes(p.pageId))
@@ -419,7 +426,85 @@ export async function connectMetaPages(
     else skipped.push(outcome.skipped)
   }
 
+  // The number that answers "does a full batch fit in the Lambda?" from real
+  // traffic rather than from arithmetic. A batch killed by the timeout leaves
+  // no log line at all, so a run that stops appearing here IS the signal.
+  const elapsedMs = Date.now() - startedAt
+  console.log(
+    `[meta-connect] batch complete: ${wanted.length} page(s) in ${elapsedMs}ms ` +
+      `(concurrency ${PAGE_WORK_CONCURRENCY}, ${connected.length} connected, ${skipped.length} skipped, ` +
+      `${Math.round(elapsedMs / Math.max(wanted.length, 1))}ms/page, budget ${LAMBDA_BUDGET_MS}ms)`
+  )
+  if (elapsedMs > LAMBDA_BUDGET_MS * 0.5) {
+    console.warn(
+      `[meta-connect] batch used ${Math.round((elapsedMs / LAMBDA_BUDGET_MS) * 100)}% of the Lambda budget ` +
+        `for ${wanted.length} page(s) -- a larger batch may not finish`
+    )
+  }
+
   return { connected, skipped }
+}
+
+/**
+ * How stale a verification may be before we re-check with Meta.
+ *
+ * The point of the window is that the repair costs one Graph call per Page, so
+ * an unbounded check would put a call per Page on every dashboard load. Twelve
+ * hours keeps a broken Page invisible for at most half a day while making the
+ * common case free.
+ */
+const VERIFY_STALE_AFTER_MS = 12 * 60 * 60 * 1000
+
+/**
+ * Finds Pages that are claimed in our registry but not actually subscribed at
+ * Meta, and re-subscribes them.
+ *
+ * This is the state a Lambda timeout can leave behind: connectMetaPages claims
+ * a Page, then subscribes it, and rolls the claim back if subscribing THROWS --
+ * but a timeout kills the rollback along with the process. The Page is left
+ * showing "Connected" in the dashboard while Meta delivers nothing for it, and
+ * a retry makes it worse, because the picker shows it already ticked so the
+ * client has no way to act on it.
+ *
+ * Also repairs the same shape from any other cause: an admin revoking and
+ * regranting the app, or Meta dropping a subscription on its own.
+ */
+export async function reconcilePageSubscriptions(clientId: string): Promise<MetaSubscriptionReport> {
+  const rows = await listPagesForClient(clientId)
+  const now = Date.now()
+
+  const due = rows.filter((row) => {
+    // A row with no token cannot be checked -- nothing to authenticate the
+    // Graph call with. Those are the pre-registry rows the backfill skipped.
+    if (!row.pageAccessTokenEncrypted) return false
+    if (!row.lastVerifiedAt) return true
+    return now - new Date(row.lastVerifiedAt).getTime() > VERIFY_STALE_AFTER_MS
+  })
+
+  const repaired: string[] = []
+  const unrepairable: string[] = []
+
+  await mapWithConcurrency(due, PAGE_WORK_CONCURRENCY, async (row) => {
+    try {
+      const token = await decrypt(row.pageAccessTokenEncrypted as string)
+      if (await metaProvider.isPageSubscribedToLeadgen(row.pageId, token)) {
+        await markPageVerified(row.pageId)
+        return
+      }
+
+      console.warn(`[meta-verify] page ${row.pageId} was claimed but not subscribed; re-subscribing`)
+      await metaProvider.subscribePageToWebhook(row.pageId, token)
+      await markPageVerified(row.pageId)
+      repaired.push(row.pageId)
+    } catch (error) {
+      // Never throw: this runs alongside a normal dashboard read, and a Page we
+      // cannot check must not take the whole page down with it.
+      console.error(`[meta-verify] could not verify page ${row.pageId}:`, error)
+      unrepairable.push(row.pageId)
+    }
+  })
+
+  return { checked: due.length, repaired, unrepairable }
 }
 
 /** The client's connected Pages, without their tokens. */
