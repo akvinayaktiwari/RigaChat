@@ -1,5 +1,25 @@
 # TODOS
 
+## Backfill baseline unit tests for VoiceSession / voice-relay/server.ts
+
+**What:** `backend/src/voice-relay/session.ts` (408 lines: OpenAI Realtime WS handling, RAG
+tool-calling, barge-in, call-log writes) and `server.ts` (agent lookup, WS connection
+handling) have zero existing tests today.
+
+**Why:** Surfaced during `/plan-eng-review` of `docs/designs/voice-agent-telephony-v1.md`
+(Plivo inbound telephony, v1). That PR adds real new surface right next to this file
+(a duration-cap timer inside `VoiceSession`, a Plivo audio adapter, a webhook handler in
+`server.ts`) — on top of a foundation with no regression net. Scoped out of that PR to
+keep its footprint from growing further (see the PR's own Issue 3A decision); this item
+tracks backfilling it separately.
+
+**Context:** Start with `session.ts`'s `handleOpenAIMessage`/`handleBrowserMessage`
+branches and `writeCallLog`'s status transitions — those are the parts most likely to
+silently regress once the Plivo transport is layered on top via the adapter pattern from
+Issue 1C of that review.
+
+**Depends on:** None — independently doable before or after the telephony PR lands.
+
 ## Mobile app — backend work, tracked in the vyostra-mobile repo
 
 The Android app ([vyostra-mobile](https://github.com/akvinayaktiwari/vyostra-mobile))
