@@ -135,6 +135,29 @@ Before writing a line of the Plivo transport: sit with the real-estate client's 
 - **Lead-write failure at call end** — must not crash the call itself; mirror `writeCallLog`'s fire-and-forget `.catch()` pattern.
 - **Concurrent-call ceiling hit** — caller needs a defined experience (busy signal), not a silent drop.
 
+### Open decision: where does the phone number come from?
+The design said "a real Plivo number" without settling this. It does not block the
+`voice_phone_lookup` work (that table maps whatever number Plivo delivers on the webhook
+to an agent, so all three options resolve identically), but it does block the Plivo
+account/KYC step and it changes what the client has to do.
+
+1. **Client forwards their existing number to a Plivo DID (recommended).** The client
+   keeps their number; they set forwarding at their telco. No porting, no ownership
+   transfer. Best variant: forward **on busy / no-answer**, not unconditionally — then the
+   AI answers exactly the calls being missed today, the front desk still gets first crack
+   at every call, and a call a human would have handled well still reaches the human. That
+   is the stated wedge ("missing new leads while on other calls") with the downside risk
+   mostly removed.
+2. **A new dedicated Plivo number the client advertises.** Clean attribution (every call to
+   it is measurable), but it does nothing about their existing missed calls until they put
+   it somewhere.
+3. **Port the client's number to Plivo.** Rejected for a first client: real KYC, slow, and
+   they lose the number if they leave.
+
+Indian DIDs require KYC under options 1 and 2 both — you are renting a number either way.
+That is the calendar-time dependency, and it is worth starting before the Round 1
+observation finishes since it blocks nothing else.
+
 ### Outside voice
 Skipped this pass — Codex is rate-limited (usage cap until 2026-09-10, hit earlier this same session) and a second Claude-subagent pass was judged not worth the budget after office-hours already ran one substantive cross-model challenge on this design. Recommend running `/plan-eng-review`'s outside-voice pass separately before implementation if you want it.
 
