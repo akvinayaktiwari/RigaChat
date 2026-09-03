@@ -1,5 +1,29 @@
 # TODOS
 
+## Per-client DID provisioning is onboarding friction that repeats
+
+**What:** Voice telephony rents one Plivo DID per client (see
+`docs/designs/voice-agent-telephony-v1.md` — the webhook reports which of our numbers was
+dialled, so clients cannot share a DID). Indian DIDs require KYC. That makes number
+provisioning a **per-client** step with real calendar time in it, not a one-time setup —
+every new voice client waits on it before they can take a single call.
+
+**Why:** Fine for the first real-estate client, where the whole point is one careful
+rollout. It becomes a bottleneck the moment voice is a standard plan feature: a client
+pays, activates voice, and then cannot use it for days. That is the worst possible moment
+to introduce a wait, and it is invisible in every demo.
+
+**Context:** The likely fix is bulk-provisioning a pool of DIDs in advance under our own
+KYC and assigning from the pool at signup (`claimPhoneNumber` already makes assignment an
+atomic, idempotent operation, so a pool model needs no repository change — just a source
+of unassigned numbers and a release path back to the pool). Confirm with Plivo whether
+holding unassigned Indian DIDs under our own KYC is permitted and what it costs to sit on
+them — that is a sales-call question, not a research question. ₹200/month per DID means an
+idle pool has a real carrying cost, so pool size is a tradeoff against signup latency.
+
+**Depends on:** The Plivo sales/KYC conversation already queued for v1. Do not build the
+pool before voice has more than one paying client — a pool of one is just a number.
+
 ## Backfill baseline unit tests for VoiceSession / voice-relay/server.ts
 
 **What:** `backend/src/voice-relay/session.ts` (408 lines: OpenAI Realtime WS handling, RAG
