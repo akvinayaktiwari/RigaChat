@@ -4,6 +4,7 @@ import type { VoiceAgentVoice, VoiceCallLog } from '../types/index.js'
 import { generateToken } from './auth.js'
 import { writeVoiceCallLog } from '../repositories/voice-repository.js'
 import {
+  recordCallHandoff,
   recordCallLifecycle,
   recordCallToolUse,
   recordCallTurn,
@@ -39,8 +40,32 @@ const KNOWLEDGE_BASE_TOOL = {
   },
 }
 
+// Given to the model rather than matched on keywords, because the ways a person
+// asks for a human are unbounded ("is there anyone there", "I'd rather not do
+// this with a robot", or simple exasperation) and a keyword list catches the
+// polite phrasings while missing the frustrated ones -- which are exactly the
+// calls that most need a person.
+const REQUEST_HUMAN_TOOL = {
+  type: 'function',
+  name: 'request_human',
+  description:
+    'Call this when the caller asks to speak to a person, is frustrated with the automated agent, ' +
+    'or raises something you cannot handle (a complaint, a negotiation, anything needing a decision). ' +
+    'Do not use it for questions you can answer from the knowledge base.',
+  parameters: {
+    type: 'object',
+    properties: {
+      reason: {
+        type: 'string',
+        description: "One sentence, in the caller's own terms, describing what they need a person for.",
+      },
+    },
+    required: ['reason'],
+  },
+}
+
 // Shared by both session.update send sites so they can never drift out of sync.
-const REALTIME_TOOLS = [KNOWLEDGE_BASE_TOOL]
+const REALTIME_TOOLS = [KNOWLEDGE_BASE_TOOL, REQUEST_HUMAN_TOOL]
 
 // Without this the model transcribes only its OWN speech: the caller's half of
 // every conversation is never written down. Tolerable while the transcript was
@@ -136,6 +161,7 @@ export class VoiceSession {
   private identity: CallIdentity | null = null
   private identityPending: Promise<void> | null = null
   private agentUtterance = ''
+  private hangUpAfterResponse = false
 
   constructor(clientWs: ClientTransport, agentConfig: VoiceAgentConfig) {
     this.clientWs = clientWs
@@ -437,6 +463,14 @@ export class VoiceSession {
       this.isAgentSpeaking = false
       this.currentResponseId = null
       this.flushAgentUtterance()
+
+      // Ends the call only AFTER the closing line has been spoken. Hanging up
+      // when the tool fires would cut the caller off mid-sentence, which reads
+      // as the agent dropping the call precisely when they asked for help.
+      if (this.hangUpAfterResponse) {
+        console.log(`[VoiceRelay] Ending call ${this.callId} after handoff`)
+        this.cleanup()
+      }
       return
     }
 
@@ -477,6 +511,11 @@ export class VoiceSession {
       return
     }
 
+    if (event.type === 'response.function_call_arguments.done' && event.name === 'request_human') {
+      this.handleHandoffRequest(event)
+      return
+    }
+
     if (event.type === 'error') {
       console.error('[VoiceRelay] OpenAI error event:', event.error?.message)
       this.sendToClient({ type: 'error', message: event.error?.message ?? 'Unknown error' })
@@ -505,6 +544,49 @@ export class VoiceSession {
     void this.withIdentity((identity) =>
       recordCallTurn({ identity, clientId: this.clientId, role: 'agent', text: utterance })
     )
+  }
+
+  private async handleHandoffRequest(event: OpenAIRealtimeEvent): Promise<void> {
+    let reason = 'The caller asked to speak to a person.'
+    try {
+      const parsed = JSON.parse(event.arguments ?? '{}') as { reason?: string }
+      if (parsed.reason) reason = parsed.reason
+    } catch {
+      // A malformed argument blob costs the reason, not the handoff. Someone
+      // asked for a human either way, and that is the part that must not be lost.
+    }
+
+    console.log(`[VoiceRelay] Handoff requested on call ${this.callId}: ${reason}`)
+
+    let notified = false
+    await this.withIdentity(async (identity) => {
+      const result = await recordCallHandoff({ identity, clientId: this.clientId, reason })
+      notified = result.notified
+      if (!result.notified) {
+        console.error(
+          `[VoiceRelay] Handoff on call ${this.callId} notified nobody (${result.skipReason ?? 'unknown'})`
+        )
+      }
+    })
+
+    // What the model says next is grounded in whether anyone was actually
+    // reached. Promising a callback that no alert was sent for is worse than
+    // saying nothing -- the caller hangs up satisfied and nobody ever rings.
+    const output = notified
+      ? 'A team member has been notified and will call back shortly. Tell the caller this, thank them, and say goodbye.'
+      : 'Tell the caller you will pass this on and that someone will get back to them, thank them, and say goodbye.'
+
+    this.hangUpAfterResponse = true
+
+    if (this.openaiWs.readyState === WebSocket.OPEN) {
+      this.openaiWs.send(
+        JSON.stringify({
+          type: 'conversation.item.create',
+          item: { type: 'function_call_output', call_id: event.call_id, output },
+        })
+      )
+      this.openaiWs.send(JSON.stringify({ type: 'response.create' }))
+    }
   }
 
   private async handleToolCall(event: OpenAIRealtimeEvent): Promise<void> {
