@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildRejectXml,
   buildStreamXml,
+  buildTransferXml,
   extractDialledNumber,
   parseFormBody,
   verifyPlivoSignature,
@@ -132,5 +133,46 @@ describe('extractDialledNumber', () => {
 
   it('returns null when no destination is present, so the caller is rejected not misrouted', () => {
     expect(extractDialledNumber({ From: '+919999999999' })).toBeNull()
+  })
+})
+
+describe('buildTransferXml', () => {
+  it('dials the staff number', () => {
+    const xml = buildTransferXml({ toNumber: '+919876543210' })
+
+    expect(xml).toContain('<Number>+919876543210</Number>')
+    expect(xml).toContain('timeout="25"')
+  })
+
+  // The load-bearing part. Plivo continues past a <Dial> that does not connect
+  // -- no answer, busy, a wrong number in the agent's config -- so without a
+  // fallback the caller hears ringing and then nothing, on a call that already
+  // told them they were being put through to a person.
+  it('speaks a fallback and hangs up when nobody answers', () => {
+    const xml = buildTransferXml({ toNumber: '+919876543210' })
+
+    const dialAt = xml.indexOf('</Dial>')
+    const speakAt = xml.indexOf('<Speak>')
+    expect(speakAt).toBeGreaterThan(dialAt)
+    expect(xml).toContain('call you back shortly')
+    expect(xml).toContain('<Hangup/>')
+  })
+
+  it('allows the ring time and the fallback line to be set', () => {
+    const xml = buildTransferXml({
+      toNumber: '+919876543210',
+      timeoutSeconds: 12,
+      unavailableMessage: 'Nobody free right now.',
+    })
+
+    expect(xml).toContain('timeout="12"')
+    expect(xml).toContain('<Speak>Nobody free right now.</Speak>')
+  })
+
+  it('escapes the dialled number and the message', () => {
+    const xml = buildTransferXml({ toNumber: '+91&987', unavailableMessage: 'a & b' })
+
+    expect(xml).toContain('+91&amp;987')
+    expect(xml).toContain('a &amp; b')
   })
 })

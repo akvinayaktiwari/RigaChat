@@ -101,3 +101,44 @@ export function parseFormBody(body: string): Record<string, string> {
 export function extractDialledNumber(params: Record<string, string>): string | null {
   return params.To || params.CalledNumber || params.Called || null
 }
+
+export interface TransferXmlOptions {
+  toNumber: string
+  // Rings this long before giving up. Long enough for someone to reach a
+  // handset, short enough that the caller does not sit through voicemail-
+  // length ringing having already been told they are being put through.
+  timeoutSeconds?: number
+  // Spoken when nobody answers. The whole reason this XML has a fallback: an
+  // unanswered transfer would otherwise drop the caller into silence, which is
+  // worse than never offering to transfer at all.
+  unavailableMessage?: string
+}
+
+// What Plivo fetches once the transfer is accepted.
+//
+// The <Speak> and <Hangup> AFTER the <Dial> are the load-bearing part. Plivo
+// continues to the next element when a dial does not connect -- no answer,
+// busy, a wrong number in the agent's config -- so without them the caller
+// hears ringing, then nothing, on a call that already told them they were
+// being put through to a person.
+//
+// callerId is deliberately NOT set to the caller's own number: the staff member
+// should see the business DID they are being called about, not the customer's
+// number, so a missed transfer shows up in their phone as a work call rather
+// than as an unknown mobile.
+export function buildTransferXml({
+  toNumber,
+  timeoutSeconds = 25,
+  unavailableMessage = 'Sorry, nobody is available right now. We have logged your request and someone will call you back shortly.',
+}: TransferXmlOptions): string {
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<Response>',
+    `  <Dial timeout="${timeoutSeconds}" redirect="false">`,
+    `    <Number>${escapeXml(toNumber)}</Number>`,
+    '  </Dial>',
+    `  <Speak>${escapeXml(unavailableMessage)}</Speak>`,
+    '  <Hangup/>',
+    '</Response>',
+  ].join('\n')
+}
