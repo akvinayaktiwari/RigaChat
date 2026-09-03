@@ -22,6 +22,7 @@ import {
   getClientIdsForPages,
   getPageRegistration,
   markPageVerified,
+  recordLeadForPage,
   listPagesForClient,
   getMetaLeadsByClientId,
   MetaPageConflictError,
@@ -575,6 +576,9 @@ export async function listConnectedPages(clientId: string): Promise<MetaPageSumm
     // pageName was always present.
     pageName: summary.pageName ?? summary.pageId,
     lastVerifiedAt: summary.lastVerifiedAt ?? summary.connectedAt,
+    // Zero, not undefined: a Page connected before counting existed has genuinely
+    // produced no leads that we counted, and "0" is the honest thing to show.
+    leadCount: summary.leadCount ?? 0,
   }))
 }
 
@@ -852,6 +856,14 @@ async function processSingleLeadgenEvent(
       ...(fieldDataUnavailable ? { _fieldDataUnavailable: 'Meta returned no answers for this lead' } : {}),
     }),
     sourceUrl,
+  })
+
+  // Counter only, and deliberately after the lead is durably saved: a failed
+  // increment must never cost the lead itself. Worst case the Page's total is
+  // low by one, which is a cosmetic wrong number on a dashboard, against losing
+  // a buyer who filled in a form thirty seconds ago.
+  await recordLeadForPage(pageId, metaLead.createdAt).catch((error) => {
+    console.error(`[meta-lead] could not record lead count for page ${pageId}:`, error)
   })
 
   // Hand the lead to its Agent. First in the post-save sequence because it is

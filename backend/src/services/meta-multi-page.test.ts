@@ -37,6 +37,8 @@ interface PageRow {
   pageAccessTokenEncrypted?: string
   connectedAt?: string
   lastVerifiedAt?: string
+  leadCount?: number
+  lastLeadAt?: string
 }
 
 const setPageClientMapping =
@@ -54,6 +56,7 @@ class MetaPageConflictError extends Error {}
 
 vi.mock('../repositories/meta-lead-repository.js', () => ({
   setPageClientMapping,
+  recordLeadForPage: async () => undefined,
   removePageClientMapping,
   listPagesForClient,
   getPageRegistration,
@@ -313,8 +316,11 @@ describe('listConnectedPages', () => {
 
     const result = await listConnectedPages('client-1')
 
-    expect(result).toEqual([{ pageId: 'page-1', clientId: 'client-1', pageName: 'Page 1' }])
+    expect(result[0]).toMatchObject({ pageId: 'page-1', clientId: 'client-1', pageName: 'Page 1' })
+    // The point of the test: the token never leaves the service.
     expect(result[0]).not.toHaveProperty('pageAccessTokenEncrypted')
+    // A Page connected before counting existed reports 0, not undefined.
+    expect(result[0]?.leadCount).toBe(0)
   })
 
   it('returns an empty list for a client with no Pages', async () => {
@@ -832,5 +838,27 @@ describe('bounding the repair pass', () => {
     // dashboard load resumes rather than losing them.
     expect(report.remaining).toBeGreaterThan(0)
     expect(isPageSubscribedToLeadgen.mock.calls.length).toBeLessThan(30)
+  })
+})
+
+describe('per-Page lead counters', () => {
+  it('passes a Page\'s running total and last-lead time through to the dashboard', async () => {
+    listPagesForClient.mockResolvedValue([
+      {
+        pageId: 'page-1',
+        clientId: 'client-1',
+        pageName: 'Page 1',
+        pageAccessTokenEncrypted: 'enc-tok-1',
+        leadCount: 39,
+        lastLeadAt: '2026-09-03T04:00:00.000Z',
+      },
+    ])
+
+    const result = await listConnectedPages('client-1')
+
+    expect(result[0]?.leadCount).toBe(39)
+    expect(result[0]?.lastLeadAt).toBe('2026-09-03T04:00:00.000Z')
+    // Still never the token, however many fields get added to the row.
+    expect(result[0]).not.toHaveProperty('pageAccessTokenEncrypted')
   })
 })

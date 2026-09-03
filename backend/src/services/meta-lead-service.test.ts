@@ -53,7 +53,13 @@ interface SavedMetaLead {
   phone?: string
   customFields: string
 }
-const createMetaLead = vi.fn(async (_input: SavedMetaLead) => ({ leadId: 'lead-1', clientId: 'client-1' }))
+const createMetaLead = vi.fn(async (_input: SavedMetaLead) => ({
+  leadId: 'lead-1',
+  clientId: 'client-1',
+  // The real repository returns the whole saved record. Omitting createdAt made
+  // the mock quietly unlike production once the counter began reading it.
+  createdAt: '2026-09-03T04:00:00.000Z',
+}))
 // M1: the lead path now resolves the whole registration from the pageId, so
 // the token it decrypts belongs to THAT Page rather than to the client. A
 // vi.fn (not an inline arrow) so individual tests can override it to exercise
@@ -64,6 +70,7 @@ const createMetaLead = vi.fn(async (_input: SavedMetaLead) => ({ leadId: 'lead-1
 // mock exists for (null, and a pre-M1 row with no token) stop typechecking --
 // which `npm test` never notices, because only `npm run build` runs tsc.
 type RegistrationMock = Partial<MetaPageRegistration> & { pageId: string; clientId: string }
+const recordLeadForPage = vi.fn<(pageId: string, receivedAt: string) => Promise<void>>(async () => undefined)
 const getPageRegistration = vi.fn<(pageId: string) => Promise<RegistrationMock | null>>(async () => ({
   pageId: 'page-1',
   clientId: 'client-1',
@@ -81,6 +88,7 @@ vi.mock('../repositories/meta-lead-repository.js', () => ({
   MetaPageConflictError: class extends Error {},
   removePageClientMapping: async () => undefined,
   setPageClientMapping: async () => undefined,
+  recordLeadForPage: (pageId: string, receivedAt: string) => recordLeadForPage(pageId, receivedAt),
   updateMetaLeadSyncStatus: async () => undefined,
 }))
 
@@ -142,7 +150,11 @@ beforeEach(() => {
   vi.clearAllMocks()
   verifyWebhookSignature.mockReturnValue(true)
   hasProcessed.mockResolvedValue(false)
-  createMetaLead.mockResolvedValue({ leadId: 'lead-1', clientId: 'client-1' })
+  createMetaLead.mockResolvedValue({
+    leadId: 'lead-1',
+    clientId: 'client-1',
+    createdAt: '2026-09-03T04:00:00.000Z',
+  })
   getCachedFormQuestions.mockResolvedValue(null)
   fetchFormQuestions.mockResolvedValue([])
   fetchPageLeadgenForms.mockResolvedValue([])
@@ -164,6 +176,7 @@ beforeEach(() => {
     metaConnection: { connected: true, pageName: 'Skyline Homes', pageAccessTokenEncrypted: 'enc' },
   })
   sendLeadNotification.mockResolvedValue({ notified: true })
+  recordLeadForPage.mockResolvedValue(undefined)
 })
 
 describe('empty field_data from the Graph API', () => {
@@ -454,5 +467,38 @@ describe('a client connected through the multi-Page picker', () => {
     expect(createMetaLead).not.toHaveBeenCalled()
     expect(error).toHaveBeenCalled()
     error.mockRestore()
+  })
+})
+
+describe('counting a lead against its Page', () => {
+  beforeEach(() => {
+    fetchLeadFieldData.mockResolvedValue([{ name: 'full_name', values: ['Ravi Kumar'] }])
+  })
+
+  it('records the lead against the Page it arrived on', async () => {
+    await processMetaLeadWebhook(payload, 'sha256=sig')
+
+    expect(recordLeadForPage).toHaveBeenCalledWith('page-1', expect.any(String))
+  })
+
+  // The counter is a dashboard nicety. The lead is the product.
+  it('still saves the lead when the counter write fails', async () => {
+    recordLeadForPage.mockRejectedValue(new Error('ddb down'))
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const result = await processMetaLeadWebhook(payload, 'sha256=sig')
+
+    expect(result.status).toBe(200)
+    expect(createMetaLead).toHaveBeenCalledTimes(1)
+    expect(err).toHaveBeenCalled()
+    err.mockRestore()
+  })
+
+  it('counts only after the lead is durably saved', async () => {
+    await processMetaLeadWebhook(payload, 'sha256=sig')
+
+    const savedAt = createMetaLead.mock.invocationCallOrder[0] ?? 0
+    const countedAt = recordLeadForPage.mock.invocationCallOrder[0] ?? 0
+    expect(countedAt).toBeGreaterThan(savedAt)
   })
 })
