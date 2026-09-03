@@ -2,6 +2,7 @@ import { getLeadById, getLeadsByClientId } from '../repositories/lead-repository
 import { getFormLeadById, getFormLeadsByClientId } from '../repositories/form-lead-repository.js'
 import { getFormsByClientId, getPublicFormConfig } from '../repositories/form-repository.js'
 import { getMetaLeadById, getMetaLeadsByClientId } from '../repositories/meta-lead-repository.js'
+import { getVoiceLeadById, getVoiceLeadsByClientId } from '../repositories/voice-lead-repository.js'
 import {
   appendLeadNote,
   getLeadState,
@@ -13,6 +14,7 @@ import {
   normalizeChatLead,
   normalizeFormLead,
   normalizeMetaLead,
+  normalizeVoiceLead,
   readJourneyLead,
 } from './lead-resolution-service.js'
 import type { FormField, LeadRef, LeadState, UnifiedLead, UnifiedLeadDetail,
@@ -99,10 +101,11 @@ export async function getUnifiedInbox(clientId: string, query: InboxQuery = {}):
   // The client's forms come along because a form lead's answers are keyed by
   // fieldId -- without the field definitions every form row renders as
   // "Unnamed lead / No contact". One query for all of them, not one per lead.
-  const [chatLeads, formLeads, metaLeads, states, forms] = await Promise.all([
+  const [chatLeads, formLeads, metaLeads, voiceLeads, states, forms] = await Promise.all([
     getLeadsByClientId(clientId),
     getFormLeadsByClientId(clientId),
     getMetaLeadsByClientId(clientId, META_INBOX_LIMIT),
+    getVoiceLeadsByClientId(clientId, META_INBOX_LIMIT),
     getLeadStatesForClient(clientId),
     getFormsByClientId(clientId),
   ])
@@ -133,6 +136,12 @@ export async function getUnifiedInbox(clientId: string, query: InboxQuery = {}):
     ...metaLeads.filter((lead) => !isArchived(lead.leadId)).map((lead) => ({
       ...normalizeMetaLead(lead),
       leadRef: { source: 'meta', pageId: lead.pageId, leadId: lead.leadId } as LeadRef,
+      createdAt: lead.createdAt,
+      state: read(lead.leadId),
+    })),
+    ...voiceLeads.filter((lead) => !isArchived(lead.leadId)).map((lead) => ({
+      ...normalizeVoiceLead(lead),
+      leadRef: { source: 'voice', agentId: lead.agentId, leadId: lead.leadId } as LeadRef,
       createdAt: lead.createdAt,
       state: read(lead.leadId),
     })),
@@ -319,6 +328,14 @@ async function readSourceRecord(leadRef: LeadRef, clientId: string): Promise<Sou
         createdAt: lead.createdAt,
         customFields: parseCustomFields(lead.customFields),
       }
+    }
+    case 'voice': {
+      const lead = await getVoiceLeadById(clientId, leadRef.leadId)
+      if (!lead) return null
+      // No transcript field: a call's transcript lives in lead_events, not on
+      // the lead row, because it is shared with every other channel the caller
+      // used. The detail view reads the event stream for it.
+      return { ...normalizeVoiceLead(lead), createdAt: lead.createdAt }
     }
   }
 }

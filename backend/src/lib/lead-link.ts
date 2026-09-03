@@ -26,7 +26,7 @@ const DELIMITER = '|'
 // The second field of a ref is a different key per source, and which one it is
 // carries meaning: a Meta lead's pageId is NOT a botId (see the LeadRef comment
 // in types/index.ts). Naming it 'scope' here keeps the packed form source-
-// agnostic without pretending the three are the same thing.
+// agnostic without pretending the four are the same thing.
 export function leadRefScopeId(ref: LeadRef): string {
   switch (ref.source) {
     case 'chat':
@@ -35,6 +35,8 @@ export function leadRefScopeId(ref: LeadRef): string {
       return ref.formId
     case 'meta':
       return ref.pageId
+    case 'voice':
+      return ref.agentId
   }
 }
 
