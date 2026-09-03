@@ -6,12 +6,17 @@ export const SOURCE_LABELS: Record<LeadSource, string> = {
   chat: 'Agent',
   form: 'Form',
   meta: 'Meta Ads',
+  voice: 'Phone Call',
 }
 
 export const SOURCE_BADGE_CLASSES: Record<LeadSource, string> = {
   chat: 'bg-violet-50 text-violet-700 border-violet-200',
   form: 'bg-sky-50 text-sky-700 border-sky-200',
   meta: 'bg-blue-50 text-blue-700 border-blue-200',
+  // Amber, distinct from chat's violet and Meta's blue: a phone lead is the one
+  // a person is most likely to act on within the hour, so it should not read as
+  // a variant of the web channels beside it.
+  voice: 'bg-amber-50 text-amber-700 border-amber-200',
 }
 
 export const STATUS_LABELS: Record<LeadStatus, string> = {

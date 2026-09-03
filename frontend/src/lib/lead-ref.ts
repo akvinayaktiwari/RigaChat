@@ -1,7 +1,7 @@
 import type { LeadRef } from '../types/index'
 
 // A lead's detail URL has to carry its whole LeadRef, not just the leadId: the
-// three lead tables have three different partition keys, so `leadId` alone is
+// lead tables have different partition keys, so `leadId` alone is
 // not addressable. The old route took `?botId=` and therefore could only ever
 // open a chat lead — form and Meta leads had their own separate pages.
 //
@@ -22,6 +22,7 @@ export function leadRefToSearch(ref: LeadRef): string {
   if (ref.source === 'chat') params.set('botId', ref.botId)
   if (ref.source === 'form') params.set('formId', ref.formId)
   if (ref.source === 'meta') params.set('pageId', ref.pageId)
+  if (ref.source === 'voice') params.set('agentId', ref.agentId)
   return params.toString()
 }
 
@@ -34,6 +35,7 @@ export function leadRefToQuery(ref: LeadRef): string {
   if (ref.source === 'chat') params.set('botId', ref.botId)
   if (ref.source === 'form') params.set('formId', ref.formId)
   if (ref.source === 'meta') params.set('pageId', ref.pageId)
+  if (ref.source === 'voice') params.set('agentId', ref.agentId)
   return params.toString()
 }
 
@@ -48,9 +50,11 @@ export function parseLeadRef(leadId: string | undefined, params: URLSearchParams
   const botId = params.get('botId')
   const formId = params.get('formId')
   const pageId = params.get('pageId')
+  const agentId = params.get('agentId')
 
   if (source === 'form' && formId) return { source, formId, leadId }
   if (source === 'meta' && pageId) return { source, pageId, leadId }
+  if (source === 'voice' && agentId) return { source, agentId, leadId }
   if (source === 'chat' && botId) return { source, botId, leadId }
 
   // No `source` but a botId: a link minted before the inbox existed. Treated as
@@ -75,7 +79,14 @@ export function parseLeadRef(leadId: string | undefined, params: URLSearchParams
 const PACKED_DELIMITER = '|'
 
 export function packLeadRef(ref: LeadRef): string {
-  const scopeId = ref.source === 'chat' ? ref.botId : ref.source === 'form' ? ref.formId : ref.pageId
+  const scopeId =
+    ref.source === 'chat'
+      ? ref.botId
+      : ref.source === 'form'
+        ? ref.formId
+        : ref.source === 'voice'
+          ? ref.agentId
+          : ref.pageId
   const packed = [ref.source, scopeId, ref.leadId].join(PACKED_DELIMITER)
   const bytes = new TextEncoder().encode(packed)
   const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join('')
@@ -111,6 +122,7 @@ export function unpackLeadRef(token: string): LeadRef | null {
   if (source === 'chat') return { source, botId: scopeId, leadId }
   if (source === 'form') return { source, formId: scopeId, leadId }
   if (source === 'meta') return { source, pageId: scopeId, leadId }
+  if (source === 'voice') return { source, agentId: scopeId, leadId }
 
   return null
 }
