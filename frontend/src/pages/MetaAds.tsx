@@ -562,7 +562,7 @@ export default function MetaAds() {
                 type="button"
                 onClick={() => setPageFilter(null)}
                 aria-pressed={pageFilter === null}
-                className={`min-h-[36px] px-3 rounded-full text-xs font-semibold border transition-colors ${
+                className={`min-h-[44px] px-3 rounded-full text-xs font-semibold border transition-colors ${
                   pageFilter === null
                     ? 'bg-violet-600 text-white border-violet-600'
                     : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
@@ -576,7 +576,8 @@ export default function MetaAds() {
                   type="button"
                   onClick={() => setPageFilter(p.pageId)}
                   aria-pressed={pageFilter === p.pageId}
-                  className={`min-h-[36px] max-w-full px-3 rounded-full text-xs font-semibold border transition-colors truncate ${
+                  title={p.pageName}
+                  className={`min-h-[44px] max-w-full px-3 rounded-full text-xs font-semibold border transition-colors truncate ${
                     pageFilter === p.pageId
                       ? 'bg-violet-600 text-white border-violet-600'
                       : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
