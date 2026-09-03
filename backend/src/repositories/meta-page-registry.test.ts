@@ -15,6 +15,7 @@ const {
   getClientIdForPage,
   getClientIdsForPages,
   removePageClientMapping,
+  markPageVerified,
   MetaPageConflictError,
 } = await import('./meta-lead-repository.js')
 
@@ -236,6 +237,46 @@ describe('removePageClientMapping', () => {
     send.mockRejectedValue(new Error('ProvisionedThroughputExceededException'))
 
     await expect(removePageClientMapping('page-1')).rejects.toThrow(/Failed to remove Meta page mapping page-1/)
+  })
+})
+
+describe('markPageVerified', () => {
+  it('stamps lastVerifiedAt by pageId without touching anything else on the row', async () => {
+    send.mockResolvedValue({})
+    const before = new Date().toISOString()
+
+    await markPageVerified('page-1')
+
+    const input = send.mock.calls[0][0].input
+    expect(input.TableName).toBe('test-meta-page-lookup')
+    expect(input.Key).toEqual({ pageId: 'page-1' })
+    expect(input.UpdateExpression).toBe('SET lastVerifiedAt = :now')
+    const written = input.ExpressionAttributeValues[':now'] as string
+    expect(written >= before).toBe(true)
+  })
+
+  it('guards the write so it cannot resurrect a row deleted between the read and here', async () => {
+    send.mockResolvedValue({})
+
+    await markPageVerified('page-1')
+
+    expect(send.mock.calls[0][0].input.ConditionExpression).toBe('attribute_exists(pageId)')
+  })
+
+  // The row this call was about to verify was removed (disconnected, or erased)
+  // in the gap between the reconcile pass reading it and this write landing.
+  // That is not a failure the reconcile pass should report or retry -- the
+  // Page is gone, so there is nothing left to mark.
+  it('swallows a ConditionalCheckFailedException instead of throwing', async () => {
+    send.mockRejectedValue(conditionalCheckFailed())
+
+    await expect(markPageVerified('page-1')).resolves.toBeUndefined()
+  })
+
+  it('wraps any other DynamoDB failure with the pageId for diagnosability', async () => {
+    send.mockRejectedValue(new Error('ProvisionedThroughputExceededException'))
+
+    await expect(markPageVerified('page-1')).rejects.toThrow(/Failed to mark Meta page page-1 verified/)
   })
 })
 

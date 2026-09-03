@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { MetaConnectPagesResult, MetaPageSummary } from '../types/index'
 
 // frontend vitest runs without globals, so @testing-library's auto-cleanup never
@@ -13,6 +13,7 @@ const disconnectMetaPage = vi.fn()
 const getConnectedMetaPages = vi.fn()
 const getMetaLeads = vi.fn()
 const getMetaStatus = vi.fn()
+const verifyMetaPageSubscriptions = vi.fn()
 
 vi.mock('../services/api', () => ({
   connectMeta: (...a: unknown[]) => connectMeta(...a),
@@ -21,6 +22,7 @@ vi.mock('../services/api', () => ({
   getConnectedMetaPages: (...a: unknown[]) => getConnectedMetaPages(...a),
   getMetaLeads: (...a: unknown[]) => getMetaLeads(...a),
   getMetaStatus: (...a: unknown[]) => getMetaStatus(...a),
+  verifyMetaPageSubscriptions: (...a: unknown[]) => verifyMetaPageSubscriptions(...a),
 }))
 
 const toastShow = vi.fn()
@@ -58,7 +60,15 @@ beforeEach(() => {
   getMetaStatus.mockResolvedValue({ success: true, data: null })
   getMetaLeads.mockResolvedValue({ success: true, data: [] })
   getConnectedMetaPages.mockResolvedValue({ success: true, data: [] })
+  verifyMetaPageSubscriptions.mockResolvedValue({
+    success: true,
+    data: { checked: 0, repaired: [], unrepairable: [], remaining: 0 },
+  })
   window.history.replaceState({}, '', '/dashboard/meta-ads')
+  // The repair effect gates itself once per browser session (sessionStorage),
+  // not once per mount. Without clearing it here, only the first test in this
+  // file would ever call verifyMetaPageSubscriptions.
+  sessionStorage.clear()
 })
 
 describe('empty state', () => {
@@ -222,7 +232,7 @@ describe('picker callbacks surfaced by MetaAds', () => {
     }
     pickerProps.onConnected?.(result)
 
-    await waitFor(() => expect(screen.getByText('Connected 1 of 2 Pages')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/Connected 1 Page.*1 needs attention/)).toBeTruthy())
     expect(screen.getByText(/Page 2.*already connected to another account/)).toBeTruthy()
     await waitFor(() => expect(toastShow).toHaveBeenCalledWith('Connected 1 Page', 'success'))
   })
@@ -238,7 +248,7 @@ describe('picker callbacks surfaced by MetaAds', () => {
       skipped: [{ pageId: 'page-2', pageName: 'Page 2', reason: 'subscribe_failed' }],
     })
 
-    await waitFor(() => expect(screen.getByText('Connected 0 of 1 Pages')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/Connected 0 Pages.*1 needs attention/)).toBeTruthy())
     expect(toastShow).not.toHaveBeenCalledWith(expect.stringContaining('Connected'), 'success')
   })
 
@@ -319,5 +329,162 @@ describe('per-Page disconnect when the network fails', () => {
     await waitFor(() =>
       expect(toastShow).toHaveBeenCalledWith(expect.stringContaining('still connected'), 'error')
     )
+  })
+})
+
+describe('the background subscription repair', () => {
+  it('shows no repaired banner when there was nothing to repair', async () => {
+    // The common case. A client reading their leads should not be told about a
+    // maintenance pass that found everything healthy.
+    getConnectedMetaPages.mockResolvedValue({ success: true, data: [page(1)] })
+
+    render(<MetaAds />)
+    await waitFor(() => expect(screen.getByText('Page 1')).toBeTruthy())
+
+    expect(screen.queryByText(/stopped/)).toBeFalsy()
+    expect(toastShow).not.toHaveBeenCalled()
+  })
+
+  it('tells the client in lead terms, and names the Page, when it fixed one', async () => {
+    getConnectedMetaPages.mockResolvedValue({ success: true, data: [page(1)] })
+    verifyMetaPageSubscriptions.mockResolvedValue({
+      success: true,
+      data: { checked: 1, repaired: [{ pageId: 'page-1', pageName: 'Skyline Homes' }], unrepairable: [], remaining: 0 },
+    })
+
+    render(<MetaAds />)
+
+    await waitFor(() => expect(screen.getByText(/stopped.*receiving leads/)).toBeTruthy())
+    expect(screen.getByText('Skyline Homes')).toBeTruthy()
+    // This is a persistent panel, not a toast: the point of the redesign was
+    // that a 3s toast is the wrong surface for something the client needs to
+    // read and act on.
+    expect(toastShow).not.toHaveBeenCalled()
+  })
+
+  it('says Page, not Pages, when it repaired exactly one', async () => {
+    getConnectedMetaPages.mockResolvedValue({ success: true, data: [page(1)] })
+    verifyMetaPageSubscriptions.mockResolvedValue({
+      success: true,
+      data: { checked: 1, repaired: [{ pageId: 'page-1', pageName: 'Page 1' }], unrepairable: [], remaining: 0 },
+    })
+
+    render(<MetaAds />)
+
+    await waitFor(() => expect(screen.getByText(/Reconnected 1 Page that/)).toBeTruthy())
+  })
+
+  it('says Pages, plural, when it repaired more than one', async () => {
+    getConnectedMetaPages.mockResolvedValue({ success: true, data: [page(1), page(2)] })
+    verifyMetaPageSubscriptions.mockResolvedValue({
+      success: true,
+      data: {
+        checked: 2,
+        repaired: [
+          { pageId: 'page-1', pageName: 'Page 1' },
+          { pageId: 'page-2', pageName: 'Page 2' },
+        ],
+        unrepairable: [],
+        remaining: 0,
+      },
+    })
+
+    render(<MetaAds />)
+
+    await waitFor(() => expect(screen.getByText(/Reconnected 2 Pages that/)).toBeTruthy())
+    // "Page 1"/"Page 2" render twice each (repaired banner + connected list) --
+    // assert on presence via getAllByText rather than a getByText that would
+    // throw on the ambiguity.
+    expect(screen.getAllByText('Page 1').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('Page 2').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('reloads the Page list after a repair so the dashboard reflects the fix', async () => {
+    getConnectedMetaPages.mockResolvedValue({ success: true, data: [page(1)] })
+    verifyMetaPageSubscriptions.mockResolvedValue({
+      success: true,
+      data: { checked: 1, repaired: [{ pageId: 'page-1', pageName: 'Page 1' }], unrepairable: [], remaining: 0 },
+    })
+
+    render(<MetaAds />)
+
+    await waitFor(() => expect(screen.getByText(/Reconnected 1 Page that/)).toBeTruthy())
+    // Once from the initial mount effect, once from the repair's own reload.
+    await waitFor(() => expect(getConnectedMetaPages.mock.calls.length).toBeGreaterThanOrEqual(2))
+  })
+
+  it('the banner can be dismissed', async () => {
+    getConnectedMetaPages.mockResolvedValue({ success: true, data: [page(1)] })
+    verifyMetaPageSubscriptions.mockResolvedValue({
+      success: true,
+      data: { checked: 1, repaired: [{ pageId: 'page-1', pageName: 'Page 1' }], unrepairable: [], remaining: 0 },
+    })
+
+    render(<MetaAds />)
+    await waitFor(() => expect(screen.getByText(/Reconnected 1 Page that/)).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+
+    expect(screen.queryByText(/Reconnected 1 Page that/)).toBeFalsy()
+  })
+
+  it('shows no repaired banner when the repair pass reports it could not fix a Page', async () => {
+    // unrepairable is diagnostic (server logs), not a client-facing failure --
+    // the client did not ask for this maintenance pass and should not be
+    // handed an error about it.
+    getConnectedMetaPages.mockResolvedValue({ success: true, data: [page(1)] })
+    verifyMetaPageSubscriptions.mockResolvedValue({
+      success: true,
+      data: { checked: 1, repaired: [], unrepairable: ['page-1'], remaining: 0 },
+    })
+
+    render(<MetaAds />)
+    await waitFor(() => expect(screen.getByText('Page 1')).toBeTruthy())
+
+    expect(screen.queryByText(/stopped/)).toBeFalsy()
+  })
+
+  it('stays silent when the repair pass itself fails', async () => {
+    // A background repair failing is not the client's problem to action.
+    getConnectedMetaPages.mockResolvedValue({ success: true, data: [page(1)] })
+    verifyMetaPageSubscriptions.mockRejectedValue(new Error('network down'))
+
+    render(<MetaAds />)
+    await waitFor(() => expect(screen.getByText('Page 1')).toBeTruthy())
+
+    expect(screen.queryByText(/stopped/)).toBeFalsy()
+    expect(toastShow).not.toHaveBeenCalled()
+  })
+
+  it('runs the repair check only once per browser session, not once per mount', async () => {
+    getConnectedMetaPages.mockResolvedValue({ success: true, data: [page(1)] })
+
+    const { unmount } = render(<MetaAds />)
+    await waitFor(() => expect(verifyMetaPageSubscriptions).toHaveBeenCalledTimes(1))
+    unmount()
+
+    render(<MetaAds />)
+    await waitFor(() => expect(screen.getByText('Page 1')).toBeTruthy())
+    expect(verifyMetaPageSubscriptions).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('a batch that ran out of Lambda time', () => {
+  it('says the rest were not attempted, not that they failed', async () => {
+    // "Meta refused the subscription" would be a lie and would send the client
+    // looking for a problem on Facebook's side. Nothing was attempted, and
+    // pressing Connect again is all it takes.
+    window.history.replaceState({}, '', '/dashboard/meta-ads?meta=select_pages')
+
+    render(<MetaAds />)
+    await waitFor(() => expect(screen.getByTestId('meta-page-picker')).toBeTruthy())
+
+    pickerProps.onConnected?.({
+      connected: [page(1)],
+      skipped: [{ pageId: 'page-2', pageName: 'Page 2', reason: 'batch_budget_exceeded' }],
+    })
+
+    await waitFor(() => expect(screen.getByText(/not attempted/)).toBeTruthy())
+    expect(screen.getByText(/press Add Pages again/)).toBeTruthy()
   })
 })

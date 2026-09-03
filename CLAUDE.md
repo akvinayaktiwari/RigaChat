@@ -73,6 +73,11 @@ POST /api/integrations/meta/pages -> connect a selected set. PARTIAL SUCCESS is 
                                   selection, 409 on an expired user token (auth required)
 DELETE /api/integrations/meta/pages/:pageId -> disconnect ONE Page, unsubscribing its webhook. Refuses a Page owned
                                   by another client (auth required)
+POST /api/integrations/meta/pages/verify -> re-checks each connected Page is genuinely subscribed at Meta and
+                                  re-subscribes any that are not. Repairs the claimed-but-unsubscribed state a
+                                  timed-out connect leaves behind, where the dashboard says Connected and no lead
+                                  ever arrives. Staleness-gated on lastVerifiedAt (12h), so the usual call makes
+                                  zero Graph calls. POST because it repairs rather than reports (auth required)
 DELETE /api/integrations/meta/disconnect -> disconnect-all: every Page row AND the stored user token, so
                                   "disconnected" means we no longer hold a credential that can enumerate their
                                   Facebook assets (auth required)
@@ -294,9 +299,20 @@ Hallucination prevention:
 
 
 Git Commit Rule:
-After every completed and tested feature, run:
-  git add .
+COMMIT IN CHUNKS. A body of work lands as several small logical commits, never
+as one big one. One commit per logical change, each independently valid so the
+history bisects. A source fix and its regression test belong in the SAME commit;
+two unrelated fixes never do. Order commits so dependencies land first.
+
+Stage by name, not wholesale:
+  git add <the files for THIS logical change>
   git commit -m "<type>: <short description>"
+
+Do NOT `git add .` or `git add -A` when the tree holds unrelated work -- that is
+what collapses a reviewable series into one unrevertable lump.
+
+The message says what broke and why the fix is right, not what the diff
+contains. If a message needs a list to describe one commit, it is really two.
 
 Commit message format:
   feat: add support email extraction in crawler

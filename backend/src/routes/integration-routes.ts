@@ -43,6 +43,7 @@ import {
   disconnectMetaPage,
   listConnectedPages,
   listSelectablePages,
+  reconcilePageSubscriptions,
   getMetaLeadsForClient,
   getMetaStatus,
 } from '../services/meta-lead-service.js'
@@ -56,6 +57,7 @@ import type {
   MetaLead,
   MetaPageSummary,
   MetaSelectablePagesResult,
+  MetaSubscriptionReport,
   WhatsAppConnection,
 } from '../types/index.js'
 
@@ -491,6 +493,24 @@ integrationRoutes.post('/meta/pages', requireAuth, async (c) => {
     if (error instanceof MetaUserTokenExpiredError) {
       return c.json<ApiResponse<null>>({ success: false, error: error.message }, 409)
     }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+// Re-checks that each connected Page is genuinely subscribed at Meta, and
+// re-subscribes any that are not. Its own route, and a POST, because it repairs
+// state rather than reporting it -- and because the dashboard calls it on load,
+// where a GET that mutates would be the wrong contract.
+//
+// Staleness-gated, so the common case makes zero Graph calls and returns
+// checked: 0.
+integrationRoutes.post('/meta/pages/verify', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+
+  try {
+    const report = await reconcilePageSubscriptions(clientId)
+    return c.json<ApiResponse<MetaSubscriptionReport>>({ success: true, data: report }, 200)
+  } catch (error) {
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }
 })

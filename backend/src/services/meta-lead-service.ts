@@ -21,6 +21,7 @@ import {
   getClientIdForPage,
   getClientIdsForPages,
   getPageRegistration,
+  markPageVerified,
   listPagesForClient,
   getMetaLeadsByClientId,
   MetaPageConflictError,
@@ -42,6 +43,8 @@ import type {
   MetaPageSkipped,
   MetaPageSummary,
   MetaSelectablePage,
+  MetaPageRepaired,
+  MetaSubscriptionReport,
   FormField,
   MetaConnection,
   MetaDeletionRequest,
@@ -237,16 +240,30 @@ export async function disconnectMetaAds(clientId: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 // A batch size, not a product ceiling. Each Page costs a webhook subscription
-// round trip and the Lambda has 60 seconds; a client with 60 Pages connects
+// round trip against LAMBDA_BUDGET_MS; a client with 60 Pages connects
 // them in three passes rather than being told 25 is all they may ever have.
 export const MAX_PAGES_PER_CONNECT = 25
 
 // Each Page costs a Graph round trip, so 25 of them one after another is a
-// real chance of spending the Lambda's whole 60s budget and timing out
+// real chance of spending the whole LAMBDA_BUDGET_MS and timing out
 // mid-batch -- leaving some Pages claimed and subscribed and the rest not,
 // with nothing to roll them back. Bounded rather than unbounded: firing all 25
 // at once only trades the timeout risk for a Graph rate-limit risk.
 const PAGE_WORK_CONCURRENCY = 5
+
+// The deployed Lambda timeout. Used only to judge how close a batch came to it,
+// so the log says "80% of budget" rather than an unanchored millisecond count.
+const LAMBDA_BUDGET_MS = 60_000
+
+// Stop starting new Pages past this point.
+//
+// LAMBDA_BUDGET_MS used to be a cliff: the batch either finished or the process
+// was killed mid-Page, and a kill lands between the claim and the webhook
+// subscription -- leaving a Page that reads Connected and receives nothing,
+// with the rollback killed alongside it. Checked instead of hoped for, running
+// out of time becomes a reported outcome the client can act on. The 15s margin
+// covers the Page already in flight plus the response.
+const BATCH_DEADLINE_MS = 45_000
 
 /**
  * Runs `work` over `items` with at most `limit` in flight, preserving input
@@ -357,6 +374,7 @@ export async function connectMetaPages(
     throw new MetaTooManyPagesError(pageIds.length, MAX_PAGES_PER_CONNECT)
   }
 
+  const startedAt = Date.now()
   const userToken = await requireUserToken(clientId)
   const available = await fetchPagesOrExpired(userToken)
   const wanted = available.filter((p) => pageIds.includes(p.pageId))
@@ -367,6 +385,13 @@ export async function connectMetaPages(
     wanted,
     PAGE_WORK_CONCURRENCY,
     async (page) => {
+      // Checked before the claim, never between the claim and the subscribe:
+      // stopping in that gap would create exactly the state this guard exists
+      // to prevent.
+      if (Date.now() - startedAt > BATCH_DEADLINE_MS) {
+        return { skipped: { pageId: page.pageId, pageName: page.pageName, reason: 'batch_budget_exceeded' } }
+      }
+
       // Claim first, exactly as the single-Page path does: the atomic condition
       // is the real guarantee, and claiming before any other write means a lost
       // race never leaves a half-connected Page behind.
@@ -419,7 +444,124 @@ export async function connectMetaPages(
     else skipped.push(outcome.skipped)
   }
 
+  // The number that answers "does a full batch fit in the Lambda?" from real
+  // traffic rather than from arithmetic. A batch killed by the timeout leaves
+  // no log line at all, so a run that stops appearing here IS the signal.
+  const elapsedMs = Date.now() - startedAt
+  console.log(
+    `[meta-connect] batch complete: ${wanted.length} page(s) in ${elapsedMs}ms ` +
+      `(concurrency ${PAGE_WORK_CONCURRENCY}, ${connected.length} connected, ${skipped.length} skipped, ` +
+      `${Math.round(elapsedMs / Math.max(wanted.length, 1))}ms/page, budget ${LAMBDA_BUDGET_MS}ms)`
+  )
+  const ranOutOfTime = skipped.filter((p) => p.reason === 'batch_budget_exceeded').length
+  if (ranOutOfTime > 0) {
+    console.warn(
+      `[meta-connect] deadline hit after ${elapsedMs}ms: ${ranOutOfTime} page(s) not attempted. ` +
+        `The client can reconnect them; nothing was left half-written.`
+    )
+  }
+  if (elapsedMs > LAMBDA_BUDGET_MS * 0.5) {
+    console.warn(
+      `[meta-connect] batch used ${Math.round((elapsedMs / LAMBDA_BUDGET_MS) * 100)}% of the Lambda budget ` +
+        `for ${wanted.length} page(s) -- a larger batch may not finish`
+    )
+  }
+
   return { connected, skipped }
+}
+
+/**
+ * How stale a verification may be before we re-check with Meta.
+ *
+ * The point of the window is that the repair costs one Graph call per Page, so
+ * an unbounded check would put a call per Page on every dashboard load. Twelve
+ * hours keeps a broken Page invisible for at most half a day while making the
+ * common case free.
+ */
+const VERIFY_STALE_AFTER_MS = 12 * 60 * 60 * 1000
+
+// This pass runs while a client waits for their dashboard, and it costs a Graph
+// call per Page. Both bounds exist because a client's Pages all go stale
+// TOGETHER -- they were connected in one batch, so they cross the 12h boundary
+// in one batch -- which makes "one Page at a time" the wrong mental model and
+// "the whole account at once" the real one. Unbounded, 500 Pages is 100
+// sequential waves and blows the same Lambda budget connectMetaPages guards.
+const VERIFY_MAX_PER_PASS = 40
+const VERIFY_DEADLINE_MS = 20_000
+
+/**
+ * Finds Pages that are claimed in our registry but not actually subscribed at
+ * Meta, and re-subscribes them.
+ *
+ * This is the state a Lambda timeout can leave behind: connectMetaPages claims
+ * a Page, then subscribes it, and rolls the claim back if subscribing THROWS --
+ * but a timeout kills the rollback along with the process. The Page is left
+ * showing "Connected" in the dashboard while Meta delivers nothing for it, and
+ * a retry makes it worse, because the picker shows it already ticked so the
+ * client has no way to act on it.
+ *
+ * Also repairs the same shape from any other cause: an admin revoking and
+ * regranting the app, or Meta dropping a subscription on its own.
+ */
+export async function reconcilePageSubscriptions(clientId: string): Promise<MetaSubscriptionReport> {
+  const rows = await listPagesForClient(clientId)
+  const now = Date.now()
+
+  const stale = rows
+    .filter((row) => {
+      // A row with no token cannot be checked -- nothing to authenticate the
+      // Graph call with. Those are the pre-registry rows the backfill skipped.
+      if (!row.pageAccessTokenEncrypted) return false
+      if (!row.lastVerifiedAt) return true
+      return now - new Date(row.lastVerifiedAt).getTime() > VERIFY_STALE_AFTER_MS
+    })
+    // Oldest first, so a capped pass makes real progress instead of re-checking
+    // the same arbitrary slice on every dashboard load.
+    .sort((a, b) => (a.lastVerifiedAt ?? '').localeCompare(b.lastVerifiedAt ?? ''))
+
+  const due = stale.slice(0, VERIFY_MAX_PER_PASS)
+  const startedAt = Date.now()
+
+  const repaired: MetaPageRepaired[] = []
+  const unrepairable: string[] = []
+  let skippedForTime = 0
+
+  await mapWithConcurrency(due, PAGE_WORK_CONCURRENCY, async (row) => {
+    // Same guard connectMetaPages uses, for the same reason: being killed
+    // mid-pass wastes the work and tells the client nothing. Stopping early is
+    // free here because every step is idempotent -- the next load resumes.
+    if (Date.now() - startedAt > VERIFY_DEADLINE_MS) {
+      skippedForTime += 1
+      return
+    }
+
+    try {
+      const token = await decrypt(row.pageAccessTokenEncrypted as string)
+      if (await metaProvider.isPageSubscribedToLeadgen(row.pageId, token)) {
+        await markPageVerified(row.pageId)
+        return
+      }
+
+      console.warn(`[meta-verify] page ${row.pageId} was claimed but not subscribed; re-subscribing`)
+      await metaProvider.subscribePageToWebhook(row.pageId, token)
+      await markPageVerified(row.pageId)
+      // Named, not just counted: the client needs to know WHICH Pages were
+      // silently dropping leads to judge how much history to worry about.
+      repaired.push({ pageId: row.pageId, pageName: row.pageName ?? row.pageId })
+    } catch (error) {
+      // Never throw: this runs alongside a normal dashboard read, and a Page we
+      // cannot check must not take the whole page down with it.
+      console.error(`[meta-verify] could not verify page ${row.pageId}:`, error)
+      unrepairable.push(row.pageId)
+    }
+  })
+
+  const remaining = stale.length - due.length + skippedForTime
+  if (remaining > 0) {
+    console.log(`[meta-verify] ${remaining} page(s) still due; the next dashboard load continues`)
+  }
+
+  return { checked: due.length - skippedForTime, repaired, unrepairable, remaining }
 }
 
 /** The client's connected Pages, without their tokens. */

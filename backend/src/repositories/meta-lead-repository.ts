@@ -289,6 +289,29 @@ export async function getClientIdsForPages(pageIds: string[]): Promise<Map<strin
   return owners
 }
 
+// Records that we re-checked this Page with Meta, without touching anything
+// else on the row. Its own function because setPageClientMapping requires the
+// name and token, and a verification pass has neither to hand.
+export async function markPageVerified(pageId: string): Promise<void> {
+  try {
+    await dynamoClient.send(
+      new UpdateCommand({
+        TableName: PAGE_LOOKUP_TABLE_NAME(),
+        Key: { pageId },
+        UpdateExpression: 'SET lastVerifiedAt = :now',
+        // Never resurrect a row that was deleted between the read and here.
+        ConditionExpression: 'attribute_exists(pageId)',
+        ExpressionAttributeValues: { ':now': new Date().toISOString() },
+      })
+    )
+  } catch (error) {
+    if (error instanceof Error && error.name === 'ConditionalCheckFailedException') return
+    throw new Error(
+      `Failed to mark Meta page ${pageId} verified: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
 export async function removePageClientMapping(pageId: string): Promise<void> {
   try {
     await dynamoClient.send(
