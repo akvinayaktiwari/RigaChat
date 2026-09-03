@@ -40,6 +40,32 @@ function skipReasonText(reason: MetaPageSkipped['reason']): string {
   }
 }
 
+// Intl.RelativeTimeFormat rather than a date library: the platform ships this,
+// and the whole need here is one short phrase.
+const RELATIVE = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
+const RELATIVE_STEPS: [Intl.RelativeTimeFormatUnit, number][] = [
+  ['second', 60],
+  ['minute', 60],
+  ['hour', 24],
+  ['day', 30],
+  ['month', 12],
+]
+
+function timeAgo(iso: string): string {
+  let delta = (Date.now() - new Date(iso).getTime()) / 1000
+  // A clock skew between the server stamping the lead and the browser reading it
+  // must not render "in 3 seconds" on a lead that already arrived.
+  if (delta < 0) delta = 0
+  for (const [unit, size] of RELATIVE_STEPS) {
+    if (delta < size) return RELATIVE.format(-Math.floor(delta), unit)
+    delta /= size
+  }
+  return RELATIVE.format(-Math.floor(delta), 'year')
+}
+
+// Mirrors getMetaLeadsByClientId's default limit.
+const LEADS_PAGE_SIZE = 50
+
 const VERIFY_ONCE_KEY = 'meta-pages-verified-this-session'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -143,6 +169,12 @@ export default function MetaAds() {
   // A filter over one Page is decoration. Only offer it once there is a choice
   // to make.
   const showPageFilter = filterablePages.length > 1
+
+  // The leads endpoint returns the 50 most recent. Hitting exactly that means
+  // there are probably more, and every count on this card describes the window
+  // rather than the lifetime -- which the per-Page totals above do not. Say so
+  // instead of letting the two disagree silently.
+  const atLeadsCap = leads.length >= LEADS_PAGE_SIZE
 
   function loadPages(): void {
     setPagesLoading(true)
@@ -466,8 +498,17 @@ export default function MetaAds() {
                 {pages.map((page) => (
                   <li key={page.pageId} className="flex items-center justify-between gap-4 py-3 min-h-[52px]">
                     <div className="min-w-0">
-                      <p className="text-base text-gray-900 truncate">{page.pageName}</p>
-                      <p className="text-xs text-gray-400">{page.pageId}</p>
+                      <p className="text-base text-gray-900 truncate" title={page.pageId}>
+                        {page.pageName}
+                      </p>
+                      {/* Recency first, count second. A Page that broke three days
+                          ago still shows a healthy cumulative total, so the date is
+                          the half that reveals it has gone quiet. */}
+                      <p className="text-xs text-gray-500">
+                        {page.lastLeadAt
+                          ? `${page.leadCount ?? 0} lead${page.leadCount === 1 ? '' : 's'} · last ${timeAgo(page.lastLeadAt)}`
+                          : 'No leads yet'}
+                      </p>
                     </div>
                     <button
                       type="button"
@@ -548,8 +589,8 @@ export default function MetaAds() {
               {leadsLoading
                 ? ''
                 : pageFilter === null
-                  ? `${leads.length} lead${leads.length === 1 ? '' : 's'} from every Page`
-                  : `${visibleLeads.length} lead${visibleLeads.length === 1 ? '' : 's'} from ${pageNameOf(pageFilter)}`}
+                  ? `${leads.length} lead${leads.length === 1 ? '' : 's'} from every Page${atLeadsCap ? ', the most recent first' : ''}`
+                  : `${visibleLeads.length} lead${visibleLeads.length === 1 ? '' : 's'} from ${pageNameOf(pageFilter)}${atLeadsCap ? ', of the most recent shown' : ''}`}
             </p>
           </div>
 
