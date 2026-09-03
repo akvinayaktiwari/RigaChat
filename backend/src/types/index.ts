@@ -1201,6 +1201,25 @@ export interface AgentBindingLookup {
   boundAt: string
 }
 
+// Routes an inbound phone call to the voice agent that answers it. A Plivo
+// answer webhook carries the dialled number and nothing else -- no agentId, no
+// clientId -- which is why the number is the partition key and this is its own
+// table rather than a GSI on voice_agents. Same shape and same reasoning as
+// meta_page_lookup (pageId), gupshup_app_lookup (appName), and
+// agent_binding_lookup (resourceId).
+//
+// The row IS the connection: it is written when a number is assigned to an
+// agent and deleted when it is released, so the webhook gates on the row
+// existing rather than on any field of the VoiceAgent record.
+export interface VoicePhoneLookup {
+  // E.164, exactly as Plivo delivers it on the webhook (e.g. +919876543210).
+  // Callers normalise before reaching this layer -- see normalisePhoneNumber.
+  phoneNumber: string
+  agentId: string
+  clientId: string
+  assignedAt: string
+}
+
 // The bounded MCP capability palette. Engineering-controlled: clients pick
 // FROM this set, they never extend it (the approved design's "bounded
 // toolbox, NOT full autonomy"). A union rather than `string` so a bad

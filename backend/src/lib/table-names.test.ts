@@ -47,6 +47,10 @@ const PRODUCTION_TABLE_NAMES: Record<TableKey, string> = {
   // the Lambda environment is at 3597/4096 bytes. Provisioned by
   // scripts/provision-device-tokens.sh.
   device_tokens: 'device_tokens',
+  // Added 2026-09-03 with voice telephony. Like device_tokens above it, never a
+  // DYNAMODB_TABLE_* variable and must not become one. Provisioned by
+  // scripts/provision-voice-phone-lookup.sh.
+  voice_phone_lookup: 'voice_phone_lookup',
 }
 
 // vitest.config.ts sets DYNAMODB_TABLE_PREFIX=test- as a safety boundary, so an
