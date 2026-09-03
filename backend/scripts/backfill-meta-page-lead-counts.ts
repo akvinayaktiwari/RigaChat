@@ -6,10 +6,15 @@
 // nothing, because it looks like the Page is broken.
 //
 // Safe to re-run. Both fields are SET to values recomputed from the leads table
-// rather than incremented, so a second run converges on the same answer instead
-// of doubling. The one race: a lead arriving between the scan and the write is
-// counted by the scan AND by its own increment, leaving that Page one high
-// until the next run. Cosmetic, and self-correcting.
+// rather than incremented, so a second run converges instead of doubling.
+//
+// The one race, and its direction matters: a lead that lands AFTER the scan has
+// read its Page but BEFORE the SET lands is missing from the tally, and the SET
+// then overwrites the increment the live path had already applied. So the error
+// is always an UNDERCOUNT -- by however many leads arrive inside that window --
+// never a double count. A number that is one or two low looks perfectly
+// plausible, so do not expect to notice it: re-run once traffic is quiet and it
+// converges on the truth.
 //
 // Run from backend/:
 //   npx tsx scripts/backfill-meta-page-lead-counts.ts --dry-run
