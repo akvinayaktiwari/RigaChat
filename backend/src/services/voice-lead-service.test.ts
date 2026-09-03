@@ -9,9 +9,11 @@ vi.mock('../repositories/voice-lead-repository.js', () => ({ createVoiceLead }))
 const findLeadByPhone = vi.fn()
 vi.mock('./lead-identity-service.js', () => ({ findLeadByPhone }))
 
-const { resolveCallLead, recordCallTurn, recordCallLifecycle, recordCallToolUse } = await import(
-  './voice-lead-service.js'
-)
+const sendHandoffAlert = vi.fn()
+vi.mock('./notification-service.js', () => ({ sendHandoffAlert }))
+
+const { resolveCallLead, recordCallTurn, recordCallLifecycle, recordCallToolUse, recordCallHandoff } =
+  await import('./voice-lead-service.js')
 
 const CALL = {
   clientId: 'client-1',
@@ -25,6 +27,7 @@ beforeEach(() => {
   appendLeadEvent.mockReset().mockResolvedValue(undefined)
   createVoiceLead.mockReset()
   findLeadByPhone.mockReset().mockResolvedValue(null)
+  sendHandoffAlert.mockReset().mockResolvedValue({ notified: true })
 })
 
 describe('resolveCallLead', () => {
@@ -173,5 +176,63 @@ describe('recording the conversation', () => {
         body: 'search_knowledge_base(price of 4B) -> 3 result(s)',
       })
     )
+  })
+})
+
+describe('recordCallHandoff', () => {
+  const identity = {
+    leadRef: { source: 'voice' as const, agentId: 'a', leadId: 'lead-1' },
+    leadId: 'lead-1',
+    botId: 'bot-1',
+    isNewLead: false,
+  }
+
+  // The same path a journey handoff takes. A client should not have to learn
+  // two notification systems depending on which channel the person asking for
+  // help happened to use.
+  it('records the handoff and raises the existing alert', async () => {
+    const result = await recordCallHandoff({ identity, clientId: 'client-1', reason: 'wants to negotiate' })
+
+    expect(appendLeadEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'handoff', channel: 'voice', body: 'wants to negotiate' })
+    )
+    expect(sendHandoffAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        leadRef: identity.leadRef,
+        clientId: 'client-1',
+        reason: 'wants to negotiate',
+        trigger: 'hand_to_agent',
+      })
+    )
+    expect(result.notified).toBe(true)
+  })
+
+  // A handoff whose alert failed is still a handoff. The event is written
+  // first so the timeline shows a human was asked for even when nobody could
+  // be told -- precisely the case an operator needs to be able to find.
+  it('still records the event when nobody could be notified', async () => {
+    sendHandoffAlert.mockResolvedValue({ notified: false, skipReason: 'no_notification_number' })
+
+    const result = await recordCallHandoff({ identity, clientId: 'client-1', reason: 'complaint' })
+
+    expect(appendLeadEvent).toHaveBeenCalledWith(expect.objectContaining({ type: 'handoff' }))
+    expect(result).toMatchObject({ notified: false, skipReason: 'no_notification_number' })
+  })
+
+  it('reports not-notified rather than throwing when the alert path throws', async () => {
+    sendHandoffAlert.mockRejectedValue(new Error('SES down'))
+
+    await expect(
+      recordCallHandoff({ identity, clientId: 'client-1', reason: 'x' })
+    ).resolves.toMatchObject({ notified: false, skipReason: 'send_failed' })
+  })
+
+  it('still attempts the alert when writing the event fails', async () => {
+    appendLeadEvent.mockRejectedValue(new Error('DynamoDB down'))
+
+    const result = await recordCallHandoff({ identity, clientId: 'client-1', reason: 'x' })
+
+    expect(sendHandoffAlert).toHaveBeenCalled()
+    expect(result.notified).toBe(true)
   })
 })

@@ -1,6 +1,7 @@
 import { appendLeadEvent } from '../repositories/lead-event-repository.js'
 import { createVoiceLead } from '../repositories/voice-lead-repository.js'
 import { findLeadByPhone } from './lead-identity-service.js'
+import { sendHandoffAlert } from './notification-service.js'
 import type { LeadRef } from '../types/index.js'
 
 // -------------------------------------------------------------------------
@@ -166,4 +167,65 @@ export async function recordCallToolUse(input: RecordCallToolUseInput): Promise<
     channel: 'voice',
     body: `search_knowledge_base(${input.query}) -> ${input.resultCount} result(s)`,
   })
+}
+
+export interface RecordCallHandoffInput {
+  identity: CallIdentity
+  clientId: string
+  reason: string
+}
+
+export interface CallHandoffResult {
+  notified: boolean
+  skipReason?: string
+}
+
+// The caller asked for a person.
+//
+// Deliberately the SAME path a journey handoff takes -- the handoff lead event
+// plus sendHandoffAlert -- rather than a voice-specific alert. A client should
+// not have to learn two notification systems depending on which channel the
+// person asking for help happened to use, and everything downstream (the
+// mobile push, the WhatsApp templates, journey-service reading `handed_off`
+// off the last event) already understands this shape.
+//
+// It also gets better on its own here: the alert summarises recent lead_events,
+// and voice turns now live there, so the human picking this up sees what the
+// caller actually said on the call rather than just "a call happened".
+//
+// Never throws. A handoff whose alert failed is still a handoff -- the event is
+// written first so the timeline shows a human was asked for even when nobody
+// could be told, which is precisely the case an operator needs to find.
+export async function recordCallHandoff(input: RecordCallHandoffInput): Promise<CallHandoffResult> {
+  try {
+    await appendLeadEvent({
+      leadId: input.identity.leadId,
+      clientId: input.clientId,
+      botId: input.identity.botId,
+      type: 'handoff',
+      channel: 'voice',
+      body: input.reason,
+    })
+  } catch (error) {
+    console.error(
+      '[voice-lead] failed to record handoff event:',
+      error instanceof Error ? error.message : error
+    )
+  }
+
+  try {
+    const alert = await sendHandoffAlert({
+      leadRef: input.identity.leadRef,
+      clientId: input.clientId,
+      reason: input.reason,
+      trigger: 'hand_to_agent',
+    })
+    return { notified: alert.notified, skipReason: alert.skipReason }
+  } catch (error) {
+    console.error(
+      '[voice-lead] handoff alert threw:',
+      error instanceof Error ? error.message : error
+    )
+    return { notified: false, skipReason: 'send_failed' }
+  }
 }
