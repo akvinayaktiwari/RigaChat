@@ -61,6 +61,11 @@ export interface VoiceAgentConfig {
   voice: VoiceAgentVoice
   instructions: string
   firstMessage: string
+  // VoiceAgent.maxSessionDuration, in minutes. Stored and validated at agent
+  // creation since the beginning and never enforced anywhere, so a call could
+  // run until someone noticed. Tolerable while every call started with a user
+  // clicking a widget; not tolerable once a public phone number can start one.
+  maxSessionMinutes?: 5 | 10 | 15
 }
 
 interface OpenAIResponseUsage {
@@ -103,6 +108,7 @@ export class VoiceSession {
   private contextReceived = false
   private sessionUpdateSent = false
   private contextTimeout: NodeJS.Timeout | null = null
+  private durationTimeout: NodeJS.Timeout | null = null
   private fallbackVoice: VoiceAgentVoice
   private fallbackInstructions: string
   private context: VoiceContext = {}
@@ -124,6 +130,18 @@ export class VoiceSession {
         Authorization: `Bearer ${apiKey}`,
       },
     })
+
+    if (agentConfig.maxSessionMinutes) {
+      this.durationTimeout = setTimeout(
+        () => {
+          console.warn(
+            `[VoiceRelay] Call ${this.callId} hit the ${agentConfig.maxSessionMinutes}-minute cap, ending it`
+          )
+          this.cleanup()
+        },
+        agentConfig.maxSessionMinutes * 60 * 1000
+      )
+    }
 
     this.openaiWs.on('open', () => {
       this.openaiReady = true
@@ -222,6 +240,11 @@ export class VoiceSession {
     if (this.contextTimeout) {
       clearTimeout(this.contextTimeout)
       this.contextTimeout = null
+    }
+
+    if (this.durationTimeout) {
+      clearTimeout(this.durationTimeout)
+      this.durationTimeout = null
     }
 
     // Fire-and-forget: cleanup() is synchronous and must always close the
