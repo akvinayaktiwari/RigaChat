@@ -158,6 +158,31 @@ Indian DIDs require KYC under options 1 and 2 both — you are renting a number 
 That is the calendar-time dependency, and it is worth starting before the Round 1
 observation finishes since it blocks nothing else.
 
+**Multi-client routing: one Plivo DID per client, and the DID is the lookup key.**
+
+```
+Client A's public number --forward--> DID +91...A --\
+Client B's public number --forward--> DID +91...B ---+--> voice relay
+Client C's public number --forward--> DID +91...C --/
+                                                    |
+                            webhook says "To: +91...B"
+                            voice_phone_lookup[+91...B] -> agentId -> clientId
+```
+
+Clients cannot share a DID. The answer webhook reports which of *our* numbers was
+dialled, never who the caller originally meant to reach, so a shared DID leaves every
+call ambiguous by construction. Some carriers pass the original destination in a SIP
+`Diversion`/RDNIS header; Indian telco support is inconsistent, so do not route on it.
+
+The row's `phoneNumber` is therefore **our Plivo DID**, never the client's own advertised
+number — the client's number never reaches us, since their telco forwards to the DID.
+Storing the client's public number would create a row no inbound call can ever match, and
+the failure is silent: the caller hears nothing and nothing errors. Pinned by a test.
+
+Cost consequence: DID rental (₹200/month) is a per-client floor that scales linearly —
+25 clients is ₹5,000/month against plans starting at ₹1,999 each. Small, but it belongs in
+the pricing model rather than being discovered later.
+
 ### Outside voice
 Skipped this pass — Codex is rate-limited (usage cap until 2026-09-10, hit earlier this same session) and a second Claude-subagent pass was judged not worth the budget after office-hours already ran one substantive cross-model challenge on this design. Recommend running `/plan-eng-review`'s outside-voice pass separately before implementation if you want it.
 

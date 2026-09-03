@@ -2,6 +2,11 @@ import { DeleteCommand, GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import type { VoicePhoneLookup } from '../types/index.js'
 
+// Every phoneNumber in this module is OUR Plivo DID -- the number Plivo reports
+// as the call's destination -- never the client's own advertised number. One DID
+// per client; their telco forwards their public number to it. See
+// VoicePhoneLookup in types/index.ts for the routing diagram and why clients
+// cannot share a DID.
 const TABLE_NAME = (): string => getTableName('voice_phone_lookup')
 
 export class VoicePhoneConflictError extends Error {
@@ -56,6 +61,7 @@ export function normalisePhoneNumber(raw: string): string {
 // it, so a refreshed timestamp on re-assignment is harmless rather than a
 // silent reordering.
 export async function claimPhoneNumber(
+  // Our Plivo DID, not the client's advertised number.
   phoneNumber: string,
   agentId: string,
   clientId: string

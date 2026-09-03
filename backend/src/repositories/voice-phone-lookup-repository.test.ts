@@ -107,6 +107,31 @@ describe('claimPhoneNumber', () => {
   })
 })
 
+// One DID per client is what makes the dialled number a usable identifier. If
+// two clients were ever pointed at the same DID, the second claim must be
+// refused rather than silently stealing the first client's calls -- the webhook
+// reports only which of OUR numbers was dialled, so a shared DID is
+// unresolvable by construction, not merely untidy.
+describe('one DID serves exactly one client', () => {
+  it('refuses a second client claiming a DID another agent already owns', async () => {
+    send.mockRejectedValueOnce(conditionalCheckFailed())
+
+    await expect(
+      claimPhoneNumber('+919876543210', 'agent-client-b', 'client-b')
+    ).rejects.toBeInstanceOf(VoicePhoneConflictError)
+  })
+
+  it('lets the same agent re-claim its own DID, so re-assignment is idempotent', async () => {
+    send.mockResolvedValueOnce({})
+
+    await claimPhoneNumber('+919876543210', 'agent-1', 'client-1')
+
+    expect(send.mock.calls[0][0].input.ExpressionAttributeValues).toEqual({
+      ':agentId': 'agent-1',
+    })
+  })
+})
+
 describe('getAgentForPhoneNumber', () => {
   it('returns the owning agent for a claimed number', async () => {
     send.mockResolvedValueOnce({

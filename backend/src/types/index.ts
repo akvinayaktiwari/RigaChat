@@ -1211,9 +1211,32 @@ export interface AgentBindingLookup {
 // The row IS the connection: it is written when a number is assigned to an
 // agent and deleted when it is released, so the webhook gates on the row
 // existing rather than on any field of the VoiceAgent record.
+//
+// ONE PLIVO DID PER CLIENT, AND THE DID IS THE KEY. Clients do not hand over
+// their own number; their telco forwards it (ideally on busy/no-answer) to a
+// DID we rent for them:
+//
+//   Client A's public number --forward--> DID +91...A --\
+//   Client B's public number --forward--> DID +91...B ---+--> relay
+//                                                        |
+//                        webhook says "To: +91...B" -----/
+//                        lookup[+91...B] -> agentId -> clientId
+//
+// Clients cannot share one DID: the webhook reports which of OUR numbers was
+// dialled, never who the caller originally meant to reach, so a shared DID
+// leaves every call ambiguous. Some carriers pass the original destination in a
+// SIP Diversion/RDNIS header, but Indian telco support for that is
+// inconsistent -- do not route on it.
 export interface VoicePhoneLookup {
-  // E.164, exactly as Plivo delivers it on the webhook (e.g. +919876543210).
-  // Callers normalise before reaching this layer -- see normalisePhoneNumber.
+  // OUR Plivo DID -- the number Plivo reports as the call's destination. NOT the
+  // client's own advertised/business number, which never reaches us: their telco
+  // forwards to this DID and the original destination is not in the payload.
+  // Storing the client's public number here instead would produce a row no
+  // inbound call can ever match, and the failure is silent (the caller hears
+  // nothing, nothing errors).
+  //
+  // E.164, exactly as Plivo delivers it (e.g. +919876543210). Callers normalise
+  // before reaching this layer -- see normalisePhoneNumber.
   phoneNumber: string
   agentId: string
   clientId: string
