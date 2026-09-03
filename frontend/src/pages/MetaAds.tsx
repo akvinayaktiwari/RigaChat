@@ -11,7 +11,36 @@ import {
   getMetaStatus,
 } from '../services/api'
 import MetaPagePicker from '../components/MetaPagePicker'
-import type { MetaConnectPagesResult, MetaConnection, MetaLead, MetaPageSummary } from '../types/index'
+import type {
+  MetaConnectPagesResult,
+  MetaConnection,
+  MetaLead,
+  MetaPageRepaired,
+  MetaPageSkipped,
+  MetaPageSummary,
+} from '../types/index'
+
+// Exhaustive by construction: adding a reason to the union without adding it
+// here fails the build. The old nested ternary fell through to "Meta refused
+// the webhook subscription", so an unrecognised reason asserted a specific and
+// probably wrong cause, sending the client to look for a problem on Facebook's
+// side that may not exist.
+function skipReasonText(reason: MetaPageSkipped['reason']): string {
+  switch (reason) {
+    case 'already_connected_to_another_account':
+      return 'already connected to another account'
+    case 'batch_budget_exceeded':
+      return 'not attempted — press Add Pages again to finish these'
+    case 'subscribe_failed':
+      return 'Meta refused the webhook subscription; try again'
+    default: {
+      const unreachable: never = reason
+      return `could not be connected (${String(unreachable)}); try again`
+    }
+  }
+}
+
+const VERIFY_ONCE_KEY = 'meta-pages-verified-this-session'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -74,6 +103,11 @@ export default function MetaAds() {
   const [tokenExpired, setTokenExpired] = useState(false)
   const [partial, setPartial] = useState<MetaConnectPagesResult | null>(null)
   const [removingPageId, setRemovingPageId] = useState<string | null>(null)
+  // Same reasoning as connectError above: a client learning that Pages were
+  // silently dropping leads needs to read WHICH Pages and decide what to do
+  // about the gap. A 3s toast is the wrong surface for that, and this file
+  // already made that call once.
+  const [repaired, setRepaired] = useState<MetaPageRepaired[] | null>(null)
 
   function loadPages(): void {
     setPagesLoading(true)
@@ -94,16 +128,19 @@ export default function MetaAds() {
   useEffect(() => {
     let cancelled = false
 
+    // Once per browser session, not once per mount. The server gates on a 12h
+    // staleness window, so a second mount inside that window re-does the whole
+    // due-set computation to answer "nothing to do" -- and route re-entry or a
+    // second tab makes that common.
+    if (sessionStorage.getItem(VERIFY_ONCE_KEY)) return
+    sessionStorage.setItem(VERIFY_ONCE_KEY, '1')
+
     verifyMetaPageSubscriptions()
       .then((res) => {
         if (cancelled || !res.success || !res.data) return
         if (res.data.repaired.length === 0) return
 
-        const n = res.data.repaired.length
-        toast.show(
-          `Reconnected ${n} Page${n === 1 ? '' : 's'} that had stopped receiving leads`,
-          'success'
-        )
+        setRepaired(res.data.repaired)
         loadPages()
       })
       // Silent on failure by design: this is a background repair, and a client
@@ -284,6 +321,40 @@ export default function MetaAds() {
         {/* Partial success uses a focusable summary, not a toast: a toast with no
             focus target and no per-Page detail is the documented anti-pattern,
             and this message names something the client may need to act on. */}
+        {/* Persistent, not a toast: the client is learning that Pages were
+            dropping leads for an unknown stretch, and needs to read which ones. */}
+        {repaired && repaired.length > 0 && (
+          <div
+            role="alert"
+            tabIndex={-1}
+            ref={(el) => el?.focus()}
+            aria-labelledby="meta-repaired-title"
+            className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4"
+          >
+            <h3 id="meta-repaired-title" className="font-semibold text-amber-900 text-sm" style={JAKARTA_FONT}>
+              Reconnected {repaired.length} Page{repaired.length === 1 ? '' : 's'} that had stopped
+              receiving leads
+            </h3>
+            <ul className="mt-2 space-y-1 text-sm text-amber-800">
+              {repaired.map((r) => (
+                <li key={r.pageId}>{r.pageName}</li>
+              ))}
+            </ul>
+            <p className="mt-2 text-sm text-amber-800">
+              New leads from {repaired.length === 1 ? 'this Page' : 'these Pages'} will arrive
+              normally. Leads submitted while the connection was broken did not reach us and cannot
+              be recovered.
+            </p>
+            <button
+              type="button"
+              onClick={() => setRepaired(null)}
+              className="mt-3 text-amber-900 font-medium text-sm underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
         {partial && partial.skipped.length > 0 && (
           <div
             role="alert"
@@ -293,18 +364,15 @@ export default function MetaAds() {
             className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4"
           >
             <h3 id="meta-partial-title" className="font-semibold text-amber-900 text-sm" style={JAKARTA_FONT}>
-              Connected {partial.connected.length} of{' '}
-              {partial.connected.length + partial.skipped.length} Pages
+              Connected {partial.connected.length} Page
+              {partial.connected.length === 1 ? '' : 's'} · {partial.skipped.length} need
+              {partial.skipped.length === 1 ? 's' : ''} attention
             </h3>
             <ul className="mt-2 space-y-1 text-sm text-amber-800">
               {partial.skipped.map((s) => (
                 <li key={s.pageId}>
                   {s.pageName} —{' '}
-                  {s.reason === 'already_connected_to_another_account'
-                    ? 'already connected to another account'
-                    : s.reason === 'batch_budget_exceeded'
-                      ? 'not attempted — press Add Pages again to finish these'
-                      : 'Meta refused the webhook subscription; try again'}
+                  {skipReasonText(s.reason)}
                 </li>
               ))}
             </ul>
