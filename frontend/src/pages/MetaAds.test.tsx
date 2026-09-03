@@ -81,14 +81,16 @@ describe('empty state', () => {
 })
 
 describe('connected Pages list', () => {
-  it('lists every connected Page with its pageId', async () => {
+  it('lists every connected Page, with the pageId reachable for support', async () => {
     getConnectedMetaPages.mockResolvedValue({ success: true, data: [page(1), page(2)] })
 
     render(<MetaAds />)
 
     await waitFor(() => expect(screen.getByText('Page 1')).toBeTruthy())
     expect(screen.getByText('Page 2')).toBeTruthy()
-    expect(screen.getByText('page-1')).toBeTruthy()
+    // The pageId moved off the visible line -- the lead count and recency earn
+    // that space -- but stays reachable on hover for a support conversation.
+    expect(screen.getByTitle('page-1')).toBeTruthy()
     expect(screen.getByText('Connected Pages (2)')).toBeTruthy()
   })
 
@@ -599,5 +601,71 @@ describe('filtering leads by Page', () => {
     await waitFor(() => expect(screen.getByText('Lead 1')).toBeTruthy())
 
     expect(screen.queryByRole('group', { name: 'Filter leads by Page' })).toBeNull()
+  })
+})
+
+describe('per-Page lead totals on the connected list', () => {
+  it('leads with recency, because that is what reveals a Page gone quiet', async () => {
+    // A Page that broke days ago still shows a healthy cumulative count. The
+    // date is the half that catches it.
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+    getConnectedMetaPages.mockResolvedValue({
+      success: true,
+      data: [page(1, { leadCount: 39, lastLeadAt: twoHoursAgo })],
+    })
+
+    render(<MetaAds />)
+
+    await waitFor(() => expect(screen.getByText(/39 leads · last 2 hours ago/)).toBeTruthy())
+  })
+
+  it('says a Page has produced nothing rather than showing a bare zero', async () => {
+    getConnectedMetaPages.mockResolvedValue({ success: true, data: [page(1, { leadCount: 0 })] })
+
+    render(<MetaAds />)
+
+    await waitFor(() => expect(screen.getByText('No leads yet')).toBeTruthy())
+  })
+
+  it('says lead, not leads, for a single one', async () => {
+    getConnectedMetaPages.mockResolvedValue({
+      success: true,
+      data: [page(1, { leadCount: 1, lastLeadAt: new Date(Date.now() - 60_000).toISOString() })],
+    })
+
+    render(<MetaAds />)
+
+    await waitFor(() => expect(screen.getByText(/^1 lead · /)).toBeTruthy())
+  })
+
+  it('never renders a lead as arriving in the future when clocks disagree', async () => {
+    // Server stamps the lead, browser renders it. A few seconds of skew must not
+    // produce "last in 4 seconds".
+    const slightlyAhead = new Date(Date.now() + 5000).toISOString()
+    getConnectedMetaPages.mockResolvedValue({
+      success: true,
+      data: [page(1, { leadCount: 3, lastLeadAt: slightlyAhead })],
+    })
+
+    render(<MetaAds />)
+
+    await waitFor(() => expect(screen.getByText(/3 leads · last/)).toBeTruthy())
+    expect(screen.queryByText(/ in /)).toBeNull()
+  })
+})
+
+describe('when the leads window is full', () => {
+  it('says the list is a window, so its counts are not read as lifetime totals', async () => {
+    // The per-Page totals above ARE lifetime. These are not. Saying so stops the
+    // two disagreeing silently.
+    getConnectedMetaPages.mockResolvedValue({ success: true, data: [page(1), page(2)] })
+    getMetaLeads.mockResolvedValue({
+      success: true,
+      data: Array.from({ length: 50 }, (_, i) => lead(i, i % 2 ? 'page-1' : 'page-2')),
+    })
+
+    render(<MetaAds />)
+
+    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/most recent/))
   })
 })

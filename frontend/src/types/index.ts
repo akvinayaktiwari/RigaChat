@@ -408,6 +408,10 @@ export interface MetaPageSummary {
   pageName: string
   connectedAt: string
   lastVerifiedAt: string
+  /** Running total kept on the Page row, so it is accurate past the 50-lead page size. */
+  leadCount?: number
+  /** When this Page last produced a lead. Absent means it never has. */
+  lastLeadAt?: string
 }
 
 /** One Page as offered in the picker, with what we already know about it. */

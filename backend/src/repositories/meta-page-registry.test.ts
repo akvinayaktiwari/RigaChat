@@ -16,6 +16,7 @@ const {
   getClientIdsForPages,
   removePageClientMapping,
   markPageVerified,
+  recordLeadForPage,
   MetaPageConflictError,
 } = await import('./meta-lead-repository.js')
 
@@ -369,5 +370,54 @@ describe('getClientIdsForPages', () => {
     })
 
     await expect(getClientIdsForPages(['page-2'])).rejects.toThrow(/still unprocessed/)
+  })
+})
+
+describe('recordLeadForPage', () => {
+  it('increments atomically rather than read-modify-write', async () => {
+    // Two leads landing on the same Page at once would lose a count if this
+    // read the row first. ADD is applied by DynamoDB itself.
+    send.mockResolvedValue({})
+
+    await recordLeadForPage('page-1', '2026-09-03T04:00:00.000Z')
+
+    const input = send.mock.calls[0][0].input
+    expect(input.UpdateExpression).toContain('ADD leadCount :one')
+    expect(input.ExpressionAttributeValues[':one']).toBe(1)
+  })
+
+  it('stamps when the Page last produced a lead', async () => {
+    send.mockResolvedValue({})
+
+    await recordLeadForPage('page-1', '2026-09-03T04:00:00.000Z')
+
+    const input = send.mock.calls[0][0].input
+    expect(input.UpdateExpression).toContain('SET lastLeadAt = :receivedAt')
+    expect(input.ExpressionAttributeValues[':receivedAt']).toBe('2026-09-03T04:00:00.000Z')
+  })
+
+  // Without the guard, a straggler webhook for a Page the client disconnected
+  // would RECREATE the row -- DynamoDB's Update is an upsert -- and the Page
+  // would silently reappear in their list.
+  it('refuses to resurrect a Page that was disconnected', async () => {
+    send.mockResolvedValue({})
+
+    await recordLeadForPage('page-1', '2026-09-03T04:00:00.000Z')
+
+    expect(send.mock.calls[0][0].input.ConditionExpression).toBe('attribute_exists(pageId)')
+  })
+
+  it('treats a missing row as nothing to do, not an error', async () => {
+    send.mockRejectedValue(conditionalCheckFailed())
+
+    await expect(recordLeadForPage('page-gone', '2026-09-03T04:00:00.000Z')).resolves.toBeUndefined()
+  })
+
+  it('surfaces a real DynamoDB failure with the pageId', async () => {
+    send.mockRejectedValue(new Error('ProvisionedThroughputExceededException'))
+
+    await expect(recordLeadForPage('page-1', '2026-09-03T04:00:00.000Z')).rejects.toThrow(
+      /Failed to record lead for Meta page page-1/
+    )
   })
 })

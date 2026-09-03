@@ -312,6 +312,36 @@ export async function markPageVerified(pageId: string): Promise<void> {
   }
 }
 
+// Records that a Page produced a lead: bumps its running total and stamps when.
+//
+// ADD is atomic, so concurrent leads on the same Page cannot lose a count the
+// way a read-modify-write would.
+//
+// lastLeadAt is set unconditionally. A late webhook redelivery can therefore
+// move it BACKWARDS, making a Page look quieter than it is -- which errs toward
+// raising a false alarm rather than hiding a real one, and is the direction to
+// err on a screen whose job is spotting Pages that went silent.
+export async function recordLeadForPage(pageId: string, receivedAt: string): Promise<void> {
+  try {
+    await dynamoClient.send(
+      new UpdateCommand({
+        TableName: PAGE_LOOKUP_TABLE_NAME(),
+        Key: { pageId },
+        UpdateExpression: 'ADD leadCount :one SET lastLeadAt = :receivedAt',
+        // Never recreate a row that was deleted: a disconnected Page must not
+        // reappear in the client's list because a straggler webhook arrived.
+        ConditionExpression: 'attribute_exists(pageId)',
+        ExpressionAttributeValues: { ':one': 1, ':receivedAt': receivedAt },
+      })
+    )
+  } catch (error) {
+    if (error instanceof Error && error.name === 'ConditionalCheckFailedException') return
+    throw new Error(
+      `Failed to record lead for Meta page ${pageId}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
 export async function removePageClientMapping(pageId: string): Promise<void> {
   try {
     await dynamoClient.send(
