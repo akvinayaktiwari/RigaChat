@@ -43,6 +43,7 @@ import type {
   MetaPageSkipped,
   MetaPageSummary,
   MetaSelectablePage,
+  MetaPageRepaired,
   MetaSubscriptionReport,
   FormField,
   MetaConnection,
@@ -239,12 +240,12 @@ export async function disconnectMetaAds(clientId: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 // A batch size, not a product ceiling. Each Page costs a webhook subscription
-// round trip and the Lambda has 60 seconds; a client with 60 Pages connects
+// round trip against LAMBDA_BUDGET_MS; a client with 60 Pages connects
 // them in three passes rather than being told 25 is all they may ever have.
 export const MAX_PAGES_PER_CONNECT = 25
 
 // Each Page costs a Graph round trip, so 25 of them one after another is a
-// real chance of spending the Lambda's whole 60s budget and timing out
+// real chance of spending the whole LAMBDA_BUDGET_MS and timing out
 // mid-batch -- leaving some Pages claimed and subscribed and the rest not,
 // with nothing to roll them back. Bounded rather than unbounded: firing all 25
 // at once only trades the timeout risk for a Graph rate-limit risk.
@@ -256,7 +257,7 @@ const LAMBDA_BUDGET_MS = 60_000
 
 // Stop starting new Pages past this point.
 //
-// The 60s limit used to be a cliff: the batch either finished or the process
+// LAMBDA_BUDGET_MS used to be a cliff: the batch either finished or the process
 // was killed mid-Page, and a kill lands between the claim and the webhook
 // subscription -- leaving a Page that reads Connected and receives nothing,
 // with the rollback killed alongside it. Checked instead of hoped for, running
@@ -479,6 +480,15 @@ export async function connectMetaPages(
  */
 const VERIFY_STALE_AFTER_MS = 12 * 60 * 60 * 1000
 
+// This pass runs while a client waits for their dashboard, and it costs a Graph
+// call per Page. Both bounds exist because a client's Pages all go stale
+// TOGETHER -- they were connected in one batch, so they cross the 12h boundary
+// in one batch -- which makes "one Page at a time" the wrong mental model and
+// "the whole account at once" the real one. Unbounded, 500 Pages is 100
+// sequential waves and blows the same Lambda budget connectMetaPages guards.
+const VERIFY_MAX_PER_PASS = 40
+const VERIFY_DEADLINE_MS = 20_000
+
 /**
  * Finds Pages that are claimed in our registry but not actually subscribed at
  * Meta, and re-subscribes them.
@@ -497,18 +507,34 @@ export async function reconcilePageSubscriptions(clientId: string): Promise<Meta
   const rows = await listPagesForClient(clientId)
   const now = Date.now()
 
-  const due = rows.filter((row) => {
-    // A row with no token cannot be checked -- nothing to authenticate the
-    // Graph call with. Those are the pre-registry rows the backfill skipped.
-    if (!row.pageAccessTokenEncrypted) return false
-    if (!row.lastVerifiedAt) return true
-    return now - new Date(row.lastVerifiedAt).getTime() > VERIFY_STALE_AFTER_MS
-  })
+  const stale = rows
+    .filter((row) => {
+      // A row with no token cannot be checked -- nothing to authenticate the
+      // Graph call with. Those are the pre-registry rows the backfill skipped.
+      if (!row.pageAccessTokenEncrypted) return false
+      if (!row.lastVerifiedAt) return true
+      return now - new Date(row.lastVerifiedAt).getTime() > VERIFY_STALE_AFTER_MS
+    })
+    // Oldest first, so a capped pass makes real progress instead of re-checking
+    // the same arbitrary slice on every dashboard load.
+    .sort((a, b) => (a.lastVerifiedAt ?? '').localeCompare(b.lastVerifiedAt ?? ''))
 
-  const repaired: string[] = []
+  const due = stale.slice(0, VERIFY_MAX_PER_PASS)
+  const startedAt = Date.now()
+
+  const repaired: MetaPageRepaired[] = []
   const unrepairable: string[] = []
+  let skippedForTime = 0
 
   await mapWithConcurrency(due, PAGE_WORK_CONCURRENCY, async (row) => {
+    // Same guard connectMetaPages uses, for the same reason: being killed
+    // mid-pass wastes the work and tells the client nothing. Stopping early is
+    // free here because every step is idempotent -- the next load resumes.
+    if (Date.now() - startedAt > VERIFY_DEADLINE_MS) {
+      skippedForTime += 1
+      return
+    }
+
     try {
       const token = await decrypt(row.pageAccessTokenEncrypted as string)
       if (await metaProvider.isPageSubscribedToLeadgen(row.pageId, token)) {
@@ -519,7 +545,9 @@ export async function reconcilePageSubscriptions(clientId: string): Promise<Meta
       console.warn(`[meta-verify] page ${row.pageId} was claimed but not subscribed; re-subscribing`)
       await metaProvider.subscribePageToWebhook(row.pageId, token)
       await markPageVerified(row.pageId)
-      repaired.push(row.pageId)
+      // Named, not just counted: the client needs to know WHICH Pages were
+      // silently dropping leads to judge how much history to worry about.
+      repaired.push({ pageId: row.pageId, pageName: row.pageName ?? row.pageId })
     } catch (error) {
       // Never throw: this runs alongside a normal dashboard read, and a Page we
       // cannot check must not take the whole page down with it.
@@ -528,7 +556,12 @@ export async function reconcilePageSubscriptions(clientId: string): Promise<Meta
     }
   })
 
-  return { checked: due.length, repaired, unrepairable }
+  const remaining = stale.length - due.length + skippedForTime
+  if (remaining > 0) {
+    console.log(`[meta-verify] ${remaining} page(s) still due; the next dashboard load continues`)
+  }
+
+  return { checked: due.length - skippedForTime, repaired, unrepairable, remaining }
 }
 
 /** The client's connected Pages, without their tokens. */

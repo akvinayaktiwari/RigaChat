@@ -441,10 +441,23 @@ export interface MetaSelectablePagesResult {
 }
 
 /** Result of a webhook-subscription reconciliation pass over the client's Pages. */
+/** A Page whose webhook subscription was found missing and put back. */
+export interface MetaPageRepaired {
+  pageId: string
+  pageName: string
+}
+
 export interface MetaSubscriptionReport {
   checked: number
-  repaired: string[]
+  /**
+   * Named rather than counted, and shaped like MetaPageSkipped for consistency:
+   * a client told "1 Page was dropping leads" needs to know WHICH one to judge
+   * how much lead history to go looking for.
+   */
+  repaired: MetaPageRepaired[]
   unrepairable: string[]
+  /** Still stale after this pass. The next dashboard load continues. */
+  remaining: number
 }
 
 export interface MetaConnectPagesResult {
