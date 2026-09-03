@@ -488,3 +488,116 @@ describe('a batch that ran out of Lambda time', () => {
     expect(screen.getByText(/press Add Pages again/)).toBeTruthy()
   })
 })
+
+// ---------------------------------------------------------------------------
+// Per-Page lead filtering. MetaLead already carries pageId, so this is entirely
+// client-side -- no endpoint, no round trip.
+// ---------------------------------------------------------------------------
+function lead(n: number, pageId: string) {
+  return {
+    leadId: `lead-${n}`,
+    pageId,
+    clientId: 'client-1',
+    source: 'meta' as const,
+    name: `Lead ${n}`,
+    phone: '+919876543210',
+    customFields: '{}',
+    sourceUrl: '',
+    createdAt: '2026-09-01T00:00:00.000Z',
+  }
+}
+
+describe('filtering leads by Page', () => {
+  beforeEach(() => {
+    getConnectedMetaPages.mockResolvedValue({ success: true, data: [page(1), page(2)] })
+    getMetaLeads.mockResolvedValue({
+      success: true,
+      data: [lead(1, 'page-1'), lead(2, 'page-1'), lead(3, 'page-2')],
+    })
+  })
+
+  it('counts leads per Page on each chip', async () => {
+    render(<MetaAds />)
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Page 1 (2)' })).toBeTruthy())
+    expect(screen.getByRole('button', { name: 'Page 2 (1)' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'All Pages (3)' })).toBeTruthy()
+  })
+
+  it('shows only that Page\'s leads once a chip is picked', async () => {
+    render(<MetaAds />)
+    await waitFor(() => expect(screen.getByText('Lead 3')).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Page 1 (2)' }))
+
+    expect(screen.getByText('Lead 1')).toBeTruthy()
+    expect(screen.getByText('Lead 2')).toBeTruthy()
+    expect(screen.queryByText('Lead 3')).toBeNull()
+  })
+
+  it('marks the active chip pressed, so it is not conveyed by colour alone', async () => {
+    render(<MetaAds />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'All Pages (3)' })).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Page 2 (1)' }))
+
+    expect(screen.getByRole('button', { name: 'Page 2 (1)' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'All Pages (3)' }).getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('announces something meaningful, not a bare count', async () => {
+    // A screen reader hearing "1" learns nothing about what changed.
+    render(<MetaAds />)
+    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('from every Page'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Page 2 (1)' }))
+
+    expect(screen.getByRole('status').textContent).toBe('1 lead from Page 2')
+  })
+
+  it('names the Page on each lead row, so a lead can be acted on', async () => {
+    render(<MetaAds />)
+
+    await waitFor(() => expect(screen.getByText('Lead 3')).toBeTruthy())
+    // Two leads from Page 1, one from Page 2 -- the chip also carries the name,
+    // so match on the row-level element count rather than a single lookup.
+    expect(screen.getAllByText('Page 1').length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('offers a way back when the chosen Page has no leads', async () => {
+    getMetaLeads.mockResolvedValue({ success: true, data: [lead(1, 'page-1')] })
+
+    render(<MetaAds />)
+    await waitFor(() => expect(screen.getByText('Lead 1')).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Page 2 (0)' }))
+
+    expect(screen.getByText(/No leads from Page 2 yet/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Show every Page' }))
+    expect(screen.getByText('Lead 1')).toBeTruthy()
+  })
+
+  it('keeps leads from a Page that was disconnected reachable', async () => {
+    // Their leads still exist. Dropping the Page from the filter would strand
+    // them with no way to view them.
+    getConnectedMetaPages.mockResolvedValue({ success: true, data: [page(1)] })
+    getMetaLeads.mockResolvedValue({ success: true, data: [lead(1, 'page-1'), lead(9, 'page-gone')] })
+
+    render(<MetaAds />)
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Disconnected Page (1)' })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnected Page (1)' }))
+    expect(screen.getByText('Lead 9')).toBeTruthy()
+  })
+
+  it('does not offer a filter when there is only one Page to filter by', async () => {
+    // A filter with one option is decoration.
+    getConnectedMetaPages.mockResolvedValue({ success: true, data: [page(1)] })
+    getMetaLeads.mockResolvedValue({ success: true, data: [lead(1, 'page-1')] })
+
+    render(<MetaAds />)
+    await waitFor(() => expect(screen.getByText('Lead 1')).toBeTruthy())
+
+    expect(screen.queryByRole('group', { name: 'Filter leads by Page' })).toBeNull()
+  })
+})
