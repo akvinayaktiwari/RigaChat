@@ -116,6 +116,10 @@ export interface VoiceAgentConfig {
   // UUID. VoiceSession deliberately does not know what a Plivo is -- it asks
   // for a transfer and is told whether it worked.
   transferToHuman?: () => Promise<boolean>
+  // Set when a transfer was possible in principle but the office is shut. Lets
+  // the agent name the reopening time rather than saying only that someone will
+  // call back.
+  closedUntil?: string
 }
 
 interface OpenAIResponseUsage {
@@ -168,6 +172,7 @@ export class VoiceSession {
   private agentUtterance = ''
   private pendingAction: 'none' | 'hangup' | 'transfer' = 'none'
   private transferToHuman?: () => Promise<boolean>
+  private closedUntil?: string
 
   constructor(clientWs: ClientTransport, agentConfig: VoiceAgentConfig) {
     this.clientWs = clientWs
@@ -181,6 +186,7 @@ export class VoiceSession {
     // that latent bug into the normal case.
     this.fallbackInstructions = agentConfig.instructions || FALLBACK_INSTRUCTIONS
     this.transferToHuman = agentConfig.transferToHuman
+    this.closedUntil = agentConfig.closedUntil
 
     this.openaiWs = new WebSocket(REALTIME_URL, {
       headers: {
@@ -634,9 +640,15 @@ export class VoiceSession {
       output = 'Tell the caller you are putting them through to a colleague now. One short sentence.'
     } else {
       this.pendingAction = 'hangup'
-      output = notified
-        ? 'A team member has been notified and will call back shortly. Tell the caller this, thank them, and say goodbye.'
-        : 'Tell the caller you will pass this on and that someone will get back to them, thank them, and say goodbye.'
+      if (this.closedUntil) {
+        output =
+          `The office is currently closed and reopens ${this.closedUntil}. Tell the caller this, ` +
+          'say the team will get back to them then, thank them, and say goodbye.'
+      } else {
+        output = notified
+          ? 'A team member has been notified and will call back shortly. Tell the caller this, thank them, and say goodbye.'
+          : 'Tell the caller you will pass this on and that someone will get back to them, thank them, and say goodbye.'
+      }
     }
 
     if (this.openaiWs.readyState === WebSocket.OPEN) {

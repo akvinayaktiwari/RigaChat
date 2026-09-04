@@ -18,6 +18,7 @@ import {
 } from './transports/plivo-webhook.js'
 import { getAgentForPhoneNumber } from '../repositories/voice-phone-lookup-repository.js'
 import { transferCall } from '../providers/plivo-call-provider.js'
+import { describeNextOpening, isWithinBusinessHours } from '../lib/business-hours.js'
 
 const PORT = 3100
 
@@ -76,6 +77,7 @@ interface VoiceAgentRecord {
   systemPrompt?: string
   botId?: string
   handoffNumber?: string
+  businessHours?: VoiceAgent['businessHours']
   maxSessionDuration?: VoiceAgent['maxSessionDuration']
 }
 
@@ -335,7 +337,7 @@ function authenticate(ws: WebSocket, url: URL): string | null {
 function buildTransferCapability(
   agent: VoiceAgentRecord,
   callUuid: string
-): { transferToHuman?: () => Promise<boolean> } {
+): { transferToHuman?: () => Promise<boolean>; closedUntil?: string } {
   if (!agent.handoffNumber || !plivoAuthId || !plivoAuthToken || !callUuid) {
     if (agent.handoffNumber && !plivoAuthId) {
       console.warn(
@@ -343,6 +345,23 @@ function buildTransferCapability(
       )
     }
     return {}
+  }
+
+  // Evaluated ONCE, when the call connects, rather than at the moment of
+  // handoff. A caller who reaches the office at 17:59 should be put through
+  // even if they ask for a person at 18:01 -- re-checking mid-call would drop
+  // them for crossing a boundary while already talking to us.
+  if (agent.businessHours && !isWithinBusinessHours(agent.businessHours, new Date())) {
+    const reopensAt = describeNextOpening(agent.businessHours, new Date())
+    console.log(
+      `[VoiceRelay] Agent ${agent.agentId} is outside business hours; transfer disabled for this call` +
+        (reopensAt ? ` (reopens ${reopensAt})` : '')
+    )
+    // No transfer capability, but the session is told WHY, so the agent can say
+    // "the office opens tomorrow at 9am" instead of a bare "someone will call
+    // you back" -- a caller who knows when to expect contact is far less likely
+    // to ring again in an hour.
+    return reopensAt ? { closedUntil: reopensAt } : {}
   }
 
   const handoffNumber = agent.handoffNumber
