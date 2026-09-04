@@ -798,6 +798,30 @@ export interface CreateFormLeadInput {
   sourceUrl: string
 }
 
+export type Weekday = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat'
+
+// A single open period, as local wall-clock "HH:MM" in the parent
+// BusinessHours.timezone. Several per day handles a lunch closure, which is
+// ordinary for the Indian offices this ships to first.
+//
+// `close` may be EARLIER than `open`, meaning the period runs past midnight
+// (a 22:00-02:00 shift). That is a supported shape, not a mistake -- see
+// lib/business-hours.ts, where forgetting it is what makes the second half of
+// a late shift read as closed.
+export interface BusinessHoursWindow {
+  open: string
+  close: string
+}
+
+export interface BusinessHours {
+  // IANA zone, e.g. 'Asia/Kolkata'. Stored rather than assumed so the first
+  // client outside IST is a config change and not a code change.
+  timezone: string
+  // A weekday absent from the map is closed all day. Being closed is the
+  // default, so a partially filled map cannot accidentally imply availability.
+  days: Partial<Record<Weekday, BusinessHoursWindow[]>>
+}
+
 export type VoiceAgentVoice = 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse' | 'marin' | 'cedar'
 
 export type VoiceAgentStatus = 'processing' | 'kb_only'
@@ -817,6 +841,12 @@ export interface VoiceAgent {
   brandColor: string
   widgetPosition: 'bottom-left' | 'bottom-right' | 'bottom-center'
   maxSessionDuration: 5 | 10 | 15
+  // When a human is actually reachable, for the live transfer only. The AI
+  // answers around the clock; this gates whether a caller is put THROUGH.
+  // Absent means always available, which preserves the behaviour transfer
+  // shipped with and is the honest default for a client who has not said
+  // otherwise.
+  businessHours?: BusinessHours
   // Where a live call goes when the caller asks for a person. Absent means the
   // handoff still happens -- the event is recorded and staff are alerted -- but
   // the caller is told someone will ring back rather than being put through.
