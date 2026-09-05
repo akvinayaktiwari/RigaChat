@@ -234,6 +234,29 @@ describe('session.update', () => {
     expect(sessionUpdate(openai).instructions).toBe('You are Priya.')
   })
 
+  it('uses the voice the context asked for, whenever the context arrives', () => {
+    // Both orderings must configure the same agent. The post-open path used to
+    // drop the voice and leave OpenAI on its default -- the same shape of bug
+    // as the dropped instructions above, on the ordering the browser actually
+    // hits most often.
+    for (const contextFirst of [true, false]) {
+      vi.useFakeTimers()
+      const { client, openai } = startSession()
+
+      if (contextFirst) {
+        client.receive({ type: 'context', instructions: 'You are Priya.', voice: 'alloy' })
+        openai.connect()
+      } else {
+        openai.connect()
+        client.receive({ type: 'context', instructions: 'You are Priya.', voice: 'alloy' })
+      }
+
+      const audio = sessionUpdate(openai).audio as { output: { voice?: string } }
+      expect(audio.output.voice).toBe('alloy')
+      vi.useRealTimers()
+    }
+  })
+
   it('offers both tools and transcribes the caller, not only the agent', () => {
     // Without input transcription the caller's half of every call is never
     // written down, which is the entire value of the CRM record.

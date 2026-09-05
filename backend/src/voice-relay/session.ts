@@ -241,33 +241,17 @@ export class VoiceSession {
     this.contextReceived = true
     this.context = context
 
-    if (this.openaiReady && !this.sessionUpdateSent && this.openaiWs.readyState === WebSocket.OPEN) {
-      this.openaiWs.send(
-        JSON.stringify({
-          type: 'session.update',
-          session: {
-            type: 'realtime',
-            instructions: context.instructions ?? this.fallbackInstructions,
-            tools: REALTIME_TOOLS,
-            audio: {
-              input: {
-                format: { type: 'audio/pcm', rate: 24000 },
-                transcription: TRANSCRIPTION,
-                turn_detection: {
-                  type: 'server_vad',
-                  threshold: 0.5,
-                  prefix_padding_ms: 300,
-                  silence_duration_ms: 500,
-                },
-              },
-              output: {
-                format: { type: 'audio/pcm', rate: 24000 },
-              },
-            },
-          },
-        })
+    // Routed through sendSessionUpdate rather than building its own payload.
+    // The two send sites had already drifted: this one omitted the voice, so a
+    // context message arriving AFTER the OpenAI socket opened left the model on
+    // its default voice while the same message arriving before it was honoured.
+    // That is the browser's usual ordering, and the same shape of bug as the
+    // instructions this path used to drop.
+    if (this.openaiReady && !this.sessionUpdateSent) {
+      this.sendSessionUpdate(
+        context.instructions ?? this.fallbackInstructions,
+        context.voice ?? this.fallbackVoice
       )
-      this.sessionUpdateSent = true
     }
   }
 
