@@ -304,6 +304,12 @@ describe('the HTTP endpoints', () => {
       expect(getAgentForPhoneNumber).not.toHaveBeenCalled()
     })
 
+    it('refuses a body too large to be a webhook', async () => {
+      const response = await postAnswer({}, { body: 'To=' + 'x'.repeat(70 * 1024) })
+
+      expect(response.status).toBe(413)
+    })
+
   })
 
   describe('the transfer XML endpoint', () => {

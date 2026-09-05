@@ -96,8 +96,13 @@ function readBody(req: http.IncomingMessage): Promise<string> {
       // A webhook body is a few hundred bytes. Anything approaching a megabyte
       // is not Plivo, and buffering it would be the whole attack.
       if (size > 64 * 1024) {
+        // Paused rather than destroyed. Destroying the request tears the socket
+        // down before the 413 can be written, so the caller saw a reset
+        // connection and the status code below was unreachable. Pausing stops
+        // the buffering -- which was the whole attack -- and leaves the response
+        // deliverable; the Connection: close header ends the socket after it.
+        req.pause()
         reject(new Error('Request body too large'))
-        req.destroy()
         return
       }
       chunks.push(chunk)
@@ -130,7 +135,7 @@ export async function handlePlivoAnswer(
   try {
     body = await readBody(req)
   } catch {
-    res.writeHead(413)
+    res.writeHead(413, { Connection: 'close' })
     res.end()
     return
   }
