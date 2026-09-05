@@ -162,6 +162,10 @@ describe('the HTTP endpoints', () => {
   })
 
   afterAll(async () => {
+    // close() alone waits for open connections, and the oversized-body case
+    // deliberately leaves a paused, half-read request behind -- on a loaded
+    // machine that is a suite that hangs rather than one that fails.
+    server.closeAllConnections()
     await new Promise<void>((resolve, reject) =>
       server.close((err) => (err ? reject(err) : resolve()))
     )
