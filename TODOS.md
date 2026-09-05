@@ -24,26 +24,6 @@ idle pool has a real carrying cost, so pool size is a tradeoff against signup la
 **Depends on:** The Plivo sales/KYC conversation already queued for v1. Do not build the
 pool before voice has more than one paying client — a pool of one is just a number.
 
-## Backfill unit tests for voice-relay/server.ts
-
-**What:** `backend/src/voice-relay/server.ts` (agent lookup, the Plivo answer webhook,
-the transfer-XML endpoint, the concurrency ceiling, `buildTransferCapability`) still has
-no tests. `session.ts` no longer does — `session.test.ts` covers it as of this branch.
-
-**Why:** Every decision that governs whether a call is answered at all lives in this file,
-and two of them are money: the concurrency ceiling and the signed transfer endpoint, which
-without its token check is an open relay that dials any number at our expense. Those are
-currently protected by reading the code carefully.
-
-**Context:** It needs a seam before it needs tests. The module runs on import — it throws
-on missing env, constructs a DynamoDB client, and calls `server.listen(3100)` at the top
-level — so importing it from a test starts a server. The smallest honest change is to move
-the request handlers and `buildTransferCapability` into a sibling module that takes its
-config as an argument, leaving `server.ts` as the wiring that reads env and listens. Do
-that first; testing what is left is then unremarkable.
-
-**Depends on:** None.
-
 ## Mobile app — backend work, tracked in the vyostra-mobile repo
 
 The Android app ([vyostra-mobile](https://github.com/akvinayaktiwari/vyostra-mobile))
