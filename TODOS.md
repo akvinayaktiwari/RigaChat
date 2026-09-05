@@ -24,25 +24,25 @@ idle pool has a real carrying cost, so pool size is a tradeoff against signup la
 **Depends on:** The Plivo sales/KYC conversation already queued for v1. Do not build the
 pool before voice has more than one paying client — a pool of one is just a number.
 
-## Backfill baseline unit tests for VoiceSession / voice-relay/server.ts
+## Backfill unit tests for voice-relay/server.ts
 
-**What:** `backend/src/voice-relay/session.ts` (408 lines: OpenAI Realtime WS handling, RAG
-tool-calling, barge-in, call-log writes) and `server.ts` (agent lookup, WS connection
-handling) have zero existing tests today.
+**What:** `backend/src/voice-relay/server.ts` (agent lookup, the Plivo answer webhook,
+the transfer-XML endpoint, the concurrency ceiling, `buildTransferCapability`) still has
+no tests. `session.ts` no longer does — `session.test.ts` covers it as of this branch.
 
-**Why:** Surfaced during `/plan-eng-review` of `docs/designs/voice-agent-telephony-v1.md`
-(Plivo inbound telephony, v1). That PR adds real new surface right next to this file
-(a duration-cap timer inside `VoiceSession`, a Plivo audio adapter, a webhook handler in
-`server.ts`) — on top of a foundation with no regression net. Scoped out of that PR to
-keep its footprint from growing further (see the PR's own Issue 3A decision); this item
-tracks backfilling it separately.
+**Why:** Every decision that governs whether a call is answered at all lives in this file,
+and two of them are money: the concurrency ceiling and the signed transfer endpoint, which
+without its token check is an open relay that dials any number at our expense. Those are
+currently protected by reading the code carefully.
 
-**Context:** Start with `session.ts`'s `handleOpenAIMessage`/`handleBrowserMessage`
-branches and `writeCallLog`'s status transitions — those are the parts most likely to
-silently regress once the Plivo transport is layered on top via the adapter pattern from
-Issue 1C of that review.
+**Context:** It needs a seam before it needs tests. The module runs on import — it throws
+on missing env, constructs a DynamoDB client, and calls `server.listen(3100)` at the top
+level — so importing it from a test starts a server. The smallest honest change is to move
+the request handlers and `buildTransferCapability` into a sibling module that takes its
+config as an argument, leaving `server.ts` as the wiring that reads env and listens. Do
+that first; testing what is left is then unremarkable.
 
-**Depends on:** None — independently doable before or after the telephony PR lands.
+**Depends on:** None.
 
 ## Mobile app — backend work, tracked in the vyostra-mobile repo
 
