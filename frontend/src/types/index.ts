@@ -582,6 +582,17 @@ export interface VoiceCallLog {
   status: 'completed' | 'dropped' | 'error'
 }
 
+// One row per connected Plivo DID. phoneNumber is OUR number -- the one Plivo
+// reports as the call's destination -- never the client's own advertised
+// number, which their telco forwards to it and which never reaches us. Mirrors
+// backend/src/types/index.ts's VoicePhoneLookup.
+export interface VoicePhoneLookup {
+  phoneNumber: string
+  agentId: string
+  clientId: string
+  assignedAt: string
+}
+
 export interface VoiceUsageSummary {
   totalCalls: number
   totalMinutes: number

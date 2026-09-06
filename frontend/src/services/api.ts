@@ -57,6 +57,7 @@ import type {
   UpdateVoiceAgentInput,
   VoiceAgent,
   VoiceKnowledgeBaseEntry,
+  VoicePhoneLookup,
   VoiceUsageSummary,
   WhatsAppConnection,
   BotWhatsAppStatus,
@@ -731,6 +732,26 @@ export function setupVoiceAgent(agentId: string): Promise<ApiResponse<VoiceAgent
 
 export function getVoiceAgentUsage(agentId: string): Promise<ApiResponse<VoiceUsageSummary>> {
   return apiClient<VoiceUsageSummary>(`/api/voice-agents/${agentId}/usage`)
+}
+
+// null data is the normal answer for an agent with no number, not a failure.
+export function getVoiceAgentPhoneNumber(
+  agentId: string
+): Promise<ApiResponse<VoicePhoneLookup | null>> {
+  return apiClient<VoicePhoneLookup | null>(`/api/voice-agents/${agentId}/phone-number`)
+}
+
+export function assignVoiceAgentPhoneNumber(
+  agentId: string,
+  phoneNumber: string
+): Promise<ApiResponse<VoicePhoneLookup>> {
+  return apiClient<VoicePhoneLookup>(`/api/voice-agents/${agentId}/phone-number`, 'PUT', {
+    phoneNumber,
+  })
+}
+
+export function releaseVoiceAgentPhoneNumber(agentId: string): Promise<ApiResponse<null>> {
+  return apiClient<null>(`/api/voice-agents/${agentId}/phone-number`, 'DELETE')
 }
 
 export function addVoiceKBEntry(
