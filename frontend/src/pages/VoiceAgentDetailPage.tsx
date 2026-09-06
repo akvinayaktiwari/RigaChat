@@ -1,17 +1,36 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { BookOpen, Check, ChevronLeft, Code, Copy, Loader2, RefreshCw, Trash2 } from 'lucide-react'
 import {
+  BookOpen,
+  Check,
+  ChevronLeft,
+  Code,
+  Copy,
+  Loader2,
+  Phone,
+  RefreshCw,
+  Trash2,
+} from 'lucide-react'
+import {
+  assignVoiceAgentPhoneNumber,
   deleteVoiceAgent,
   getMyBots,
   getVoiceAgent,
+  getVoiceAgentPhoneNumber,
   getVoiceAgentUsage,
+  releaseVoiceAgentPhoneNumber,
   setupVoiceAgent,
   updateVoiceAgent,
 } from '../services/api'
 import IndexingProgressCard from '../components/IndexingProgressCard'
 import { useIndexingStatus } from '../hooks/useIndexingStatus'
-import type { BotConfig, VoiceAgent, VoiceAgentVoice, VoiceUsageSummary } from '../types/index'
+import type {
+  BotConfig,
+  VoiceAgent,
+  VoiceAgentVoice,
+  VoicePhoneLookup,
+  VoiceUsageSummary,
+} from '../types/index'
 import Dropdown from '../components/Dropdown/Dropdown'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -92,6 +111,13 @@ function toFormData(agent: VoiceAgent): FormData {
   }
 }
 
+// +919876543210 -> +91 98765 43210. Display only: everything sent to the server
+// is the raw input, which the server normalises itself.
+function formatPhoneNumber(e164: string): string {
+  const match = /^(\+91)(\d{5})(\d{5})$/.exec(e164)
+  return match ? `${match[1]} ${match[2]} ${match[3]}` : e164
+}
+
 function LoadingSkeleton() {
   return (
     <div>
@@ -134,6 +160,14 @@ export default function VoiceAgentDetailPage() {
 
   const [copySuccess, setCopySuccess] = useState(false)
 
+  const [phoneAssignment, setPhoneAssignment] = useState<VoicePhoneLookup | null>(null)
+  const [phoneLoading, setPhoneLoading] = useState(true)
+  const [phoneInput, setPhoneInput] = useState('')
+  const [phoneSaving, setPhoneSaving] = useState(false)
+  const [phoneError, setPhoneError] = useState<string | null>(null)
+  const [releasing, setReleasing] = useState(false)
+  const [confirmingRelease, setConfirmingRelease] = useState(false)
+
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
@@ -169,6 +203,56 @@ export default function VoiceAgentDetailPage() {
       }
     })
   }, [agentId])
+
+  useEffect(() => {
+    if (!agentId) return
+    getVoiceAgentPhoneNumber(agentId).then((res) => {
+      if (res.success) {
+        setPhoneAssignment(res.data ?? null)
+      }
+      setPhoneLoading(false)
+    })
+  }, [agentId])
+
+  async function handleAssignPhone() {
+    if (!agentId || !phoneInput.trim()) return
+    setPhoneSaving(true)
+    setPhoneError(null)
+
+    try {
+      const res = await assignVoiceAgentPhoneNumber(agentId, phoneInput.trim())
+      if (res.success && res.data) {
+        setPhoneAssignment(res.data)
+        setPhoneInput('')
+      } else {
+        setPhoneError(res.error ?? 'Failed to assign this number')
+      }
+    } catch {
+      setPhoneError('Failed to assign this number')
+    } finally {
+      setPhoneSaving(false)
+    }
+  }
+
+  async function handleReleasePhone() {
+    if (!agentId) return
+    setReleasing(true)
+    setPhoneError(null)
+
+    try {
+      const res = await releaseVoiceAgentPhoneNumber(agentId)
+      if (res.success) {
+        setPhoneAssignment(null)
+        setConfirmingRelease(false)
+      } else {
+        setPhoneError(res.error ?? 'Failed to release this number')
+      }
+    } catch {
+      setPhoneError('Failed to release this number')
+    } finally {
+      setReleasing(false)
+    }
+  }
 
   const fetchIndexingStatus = useCallback(async () => {
     if (!agentId) return undefined
@@ -545,6 +629,110 @@ export default function VoiceAgentDetailPage() {
               <BookOpen size={14} />
               Manage Knowledge Base
             </button>
+          </div>
+
+          <div className="bg-white rounded-2xl p-6 border border-black/5 shadow-sm">
+            <div className="flex items-center gap-2 mb-1">
+              <Phone size={18} className="text-gray-500" />
+              <h2 className="font-bold text-lg text-gray-900" style={JAKARTA_FONT}>
+                Phone number
+              </h2>
+            </div>
+            <p className="text-gray-500 text-sm mb-4">
+              The number this agent answers calls on. Forward your business line to it — callers
+              keep dialling the number they already know.
+            </p>
+
+            {phoneLoading ? (
+              <div className="h-10 bg-gray-100 rounded-xl animate-pulse" />
+            ) : phoneAssignment ? (
+              <>
+                <div className="flex items-center justify-between gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+                  <div>
+                    <p className="font-semibold text-gray-900 tabular-nums">
+                      {formatPhoneNumber(phoneAssignment.phoneNumber)}
+                    </p>
+                    <p className="text-xs text-emerald-700">
+                      Answering since {formatCreatedDate(phoneAssignment.assignedAt)}
+                    </p>
+                  </div>
+                  <span className="inline-flex items-center gap-1 border text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 border-emerald-200 shrink-0">
+                    <Check size={12} />
+                    Live
+                  </span>
+                </div>
+
+                {!agent.isEnabled && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mt-3">
+                    This agent is disabled, so calls to this number are not answered. Enable it in
+                    Settings.
+                  </p>
+                )}
+
+                {confirmingRelease ? (
+                  <div className="mt-3">
+                    <p className="text-sm text-gray-600 mb-2">
+                      Release this number? Calls to it stop being answered immediately.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleReleasePhone}
+                        disabled={releasing}
+                        className={`flex-1 py-2.5 text-sm ${dangerButtonClasses}`}
+                      >
+                        {releasing ? 'Releasing...' : 'Release number'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmingRelease(false)}
+                        disabled={releasing}
+                        className={`flex-1 py-2.5 text-sm ${secondaryButtonClasses}`}
+                      >
+                        Keep it
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingRelease(true)}
+                    className={`w-full mt-3 py-2.5 text-sm ${secondaryButtonClasses}`}
+                  >
+                    Release number
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                <label className={labelClasses}>Assign a number</label>
+                <input
+                  type="tel"
+                  value={phoneInput}
+                  onChange={(e) => setPhoneInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void handleAssignPhone()
+                  }}
+                  placeholder="+91 98765 43210"
+                  className={inputClasses}
+                />
+                <button
+                  type="button"
+                  onClick={handleAssignPhone}
+                  disabled={phoneSaving || !phoneInput.trim()}
+                  className={`w-full mt-3 py-2.5 flex items-center justify-center gap-2 text-sm ${primaryButtonClasses}`}
+                >
+                  {phoneSaving ? <Loader2 size={14} className="animate-spin" /> : <Phone size={14} />}
+                  {phoneSaving ? 'Assigning...' : 'Assign number'}
+                </button>
+              </>
+            )}
+
+            {phoneError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 mt-3">
+                <p className="text-sm text-red-700">{phoneError}</p>
+              </div>
+            )}
           </div>
 
           <div className="bg-white rounded-2xl p-6 border border-black/5 shadow-sm">
