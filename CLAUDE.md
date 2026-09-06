@@ -118,6 +118,18 @@ POST /mcp/brochure   -> MCP server, send_brochure tool (STUB -- no document/asse
 POST /api/contact           -> marketing-site "Get in touch" form: store the message + email support (public, no auth; honeypot + per-ip/email rate limit)
 GET  /api/webhooks/meta/data-deletion/:code -> public status lookup for a Meta data-deletion request; the confirmation code is the only credential (no auth)
 GET  /api/admin/contact-messages -> staff console list of contact submissions; defaults to un-notified only, ?unnotifiedOnly=false for all (STAFF Cognito auth)
+GET  /api/voice-agents/:id/phone-number -> the Plivo DID this voice agent answers on. `null` data is the
+                                  normal answer, not an error: most agents are browser-only (auth required)
+PUT  /api/voice-agents/:id/phone-number -> assign a DID. PUT because re-assigning the same number to the same
+                                  agent is the same end state and the claim underneath is idempotent. 409 when
+                                  another agent holds the number, and 409 (NOT a silent swap) when this agent
+                                  already has a different one — a swap is a release plus a claim with no
+                                  transaction around them, and half of one leaves the agent answering on
+                                  neither number (auth required)
+DELETE /api/voice-agents/:id/phone-number -> release this agent's DID. Takes NO number: the server already
+                                  knows which one the agent holds, and accepting it from the caller lets a
+                                  wrong value delete a row for an agent they own but did not mean to touch
+                                  (auth required)
 
 ## Key Interfaces
 interface MessageChannel {
@@ -186,6 +198,15 @@ interface KnowledgeBaseEntry {
 - meta_deletion_requests — partition key: confirmationCode (Meta's mandated data-deletion callback. No GSI: every read is a point lookup by the code Meta hands the user. No TTL — the row is the evidence the request was handled)
 - lead_events — partition key: leadId, sort key: ts (`<iso>#<uuid>`), GSI clientId-ts-index, sparse GSI wamid-index, sparse GSI bundleId-ts-index (append-only record of everything that happened to a lead: messages both directions, delivery statuses, journey steps, tool calls, handoffs. The wamid index exists because a Meta status webhook carries a wamid and no leadId. No TTL — this is the audit record)
 - contact_messages — partition key: messageId, GSI recordType-createdAt-index (marketing-site contact form; no clientId/botId — these are messages to us, not leads for a client's bot)
+- voice_phone_lookup — partition key: phoneNumber, GSI agentId-index (routes an inbound call to its voice agent.
+  phoneNumber is OUR Plivo DID — the number Plivo reports as the call's destination — NEVER the client's own
+  advertised number, which their telco forwards to the DID and which never reaches us; storing the latter
+  creates a row no call can ever match and the failure is silent. One DID per client: the webhook says which of
+  our numbers was dialled, never who the caller meant to reach, so a shared DID is ambiguous by construction.
+  The GSI answers the dashboard's inverse question ("which number rings this agent?") and is never on the call
+  path — routing stays a point read, because connecting a call is not the place to accept eventual consistency)
+- voice_leads — partition key: clientId, sort key: leadId (a phone call's CRM record, partitioned like
+  meta_leads)
 
 ## Environment Variables
 OPENAI_API_KEY
