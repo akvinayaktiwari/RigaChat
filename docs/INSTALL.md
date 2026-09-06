@@ -78,8 +78,8 @@ META_APP_ID   META_APP_SECRET   META_REDIRECT_URI   META_WEBHOOK_VERIFY_TOKEN
 ```
 
 `.env` (git-ignored, confirmed via `.gitignore`) is loaded by
-`npm run dev`'s `--env-file=.env` flag. There's no `.env.example` in the
-repo as of this writing — TODO, worth adding one from the list above.
+`npm run dev`'s `--env-file=.env` flag. `backend/.env.example` is the
+annotated template.
 
 ## Frontend environment variables (Vite, build-time)
 
