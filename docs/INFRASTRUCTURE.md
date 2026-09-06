@@ -70,16 +70,30 @@ Discovered from AWS on 2026-09-06 and recorded here because it was previously
 a TODO in this file — the repo had no record of the host at all, while a relay
 was demonstrably serving live browser voice calls.
 
+**This repo is public, so the identifiers stay out of it.** Resolve them
+yourself; the box is tagged, so nothing here needs hardcoding:
+
+```bash
+aws ec2 describe-instances --region ap-south-1 \
+  --filters "Name=tag:Name,Values=vyostra-voice-relay" \
+             "Name=instance-state-name,Values=running" \
+  --query 'Reservations[].Instances[].{Id:InstanceId,Ip:PublicIpAddress,Sg:SecurityGroups[].GroupId}'
 ```
-Instance     i-034aa3c81d171a763   "vyostra-voice-relay"
+
+```
+Tag          vyostra-voice-relay
 Type         t4g.small (arm64 — Graviton, so anything native must build for it)
-AMI          ami-0b2c6d4daacfcfeb4  Ubuntu 24.04 LTS arm64 (Canonical)
-Public IP    3.108.137.95           (not an Elastic IP — verify before pinning DNS)
+OS           Ubuntu 24.04 LTS arm64 (Canonical)
 Launched     2026-07-16
-Key pair     vyostra-voice-key      (the .pem is NOT in this repo or on CI)
 Role         vyostra-voice-relay-role
-Security gp  sg-091522ab43636384e   — inbound 22, 80, 443, all from 0.0.0.0/0
+Public IP    not an Elastic IP — it changes on stop/start, so verify before
+             pinning DNS at it
 ```
+
+**Security-group review is outstanding.** The relay's inbound rules are wider
+than a box running one service on one port needs. Check them against what it
+actually serves (443 in front of 3100) and close the rest — the SSM deploy path
+below exists partly so that shutting the remainder costs nothing.
 
 The relay listens on **port 3100** (`voice-relay/server.ts`), so something in
 front of it terminates TLS and proxies 443 → 3100. The primer says Caddy + PM2;

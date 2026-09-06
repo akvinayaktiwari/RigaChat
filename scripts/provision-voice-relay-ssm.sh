@@ -7,10 +7,10 @@ set -e
 #
 # The relay has always been deployed by hand -- no script in this repo ships
 # dist/voice-relay.js anywhere (see docs/INFRASTRUCTURE.md). The two ways to
-# fix that are SSH with the existing vyostra-voice-key, or SSM Run Command.
-# SSM wins for one reason that matters more than convenience: it needs no
-# long-lived private key sitting in a CI secret for a box whose port 22 is open
-# to 0.0.0.0/0. An IAM role is enough, and access is logged per command.
+# fix that are SSH with the existing key pair, or SSM Run Command. SSM wins for
+# one reason that matters more than convenience: it needs no long-lived private
+# key sitting in a CI secret for an internet-facing box. An IAM role is enough,
+# and access is logged per command.
 #
 # Run this ONCE. After it, scripts/deploy-voice-relay.sh works from any machine
 # with AWS credentials, and later from CI with nothing but a role.
@@ -21,26 +21,41 @@ set -e
 #     bundle in a command parameter, so the file goes via S3)
 #   - grants the role read on that bucket only
 #
-# It does NOT open or close any security group rule. Closing port 22 once SSM
-# works is a good follow-up, but it is a separate, riskier decision -- if SSM
-# is misconfigured and 22 is shut, the box is unreachable.
+# It does NOT change any security group rule. Narrowing inbound access once SSM
+# works is a good follow-up, but it is a separate, riskier decision -- if SSM is
+# misconfigured and SSH is shut at the same time, the box is unreachable.
 
 REGION="ap-south-1"
 ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
-INSTANCE="${VOICE_RELAY_INSTANCE_ID:-i-034aa3c81d171a763}"
+INSTANCE_TAG="${VOICE_RELAY_INSTANCE_TAG:-vyostra-voice-relay}"
 ROLE="vyostra-voice-relay-role"
 BUCKET="${VOICE_RELAY_ARTIFACT_BUCKET:-vyostra-deploy-artifacts-${ACCOUNT}}"
 POLICY_NAME="voice-relay-artifact-read"
 
-echo "==> 1/5 Checking the instance exists and is running"
-STATE=$(aws ec2 describe-instances --region "$REGION" --instance-ids "$INSTANCE" \
-  --query 'Reservations[].Instances[].State.Name' --output text 2>/dev/null || echo "missing")
-if [ "$STATE" != "running" ]; then
-  echo "    instance ${INSTANCE} is '${STATE}', expected 'running'"
-  echo "    override with VOICE_RELAY_INSTANCE_ID if the host has been replaced"
+# Resolved by tag rather than hardcoded: this repo is public, and an instance id
+# plus a public IP is a targeting aid nobody needs handed to them -- the same
+# reason the account id above is derived. It also survives the box being
+# replaced, which a pinned id does not.
+resolve_instance() {
+  if [ -n "${VOICE_RELAY_INSTANCE_ID:-}" ]; then
+    echo "$VOICE_RELAY_INSTANCE_ID"
+    return
+  fi
+  aws ec2 describe-instances --region "$REGION" \
+    --filters "Name=tag:Name,Values=${INSTANCE_TAG}" \
+              "Name=instance-state-name,Values=running" \
+    --query 'Reservations[].Instances[0].InstanceId' --output text 2>/dev/null | head -1
+}
+
+INSTANCE="$(resolve_instance)"
+if [ -z "$INSTANCE" ] || [ "$INSTANCE" = "None" ]; then
+  echo "No running instance tagged Name=${INSTANCE_TAG} in ${REGION}."
+  echo "Set VOICE_RELAY_INSTANCE_ID if the host is tagged differently."
   exit 1
 fi
-echo "    ${INSTANCE} is running"
+
+echo "==> 1/5 Target instance"
+echo "    ${INSTANCE} (tagged ${INSTANCE_TAG})"
 
 echo "==> 2/5 Attaching AmazonSSMManagedInstanceCore to ${ROLE}"
 # Idempotent: attach-role-policy on an already-attached policy is a no-op.

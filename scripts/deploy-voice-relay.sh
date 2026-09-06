@@ -20,7 +20,7 @@ set -e
 
 REGION="ap-south-1"
 ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
-INSTANCE="${VOICE_RELAY_INSTANCE_ID:-i-034aa3c81d171a763}"
+INSTANCE_TAG="${VOICE_RELAY_INSTANCE_TAG:-vyostra-voice-relay}"
 BUCKET="${VOICE_RELAY_ARTIFACT_BUCKET:-vyostra-deploy-artifacts-${ACCOUNT}}"
 
 # The two facts about the box this script cannot derive. They are GUESSES until
@@ -29,6 +29,28 @@ BUCKET="${VOICE_RELAY_ARTIFACT_BUCKET:-vyostra-deploy-artifacts-${ACCOUNT}}"
 # bundle somewhere nothing reads, and report success.
 REMOTE_DIR="${VOICE_RELAY_REMOTE_DIR:-/opt/voice-relay}"
 RESTART_CMD="${VOICE_RELAY_RESTART_CMD:-pm2 restart voice-relay}"
+
+# Resolved by tag rather than hardcoded: this repo is public, and an instance id
+# plus a public IP is a targeting aid nobody needs handed to them -- the same
+# reason the account id above is derived. It also survives the box being
+# replaced, which a pinned id does not.
+resolve_instance() {
+  if [ -n "${VOICE_RELAY_INSTANCE_ID:-}" ]; then
+    echo "$VOICE_RELAY_INSTANCE_ID"
+    return
+  fi
+  aws ec2 describe-instances --region "$REGION" \
+    --filters "Name=tag:Name,Values=${INSTANCE_TAG}" \
+              "Name=instance-state-name,Values=running" \
+    --query 'Reservations[].Instances[0].InstanceId' --output text 2>/dev/null | head -1
+}
+
+INSTANCE="$(resolve_instance)"
+if [ -z "$INSTANCE" ] || [ "$INSTANCE" = "None" ]; then
+  echo "No running instance tagged Name=${INSTANCE_TAG} in ${REGION}."
+  echo "Set VOICE_RELAY_INSTANCE_ID if the host is tagged differently."
+  exit 1
+fi
 
 PROBE=false
 ASSUME_YES=false
@@ -44,7 +66,8 @@ for ARG in "$@"; do
       echo "            until you have seen its output."
       echo "  --yes     Skip the 'this drops live calls' confirmation."
       echo
-      echo "Overrides: VOICE_RELAY_INSTANCE_ID, VOICE_RELAY_ARTIFACT_BUCKET,"
+      echo "Overrides: VOICE_RELAY_INSTANCE_TAG, VOICE_RELAY_INSTANCE_ID,"
+      echo "           VOICE_RELAY_ARTIFACT_BUCKET,"
       echo "           VOICE_RELAY_REMOTE_DIR, VOICE_RELAY_RESTART_CMD"
       exit 0
       ;;
