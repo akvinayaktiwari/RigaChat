@@ -85,20 +85,37 @@ The relay listens on **port 3100** (`voice-relay/server.ts`), so something in
 front of it terminates TLS and proxies 443 → 3100. The primer says Caddy + PM2;
 still unverified from outside the box.
 
-### How the artifact reaches the box: still unknown
+### Deploying the relay
 
-`npm run build:relay` produces `backend/dist/voice-relay.js` and **no deploy
-path ships it**. Not `scripts/deploy.sh`, not `backend/scripts/deploy.js`, not
-`.github/workflows/ci.yml`. Whatever put the running code there was done by
-hand and left no trace in the repo. Two mechanisms are available:
+`npm run build:relay` produces `backend/dist/voice-relay.js`. Until 2026-09-06
+nothing shipped it — not `scripts/deploy.sh`, not `backend/scripts/deploy.js`,
+not CI — so whatever runs on that box was put there by hand.
 
-- **SSM Run Command** — no keys to distribute and no reliance on port 22.
-  Needs `AmazonSSMManagedInstanceCore` on the instance role; the agent itself
-  is preinstalled on Canonical's Ubuntu 24.04 images. `aws ssm
-  describe-instance-information` returns nothing today, so it is not yet
-  registered.
-- **SSH** — port 22 is already open to the world and the key pair exists, but
-  the private key is on somebody's laptop rather than anywhere CI can reach.
+```bash
+./scripts/provision-voice-relay-ssm.sh     # once: enable SSM + artifact bucket
+./scripts/deploy-voice-relay.sh --probe    # learn the box's actual layout
+./scripts/deploy-voice-relay.sh            # build, ship, restart, verify
+```
+
+SSM Run Command rather than SSH: no long-lived private key in a CI secret for
+a box with port 22 open to the world, and every command is logged. The agent
+ships preinstalled on Canonical's Ubuntu 24.04 images and registers once the
+instance profile carries `AmazonSSMManagedInstanceCore`. The 3.5MB bundle
+travels via a private, versioned S3 bucket, because a Run Command parameter
+cannot carry it.
+
+**Two values the deploy script cannot derive** — the install directory and the
+restart command. Its defaults (`/opt/voice-relay`, `pm2 restart voice-relay`)
+come from the primer and are unverified, so the script checks both on the box
+and aborts rather than trusting them: a wrong install directory is the failure
+that looks like success, where the file lands somewhere nothing reads and the
+old code keeps serving. `--probe` reports the real layout; override with
+`VOICE_RELAY_REMOTE_DIR` and `VOICE_RELAY_RESTART_CMD`.
+
+**Restarting drops every call in progress.** Sessions are held in memory in one
+Node process — no draining, nothing to fail over to. The script confirms before
+restarting unless given `--yes`, keeps the previous bundle on the box as
+`voice-relay.js.prev`, and prints the one-line rollback.
 
 ### IAM: read-only, which is not what telephony needs
 
