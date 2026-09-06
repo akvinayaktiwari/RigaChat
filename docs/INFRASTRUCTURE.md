@@ -64,25 +64,72 @@ repo) — there is no in-repo source of truth for e.g. DynamoDB table
 capacity mode, IAM role policies attached to any of the three Lambdas, or
 VPC/subnet config.
 
-## Voice relay (EC2) — marked TODO, not discoverable in-repo
+## Voice relay (EC2)
 
-The founder-memory primer describes this as EC2-hosted with PM2 + Caddy. A
-repo-wide search for `pm2`, `caddy`, `ecosystem.config`, `Caddyfile`,
-`*.service` (systemd units) found **nothing**. `backend/src/voice-relay/`
-has the relay's TypeScript source and a build script
-(`npm run build:relay` → `dist/voice-relay.js`), but no deploy step for that
-artifact exists in `deploy.yml`, `scripts/deploy.sh`, or
-`backend/scripts/deploy.js` — none of the three deploy paths touch the
-voice relay at all.
+Discovered from AWS on 2026-09-06 and recorded here because it was previously
+a TODO in this file — the repo had no record of the host at all, while a relay
+was demonstrably serving live browser voice calls.
 
-**TODO for whoever maintains the EC2 host:** confirm and document instance
-ID/AMI, PM2 process name, Caddy config (reverse proxy + TLS termination
-presumably), and how `dist/voice-relay.js` actually gets onto that box today
-(manual `scp`? a script not in this repo?). Also see
-`backend/src/voice-relay/session.ts`'s own TODO comment — the relay's `.env`
-on EC2 is missing `BACKEND_URL` entirely, currently papered over by a
-hardcoded fallback in source (detailed in
-[CHALLENGES.md](./CHALLENGES.md)).
+```
+Instance     i-034aa3c81d171a763   "vyostra-voice-relay"
+Type         t4g.small (arm64 — Graviton, so anything native must build for it)
+AMI          ami-0b2c6d4daacfcfeb4  Ubuntu 24.04 LTS arm64 (Canonical)
+Public IP    3.108.137.95           (not an Elastic IP — verify before pinning DNS)
+Launched     2026-07-16
+Key pair     vyostra-voice-key      (the .pem is NOT in this repo or on CI)
+Role         vyostra-voice-relay-role
+Security gp  sg-091522ab43636384e   — inbound 22, 80, 443, all from 0.0.0.0/0
+```
+
+The relay listens on **port 3100** (`voice-relay/server.ts`), so something in
+front of it terminates TLS and proxies 443 → 3100. The primer says Caddy + PM2;
+still unverified from outside the box.
+
+### How the artifact reaches the box: still unknown
+
+`npm run build:relay` produces `backend/dist/voice-relay.js` and **no deploy
+path ships it**. Not `scripts/deploy.sh`, not `backend/scripts/deploy.js`, not
+`.github/workflows/ci.yml`. Whatever put the running code there was done by
+hand and left no trace in the repo. Two mechanisms are available:
+
+- **SSM Run Command** — no keys to distribute and no reliance on port 22.
+  Needs `AmazonSSMManagedInstanceCore` on the instance role; the agent itself
+  is preinstalled on Canonical's Ubuntu 24.04 images. `aws ssm
+  describe-instance-information` returns nothing today, so it is not yet
+  registered.
+- **SSH** — port 22 is already open to the world and the key pair exists, but
+  the private key is on somebody's laptop rather than anywhere CI can reach.
+
+### IAM: read-only, which is not what telephony needs
+
+The role carries `AmazonDynamoDBReadOnlyAccess` plus one inline policy
+(`voice-call-logs-write`) allowing `PutItem` on `voice_call_logs` alone. That
+was correct when the relay only answered browser calls and wrote one billing
+row per call.
+
+The telephony path writes far more than that — `voice_leads`, `lead_events`,
+`lead_state` — and every one of those is currently denied. Critically it fails
+**silently**: `VoiceSession.resolveIdentity` and `withIdentity` swallow CRM
+errors on purpose, so that a DynamoDB problem can never drop a live call. The
+observable result of the missing permissions is a phone that rings, an agent
+that answers, and a CRM that stays empty with nothing logged as wrong.
+
+Fix: `scripts/provision-voice-relay-iam.sh`. Restart the relay process after
+running it — the SDK caches instance-role credentials for the process
+lifetime.
+
+### Environment on the box
+
+The relay reads its own `.env`, separate from the Lambda's. Required:
+`AWS_REGION`, `VOICE_AUTH_SECRET`, `OPENAI_API_KEY`. For telephony, also
+`PLIVO_AUTH_TOKEN` and `VOICE_RELAY_PUBLIC_HOST` (both absent = telephony off
+and every Plivo endpoint answers 503 — fail-closed by design),
+`PLIVO_AUTH_ID` (absent = transfer disabled, inbound answering unaffected),
+and optionally `VOICE_MAX_CONCURRENT_CALLS` (default 10).
+
+`BACKEND_URL` is still missing there, which is why `session.ts` carries a
+hardcoded Lambda Function URL as a fallback for its RAG calls. See
+[CHALLENGES.md](./CHALLENGES.md).
 
 ## Third-party managed services (external, not AWS)
 

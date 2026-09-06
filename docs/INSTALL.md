@@ -36,6 +36,14 @@ STAFF_COGNITO_USER_POOL_ID    UPSTASH_REDIS_REST_TOKEN       UPSTASH_REDIS_REST_
 VOICE_AUTH_SECRET
 ```
 
+> The voice relay is a **separate process on its own EC2 host** and reads its
+> own `.env`, not this one. Its variables (`VOICE_RELAY_PUBLIC_HOST`,
+> `PLIVO_AUTH_TOKEN`, `PLIVO_AUTH_ID`, `VOICE_MAX_CONCURRENT_CALLS`, plus
+> `VOICE_AUTH_SECRET` and `BACKEND_URL` shared with the Lambda) are documented
+> in `backend/.env.example` and [INFRASTRUCTURE.md](./INFRASTRUCTURE.md).
+> Telephony stays off until `PLIVO_AUTH_TOKEN` and `VOICE_RELAY_PUBLIC_HOST`
+> are both set.
+
 Read via `process.env[dynamicName]` in `backend/src/repositories/voice-repository.ts` (table names built from constants, not literal `process.env.X`, hence invisible to a literal grep):
 
 ```
