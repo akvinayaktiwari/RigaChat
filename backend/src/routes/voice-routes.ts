@@ -3,17 +3,23 @@ import { Hono } from 'hono'
 import { requireAuth } from '../lib/cognito.js'
 import {
   addVoiceKBEntry,
+  AgentAlreadyHasNumberError,
+  assignVoiceAgentPhoneNumber,
   confirmVoiceKBUpload,
   createVoiceAgent,
   deleteVoiceAgent,
   getVoiceAgentById,
   getVoiceAgentContext,
+  getVoiceAgentPhoneNumber,
   getVoiceAgentPublicConfig,
   getVoiceAgentRecord,
   getVoiceAgents,
   getVoiceAgentUsage,
   getVoiceKBEntries,
   getVoiceKBUploadUrl,
+  InvalidPhoneNumberError,
+  PhoneNumberInUseError,
+  releaseVoiceAgentPhoneNumber,
   removeVoiceKBEntry,
   setupVoiceAgent,
   updateVoiceAgent,
@@ -23,7 +29,13 @@ import type { KBFileType, KBUploadUrlResult } from '../services/kb-service.js'
 import { retrieveContext } from '../services/rag-service.js'
 import { generateToken } from '../voice-relay/auth.js'
 import { checkEntitlement, EntitlementError, toEntitlementErrorResponse } from '../services/entitlement-service.js'
-import type { ApiResponse, VoiceAgent, VoiceKnowledgeBaseEntry, VoiceUsageSummary } from '../types/index.js'
+import type {
+  ApiResponse,
+  VoiceAgent,
+  VoiceKnowledgeBaseEntry,
+  VoicePhoneLookup,
+  VoiceUsageSummary,
+} from '../types/index.js'
 
 interface AuthEnv {
   Variables: {
@@ -49,6 +61,10 @@ type UpdateVoiceAgentBody = Partial<
     'name' | 'voice' | 'greetingMessage' | 'systemPrompt' | 'brandColor' | 'widgetPosition' | 'maxSessionDuration' | 'isEnabled'
   >
 >
+
+interface AssignPhoneNumberBody {
+  phoneNumber?: string
+}
 
 interface AddVoiceKBEntryBody {
   title?: string
@@ -366,6 +382,79 @@ voiceRoutes.get('/:id/usage', requireAuth, async (c) => {
   try {
     const usage = await getVoiceAgentUsage(agentId, clientId)
     return c.json<ApiResponse<VoiceUsageSummary>>({ success: true, data: usage }, 200)
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      return c.json<ApiResponse<null>>({ success: false, error: 'Voice agent not found' }, 404)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+// The Plivo DID this agent answers on. Null is a normal answer, not an error:
+// most agents are browser-only and will never have a number.
+voiceRoutes.get('/:id/phone-number', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const agentId = c.req.param('id')
+
+  try {
+    const assignment = await getVoiceAgentPhoneNumber(agentId, clientId)
+    return c.json<ApiResponse<VoicePhoneLookup | null>>({ success: true, data: assignment }, 200)
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      return c.json<ApiResponse<null>>({ success: false, error: 'Voice agent not found' }, 404)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+// PUT, not POST: assigning the same number to the same agent twice is the same
+// end state, and the underlying claim is deliberately idempotent for exactly
+// that reason.
+voiceRoutes.put('/:id/phone-number', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const agentId = c.req.param('id')
+
+  let body: AssignPhoneNumberBody
+  try {
+    body = await c.req.json<AssignPhoneNumberBody>()
+  } catch {
+    return c.json<ApiResponse<null>>({ success: false, error: 'Invalid JSON body' }, 400)
+  }
+
+  if (typeof body.phoneNumber !== 'string' || !body.phoneNumber.trim()) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'phoneNumber is required' }, 400)
+  }
+
+  try {
+    const assignment = await assignVoiceAgentPhoneNumber(agentId, clientId, body.phoneNumber)
+    return c.json<ApiResponse<VoicePhoneLookup>>({ success: true, data: assignment }, 200)
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      return c.json<ApiResponse<null>>({ success: false, error: 'Voice agent not found' }, 404)
+    }
+    if (error instanceof InvalidPhoneNumberError) {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 400)
+    }
+    // 409, not 400: the request is well-formed and the client cannot fix it by
+    // correcting their input -- someone else holds the number, or this agent
+    // already has one and must release it first.
+    if (error instanceof PhoneNumberInUseError || error instanceof AgentAlreadyHasNumberError) {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 409)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+// No number in the path: the server already knows which one this agent holds,
+// and taking it from the caller would let a wrong value delete a row for an
+// agent they own but did not mean to touch.
+voiceRoutes.delete('/:id/phone-number', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+  const agentId = c.req.param('id')
+
+  try {
+    await releaseVoiceAgentPhoneNumber(agentId, clientId)
+    return c.body(null, 204)
   } catch (error) {
     if (isNotFoundError(error)) {
       return c.json<ApiResponse<null>>({ success: false, error: 'Voice agent not found' }, 404)
