@@ -38,13 +38,20 @@ echo "==> 1/3 Creating the ${TABLE} table"
 if aws dynamodb describe-table --table-name "$TABLE" --region "$REGION" >/dev/null 2>&1; then
   echo "    $TABLE already exists, skipping"
 else
-  echo "    creating $TABLE (pk=phoneNumber, no sk, no GSI)"
+  # The GSI serves the dashboard only ("which number rings this agent?"). The
+  # inbound-call path never touches it -- that stays a point read on the
+  # partition key, because a call being routed is not the place to accept a
+  # GSI's eventual consistency.
+  echo "    creating $TABLE (pk=phoneNumber, no sk, GSI agentId-index)"
   aws dynamodb create-table --table-name "$TABLE" --region "$REGION" \
     --billing-mode PAY_PER_REQUEST \
     --attribute-definitions \
       AttributeName=phoneNumber,AttributeType=S \
+      AttributeName=agentId,AttributeType=S \
     --key-schema \
       AttributeName=phoneNumber,KeyType=HASH \
+    --global-secondary-indexes \
+      "IndexName=agentId-index,KeySchema=[{AttributeName=agentId,KeyType=HASH}],Projection={ProjectionType=ALL}" \
     --output json >/dev/null
   echo "    waiting for $TABLE to become ACTIVE..."
   aws dynamodb wait table-exists --table-name "$TABLE" --region "$REGION"

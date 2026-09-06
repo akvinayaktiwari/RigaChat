@@ -1,4 +1,4 @@
-import { DeleteCommand, GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb'
+import { DeleteCommand, GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoClient, getTableName } from './dynamo-client.js'
 import type { VoicePhoneLookup } from '../types/index.js'
 
@@ -65,7 +65,7 @@ export async function claimPhoneNumber(
   phoneNumber: string,
   agentId: string,
   clientId: string
-): Promise<void> {
+): Promise<VoicePhoneLookup> {
   const normalised = normalisePhoneNumber(phoneNumber)
   const record: VoicePhoneLookup = {
     phoneNumber: normalised,
@@ -83,6 +83,10 @@ export async function claimPhoneNumber(
         ExpressionAttributeValues: { ':agentId': agentId },
       })
     )
+    // Returned rather than left to the caller to read back: the agentId index
+    // is eventually consistent, so a read-after-write there can hand back the
+    // state from before this claim.
+    return record
   } catch (error) {
     if (error instanceof Error && error.name === 'ConditionalCheckFailedException') {
       throw new VoicePhoneConflictError(normalised)
@@ -111,6 +115,34 @@ export async function getAgentForPhoneNumber(phoneNumber: string): Promise<Voice
   } catch (error) {
     throw new Error(
       `Failed to look up voice agent for phone number ${normalised}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
+// The dashboard's question, which is the inverse of the hot path's: "which
+// number rings this agent?" rather than "which agent does this number ring?".
+// It needs the index because agentId is not the key -- and it must never become
+// the routing read, which stays a point lookup on the partition key.
+//
+// Eventually consistent, like every GSI read. A caller that has just claimed a
+// number should use what claimPhoneNumber wrote rather than reading it back
+// here, or it may briefly see the state from before its own write.
+export async function getPhoneNumberForAgent(agentId: string): Promise<VoicePhoneLookup | null> {
+  try {
+    const result = await dynamoClient.send(
+      new QueryCommand({
+        TableName: TABLE_NAME(),
+        IndexName: 'agentId-index',
+        KeyConditionExpression: 'agentId = :agentId',
+        ExpressionAttributeValues: { ':agentId': agentId },
+        Limit: 1,
+      })
+    )
+    const items = (result.Items as VoicePhoneLookup[] | undefined) ?? []
+    return items[0] ?? null
+  } catch (error) {
+    throw new Error(
+      `Failed to look up the phone number for voice agent ${agentId}: ${error instanceof Error ? error.message : String(error)}`
     )
   }
 }

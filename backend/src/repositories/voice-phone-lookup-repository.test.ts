@@ -11,6 +11,7 @@ vi.mock('./dynamo-client.js', () => ({
 const {
   claimPhoneNumber,
   getAgentForPhoneNumber,
+  getPhoneNumberForAgent,
   releasePhoneNumber,
   normalisePhoneNumber,
   VoicePhoneConflictError,
@@ -195,5 +196,68 @@ describe('releasePhoneNumber', () => {
     await expect(releasePhoneNumber('+919876543210')).rejects.toThrow(
       /Failed to release phone number/
     )
+  })
+})
+
+describe('getPhoneNumberForAgent', () => {
+  it('queries the agentId index, not the table', () => {
+    // The partition key is the phone number, so the dashboard's question
+    // ("which number rings this agent?") has no key to read by without it.
+    send.mockResolvedValue({ Items: [] })
+
+    void getPhoneNumberForAgent('agent-1')
+
+    const command = send.mock.calls[0][0]
+    expect(command.input.IndexName).toBe('agentId-index')
+    expect(command.input.ExpressionAttributeValues).toEqual({ ':agentId': 'agent-1' })
+  })
+
+  it('returns the assignment when the agent has one', async () => {
+    const row = {
+      phoneNumber: '+919876543210',
+      agentId: 'agent-1',
+      clientId: 'client-1',
+      assignedAt: '2026-09-06T00:00:00.000Z',
+    }
+    send.mockResolvedValue({ Items: [row] })
+
+    await expect(getPhoneNumberForAgent('agent-1')).resolves.toEqual(row)
+  })
+
+  it('returns null for an agent with no number', async () => {
+    send.mockResolvedValue({ Items: [] })
+
+    await expect(getPhoneNumberForAgent('agent-1')).resolves.toBeNull()
+  })
+
+  it('returns null rather than undefined when the query returns no Items key', async () => {
+    send.mockResolvedValue({})
+
+    await expect(getPhoneNumberForAgent('agent-1')).resolves.toBeNull()
+  })
+
+  it('surfaces a query failure instead of reporting no number', async () => {
+    // Reporting null here would show "no number assigned" on the dashboard for
+    // an agent that has one, and invite the client to claim a second.
+    send.mockRejectedValue(new Error('DynamoDB unavailable'))
+
+    await expect(getPhoneNumberForAgent('agent-1')).rejects.toThrow('DynamoDB unavailable')
+  })
+})
+
+describe('claimPhoneNumber returns the row it wrote', () => {
+  it('hands back the assignment rather than making the caller read it back', async () => {
+    // The agentId index is eventually consistent: a read-after-write there can
+    // return the state from before this claim.
+    send.mockResolvedValue({})
+
+    const result = await claimPhoneNumber('+91 98765 43210', 'agent-1', 'client-1')
+
+    expect(result).toMatchObject({
+      phoneNumber: '+919876543210',
+      agentId: 'agent-1',
+      clientId: 'client-1',
+    })
+    expect(result.assignedAt).toBeTruthy()
   })
 })
