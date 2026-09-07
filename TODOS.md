@@ -1,5 +1,68 @@
 # TODOS
 
+## Identity join reads every lead a client owns, on every inbound message
+
+**What:** `findLeadByPhone` calls `getLeadsForClient(clientId)`, an unpaginated
+`clientId-index` Query with no `Limit`, and it runs on every inbound WhatsApp message and
+every phone call. Cost and latency grow with a client's lifetime lead count.
+
+**Two problems, not one.** The obvious one is cost on a hot path. The quieter one is
+correctness: DynamoDB caps a Query page at 1MB and `getLeadsByClientId` never follows
+`LastEvaluatedKey`, so past that size it silently returns a subset — and the identity join
+can miss the very lead it should have matched. A returning caller becomes a stranger, with
+nothing logged.
+
+**Pre-existing, and inherited rather than introduced.** `main`'s
+inbound-lead-match-service already did exactly this for WhatsApp. This branch moved it and
+extended it to phone calls, so the shape is unchanged and the blast radius is wider.
+
+**Fix:** give the join a keyed read instead of a per-client sweep — a phone-indexed GSI on
+leads, or a `phone -> leadId` lookup table shaped like `voice_phone_lookup`. Then the join
+is a point read and the pagination question disappears. Capping with a Limit is the cheap
+half-measure; it bounds cost and leaves the correctness hole.
+
+**Depends on:** None. Do it before a client's lead count makes the truncation reachable.
+
+## Two copies of the voice token validator, now with different capabilities
+
+**What:** `validateVoiceToken` in `backend/src/routes/voice-routes.ts` is a duplicate of
+`validateToken` in `backend/src/voice-relay/auth.ts`, deliberately — voice-relay builds as
+a separate EC2 bundle the Lambda does not include.
+
+**Why it matters more now:** `auth.ts` gained an optional signature scope (binding a
+transfer token to its destination). The Lambda's copy has no scope parameter. They agree
+today because an omitted scope is byte-compatible, so the RAG route still validates widget
+tokens correctly — but the two have started to differ in what they can express, and the
+next change to the token format will silently split them.
+
+**Fix:** extract the token logic into a dependency-free module under `backend/src/lib/`
+that both builds import. The constraint is only that it must not pull in the AWS SDK or
+any service — the relay bundle stays small (see the bundle-size item above).
+
+**Depends on:** None.
+
+## Voice branches added to shared code without matching tests
+
+**What:** the ship coverage audit put this branch at 93%, and named where the remaining
+gaps cluster. Two files have no test file at all — `backend/src/routes/voice-routes.ts`
+(every status-code branch of the new phone-number routes is unverified at the HTTP layer,
+though the service beneath is thorough) and `backend/src/repositories/voice-lead-repository.ts`.
+Beyond those, `voice` cases were bolted onto existing multi-source switches whose tests
+nobody extended: `normalizeVoiceLead` and `readJourneyLead`'s voice case in
+lead-resolution-service, `leadParentIdOf` in journey-ignition-service, and
+`getUnifiedLeadDetail`/`getLeadTimeline` for a voice-sourced lead.
+
+**Why it is worth doing rather than filing and forgetting:** this is the exact shape that
+produced the lead-link deep-link bug — a `voice` case added to one side of a mirrored pair,
+no test covering it, and the omission invisible until someone taps a dead link. The
+untested branches above are the remaining instances of that shape.
+
+**Also flagged, and deliberately left:** `unpackLeadRef`'s sibling gaps are now closed, and
+`deleteVoiceLead` appears to have no production caller — confirm it is wanted before
+writing a test that pins dead code in place.
+
+**Depends on:** None. Each is a small, independent test file.
+
 ## P0 GATE: call-recording consent before telephony goes live
 
 **What:** A phone call records both halves of the conversation into `lead_events`. There
