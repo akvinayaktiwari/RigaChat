@@ -115,6 +115,10 @@ export interface UnifiedInboxPage {
   leads: UnifiedLead[]
   total: number
   nextCursor?: string
+  // Sources that failed to load, so this page is missing their leads. Omitted
+  // entirely on a healthy read -- the field appearing at all means the inbox is
+  // incomplete, and the UI must say so. Mirrors backend/src/types/index.ts.
+  degradedSources?: LeadSource[]
 }
 
 export interface UnifiedLead {
