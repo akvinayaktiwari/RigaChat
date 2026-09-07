@@ -248,25 +248,41 @@ echo "==> 2/6 Checking the box has every module the bundle needs"
 # lib-dynamodb and ws; telephony pulled in kms, sesv2, sfn and sqs, because
 # lead-identity-service reaches lead-service and from there the whole services
 # layer. See TODOS.md.
-REQUIRED=$(grep -oE 'require\("@aws-sdk/[a-z0-9-]+"\)' "$BUNDLE" | sed 's/require("//;s/")//' | sort -u)
-INSTALLED=$(run_remote "list installed aws-sdk modules" \
-  "ls ${REMOTE_DIR}/node_modules/@aws-sdk/ 2>/dev/null")
+# Every bare specifier, not just @aws-sdk -- the first version of this check
+# looked only at those and would have missed anything else the bundle started
+# externalising. node: builtins and relative paths are dropped; the two
+# allowlisted names are ws's optional native speedups, required inside a
+# try/catch, which fall back to JS when absent and must not fail a deploy.
+REQUIRED=$(grep -oE 'require\("[^"./][^"]*"\)' "$BUNDLE" \
+  | sed 's/require("//;s/")//' \
+  | grep -v '^node:' \
+  | grep -vE '^(bufferutil|utf-8-validate)$' \
+  | sort -u \
+  | tr '\n' ' ')
+# Flattened to one line above: SSM runs this through sh, and a newline inside
+# the `for` list splits the statement rather than separating two words.
 
-MISSING=""
-for M in $REQUIRED; do
-  NAME="${M#@aws-sdk/}"
-  echo "$INSTALLED" | tr -d '\r' | grep -qx "$NAME" || MISSING="${MISSING} ${M}"
-done
+# Resolved by node itself, from the relay's own directory, so this answers the
+# question that actually matters -- "will the require succeed at load" -- rather
+# than guessing from a directory listing.
+CHECK_SCRIPT="cd ${REMOTE_DIR}; for M in ${REQUIRED}; do node -e \"require.resolve('\$M')\" >/dev/null 2>&1 || echo \"MISSING \$M\"; done; echo DONE"
+RESOLVED=$(run_remote "resolve bundle dependencies" "$CHECK_SCRIPT")
+MISSING=$(echo "$RESOLVED" | grep '^MISSING ' | awk '{print $2}' | tr '\n' ' ')
 
-if [ -n "$MISSING" ]; then
-  echo "    MISSING on the box:${MISSING}"
+if ! echo "$RESOLVED" | grep -q DONE; then
+  echo "    could not verify dependencies on the box"
+  exit 1
+fi
+
+if [ -n "$(echo "$MISSING" | tr -d '[:space:]')" ]; then
+  echo "    MISSING on the box: ${MISSING}"
   echo
   echo "Refusing to deploy. These are require()d at load, so the relay would"
   echo "crash on start and PM2 would restart-loop it -- taking browser voice"
   echo "down too, not just telephony."
   echo
   echo "Install them first, then re-run:"
-  echo "  ssh <box> 'cd ${REMOTE_DIR} && npm install --omit=dev${MISSING}'"
+  echo "  ssh <box> 'cd ${REMOTE_DIR} && npm install --omit=dev ${MISSING}'"
   exit 1
 fi
 echo "    all $(echo "$REQUIRED" | wc -w | tr -d ' ') external modules present"

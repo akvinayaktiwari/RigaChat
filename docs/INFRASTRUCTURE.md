@@ -140,11 +140,19 @@ here.
 
 **The bundle's external dependencies are a live trap.** `build:relay` externalises
 `@aws-sdk/*`, so those resolve from the box's own `node_modules`. Telephony grew
-the bundle from 144KB to 3.5MB and added four SDK clients (`kms`, `sesv2`, `sfn`,
-`sqs`) that the box does not have installed — a require at load, so deploying
-without installing them first crashes the relay into a PM2 restart loop and takes
-**browser** voice down too. The deploy script checks and refuses; `TODOS.md` has
-why the import graph grew.
+the bundle from 144KB to 3.5MB and added four SDK clients — `kms`, `sesv2`, `sfn`,
+`sqs` — that the box did not have. They are required at load, so deploying without
+them crashes the relay into a PM2 restart loop and takes **browser** voice down
+too. Installed on 2026-09-07 at the versions `backend/package.json` pins; the
+running process was not restarted, so it still serves the old bundle.
+
+The deploy script now resolves every bare specifier in the bundle against the box
+before shipping anything, and refuses if one is missing. `TODOS.md` records why
+the import graph grew — the check is a guard, not the fix.
+
+**The relay's own `package.json` lives only on that box** and is not in this repo,
+so the dependency list has no source of truth outside the instance. Worth
+correcting the next time the relay's build is touched.
 
 **Restarting drops every call in progress.** Sessions are held in memory in one
 Node process — no draining, nothing to fail over to. The script confirms before
