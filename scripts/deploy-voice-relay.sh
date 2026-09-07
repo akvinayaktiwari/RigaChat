@@ -23,12 +23,23 @@ ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
 INSTANCE_TAG="${VOICE_RELAY_INSTANCE_TAG:-vyostra-voice-relay}"
 BUCKET="${VOICE_RELAY_ARTIFACT_BUCKET:-vyostra-deploy-artifacts-${ACCOUNT}}"
 
-# The two facts about the box this script cannot derive. They are GUESSES until
-# --probe confirms them, so every path below verifies before it writes rather
-# than trusting the default -- a wrong REMOTE_DIR would otherwise scatter a
-# bundle somewhere nothing reads, and report success.
-REMOTE_DIR="${VOICE_RELAY_REMOTE_DIR:-/opt/voice-relay}"
-RESTART_CMD="${VOICE_RELAY_RESTART_CMD:-pm2 restart voice-relay}"
+# Confirmed against the box with --probe on 2026-09-07. Every one of these was
+# wrong when guessed from the primer, which is why the probe exists.
+#
+# RUN_AS matters more than it looks. SSM's RunShellScript executes as root, and
+# the relay is a PM2 process owned by ubuntu, in ubuntu's own PM2 home. Root has
+# its own empty PM2 registry, so `pm2 restart voice-relay` as root finds no such
+# process, exits 0 having done nothing, and leaves the old code serving -- while
+# a health check still answers 200 from the process that never restarted. That
+# is the exact failure this script is supposed to make impossible, so the
+# verification below compares the PID rather than trusting an exit code.
+REMOTE_DIR="${VOICE_RELAY_REMOTE_DIR:-/home/ubuntu}"
+RUN_AS="${VOICE_RELAY_RUN_AS:-ubuntu}"
+PM2_APP="${VOICE_RELAY_PM2_APP:-voice-relay}"
+
+# Wrapped so it runs in the owner's login environment: PM2 resolves its home
+# from $HOME, and `sudo -u` alone keeps root's.
+as_owner() { echo "sudo -iu ${RUN_AS} bash -lc '$1'"; }
 
 # Resolved by tag rather than hardcoded: this repo is public, and an instance id
 # plus a public IP is a targeting aid nobody needs handed to them -- the same
@@ -67,8 +78,8 @@ for ARG in "$@"; do
       echo "  --yes     Skip the 'this drops live calls' confirmation."
       echo
       echo "Overrides: VOICE_RELAY_INSTANCE_TAG, VOICE_RELAY_INSTANCE_ID,"
-      echo "           VOICE_RELAY_ARTIFACT_BUCKET,"
-      echo "           VOICE_RELAY_REMOTE_DIR, VOICE_RELAY_RESTART_CMD"
+      echo "           VOICE_RELAY_ARTIFACT_BUCKET, VOICE_RELAY_REMOTE_DIR,"
+      echo "           VOICE_RELAY_RUN_AS, VOICE_RELAY_PM2_APP"
       exit 0
       ;;
     *) echo "Unknown argument: $ARG (try --help)"; exit 1 ;;
@@ -84,14 +95,23 @@ run_remote() {
   local DESCRIPTION="$1"
   local SCRIPT="$2"
 
+  # The parameters go in as a JSON file rather than the `commands=[...]`
+  # shorthand. That shorthand does its own comma and bracket parsing before the
+  # value ever reaches the API, so any script containing a double quote or a
+  # newline -- which is every useful one -- is mangled into a parse error.
+  local PARAM_FILE
+  PARAM_FILE=$(mktemp)
+  SCRIPT="$SCRIPT" python3 -c 'import json, os; print(json.dumps({"commands": [os.environ["SCRIPT"]]}))' > "$PARAM_FILE"
+
   local CMD_ID
   CMD_ID=$(aws ssm send-command \
     --region "$REGION" \
     --instance-ids "$INSTANCE" \
     --document-name "AWS-RunShellScript" \
     --comment "$DESCRIPTION" \
-    --parameters "commands=[\"$SCRIPT\"]" \
+    --parameters "file://${PARAM_FILE}" \
     --query 'Command.CommandId' --output text)
+  rm -f "$PARAM_FILE"
 
   # The invocation does not exist for a moment after send-command returns, so a
   # get-command-invocation immediately after can 404 on a command that is fine.
@@ -140,21 +160,25 @@ echo "    Online"
 if [ "$PROBE" = true ]; then
   echo
   echo "==> Probing the box (changing nothing)"
-  run_remote "voice-relay probe" "$(cat <<'REMOTE'
+  # Every command here runs as the process owner. Running `pm2 list` as root
+  # instead does not just report the wrong thing -- it SPAWNS a second PM2
+  # daemon under /root/.pm2 that was not there before, which is a side effect a
+  # probe has no business having.
+  run_remote "voice-relay probe" "$(cat <<REMOTE
 echo '--- node process serving the relay ---'
-ps -eo pid,args | grep -i "voice-relay" | grep -v grep || echo '(none found)'
+ps -eo pid,ppid,user,args | grep -i "voice-relay" | grep -v grep || echo '(none found)'
 echo
 echo '--- what is listening on 3100 ---'
 (ss -lntp 2>/dev/null || netstat -lntp 2>/dev/null) | grep 3100 || echo '(nothing on 3100)'
 echo
-echo '--- process manager ---'
-command -v pm2 >/dev/null && (pm2 list 2>/dev/null || true) || echo 'pm2 not installed'
-systemctl list-units --type=service --no-pager 2>/dev/null | grep -i -E 'voice|relay' || echo '(no matching systemd unit)'
+echo "--- pm2 registry for ${RUN_AS} ---"
+$(as_owner "pm2 list 2>/dev/null") || echo 'no pm2 for ${RUN_AS}'
 echo
-echo '--- likely install dirs ---'
-for D in /opt/voice-relay /opt/relay /home/ubuntu/voice-relay /home/ubuntu/relay /srv/voice-relay; do
-  [ -d "$D" ] && echo "FOUND $D" && ls -la "$D" | head -20
-done
+echo '--- pm2 boot persistence ---'
+systemctl is-enabled pm2-${RUN_AS} 2>/dev/null || echo 'pm2-${RUN_AS} not enabled: the relay will NOT come back after a reboot'
+echo
+echo "--- ${REMOTE_DIR} ---"
+ls -la ${REMOTE_DIR} 2>/dev/null | grep -iE 'voice-relay|ecosystem|\.env|node_modules|^total|^d.*\.$' || echo '(not found)'
 echo
 echo '--- reverse proxy ---'
 command -v caddy >/dev/null && echo 'caddy present' || echo 'caddy not installed'
@@ -165,10 +189,10 @@ curl -s -o /dev/null -w 'GET localhost:3100/ -> %{http_code}\n' http://localhost
 REMOTE
 )"
   echo
-  echo "Set VOICE_RELAY_REMOTE_DIR and VOICE_RELAY_RESTART_CMD from the above"
-  echo "if they differ from the defaults:"
-  echo "  REMOTE_DIR  = ${REMOTE_DIR}"
-  echo "  RESTART_CMD = ${RESTART_CMD}"
+  echo "Current settings (override with the env vars in --help):"
+  echo "  REMOTE_DIR = ${REMOTE_DIR}"
+  echo "  RUN_AS     = ${RUN_AS}"
+  echo "  PM2_APP    = ${PM2_APP}"
   exit 0
 fi
 
@@ -182,27 +206,23 @@ if ! run_remote "check remote dir" "test -d ${REMOTE_DIR} && echo ok" | grep -q 
 fi
 echo "    ${REMOTE_DIR} exists"
 
-RESTART_BIN="${RESTART_CMD%% *}"
-if ! run_remote "check restart command" "command -v ${RESTART_BIN} >/dev/null && echo ok" | grep -q ok; then
-  echo "    '${RESTART_BIN}' is not on the box's PATH."
-  echo "    Run '$0 --probe' to see what manages the process, then set"
-  echo "    VOICE_RELAY_RESTART_CMD."
+# Checks the app is in THIS user's PM2 registry, not merely that a pm2 binary
+# exists somewhere. Root has its own empty registry, so the weaker check passes
+# while the restart silently does nothing.
+BEFORE_PID=$(run_remote "read current relay pid" \
+  "$(as_owner "pm2 pid ${PM2_APP} 2>/dev/null")" | tr -d '[:space:]')
+if [ -z "$BEFORE_PID" ] || [ "$BEFORE_PID" = "0" ]; then
+  echo "    '${PM2_APP}' is not a running app in ${RUN_AS}'s PM2 registry."
+  echo "    Run '$0 --probe' to see what actually manages the relay, then set"
+  echo "    VOICE_RELAY_RUN_AS / VOICE_RELAY_PM2_APP."
   exit 1
 fi
-echo "    ${RESTART_BIN} is available"
+echo "    ${PM2_APP} is online as ${RUN_AS}, pid ${BEFORE_PID}"
 
-if [ "$ASSUME_YES" != true ]; then
-  echo
-  echo "Restarting the relay DROPS EVERY CALL IN PROGRESS -- sessions are held"
-  echo "in memory in one process, with no draining and nothing to fail over to."
-  read -r -p "Continue? [y/N] " REPLY
-  case "$REPLY" in
-    y|Y|yes|YES) ;;
-    *) echo "Aborted."; exit 1 ;;
-  esac
-fi
-
-echo "==> 1/5 Building the relay bundle"
+# Everything that can refuse the deploy runs BEFORE the confirmation prompt.
+# Asking someone to accept dropped calls and only then discovering the deploy
+# was never going to work wastes the one thing the prompt is protecting.
+echo "==> 1/6 Building the relay bundle"
 (cd "${REPO_ROOT}/backend" && npm run build:relay >/dev/null)
 BUNDLE="${REPO_ROOT}/backend/dist/voice-relay.js"
 if [ ! -f "$BUNDLE" ]; then
@@ -217,11 +237,56 @@ GIT_SHA="$(cd "$REPO_ROOT" && git rev-parse --short HEAD)"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 KEY="voice-relay/${STAMP}-${GIT_SHA}.js"
 
-echo "==> 2/5 Uploading to s3://${BUCKET}/${KEY}"
+echo "==> 2/6 Checking the box has every module the bundle needs"
+# build:relay externalises @aws-sdk/*, so those are resolved from the box's own
+# node_modules at runtime, not from the bundle. A missing one is not a
+# degraded feature: the require is at module load, so the process dies
+# immediately and PM2 restart-loops it. The relay goes DOWN, including browser
+# calls that have nothing to do with the new code.
+#
+# This is not hypothetical. The relay's package.json lists client-dynamodb,
+# lib-dynamodb and ws; telephony pulled in kms, sesv2, sfn and sqs, because
+# lead-identity-service reaches lead-service and from there the whole services
+# layer. See TODOS.md.
+REQUIRED=$(grep -oE 'require\("@aws-sdk/[a-z0-9-]+"\)' "$BUNDLE" | sed 's/require("//;s/")//' | sort -u)
+INSTALLED=$(run_remote "list installed aws-sdk modules" \
+  "ls ${REMOTE_DIR}/node_modules/@aws-sdk/ 2>/dev/null")
+
+MISSING=""
+for M in $REQUIRED; do
+  NAME="${M#@aws-sdk/}"
+  echo "$INSTALLED" | tr -d '\r' | grep -qx "$NAME" || MISSING="${MISSING} ${M}"
+done
+
+if [ -n "$MISSING" ]; then
+  echo "    MISSING on the box:${MISSING}"
+  echo
+  echo "Refusing to deploy. These are require()d at load, so the relay would"
+  echo "crash on start and PM2 would restart-loop it -- taking browser voice"
+  echo "down too, not just telephony."
+  echo
+  echo "Install them first, then re-run:"
+  echo "  ssh <box> 'cd ${REMOTE_DIR} && npm install --omit=dev${MISSING}'"
+  exit 1
+fi
+echo "    all $(echo "$REQUIRED" | wc -w | tr -d ' ') external modules present"
+
+if [ "$ASSUME_YES" != true ]; then
+  echo
+  echo "Restarting the relay DROPS EVERY CALL IN PROGRESS -- sessions are held"
+  echo "in memory in one process, with no draining and nothing to fail over to."
+  read -r -p "Continue? [y/N] " REPLY
+  case "$REPLY" in
+    y|Y|yes|YES) ;;
+    *) echo "Aborted."; exit 1 ;;
+  esac
+fi
+
+echo "==> 3/6 Uploading to s3://${BUCKET}/${KEY}"
 aws s3 cp "$BUNDLE" "s3://${BUCKET}/${KEY}" --region "$REGION" >/dev/null
 echo "    uploaded"
 
-echo "==> 3/5 Installing it on the box"
+echo "==> 4/6 Installing it on the box"
 # The previous bundle is kept next to the new one. Rolling back is then a copy,
 # not a rebuild of an older commit -- which is the difference between a
 # 10-second recovery and a 10-minute one while calls go unanswered.
@@ -229,30 +294,46 @@ run_remote "install voice-relay bundle" \
   "set -e; cd ${REMOTE_DIR}; if [ -f voice-relay.js ]; then cp voice-relay.js voice-relay.js.prev; fi; aws s3 cp s3://${BUCKET}/${KEY} voice-relay.js --region ${REGION}; node --check voice-relay.js && echo INSTALLED" \
   | sed 's/^/    /'
 
-echo "==> 4/5 Restarting"
-run_remote "restart voice-relay" "${RESTART_CMD}" | sed 's/^/    /'
+echo "==> 5/6 Restarting"
+run_remote "restart voice-relay" "$(as_owner "pm2 restart ${PM2_APP} --update-env")" \
+  | tail -3 | sed 's/^/    /'
 
-echo "==> 5/5 Verifying it came back"
+echo "==> 6/6 Verifying it came back"
+sleep 3
+
+# The PID must have CHANGED. A restart that quietly did nothing leaves the old
+# process serving, and it answers a health check perfectly -- so "200" alone
+# would report success for a deploy that shipped nothing.
+AFTER_PID=$(run_remote "read new relay pid" \
+  "$(as_owner "pm2 pid ${PM2_APP} 2>/dev/null")" | tr -d '[:space:]')
+
 # From the box itself rather than the public hostname: this checks the relay,
 # not DNS and TLS in front of it. Those failing is a different problem with a
 # different fix, and conflating them sends you debugging the wrong layer.
-sleep 3
 HEALTH=$(run_remote "relay health check" \
   "curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://localhost:3100/ || echo 000")
 HEALTH="$(echo "$HEALTH" | tr -d '[:space:]')"
 
-if [ "$HEALTH" = "200" ]; then
-  echo "    localhost:3100/ -> 200"
+ROLLBACK="$(as_owner "cd ${REMOTE_DIR} && cp voice-relay.js.prev voice-relay.js && pm2 restart ${PM2_APP}")"
+
+if [ "$HEALTH" = "200" ] && [ -n "$AFTER_PID" ] && [ "$AFTER_PID" != "0" ] && [ "$AFTER_PID" != "$BEFORE_PID" ]; then
+  echo "    pid ${BEFORE_PID} -> ${AFTER_PID}, localhost:3100/ -> 200"
   echo
   echo "Deployed ${GIT_SHA}."
-  echo "Roll back with:  aws ssm send-command --instance-ids ${INSTANCE} \\"
-  echo "  --document-name AWS-RunShellScript --region ${REGION} \\"
-  echo "  --parameters 'commands=[\"cd ${REMOTE_DIR} && cp voice-relay.js.prev voice-relay.js && ${RESTART_CMD}\"]'"
-else
-  echo "    localhost:3100/ -> ${HEALTH}"
-  echo
-  echo "The relay is NOT answering. The previous bundle is on the box as"
-  echo "${REMOTE_DIR}/voice-relay.js.prev -- roll back with:"
-  echo "  cd ${REMOTE_DIR} && cp voice-relay.js.prev voice-relay.js && ${RESTART_CMD}"
-  exit 1
+  echo "Roll back:  ${ROLLBACK}"
+  exit 0
 fi
+
+if [ "$AFTER_PID" = "$BEFORE_PID" ]; then
+  echo "    pid is still ${BEFORE_PID} -- the process DID NOT restart."
+  echo "    The new bundle is on disk but the old code is still serving."
+  echo "    Check VOICE_RELAY_RUN_AS (${RUN_AS}) and VOICE_RELAY_PM2_APP (${PM2_APP})."
+else
+  echo "    pid ${BEFORE_PID} -> ${AFTER_PID:-none}, localhost:3100/ -> ${HEALTH}"
+  echo "    The relay is not answering."
+fi
+
+echo
+echo "The previous bundle is on the box as ${REMOTE_DIR}/voice-relay.js.prev."
+echo "Roll back:  ${ROLLBACK}"
+exit 1

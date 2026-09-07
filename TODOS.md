@@ -1,5 +1,33 @@
 # TODOS
 
+## The voice relay bundle pulls in the whole services layer
+
+**What:** `npm run build:relay` went from 144KB to 3.5MB when telephony landed, and
+the bundle now requires four AWS SDK clients the relay has no use for —
+`client-kms`, `client-sesv2`, `client-sfn`, `client-sqs` — on top of the two it
+actually needs.
+
+**Why it happens:** `voice-relay/session.ts` imports `voice-lead-service`, which imports
+`lead-identity-service`, which imports `lead-service` to search web-chat leads for a
+matching phone number. `lead-service` reaches the rest of the services layer, and esbuild
+follows every edge. The relay ends up carrying the journey engine's Step Functions client,
+the WhatsApp KMS client and the crawler's SQS client so that it can do a phone-number
+comparison.
+
+**Why it matters beyond size:** `build:relay` externalises `@aws-sdk/*`, so those four are
+resolved from the BOX's node_modules at runtime. The relay's package.json lists three
+dependencies. Deploying the bundle without installing them first crashes the process at
+load and PM2 restart-loops it — taking browser voice down along with telephony.
+`scripts/deploy-voice-relay.sh` now refuses the deploy when the box is missing any of
+them, so the trap is caught rather than sprung, but the import graph is the real problem.
+
+**Fix:** give the identity join a narrow repository-level entry point rather than importing
+`lead-service`. The lookup wants "leads for this client, by phone" — a repository query,
+not the service layer's whole surface. That is the seam; everything downstream of it
+disappears from the bundle.
+
+**Depends on:** None. Worth doing before the relay gains any more reach into the backend.
+
 ## Per-client DID provisioning is onboarding friction that repeats
 
 **What:** Voice telephony rents one Plivo DID per client (see
