@@ -1503,6 +1503,16 @@ export interface UnifiedInboxPage {
   total: number
   // Absent on the last page.
   nextCursor?: string
+  // Sources that failed to load, so this page is missing their leads. Empty on
+  // a healthy read, and OMITTED entirely rather than sent as [] -- the field
+  // appearing at all means something is wrong.
+  //
+  // The inbox degrades rather than failing whole: one source having a bad day
+  // should not hide the other three. But a lead queue that silently shows less
+  // than everything is its own hazard -- you cannot notice the leads you were
+  // never shown -- so the degradation is reported rather than swallowed, and
+  // the UI is expected to say so.
+  degradedSources?: LeadSource[]
 }
 
 export type LeadRef =
