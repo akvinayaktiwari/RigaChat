@@ -118,13 +118,33 @@ instance profile carries `AmazonSSMManagedInstanceCore`. The 3.5MB bundle
 travels via a private, versioned S3 bucket, because a Run Command parameter
 cannot carry it.
 
-**Two values the deploy script cannot derive** — the install directory and the
-restart command. Its defaults (`/opt/voice-relay`, `pm2 restart voice-relay`)
-come from the primer and are unverified, so the script checks both on the box
-and aborts rather than trusting them: a wrong install directory is the failure
-that looks like success, where the file lands somewhere nothing reads and the
-old code keeps serving. `--probe` reports the real layout; override with
-`VOICE_RELAY_REMOTE_DIR` and `VOICE_RELAY_RESTART_CMD`.
+**Confirmed layout** (from `--probe`, 2026-09-07 — every value guessed from the
+primer beforehand was wrong):
+
+```
+bundle        /home/ubuntu/voice-relay.js
+env           /home/ubuntu/.env
+pm2 config    /home/ubuntu/ecosystem.config.js
+supervisor    PM2 v7.0.3, app "voice-relay", owned by ubuntu (/home/ubuntu/.pm2)
+boot          pm2-ubuntu.service enabled — it does come back after a reboot
+proxy         Caddy
+deps          node_modules in /home/ubuntu; @aws-sdk/* is external to the bundle
+```
+
+`RUN_AS` matters more than it looks. SSM runs commands as **root**, and PM2 keeps
+a per-user registry — so `pm2 restart voice-relay` as root finds no such app,
+exits 0 having done nothing, and leaves the old code serving while a health check
+answers 200 from the process that never restarted. The script runs PM2 as the
+owner and verifies the **PID changed**, because an exit code and a 200 both lie
+here.
+
+**The bundle's external dependencies are a live trap.** `build:relay` externalises
+`@aws-sdk/*`, so those resolve from the box's own `node_modules`. Telephony grew
+the bundle from 144KB to 3.5MB and added four SDK clients (`kms`, `sesv2`, `sfn`,
+`sqs`) that the box does not have installed — a require at load, so deploying
+without installing them first crashes the relay into a PM2 restart loop and takes
+**browser** voice down too. The deploy script checks and refuses; `TODOS.md` has
+why the import graph grew.
 
 **Restarting drops every call in progress.** Sessions are held in memory in one
 Node process — no draining, nothing to fail over to. The script confirms before
