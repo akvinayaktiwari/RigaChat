@@ -105,6 +105,8 @@ echo "Done. NOTE: no Lambda environment variable was set, and none should be."
 echo "Verify with:"
 echo "  aws dynamodb describe-table --table-name ${TABLE} --region ${REGION} \\"
 echo "    --query '{pk:KeySchema,gsi:GlobalSecondaryIndexes}' --output json"
-echo "  # must still read 3597:"
+echo "  # must not have GROWN -- this script adds no variable. (It read 3597 when
+  # this was written and 2842 on 2026-09-07, after unrelated cleanup; the
+  # ceiling is 4096, so what matters is the direction, not the number.)"
 echo "  aws lambda get-function-configuration --function-name rigachat-api --region ${REGION} \\"
 echo "    --query 'Environment.Variables' --output json | wc -c"
