@@ -1,5 +1,151 @@
 # TODOS
 
+## Identity join reads every lead a client owns, on every inbound message
+
+**What:** `findLeadByPhone` calls `getLeadsForClient(clientId)`, an unpaginated
+`clientId-index` Query with no `Limit`, and it runs on every inbound WhatsApp message and
+every phone call. Cost and latency grow with a client's lifetime lead count.
+
+**Two problems, not one.** The obvious one is cost on a hot path. The quieter one is
+correctness: DynamoDB caps a Query page at 1MB and `getLeadsByClientId` never follows
+`LastEvaluatedKey`, so past that size it silently returns a subset — and the identity join
+can miss the very lead it should have matched. A returning caller becomes a stranger, with
+nothing logged.
+
+**Pre-existing, and inherited rather than introduced.** `main`'s
+inbound-lead-match-service already did exactly this for WhatsApp. This branch moved it and
+extended it to phone calls, so the shape is unchanged and the blast radius is wider.
+
+**Fix:** give the join a keyed read instead of a per-client sweep — a phone-indexed GSI on
+leads, or a `phone -> leadId` lookup table shaped like `voice_phone_lookup`. Then the join
+is a point read and the pagination question disappears. Capping with a Limit is the cheap
+half-measure; it bounds cost and leaves the correctness hole.
+
+**Depends on:** None. Do it before a client's lead count makes the truncation reachable.
+
+## Two copies of the voice token validator, now with different capabilities
+
+**What:** `validateVoiceToken` in `backend/src/routes/voice-routes.ts` is a duplicate of
+`validateToken` in `backend/src/voice-relay/auth.ts`, deliberately — voice-relay builds as
+a separate EC2 bundle the Lambda does not include.
+
+**Why it matters more now:** `auth.ts` gained an optional signature scope (binding a
+transfer token to its destination). The Lambda's copy has no scope parameter. They agree
+today because an omitted scope is byte-compatible, so the RAG route still validates widget
+tokens correctly — but the two have started to differ in what they can express, and the
+next change to the token format will silently split them.
+
+**Fix:** extract the token logic into a dependency-free module under `backend/src/lib/`
+that both builds import. The constraint is only that it must not pull in the AWS SDK or
+any service — the relay bundle stays small (see the bundle-size item above).
+
+**Depends on:** None.
+
+## Voice branches added to shared code without matching tests
+
+**What:** the ship coverage audit put this branch at 93%, and named where the remaining
+gaps cluster. Two files have no test file at all — `backend/src/routes/voice-routes.ts`
+(every status-code branch of the new phone-number routes is unverified at the HTTP layer,
+though the service beneath is thorough) and `backend/src/repositories/voice-lead-repository.ts`.
+Beyond those, `voice` cases were bolted onto existing multi-source switches whose tests
+nobody extended: `normalizeVoiceLead` and `readJourneyLead`'s voice case in
+lead-resolution-service, `leadParentIdOf` in journey-ignition-service, and
+`getUnifiedLeadDetail`/`getLeadTimeline` for a voice-sourced lead.
+
+**Why it is worth doing rather than filing and forgetting:** this is the exact shape that
+produced the lead-link deep-link bug — a `voice` case added to one side of a mirrored pair,
+no test covering it, and the omission invisible until someone taps a dead link. The
+untested branches above are the remaining instances of that shape.
+
+**Also flagged, and deliberately left:** `unpackLeadRef`'s sibling gaps are now closed, and
+`deleteVoiceLead` appears to have no production caller — confirm it is wanted before
+writing a test that pins dead code in place.
+
+**Depends on:** None. Each is a small, independent test file.
+
+## P0 GATE: call-recording consent before telephony goes live
+
+**What:** A phone call records both halves of the conversation into `lead_events`. There
+is no consent or disclosure line anywhere in the runtime code — not in `session.ts`, not
+in the agent instructions, not in the greeting.
+
+**Why it is P0 and not a nice-to-have:** `docs/designs/voice-agent-telephony-v1.md`
+(Constraints) names this explicitly — "a caller consent/disclosure line before recording
+starts" — and points at the TRAI/DPDP uncertainty in
+`docs/voice-calling-cost-and-pricing-plan.md`. That doc's own re-check (§159) says the
+AI-disclosure clause is something TRAI is *considering*, not enacted, and tells you to get
+counsel to confirm before writing it into the product. Neither the check nor the line
+happened. Recording an Indian consumer's phone call with no disclosure is the kind of gap
+you discover from a complaint, not from a test.
+
+**Why it does NOT block the current merge:** telephony is fail-closed. Without
+`PLIVO_AUTH_TOKEN` and `VOICE_RELAY_PUBLIC_HOST` no call can arrive, and the CRM write
+path only engages when `callerPhone` is set, which is telephony-only. Browser voice
+transcribes but does not persist a caller's half. So nothing starts recording on merge.
+
+**Do before the first real call, in this order:**
+1. Get counsel to confirm what disclosure (if any) is currently required for an AI voice
+   agent recording an inbound call in India.
+2. If required, add the line to the agent's opening turn — the greeting is already the
+   first thing spoken, so this is a prompt change, not new machinery.
+3. Decide whether a caller who declines should be transferred or dropped, and build that
+   branch. "Say the line and record anyway" is not consent.
+
+**Depends on:** counsel. Start it alongside the Plivo KYC conversation — both are calendar
+time, and neither blocks the other.
+
+## The voice relay bundle pulls in the whole services layer
+
+**What:** `npm run build:relay` went from 144KB to 3.5MB when telephony landed, and
+the bundle now requires four AWS SDK clients the relay has no use for —
+`client-kms`, `client-sesv2`, `client-sfn`, `client-sqs` — on top of the two it
+actually needs.
+
+**Why it happens:** `voice-relay/session.ts` imports `voice-lead-service`, which imports
+`lead-identity-service`, which imports `lead-service` to search web-chat leads for a
+matching phone number. `lead-service` reaches the rest of the services layer, and esbuild
+follows every edge. The relay ends up carrying the journey engine's Step Functions client,
+the WhatsApp KMS client and the crawler's SQS client so that it can do a phone-number
+comparison.
+
+**Why it matters beyond size:** `build:relay` externalises `@aws-sdk/*`, so those four are
+resolved from the BOX's node_modules at runtime. The relay's package.json lists three
+dependencies. Deploying the bundle without installing them first crashes the process at
+load and PM2 restart-loops it — taking browser voice down along with telephony.
+`scripts/deploy-voice-relay.sh` now refuses the deploy when the box is missing any of
+them, so the trap is caught rather than sprung, but the import graph is the real problem.
+
+**Fix:** give the identity join a narrow repository-level entry point rather than importing
+`lead-service`. The lookup wants "leads for this client, by phone" — a repository query,
+not the service layer's whole surface. That is the seam; everything downstream of it
+disappears from the bundle.
+
+**Depends on:** None. Worth doing before the relay gains any more reach into the backend.
+
+## Per-client DID provisioning is onboarding friction that repeats
+
+**What:** Voice telephony rents one Plivo DID per client (see
+`docs/designs/voice-agent-telephony-v1.md` — the webhook reports which of our numbers was
+dialled, so clients cannot share a DID). Indian DIDs require KYC. That makes number
+provisioning a **per-client** step with real calendar time in it, not a one-time setup —
+every new voice client waits on it before they can take a single call.
+
+**Why:** Fine for the first real-estate client, where the whole point is one careful
+rollout. It becomes a bottleneck the moment voice is a standard plan feature: a client
+pays, activates voice, and then cannot use it for days. That is the worst possible moment
+to introduce a wait, and it is invisible in every demo.
+
+**Context:** The likely fix is bulk-provisioning a pool of DIDs in advance under our own
+KYC and assigning from the pool at signup (`claimPhoneNumber` already makes assignment an
+atomic, idempotent operation, so a pool model needs no repository change — just a source
+of unassigned numbers and a release path back to the pool). Confirm with Plivo whether
+holding unassigned Indian DIDs under our own KYC is permitted and what it costs to sit on
+them — that is a sales-call question, not a research question. ₹200/month per DID means an
+idle pool has a real carrying cost, so pool size is a tradeoff against signup latency.
+
+**Depends on:** The Plivo sales/KYC conversation already queued for v1. Do not build the
+pool before voice has more than one paying client — a pool of one is just a number.
+
 ## Mobile app — backend work, tracked in the vyostra-mobile repo
 
 The Android app ([vyostra-mobile](https://github.com/akvinayaktiwari/vyostra-mobile))

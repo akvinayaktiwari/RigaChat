@@ -60,6 +60,7 @@ const PACKED_VECTORS: { ref: LeadRef; token: string }[] = [
   { ref: { source: 'chat', botId: 'bot-1', leadId: 'lead-1' }, token: 'Y2hhdHxib3QtMXxsZWFkLTE' },
   { ref: { source: 'form', formId: 'form-9', leadId: 'lead-2' }, token: 'Zm9ybXxmb3JtLTl8bGVhZC0y' },
   { ref: { source: 'meta', pageId: '102938', leadId: 'lead-3' }, token: 'bWV0YXwxMDI5Mzh8bGVhZC0z' },
+  { ref: { source: 'voice', agentId: 'agent-1', leadId: 'lead-4' }, token: 'dm9pY2V8YWdlbnQtMXxsZWFkLTQ' },
 ]
 
 describe('packLeadRef', () => {

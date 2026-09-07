@@ -147,7 +147,11 @@ export type LeadEventType =
   | 'journey_ended'
   | 'state_change'
 
-export type LeadEventChannel = 'whatsapp' | 'web_widget'
+// 'voice' is a live phone call through the relay. It shares the lead_events
+// stream with the other channels on purpose: a lead who WhatsApps on Tuesday
+// and calls on Thursday is ONE conversation, and anything summarising history
+// (journeys, the CRM detail view, notification-service) should see both.
+export type LeadEventChannel = 'whatsapp' | 'web_widget' | 'voice'
 
 export type MessageSendMode = 'template' | 'free_text'
 
@@ -755,11 +759,67 @@ export interface MetaLead {
   crmSyncAttempts?: number
 }
 
+// A lead whose first contact with this client was an inbound phone call.
+//
+// Its own source rather than a chat lead that arrived by phone: a voice agent
+// need not have a linked chatbot (the kb_only agent ships today and has no
+// botId), so there is often no bots-table partition to put it in -- and
+// collapsing the two would make "how many leads did the phone line produce"
+// unanswerable, which is the number that justifies the whole feature.
+//
+// Only written for a caller who matched NO existing lead. A returning caller
+// attaches to whatever lead they already are (see voice-lead-service), so this
+// table holds first contacts, not calls. Calls are lead_events.
+export interface VoiceLead {
+  leadId: string
+  agentId: string
+  clientId: string
+  source: 'voice'
+  // Caller ID, E.164. The only contact detail a phone call gives you for free,
+  // and the join key that lets a later WhatsApp message land on this same lead.
+  phone: string
+  name?: string
+  email?: string
+  propertyInterest?: string
+  budgetRange?: string
+  // The DID they dialled. Kept because a client running two numbers (a listing
+  // ad vs. a hoarding) needs to know which one produced the lead, and the
+  // lookup row it came from can be reassigned or released later.
+  dialledNumber: string
+  callId: string
+  createdAt: string
+  updatedAt?: string
+}
+
 export interface CreateFormLeadInput {
   formId: string
   clientId: string
   customFields: Record<string, string>
   sourceUrl: string
+}
+
+export type Weekday = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat'
+
+// A single open period, as local wall-clock "HH:MM" in the parent
+// BusinessHours.timezone. Several per day handles a lunch closure, which is
+// ordinary for the Indian offices this ships to first.
+//
+// `close` may be EARLIER than `open`, meaning the period runs past midnight
+// (a 22:00-02:00 shift). That is a supported shape, not a mistake -- see
+// lib/business-hours.ts, where forgetting it is what makes the second half of
+// a late shift read as closed.
+export interface BusinessHoursWindow {
+  open: string
+  close: string
+}
+
+export interface BusinessHours {
+  // IANA zone, e.g. 'Asia/Kolkata'. Stored rather than assumed so the first
+  // client outside IST is a config change and not a code change.
+  timezone: string
+  // A weekday absent from the map is closed all day. Being closed is the
+  // default, so a partially filled map cannot accidentally imply availability.
+  days: Partial<Record<Weekday, BusinessHoursWindow[]>>
 }
 
 export type VoiceAgentVoice = 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse' | 'marin' | 'cedar'
@@ -781,6 +841,18 @@ export interface VoiceAgent {
   brandColor: string
   widgetPosition: 'bottom-left' | 'bottom-right' | 'bottom-center'
   maxSessionDuration: 5 | 10 | 15
+  // When a human is actually reachable, for the live transfer only. The AI
+  // answers around the clock; this gates whether a caller is put THROUGH.
+  // Absent means always available, which preserves the behaviour transfer
+  // shipped with and is the honest default for a client who has not said
+  // otherwise.
+  businessHours?: BusinessHours
+  // Where a live call goes when the caller asks for a person. Absent means the
+  // handoff still happens -- the event is recorded and staff are alerted -- but
+  // the caller is told someone will ring back rather than being put through.
+  // Opt-in on purpose: transferring to an unattended number is worse than not
+  // offering, because the caller waits through ringing before being dropped.
+  handoffNumber?: string
   isEnabled: boolean
   // True once this agent's own websiteUrl has been crawled, chunked, and
   // embedded into its Pinecone namespace (see feat/voice-agent-rag) — or
@@ -1201,6 +1273,48 @@ export interface AgentBindingLookup {
   boundAt: string
 }
 
+// Routes an inbound phone call to the voice agent that answers it. A Plivo
+// answer webhook carries the dialled number and nothing else -- no agentId, no
+// clientId -- which is why the number is the partition key and this is its own
+// table rather than a GSI on voice_agents. Same shape and same reasoning as
+// meta_page_lookup (pageId), gupshup_app_lookup (appName), and
+// agent_binding_lookup (resourceId).
+//
+// The row IS the connection: it is written when a number is assigned to an
+// agent and deleted when it is released, so the webhook gates on the row
+// existing rather than on any field of the VoiceAgent record.
+//
+// ONE PLIVO DID PER CLIENT, AND THE DID IS THE KEY. Clients do not hand over
+// their own number; their telco forwards it (ideally on busy/no-answer) to a
+// DID we rent for them:
+//
+//   Client A's public number --forward--> DID +91...A --\
+//   Client B's public number --forward--> DID +91...B ---+--> relay
+//                                                        |
+//                        webhook says "To: +91...B" -----/
+//                        lookup[+91...B] -> agentId -> clientId
+//
+// Clients cannot share one DID: the webhook reports which of OUR numbers was
+// dialled, never who the caller originally meant to reach, so a shared DID
+// leaves every call ambiguous. Some carriers pass the original destination in a
+// SIP Diversion/RDNIS header, but Indian telco support for that is
+// inconsistent -- do not route on it.
+export interface VoicePhoneLookup {
+  // OUR Plivo DID -- the number Plivo reports as the call's destination. NOT the
+  // client's own advertised/business number, which never reaches us: their telco
+  // forwards to this DID and the original destination is not in the payload.
+  // Storing the client's public number here instead would produce a row no
+  // inbound call can ever match, and the failure is silent (the caller hears
+  // nothing, nothing errors).
+  //
+  // E.164, exactly as Plivo delivers it (e.g. +919876543210). Callers normalise
+  // before reaching this layer -- see normalisePhoneNumber.
+  phoneNumber: string
+  agentId: string
+  clientId: string
+  assignedAt: string
+}
+
 // The bounded MCP capability palette. Engineering-controlled: clients pick
 // FROM this set, they never extend it (the approved design's "bounded
 // toolbox, NOT full autonomy"). A union rather than `string` so a bad
@@ -1375,7 +1489,7 @@ export interface JourneyBundle {
 // look reasonable and would have mis-scoped RAG retrieval (rule #5).
 // -------------------------------------------------------------------------
 
-export type LeadSource = 'chat' | 'form' | 'meta'
+export type LeadSource = 'chat' | 'form' | 'meta' | 'voice'
 
 // Why a lead sits where it does in the urgency-ordered inbox. Server-computed
 // and sent on the wire so a client can explain the queue without recomputing
@@ -1389,12 +1503,26 @@ export interface UnifiedInboxPage {
   total: number
   // Absent on the last page.
   nextCursor?: string
+  // Sources that failed to load, so this page is missing their leads. Empty on
+  // a healthy read, and OMITTED entirely rather than sent as [] -- the field
+  // appearing at all means something is wrong.
+  //
+  // The inbox degrades rather than failing whole: one source having a bad day
+  // should not hide the other three. But a lead queue that silently shows less
+  // than everything is its own hazard -- you cannot notice the leads you were
+  // never shown -- so the degradation is reported rather than swallowed, and
+  // the UI is expected to say so.
+  degradedSources?: LeadSource[]
 }
 
 export type LeadRef =
   | { source: 'chat'; botId: string; leadId: string }
   | { source: 'form'; formId: string; leadId: string }
   | { source: 'meta'; pageId: string; leadId: string }
+  // agentId is the voice agent that answered, and like meta's pageId it is a
+  // discriminator rather than an address -- voice_leads is partitioned by
+  // clientId, exactly as meta_leads is, for the same reason.
+  | { source: 'voice'; agentId: string; leadId: string }
 
 // ---------------------------------------------------------------------------
 // Mobile app: device registry and readiness. Added 2026-08-26.

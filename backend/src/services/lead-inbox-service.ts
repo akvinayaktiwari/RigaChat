@@ -2,6 +2,7 @@ import { getLeadById, getLeadsByClientId } from '../repositories/lead-repository
 import { getFormLeadById, getFormLeadsByClientId } from '../repositories/form-lead-repository.js'
 import { getFormsByClientId, getPublicFormConfig } from '../repositories/form-repository.js'
 import { getMetaLeadById, getMetaLeadsByClientId } from '../repositories/meta-lead-repository.js'
+import { getVoiceLeadById, getVoiceLeadsByClientId } from '../repositories/voice-lead-repository.js'
 import {
   appendLeadNote,
   getLeadState,
@@ -13,9 +14,10 @@ import {
   normalizeChatLead,
   normalizeFormLead,
   normalizeMetaLead,
+  normalizeVoiceLead,
   readJourneyLead,
 } from './lead-resolution-service.js'
-import type { FormField, LeadRef, LeadState, UnifiedLead, UnifiedLeadDetail,
+import type { FormField, LeadRef, LeadSource, LeadState, UnifiedLead, UnifiedLeadDetail,
   LeadEvent,
   UrgencyTier,
   UnifiedInboxPage,
@@ -99,10 +101,31 @@ export async function getUnifiedInbox(clientId: string, query: InboxQuery = {}):
   // The client's forms come along because a form lead's answers are keyed by
   // fieldId -- without the field definitions every form row renders as
   // "Unnamed lead / No contact". One query for all of them, not one per lead.
-  const [chatLeads, formLeads, metaLeads, states, forms] = await Promise.all([
-    getLeadsByClientId(clientId),
-    getFormLeadsByClientId(clientId),
-    getMetaLeadsByClientId(clientId, META_INBOX_LIMIT),
+  // Each LEAD SOURCE is caught on its own. A single Promise.all rejection used
+  // to take the whole inbox down: one table having a bad day meant a client saw
+  // no leads at all, from any channel, rather than three quarters of them.
+  //
+  // Deliberately NOT applied to states and forms below. Those are not sources,
+  // they are what makes the rows legible -- without lead states every row loses
+  // its status and owner, and without forms every form lead renders as "Unnamed
+  // lead / No contact". Degrading those produces an inbox that looks fine and
+  // is quietly wrong, which is worse than an error.
+  const degradedSources: LeadSource[] = []
+  const source = <T>(name: LeadSource, read: Promise<T[]>): Promise<T[]> =>
+    read.catch((error: unknown) => {
+      console.error(
+        `[lead-inbox] ${name} lead lookup failed for ${clientId}:`,
+        error instanceof Error ? error.message : error
+      )
+      degradedSources.push(name)
+      return []
+    })
+
+  const [chatLeads, formLeads, metaLeads, voiceLeads, states, forms] = await Promise.all([
+    source('chat', getLeadsByClientId(clientId)),
+    source('form', getFormLeadsByClientId(clientId)),
+    source('meta', getMetaLeadsByClientId(clientId, META_INBOX_LIMIT)),
+    source('voice', getVoiceLeadsByClientId(clientId, META_INBOX_LIMIT)),
     getLeadStatesForClient(clientId),
     getFormsByClientId(clientId),
   ])
@@ -136,6 +159,12 @@ export async function getUnifiedInbox(clientId: string, query: InboxQuery = {}):
       createdAt: lead.createdAt,
       state: read(lead.leadId),
     })),
+    ...voiceLeads.filter((lead) => !isArchived(lead.leadId)).map((lead) => ({
+      ...normalizeVoiceLead(lead),
+      leadRef: { source: 'voice', agentId: lead.agentId, leadId: lead.leadId } as LeadRef,
+      createdAt: lead.createdAt,
+      state: read(lead.leadId),
+    })),
   ]
 
   // `now` is read ONCE, not inside the comparator. Array.sort calls the
@@ -164,6 +193,8 @@ export async function getUnifiedInbox(clientId: string, query: InboxQuery = {}):
     leads: page,
     total: sorted.length,
     ...(hasMore && last ? { nextCursor: encodeCursor(positionOf(last, now)) } : {}),
+    // Omitted when nothing failed, so the field's presence is the signal.
+    ...(degradedSources.length > 0 ? { degradedSources } : {}),
   }
 }
 
@@ -319,6 +350,14 @@ async function readSourceRecord(leadRef: LeadRef, clientId: string): Promise<Sou
         createdAt: lead.createdAt,
         customFields: parseCustomFields(lead.customFields),
       }
+    }
+    case 'voice': {
+      const lead = await getVoiceLeadById(clientId, leadRef.leadId)
+      if (!lead) return null
+      // No transcript field: a call's transcript lives in lead_events, not on
+      // the lead row, because it is shared with every other channel the caller
+      // used. The detail view reads the event stream for it.
+      return { ...normalizeVoiceLead(lead), createdAt: lead.createdAt }
     }
   }
 }

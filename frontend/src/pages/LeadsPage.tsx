@@ -168,6 +168,10 @@ export default function LeadsPage() {
   const [leads, setLeads] = useState<UnifiedLead[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  // Which channels the server could not read. Shown rather than swallowed: the
+  // list looks entirely normal when a source is missing, and nobody can notice
+  // the leads they were never shown.
+  const [degradedSources, setDegradedSources] = useState<LeadSource[]>([])
   const [savingLeadId, setSavingLeadId] = useState<string | null>(null)
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('open')
@@ -191,7 +195,10 @@ export default function LeadsPage() {
     getLeadInbox()
       .then((res) => {
         if (cancelled) return
-        if (res.success) setLeads(res.data?.leads ?? [])
+        if (res.success) {
+          setLeads(res.data?.leads ?? [])
+          setDegradedSources(res.data?.degradedSources ?? [])
+        }
         else
           setLoadError(
             describeApiError('leads/inbox', res.error, 'We couldn’t load your leads just now.')
@@ -373,6 +380,31 @@ export default function LeadsPage() {
           />
         </FilterBar>
       </div>
+
+      {degradedSources.length > 0 && !loading && !loadError && (
+        <div role="alert" className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 flex items-start gap-3">
+          <TriangleAlert size={18} className="text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-sm text-amber-900">
+              This list is incomplete
+            </p>
+            <p className="text-sm text-amber-800 mt-0.5">
+              These sources didn’t load:{' '}
+              <span className="font-semibold">
+                {degradedSources.map((s) => SOURCE_LABELS[s]).join(', ')}
+              </span>
+              . Everything else is shown below, so treat the count as a lower bound.
+            </p>
+            <button
+              type="button"
+              onClick={() => setReloadCount((n) => n + 1)}
+              className="text-sm font-semibold text-amber-900 underline mt-2"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <TableSkeleton />

@@ -65,12 +65,13 @@ export interface Lead {
 // source up front -- the three lead tables have three different partition keys.
 // ---------------------------------------------------------------------------
 
-export type LeadSource = 'chat' | 'form' | 'meta'
+export type LeadSource = 'chat' | 'form' | 'meta' | 'voice'
 
 export type LeadRef =
   | { source: 'chat'; botId: string; leadId: string }
   | { source: 'form'; formId: string; leadId: string }
   | { source: 'meta'; pageId: string; leadId: string }
+  | { source: 'voice'; agentId: string; leadId: string }
 
 export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'closed'
 
@@ -114,6 +115,10 @@ export interface UnifiedInboxPage {
   leads: UnifiedLead[]
   total: number
   nextCursor?: string
+  // Sources that failed to load, so this page is missing their leads. Omitted
+  // entirely on a healthy read -- the field appearing at all means the inbox is
+  // incomplete, and the UI must say so. Mirrors backend/src/types/index.ts.
+  degradedSources?: LeadSource[]
 }
 
 export interface UnifiedLead {
@@ -579,6 +584,17 @@ export interface VoiceCallLog {
   audioTokens: number
   totalTokens: number
   status: 'completed' | 'dropped' | 'error'
+}
+
+// One row per connected Plivo DID. phoneNumber is OUR number -- the one Plivo
+// reports as the call's destination -- never the client's own advertised
+// number, which their telco forwards to it and which never reaches us. Mirrors
+// backend/src/types/index.ts's VoicePhoneLookup.
+export interface VoicePhoneLookup {
+  phoneNumber: string
+  agentId: string
+  clientId: string
+  assignedAt: string
 }
 
 export interface VoiceUsageSummary {

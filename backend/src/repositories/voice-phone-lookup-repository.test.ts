@@ -1,0 +1,263 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+// Mock the DynamoDB boundary. getTableName also runs at module load, so it is
+// stubbed here to avoid depending on the prefix vitest.config.ts sets.
+const send = vi.fn()
+vi.mock('./dynamo-client.js', () => ({
+  dynamoClient: { send },
+  getTableName: () => 'test-voice-phone-lookup',
+}))
+
+const {
+  claimPhoneNumber,
+  getAgentForPhoneNumber,
+  getPhoneNumberForAgent,
+  releasePhoneNumber,
+  normalisePhoneNumber,
+  VoicePhoneConflictError,
+} = await import('./voice-phone-lookup-repository.js')
+
+function conditionalCheckFailed(): Error {
+  const err = new Error('The conditional request failed')
+  err.name = 'ConditionalCheckFailedException'
+  return err
+}
+
+beforeEach(() => {
+  send.mockReset()
+})
+
+describe('normalisePhoneNumber', () => {
+  // The whole point of the function: every spelling Plivo has been observed to
+  // send must collapse to ONE key, or a write and a read miss each other and
+  // the call is silently unroutable.
+  it.each([
+    ['+919876543210', '+919876543210'],
+    ['919876543210', '+919876543210'],
+    ['00919876543210', '+919876543210'],
+    ['+91 98765 43210', '+919876543210'],
+    ['+91-98765-43210', '+919876543210'],
+    ['  +919876543210  ', '+919876543210'],
+    ['+1 (415) 555-0132', '+14155550132'],
+  ])('normalises %s to %s', (input, expected) => {
+    expect(normalisePhoneNumber(input)).toBe(expected)
+  })
+
+  it.each([
+    ['', 'empty'],
+    ['   ', 'whitespace only'],
+    ['notaphone', 'letters'],
+    ['+91987', 'too short'],
+    ['+9198765432101234567', 'too long'],
+    ['+0919876543210', 'leading zero after normalisation'],
+  ])('rejects %s (%s) rather than storing an unreadable key', (input) => {
+    expect(() => normalisePhoneNumber(input)).toThrow(/Invalid phone number/)
+  })
+})
+
+describe('claimPhoneNumber', () => {
+  it('writes an atomic claim so a number maps to at most one voice agent', async () => {
+    send.mockResolvedValueOnce({})
+
+    await claimPhoneNumber('+919876543210', 'agent-1', 'client-1')
+
+    expect(send).toHaveBeenCalledTimes(1)
+    const command = send.mock.calls[0][0]
+    expect(command.input.TableName).toBe('test-voice-phone-lookup')
+    expect(command.input.Item).toMatchObject({
+      phoneNumber: '+919876543210',
+      agentId: 'agent-1',
+      clientId: 'client-1',
+    })
+    expect(command.input.Item.assignedAt).toEqual(expect.any(String))
+    expect(command.input.ConditionExpression).toBe(
+      'attribute_not_exists(phoneNumber) OR agentId = :agentId'
+    )
+    expect(command.input.ExpressionAttributeValues).toEqual({ ':agentId': 'agent-1' })
+  })
+
+  it('stores the normalised number, not the raw one, so the webhook read can find it', async () => {
+    send.mockResolvedValueOnce({})
+
+    await claimPhoneNumber('91 98765 43210', 'agent-1', 'client-1')
+
+    expect(send.mock.calls[0][0].input.Item.phoneNumber).toBe('+919876543210')
+  })
+
+  it('throws VoicePhoneConflictError when another agent already owns the number', async () => {
+    send.mockRejectedValueOnce(conditionalCheckFailed())
+
+    await expect(claimPhoneNumber('+919876543210', 'agent-2', 'client-2')).rejects.toBeInstanceOf(
+      VoicePhoneConflictError
+    )
+  })
+
+  it('surfaces non-conflict DynamoDB failures as a distinct error', async () => {
+    send.mockRejectedValueOnce(new Error('ProvisionedThroughputExceededException'))
+
+    await expect(claimPhoneNumber('+919876543210', 'agent-1', 'client-1')).rejects.toThrow(
+      /Failed to assign phone number/
+    )
+  })
+
+  it('rejects an invalid number before touching DynamoDB', async () => {
+    await expect(claimPhoneNumber('notaphone', 'agent-1', 'client-1')).rejects.toThrow(
+      /Invalid phone number/
+    )
+    expect(send).not.toHaveBeenCalled()
+  })
+})
+
+// One DID per client is what makes the dialled number a usable identifier. If
+// two clients were ever pointed at the same DID, the second claim must be
+// refused rather than silently stealing the first client's calls -- the webhook
+// reports only which of OUR numbers was dialled, so a shared DID is
+// unresolvable by construction, not merely untidy.
+describe('one DID serves exactly one client', () => {
+  it('refuses a second client claiming a DID another agent already owns', async () => {
+    send.mockRejectedValueOnce(conditionalCheckFailed())
+
+    await expect(
+      claimPhoneNumber('+919876543210', 'agent-client-b', 'client-b')
+    ).rejects.toBeInstanceOf(VoicePhoneConflictError)
+  })
+
+  it('lets the same agent re-claim its own DID, so re-assignment is idempotent', async () => {
+    send.mockResolvedValueOnce({})
+
+    await claimPhoneNumber('+919876543210', 'agent-1', 'client-1')
+
+    expect(send.mock.calls[0][0].input.ExpressionAttributeValues).toEqual({
+      ':agentId': 'agent-1',
+    })
+  })
+})
+
+describe('getAgentForPhoneNumber', () => {
+  it('returns the owning agent for a claimed number', async () => {
+    send.mockResolvedValueOnce({
+      Item: {
+        phoneNumber: '+919876543210',
+        agentId: 'agent-1',
+        clientId: 'client-1',
+        assignedAt: '2026-09-03T00:00:00.000Z',
+      },
+    })
+
+    const result = await getAgentForPhoneNumber('+919876543210')
+
+    expect(result).toEqual({
+      phoneNumber: '+919876543210',
+      agentId: 'agent-1',
+      clientId: 'client-1',
+      assignedAt: '2026-09-03T00:00:00.000Z',
+    })
+    expect(send.mock.calls[0][0].input.Key).toEqual({ phoneNumber: '+919876543210' })
+  })
+
+  // An unclaimed number must read as null so the webhook handler rejects the
+  // call. Falling back to any default agent would route a stranger's call into
+  // an arbitrary client's bot.
+  it('returns null for a number nobody has claimed', async () => {
+    send.mockResolvedValueOnce({})
+
+    await expect(getAgentForPhoneNumber('+919876543210')).resolves.toBeNull()
+  })
+
+  it('normalises before reading, so a webhook spelling variant still resolves', async () => {
+    send.mockResolvedValueOnce({})
+
+    await getAgentForPhoneNumber('919876543210')
+
+    expect(send.mock.calls[0][0].input.Key).toEqual({ phoneNumber: '+919876543210' })
+  })
+
+  it('surfaces a lookup failure rather than reporting the number as unclaimed', async () => {
+    send.mockRejectedValueOnce(new Error('AccessDeniedException'))
+
+    await expect(getAgentForPhoneNumber('+919876543210')).rejects.toThrow(
+      /Failed to look up voice agent/
+    )
+  })
+})
+
+describe('releasePhoneNumber', () => {
+  it('deletes the claim by its normalised key', async () => {
+    send.mockResolvedValueOnce({})
+
+    await releasePhoneNumber('91 98765 43210')
+
+    expect(send.mock.calls[0][0].input.Key).toEqual({ phoneNumber: '+919876543210' })
+  })
+
+  it('surfaces a delete failure', async () => {
+    send.mockRejectedValueOnce(new Error('ResourceNotFoundException'))
+
+    await expect(releasePhoneNumber('+919876543210')).rejects.toThrow(
+      /Failed to release phone number/
+    )
+  })
+})
+
+describe('getPhoneNumberForAgent', () => {
+  it('queries the agentId index, not the table', () => {
+    // The partition key is the phone number, so the dashboard's question
+    // ("which number rings this agent?") has no key to read by without it.
+    send.mockResolvedValue({ Items: [] })
+
+    void getPhoneNumberForAgent('agent-1')
+
+    const command = send.mock.calls[0][0]
+    expect(command.input.IndexName).toBe('agentId-index')
+    expect(command.input.ExpressionAttributeValues).toEqual({ ':agentId': 'agent-1' })
+  })
+
+  it('returns the assignment when the agent has one', async () => {
+    const row = {
+      phoneNumber: '+919876543210',
+      agentId: 'agent-1',
+      clientId: 'client-1',
+      assignedAt: '2026-09-06T00:00:00.000Z',
+    }
+    send.mockResolvedValue({ Items: [row] })
+
+    await expect(getPhoneNumberForAgent('agent-1')).resolves.toEqual(row)
+  })
+
+  it('returns null for an agent with no number', async () => {
+    send.mockResolvedValue({ Items: [] })
+
+    await expect(getPhoneNumberForAgent('agent-1')).resolves.toBeNull()
+  })
+
+  it('returns null rather than undefined when the query returns no Items key', async () => {
+    send.mockResolvedValue({})
+
+    await expect(getPhoneNumberForAgent('agent-1')).resolves.toBeNull()
+  })
+
+  it('surfaces a query failure instead of reporting no number', async () => {
+    // Reporting null here would show "no number assigned" on the dashboard for
+    // an agent that has one, and invite the client to claim a second.
+    send.mockRejectedValue(new Error('DynamoDB unavailable'))
+
+    await expect(getPhoneNumberForAgent('agent-1')).rejects.toThrow('DynamoDB unavailable')
+  })
+})
+
+describe('claimPhoneNumber returns the row it wrote', () => {
+  it('hands back the assignment rather than making the caller read it back', async () => {
+    // The agentId index is eventually consistent: a read-after-write there can
+    // return the state from before this claim.
+    send.mockResolvedValue({})
+
+    const result = await claimPhoneNumber('+91 98765 43210', 'agent-1', 'client-1')
+
+    expect(result).toMatchObject({
+      phoneNumber: '+919876543210',
+      agentId: 'agent-1',
+      clientId: 'client-1',
+    })
+    expect(result.assignedAt).toBeTruthy()
+  })
+})

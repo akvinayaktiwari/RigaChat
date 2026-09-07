@@ -1,7 +1,6 @@
-import { getPendingReply } from '../repositories/journey-pending-reply-repository.js'
-import { phonesMatch } from '../lib/phone-match.js'
-import { getLeadsForClient } from './lead-service.js'
-import type { Lead } from '../types/index.js'
+import { findLeadByPhone } from './lead-identity-service.js'
+import { readJourneyLead } from './lead-resolution-service.js'
+import type { JourneyLead, LeadRef } from '../types/index.js'
 
 // -------------------------------------------------------------------------
 // "Which of this client's leads just messaged us?"
@@ -10,7 +9,7 @@ import type { Lead } from '../types/index.js'
 // with `leads.find(l => phonesMatch(l.phone, from))` over EVERY lead the client
 // owns, across every bot, in DynamoDB scan order. One person who enquires twice
 // -- or once on each of two bots -- produces several leads with the same phone,
-// and `.find()` then picks an effectively arbitrary one.
+// and `.find()` then picked an effectively arbitrary one.
 //
 // Observed in production on 2026-08-16: a reply from a lead captured that
 // morning was recorded against a lead from 2026-07-07 on an unrelated bot,
@@ -18,25 +17,30 @@ import type { Lead } from '../types/index.js'
 // journey parked on the real lead's await_reply step never resumed and timed
 // out silently 24h later.
 //
-// The rule, in order:
-//   1. a candidate with a journey parked on it -- that execution is literally
-//      waiting for this message, which is about as strong a signal as exists
-//   2. otherwise the most recent by createdAt -- a returning contact means
-//      their latest enquiry, not their first
+// The candidate search and the ordering rule that fixed it now live in
+// lead-identity-service, which searches EVERY lead source rather than only the
+// chat leads table. That narrowness was invisible while chat was the only thing
+// that created leads. It stopped being invisible when a phone call could create
+// one: someone who called first and messages later has no chat lead to find, so
+// a chat-only search made them a brand-new stranger and started a second
+// history for the same person.
+//
+// This module is now the WhatsApp-facing shape around that shared resolver.
 // -------------------------------------------------------------------------
-
-// How many candidates get a pending-reply lookup. Each is a point read, and the
-// list is already sorted newest-first, so this bounds the cost for a client
-// whose CRM has accumulated dozens of leads on one phone number without
-// changing the answer in any realistic case.
-const MAX_PENDING_REPLY_PROBES = 10
 
 export type InboundMatchReason = 'only_match' | 'pending_reply' | 'most_recent'
 
 export interface InboundLeadMatch {
-  lead: Lead
-  // How many of the client's leads share this phone number. >1 means the choice
-  // below actually mattered, which is what makes it worth logging.
+  leadId: string
+  // For lead_events scoping. A voice lead has no linked chatbot, so its agentId
+  // stands in -- the field scopes events, it does not drive Pinecone retrieval.
+  botId: string
+  leadRef: LeadRef
+  // Source-agnostic view for the agent turn, so a matched voice lead can be
+  // answered exactly like a matched chat lead.
+  journeyLead: JourneyLead
+  // >1 means the ordering rule actually decided something, which is what makes
+  // it worth logging when a reply lands on the wrong lead.
   candidateCount: number
   reason: InboundMatchReason
 }
@@ -45,37 +49,36 @@ export async function matchLeadForInboundMessage(
   clientId: string,
   fromPhone: string
 ): Promise<InboundLeadMatch | null> {
-  const leads = await getLeadsForClient(clientId)
-  const candidates = leads.filter((lead) => lead.phone && phonesMatch(lead.phone, fromPhone))
+  const identity = await findLeadByPhone(clientId, fromPhone)
+  if (!identity) return null
 
-  if (candidates.length === 0) return null
-  if (candidates.length === 1) {
-    return { lead: candidates[0]!, candidateCount: 1, reason: 'only_match' }
+  // The chosen candidate's full record, read through the same source-agnostic
+  // path the journey layer uses. A null here means the row vanished between the
+  // list and the read, which is a race rather than a miss -- treated as no
+  // match so the caller creates a fresh lead instead of acting on a ghost.
+  const journeyLead = await readJourneyLead(identity.leadRef, clientId)
+  if (!journeyLead) {
+    console.error(
+      `[inbound-match] lead ${identity.leadId} matched on phone but its record could not be read`
+    )
+    return null
   }
 
-  // Newest first, so the pending-reply probe below starts where a parked
-  // journey is most likely to be and the fallback is already correct.
-  const byNewest = [...candidates].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-
-  for (const lead of byNewest.slice(0, MAX_PENDING_REPLY_PROBES)) {
-    // Never throws for a missing row -- returns null (see the repository).
-    const pending = await getPendingReply(lead.leadId)
-    if (pending) {
-      return { lead, candidateCount: candidates.length, reason: 'pending_reply' }
-    }
+  return {
+    leadId: identity.leadId,
+    botId: identity.leadRef.source === 'chat' ? identity.leadRef.botId : identity.leadRef.source === 'voice' ? identity.leadRef.agentId : clientId,
+    leadRef: identity.leadRef,
+    journeyLead,
+    candidateCount: identity.candidateCount,
+    reason: identity.reason,
   }
-
-  return { lead: byNewest[0]!, candidateCount: candidates.length, reason: 'most_recent' }
 }
 
-// Shared by both webhook paths so the two report an ambiguous match the same
-// way. Only logs when the choice was non-trivial: a single match is the normal
-// case and does not need a line.
 export function logInboundMatch(source: string, fromPhone: string, match: InboundLeadMatch): void {
   if (match.candidateCount <= 1) return
 
   console.log(
-    `[${source}] ${fromPhone} matched ${match.candidateCount} leads; chose ${match.lead.leadId} ` +
-      `(${match.reason}, bot ${match.lead.botId})`
+    `[${source}] ${fromPhone} matched ${match.candidateCount} leads; chose ${match.leadId} ` +
+      `(${match.reason}, ${match.leadRef.source}, scope ${match.botId})`
   )
 }

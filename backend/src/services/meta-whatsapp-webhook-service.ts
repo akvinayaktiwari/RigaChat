@@ -277,18 +277,23 @@ async function recordInbound(phoneNumberId: string | undefined, message: MetaInb
     // Nobody by that number yet. Before #10 the message was dropped here, which
     // made the whole click-to-WhatsApp flow a no-op: a visitor taps the button on
     // a client's site, messages the number, and nothing exists to answer them.
-    const lead = match
-      ? match.lead
-      : await createInboundLead(owner, phoneNumberId, message)
+    // A matched lead may live in ANY source table now (a caller who phoned
+    // first, then messaged), so the two branches are reduced to the fields
+    // this path actually needs rather than to a chat Lead.
+    const created = match ? null : await createInboundLead(owner, phoneNumberId, message)
+    if (!match && !created) return
 
-    if (!lead) return
+    const leadId = match ? match.leadId : created!.leadId
+    const eventBotId = match ? match.botId : created!.botId
+    const journeyLead = match ? match.journeyLead : normalizeChatLead(created!)
+
     if (match) logInboundMatch('wa-inbound', message.from, match)
-    await recordInboundMessage(lead.leadId)
+    await recordInboundMessage(leadId)
 
     await appendLeadEvent({
-      leadId: lead.leadId,
+      leadId,
       clientId: owner.clientId,
-      botId: lead.botId,
+      botId: eventBotId,
       type: 'message_in',
       channel: 'whatsapp',
       body: inbound.text,
@@ -309,7 +314,7 @@ async function recordInbound(phoneNumberId: string | undefined, message: MetaInb
         agent: resolution.agent,
         botId: resolution.botId,
         clientId: owner.clientId,
-        lead: normalizeChatLead(lead),
+        lead: journeyLead,
         message: body,
       })
       if (turn.status === 'composed_for_journey') {
@@ -317,13 +322,13 @@ async function recordInbound(phoneNumberId: string | undefined, message: MetaInb
       }
     } else {
       console.error(
-        `[wa-inbound] no Agent resolves for phone_number_id ${phoneNumberId}; lead ${lead.leadId} gets no answer`
+        `[wa-inbound] no Agent resolves for phone_number_id ${phoneNumberId}; lead ${leadId} gets no answer`
       )
     }
 
-    const outcome = await handleInboundLeadMessage(lead.leadId, body, composedReply)
+    const outcome = await handleInboundLeadMessage(leadId, body, composedReply)
     if (outcome.handled !== 'no_pending_journey') {
-      console.log(`[journey-reply] lead ${lead.leadId}: ${JSON.stringify(outcome)}`)
+      console.log(`[journey-reply] lead ${leadId}: ${JSON.stringify(outcome)}`)
     } else if (match && match.candidateCount > 1) {
       // `match` is null for a lead created moments ago by createInboundLead, and
       // a brand-new lead cannot have several candidates by definition, so this
@@ -333,7 +338,7 @@ async function recordInbound(phoneNumberId: string | undefined, message: MetaInb
       // phone number, "nothing was waiting" is exactly the symptom of having
       // picked the wrong one, and that combination went unnoticed for a day.
       console.log(
-        `[wa-inbound] chose lead ${lead.leadId} from ${match.candidateCount} matches and it had no parked journey`
+        `[wa-inbound] chose lead ${leadId} from ${match.candidateCount} matches and it had no parked journey`
       )
     }
   } catch (error) {

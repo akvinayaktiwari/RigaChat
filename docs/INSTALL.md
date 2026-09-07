@@ -36,6 +36,14 @@ STAFF_COGNITO_USER_POOL_ID    UPSTASH_REDIS_REST_TOKEN       UPSTASH_REDIS_REST_
 VOICE_AUTH_SECRET
 ```
 
+> The voice relay is a **separate process on its own EC2 host** and reads its
+> own `.env`, not this one. Its variables (`VOICE_RELAY_PUBLIC_HOST`,
+> `PLIVO_AUTH_TOKEN`, `PLIVO_AUTH_ID`, `VOICE_MAX_CONCURRENT_CALLS`, plus
+> `VOICE_AUTH_SECRET` and `BACKEND_URL` shared with the Lambda) are documented
+> in `backend/.env.example` and [INFRASTRUCTURE.md](./INFRASTRUCTURE.md).
+> Telephony stays off until `PLIVO_AUTH_TOKEN` and `VOICE_RELAY_PUBLIC_HOST`
+> are both set.
+
 Read via `process.env[dynamicName]` in `backend/src/repositories/voice-repository.ts` (table names built from constants, not literal `process.env.X`, hence invisible to a literal grep):
 
 ```
@@ -70,8 +78,8 @@ META_APP_ID   META_APP_SECRET   META_REDIRECT_URI   META_WEBHOOK_VERIFY_TOKEN
 ```
 
 `.env` (git-ignored, confirmed via `.gitignore`) is loaded by
-`npm run dev`'s `--env-file=.env` flag. There's no `.env.example` in the
-repo as of this writing — TODO, worth adding one from the list above.
+`npm run dev`'s `--env-file=.env` flag. `backend/.env.example` is the
+annotated template.
 
 ## Frontend environment variables (Vite, build-time)
 

@@ -3,6 +3,14 @@ import WebSocket from 'ws'
 import type { VoiceAgentVoice, VoiceCallLog } from '../types/index.js'
 import { generateToken } from './auth.js'
 import { writeVoiceCallLog } from '../repositories/voice-repository.js'
+import {
+  recordCallHandoff,
+  recordCallLifecycle,
+  recordCallToolUse,
+  recordCallTurn,
+  resolveCallLead,
+  type CallIdentity,
+} from '../services/voice-lead-service.js'
 
 const REALTIME_MODEL = 'gpt-realtime'
 const REALTIME_URL = `wss://api.openai.com/v1/realtime?model=${REALTIME_MODEL}`
@@ -32,8 +40,38 @@ const KNOWLEDGE_BASE_TOOL = {
   },
 }
 
+// Given to the model rather than matched on keywords, because the ways a person
+// asks for a human are unbounded ("is there anyone there", "I'd rather not do
+// this with a robot", or simple exasperation) and a keyword list catches the
+// polite phrasings while missing the frustrated ones -- which are exactly the
+// calls that most need a person.
+const REQUEST_HUMAN_TOOL = {
+  type: 'function',
+  name: 'request_human',
+  description:
+    'Call this when the caller asks to speak to a person, is frustrated with the automated agent, ' +
+    'or raises something you cannot handle (a complaint, a negotiation, anything needing a decision). ' +
+    'Do not use it for questions you can answer from the knowledge base.',
+  parameters: {
+    type: 'object',
+    properties: {
+      reason: {
+        type: 'string',
+        description: "One sentence, in the caller's own terms, describing what they need a person for.",
+      },
+    },
+    required: ['reason'],
+  },
+}
+
 // Shared by both session.update send sites so they can never drift out of sync.
-const REALTIME_TOOLS = [KNOWLEDGE_BASE_TOOL]
+const REALTIME_TOOLS = [KNOWLEDGE_BASE_TOOL, REQUEST_HUMAN_TOOL]
+
+// Without this the model transcribes only its OWN speech: the caller's half of
+// every conversation is never written down. Tolerable while the transcript was
+// a live subtitle in a browser widget; not tolerable once the call becomes a
+// CRM record, where "what did they actually ask for" is the entire value.
+const TRANSCRIPTION = { model: 'whisper-1' }
 
 const apiKey = process.env.OPENAI_API_KEY
 
@@ -43,12 +81,45 @@ if (!apiKey) {
   )
 }
 
+// The surface VoiceSession actually uses from its client-side socket. Narrower
+// than a full WebSocket on purpose: it is the whole contract a transport must
+// satisfy, so the Plivo adapter implements four members rather than faking a
+// WebSocket, and the compiler enforces the boundary instead of a cast hiding it.
+// The numeric readyState is ws's (OPEN === 1), shared rather than re-invented.
+export interface ClientTransport {
+  readyState: number
+  on(event: 'message', listener: (data: WebSocket.RawData) => void): void
+  send(data: string): void
+  close(): void
+}
+
 export interface VoiceAgentConfig {
   agentId: string
   clientId: string
   voice: VoiceAgentVoice
   instructions: string
   firstMessage: string
+  // VoiceAgent.maxSessionDuration, in minutes. Stored and validated at agent
+  // creation since the beginning and never enforced anywhere, so a call could
+  // run until someone noticed. Tolerable while every call started with a user
+  // clicking a widget; not tolerable once a public phone number can start one.
+  maxSessionMinutes?: 5 | 10 | 15
+  // Telephony only. Absent for a browser call, which has no caller ID and
+  // therefore no identity to join on -- so a browser session records no lead,
+  // exactly as it did before. Present means: resolve who this is and write the
+  // conversation into the shared lead_events stream.
+  callerPhone?: string
+  dialledNumber?: string
+  linkedBotId?: string
+  // Present only when a live transfer is actually possible: the agent has a
+  // handoff number, Plivo call-control credentials exist, and we know the call
+  // UUID. VoiceSession deliberately does not know what a Plivo is -- it asks
+  // for a transfer and is told whether it worked.
+  transferToHuman?: () => Promise<boolean>
+  // Set when a transfer was possible in principle but the office is shut. Lets
+  // the agent name the reopening time rather than saying only that someone will
+  // call back.
+  closedUntil?: string
 }
 
 interface OpenAIResponseUsage {
@@ -67,6 +138,7 @@ interface OpenAIRealtimeEvent {
   name?: string
   arguments?: string
   call_id?: string
+  transcript?: string
 }
 
 interface VoiceContext {
@@ -76,7 +148,7 @@ interface VoiceContext {
 }
 
 export class VoiceSession {
-  private browserWs: WebSocket
+  private clientWs: ClientTransport
   private openaiWs: WebSocket
   private agentId: string
   private clientId: string
@@ -91,14 +163,30 @@ export class VoiceSession {
   private contextReceived = false
   private sessionUpdateSent = false
   private contextTimeout: NodeJS.Timeout | null = null
+  private durationTimeout: NodeJS.Timeout | null = null
   private fallbackVoice: VoiceAgentVoice
+  private fallbackInstructions: string
   private context: VoiceContext = {}
+  private identity: CallIdentity | null = null
+  private identityPending: Promise<void> | null = null
+  private agentUtterance = ''
+  private pendingAction: 'none' | 'hangup' | 'transfer' = 'none'
+  private transferToHuman?: () => Promise<boolean>
+  private closedUntil?: string
 
-  constructor(browserWs: WebSocket, agentConfig: VoiceAgentConfig) {
-    this.browserWs = browserWs
+  constructor(clientWs: ClientTransport, agentConfig: VoiceAgentConfig) {
+    this.clientWs = clientWs
     this.agentId = agentConfig.agentId
     this.clientId = agentConfig.clientId
     this.fallbackVoice = agentConfig.voice
+    // agentConfig.instructions was previously accepted and ignored: every path
+    // fell back to the generic FALLBACK_INSTRUCTIONS, so a browser whose context
+    // message was slow or lost answered as an anonymous assistant instead of the
+    // client's agent. A phone call has no context message at all, which turns
+    // that latent bug into the normal case.
+    this.fallbackInstructions = agentConfig.instructions || FALLBACK_INSTRUCTIONS
+    this.transferToHuman = agentConfig.transferToHuman
+    this.closedUntil = agentConfig.closedUntil
 
     this.openaiWs = new WebSocket(REALTIME_URL, {
       headers: {
@@ -106,16 +194,32 @@ export class VoiceSession {
       },
     })
 
+    if (agentConfig.callerPhone !== undefined) {
+      this.identityPending = this.resolveIdentity(agentConfig)
+    }
+
+    if (agentConfig.maxSessionMinutes) {
+      this.durationTimeout = setTimeout(
+        () => {
+          console.warn(
+            `[VoiceRelay] Call ${this.callId} hit the ${agentConfig.maxSessionMinutes}-minute cap, ending it`
+          )
+          this.cleanup()
+        },
+        agentConfig.maxSessionMinutes * 60 * 1000
+      )
+    }
+
     this.openaiWs.on('open', () => {
       this.openaiReady = true
 
       if (this.contextReceived) {
-        this.sendSessionUpdate(this.context.instructions ?? FALLBACK_INSTRUCTIONS, this.context.voice ?? this.fallbackVoice)
+        this.sendSessionUpdate(this.context.instructions ?? this.fallbackInstructions, this.context.voice ?? this.fallbackVoice)
       }
 
       this.contextTimeout = setTimeout(() => {
         if (!this.sessionUpdateSent) {
-          this.sendSessionUpdate(FALLBACK_INSTRUCTIONS, this.fallbackVoice)
+          this.sendSessionUpdate(this.fallbackInstructions, this.fallbackVoice)
         }
       }, CONTEXT_TIMEOUT_MS)
     })
@@ -128,8 +232,8 @@ export class VoiceSession {
       console.error('[VoiceRelay] OpenAI socket error:', err.message)
     })
 
-    this.browserWs.on('message', (data: WebSocket.RawData) => {
-      this.handleBrowserMessage(data)
+    this.clientWs.on('message', (data: WebSocket.RawData) => {
+      this.handleClientMessage(data)
     })
   }
 
@@ -137,32 +241,17 @@ export class VoiceSession {
     this.contextReceived = true
     this.context = context
 
-    if (this.openaiReady && !this.sessionUpdateSent && this.openaiWs.readyState === WebSocket.OPEN) {
-      this.openaiWs.send(
-        JSON.stringify({
-          type: 'session.update',
-          session: {
-            type: 'realtime',
-            instructions: context.instructions ?? FALLBACK_INSTRUCTIONS,
-            tools: REALTIME_TOOLS,
-            audio: {
-              input: {
-                format: { type: 'audio/pcm', rate: 24000 },
-                turn_detection: {
-                  type: 'server_vad',
-                  threshold: 0.5,
-                  prefix_padding_ms: 300,
-                  silence_duration_ms: 500,
-                },
-              },
-              output: {
-                format: { type: 'audio/pcm', rate: 24000 },
-              },
-            },
-          },
-        })
+    // Routed through sendSessionUpdate rather than building its own payload.
+    // The two send sites had already drifted: this one omitted the voice, so a
+    // context message arriving AFTER the OpenAI socket opened left the model on
+    // its default voice while the same message arriving before it was honoured.
+    // That is the browser's usual ordering, and the same shape of bug as the
+    // instructions this path used to drop.
+    if (this.openaiReady && !this.sessionUpdateSent) {
+      this.sendSessionUpdate(
+        context.instructions ?? this.fallbackInstructions,
+        context.voice ?? this.fallbackVoice
       )
-      this.sessionUpdateSent = true
     }
   }
 
@@ -181,6 +270,7 @@ export class VoiceSession {
           audio: {
             input: {
               format: { type: 'audio/pcm', rate: 24000 },
+              transcription: TRANSCRIPTION,
               turn_detection: {
                 type: 'server_vad',
                 threshold: 0.5,
@@ -205,6 +295,11 @@ export class VoiceSession {
       this.contextTimeout = null
     }
 
+    if (this.durationTimeout) {
+      clearTimeout(this.durationTimeout)
+      this.durationTimeout = null
+    }
+
     // Fire-and-forget: cleanup() is synchronous and must always close the
     // sockets below regardless of whether the log write succeeds. A sync
     // try/catch here wouldn't catch a rejection from this non-awaited async
@@ -216,8 +311,57 @@ export class VoiceSession {
     if (this.openaiWs.readyState === WebSocket.OPEN || this.openaiWs.readyState === WebSocket.CONNECTING) {
       this.openaiWs.close()
     }
-    if (this.browserWs.readyState === WebSocket.OPEN || this.browserWs.readyState === WebSocket.CONNECTING) {
-      this.browserWs.close()
+    if (this.clientWs.readyState === WebSocket.OPEN || this.clientWs.readyState === WebSocket.CONNECTING) {
+      this.clientWs.close()
+    }
+  }
+
+  // Resolved once, at the start, and awaited by every write. Doing it lazily on
+  // the first transcript would race: two turns arriving together would each see
+  // no identity and create their own lead for the same caller.
+  //
+  // A failure here is logged and swallowed. Losing the CRM record of a call is
+  // bad; dropping the call itself because DynamoDB was briefly unavailable is
+  // worse, and the caller is on the line either way.
+  private async resolveIdentity(agentConfig: VoiceAgentConfig): Promise<void> {
+    try {
+      this.identity = await resolveCallLead({
+        clientId: this.clientId,
+        agentId: this.agentId,
+        callerPhone: agentConfig.callerPhone ?? '',
+        dialledNumber: agentConfig.dialledNumber ?? '',
+        callId: this.callId,
+        linkedBotId: agentConfig.linkedBotId,
+      })
+
+      await recordCallLifecycle({
+        identity: this.identity,
+        clientId: this.clientId,
+        body: this.identity.isNewLead
+          ? `Inbound call to ${agentConfig.dialledNumber ?? 'unknown number'}`
+          : `Inbound call to ${agentConfig.dialledNumber ?? 'unknown number'} (returning contact)`,
+      })
+    } catch (error) {
+      console.error(
+        '[VoiceRelay] Failed to resolve call identity:',
+        error instanceof Error ? error.message : error
+      )
+    }
+  }
+
+  // Every lead write funnels through here so none of them can run before the
+  // identity exists, and none of them can take a live call down.
+  private async withIdentity(write: (identity: CallIdentity) => Promise<void>): Promise<void> {
+    if (!this.identityPending) return
+    try {
+      await this.identityPending
+      if (!this.identity) return
+      await write(this.identity)
+    } catch (error) {
+      console.error(
+        '[VoiceRelay] Failed to record call activity:',
+        error instanceof Error ? error.message : error
+      )
     }
   }
 
@@ -242,7 +386,7 @@ export class VoiceSession {
     await writeVoiceCallLog(log)
   }
 
-  private handleBrowserMessage(data: WebSocket.RawData): void {
+  private handleClientMessage(data: WebSocket.RawData): void {
     let message: { type: string; data?: string; instructions?: string; voice?: VoiceAgentVoice; botName?: string }
     try {
       message = JSON.parse(data.toString())
@@ -268,7 +412,18 @@ export class VoiceSession {
     }
 
     if (message.type === 'ping') {
-      this.sendToBrowser({ type: 'pong' })
+      this.sendToClient({ type: 'pong' })
+      return
+    }
+
+    // A caller who dialled a number expects to be greeted; silence on answer
+    // reads as a dead line. The browser widget does not need this (the user
+    // clicked to start and speaks first), so it is a transport-driven trigger
+    // rather than something the session does unconditionally.
+    if (message.type === 'greet') {
+      if (this.openaiWs.readyState === WebSocket.OPEN) {
+        this.openaiWs.send(JSON.stringify({ type: 'response.create' }))
+      }
       return
     }
 
@@ -304,16 +459,38 @@ export class VoiceSession {
       }
       this.isAgentSpeaking = false
       this.currentResponseId = null
+      this.flushAgentUtterance()
+
+      // Acted on only AFTER the closing line has been spoken. Doing either
+      // when the tool fires would cut the caller off mid-sentence, at the exact
+      // moment they asked for help.
+      if (this.pendingAction !== 'none') {
+        void this.runPendingAction()
+      }
       return
     }
 
     if (event.type === 'response.output_audio.delta' && event.delta) {
-      this.sendToBrowser({ type: 'audio', data: event.delta })
+      this.sendToClient({ type: 'audio', data: event.delta })
       return
     }
 
     if (event.type === 'response.output_audio_transcript.delta' && event.delta?.transcript) {
-      this.sendToBrowser({ type: 'transcript', text: event.delta.transcript })
+      // Accumulated rather than written per delta: a delta is a word fragment,
+      // and fifty rows saying "the", "unit", "is" is not a transcript anyone
+      // can read. Flushed as one turn on response.done below.
+      this.agentUtterance += event.delta.transcript
+      this.sendToClient({ type: 'transcript', text: event.delta.transcript })
+      return
+    }
+
+    // The caller's half. Requires TRANSCRIPTION to be set in session.update --
+    // without it this event never fires and only the agent is ever recorded.
+    if (event.type === 'conversation.item.input_audio_transcription.completed' && event.transcript) {
+      const callerText = event.transcript
+      void this.withIdentity((identity) =>
+        recordCallTurn({ identity, clientId: this.clientId, role: 'caller', text: callerText })
+      )
       return
     }
 
@@ -330,9 +507,14 @@ export class VoiceSession {
       return
     }
 
+    if (event.type === 'response.function_call_arguments.done' && event.name === 'request_human') {
+      this.handleHandoffRequest(event)
+      return
+    }
+
     if (event.type === 'error') {
       console.error('[VoiceRelay] OpenAI error event:', event.error?.message)
-      this.sendToBrowser({ type: 'error', message: event.error?.message ?? 'Unknown error' })
+      this.sendToClient({ type: 'error', message: event.error?.message ?? 'Unknown error' })
     }
   }
 
@@ -343,7 +525,125 @@ export class VoiceSession {
     }
     this.isAgentSpeaking = false
     this.currentResponseId = null
-    this.sendToBrowser({ type: 'barge-in' })
+    // The caller interrupted, but the agent did say something before being cut
+    // off and the caller heard it. Dropping it would leave a transcript where
+    // the caller answers a question nobody asked.
+    this.flushAgentUtterance()
+    this.sendToClient({ type: 'barge-in' })
+  }
+
+  private flushAgentUtterance(): void {
+    const utterance = this.agentUtterance.trim()
+    this.agentUtterance = ''
+    if (!utterance) return
+
+    void this.withIdentity((identity) =>
+      recordCallTurn({ identity, clientId: this.clientId, role: 'agent', text: utterance })
+    )
+  }
+
+  private async runPendingAction(): Promise<void> {
+    const action = this.pendingAction
+    this.pendingAction = 'none'
+
+    if (action === 'hangup') {
+      console.log(`[VoiceRelay] Ending call ${this.callId} after handoff`)
+      this.cleanup()
+      return
+    }
+
+    if (action !== 'transfer' || !this.transferToHuman) return
+
+    const transferred = await this.transferToHuman()
+    if (transferred) {
+      // The caller's leg has moved to the staff number, so this media stream is
+      // finished. cleanup() writes the call log; Plivo tears the socket down.
+      console.log(`[VoiceRelay] Call ${this.callId} transferred to a human`)
+      this.cleanup()
+      return
+    }
+
+    // The agent has ALREADY told the caller it is putting them through, and the
+    // transfer did not happen. Saying nothing now leaves them holding a line
+    // that goes nowhere, so walk it back out loud before hanging up.
+    console.error(`[VoiceRelay] Transfer failed on call ${this.callId}; falling back to a callback`)
+    this.pendingAction = 'hangup'
+
+    if (this.openaiWs.readyState === WebSocket.OPEN) {
+      this.openaiWs.send(
+        JSON.stringify({
+          type: 'conversation.item.create',
+          item: {
+            type: 'message',
+            role: 'system',
+            content: [
+              {
+                type: 'input_text',
+                text:
+                  'The transfer could not be completed. Apologise briefly, tell the caller the team ' +
+                  'has been notified and will call them back shortly, thank them, and say goodbye.',
+              },
+            ],
+          },
+        })
+      )
+      this.openaiWs.send(JSON.stringify({ type: 'response.create' }))
+    }
+  }
+
+  private async handleHandoffRequest(event: OpenAIRealtimeEvent): Promise<void> {
+    let reason = 'The caller asked to speak to a person.'
+    try {
+      const parsed = JSON.parse(event.arguments ?? '{}') as { reason?: string }
+      if (parsed.reason) reason = parsed.reason
+    } catch {
+      // A malformed argument blob costs the reason, not the handoff. Someone
+      // asked for a human either way, and that is the part that must not be lost.
+    }
+
+    console.log(`[VoiceRelay] Handoff requested on call ${this.callId}: ${reason}`)
+
+    let notified = false
+    await this.withIdentity(async (identity) => {
+      const result = await recordCallHandoff({ identity, clientId: this.clientId, reason })
+      notified = result.notified
+      if (!result.notified) {
+        console.error(
+          `[VoiceRelay] Handoff on call ${this.callId} notified nobody (${result.skipReason ?? 'unknown'})`
+        )
+      }
+    })
+
+    // What the model says next is grounded in what will ACTUALLY happen.
+    // Promising a callback nobody was alerted about, or a transfer that cannot
+    // be attempted, is worse than saying nothing -- the caller hangs up
+    // satisfied and nothing follows.
+    let output: string
+    if (this.transferToHuman) {
+      this.pendingAction = 'transfer'
+      output = 'Tell the caller you are putting them through to a colleague now. One short sentence.'
+    } else {
+      this.pendingAction = 'hangup'
+      if (this.closedUntil) {
+        output =
+          `The office is currently closed and reopens ${this.closedUntil}. Tell the caller this, ` +
+          'say the team will get back to them then, thank them, and say goodbye.'
+      } else {
+        output = notified
+          ? 'A team member has been notified and will call back shortly. Tell the caller this, thank them, and say goodbye.'
+          : 'Tell the caller you will pass this on and that someone will get back to them, thank them, and say goodbye.'
+      }
+    }
+
+    if (this.openaiWs.readyState === WebSocket.OPEN) {
+      this.openaiWs.send(
+        JSON.stringify({
+          type: 'conversation.item.create',
+          item: { type: 'function_call_output', call_id: event.call_id, output },
+        })
+      )
+      this.openaiWs.send(JSON.stringify({ type: 'response.create' }))
+    }
   }
 
   private async handleToolCall(event: OpenAIRealtimeEvent): Promise<void> {
@@ -354,6 +654,9 @@ export class VoiceSession {
       console.log('[VoiceRelay] Fetching RAG chunks for query:', query)
       chunks = await this.fetchRagChunks(query)
       console.log('[VoiceRelay] RAG chunks received:', chunks.length, 'chunks')
+      void this.withIdentity((identity) =>
+        recordCallToolUse({ identity, clientId: this.clientId, query, resultCount: chunks.length })
+      )
     } catch (error) {
       console.log('[VoiceRelay] Tool call failed:', error)
       console.error('[VoiceRelay] Tool call failed:', error instanceof Error ? error.message : error)
@@ -400,9 +703,9 @@ export class VoiceSession {
     }
   }
 
-  private sendToBrowser(payload: unknown): void {
-    if (this.browserWs.readyState === WebSocket.OPEN) {
-      this.browserWs.send(JSON.stringify(payload))
+  private sendToClient(payload: unknown): void {
+    if (this.clientWs.readyState === WebSocket.OPEN) {
+      this.clientWs.send(JSON.stringify(payload))
     }
   }
 }

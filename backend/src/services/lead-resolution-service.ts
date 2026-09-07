@@ -2,6 +2,7 @@ import { getLeadById } from '../repositories/lead-repository.js'
 import { getFormLeadById } from '../repositories/form-lead-repository.js'
 import { getPublicFormConfig } from '../repositories/form-repository.js'
 import { getMetaLeadById } from '../repositories/meta-lead-repository.js'
+import { getVoiceLeadById } from '../repositories/voice-lead-repository.js'
 import { getAgentForResource } from '../repositories/agent-binding-lookup-repository.js'
 import { getAgents } from './agent-service.js'
 import type {
@@ -14,6 +15,7 @@ import type {
   LeadResolution,
   LeadSource,
   MetaLead,
+  VoiceLead,
 } from '../types/index.js'
 
 // -------------------------------------------------------------------------
@@ -93,6 +95,25 @@ export function normalizeMetaLead(lead: MetaLead): JourneyLead {
   }
 }
 
+// A phone call gives you caller ID and nothing else: no name, no email, no
+// stated interest. Everything beyond `phone` stays undefined until the agent
+// asks and something extracts it from the transcript, which is deliberately not
+// this function's job. sourceUrl carries the DID so a client running two
+// numbers can tell which one produced the lead.
+export function normalizeVoiceLead(lead: VoiceLead): JourneyLead {
+  return {
+    leadId: lead.leadId,
+    clientId: lead.clientId,
+    source: 'voice',
+    name: lead.name,
+    phone: lead.phone,
+    email: lead.email,
+    propertyInterest: lead.propertyInterest,
+    budgetRange: lead.budgetRange,
+    sourceUrl: lead.dialledNumber,
+  }
+}
+
 // The form builder writes customFields keyed by fieldId (a UUID), while the
 // LABELS live on the FormConfig. pickField below matches on the key, so a
 // UUID-keyed submission resolved to no name, no phone and no email -- and
@@ -167,8 +188,9 @@ export function toLeadRef(parts: {
   return { source: 'chat', botId: parts.botId, leadId: parts.leadId }
 }
 
-// clientId is required because the three lead tables are keyed three different
-// ways and meta_leads is partitioned by clientId -- the LeadRef alone cannot
+// clientId is required because the lead tables are keyed different ways and
+// both meta_leads and voice_leads are partitioned by clientId -- the LeadRef
+// alone cannot
 // address it. Every caller already holds it (from auth, or from the journey
 // event), so this asks for nothing new.
 export async function readJourneyLead(leadRef: LeadRef, clientId: string): Promise<JourneyLead | null> {
@@ -176,6 +198,10 @@ export async function readJourneyLead(leadRef: LeadRef, clientId: string): Promi
     case 'chat': {
       const lead = await getLeadById(leadRef.botId, leadRef.leadId)
       return lead ? normalizeChatLead(lead) : null
+    }
+    case 'voice': {
+      const lead = await getVoiceLeadById(clientId, leadRef.leadId)
+      return lead ? normalizeVoiceLead(lead) : null
     }
     case 'meta': {
       const lead = await getMetaLeadById(clientId, leadRef.leadId)

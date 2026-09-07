@@ -146,6 +146,8 @@ function leadParentIdOf(leadRef: LeadRef): string {
       return leadRef.formId
     case 'meta':
       return leadRef.pageId
+    case 'voice':
+      return leadRef.agentId
   }
 }
 

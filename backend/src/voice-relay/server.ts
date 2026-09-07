@@ -1,22 +1,22 @@
 import http from 'node:http'
-import { randomUUID } from 'node:crypto'
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
-import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { WebSocketServer, type WebSocket } from 'ws'
-import type { VoiceAgentVoice } from '../types/index.js'
-import { getTableName } from '../lib/table-names.js'
-import { validateToken } from './auth.js'
-import { VoiceSession } from './session.js'
+import {
+  SessionRegistry,
+  createRequestHandler,
+  handleConnection,
+  isTelephonyEnabled,
+  type RelayConfig,
+  type RelayContext,
+} from './relay.js'
+
+// This file is the process: it reads the environment, validates it, and listens.
+// Every decision about a call lives in relay.ts, which takes its configuration
+// as an argument -- so those decisions are reachable from a test, and this file
+// stays small enough that its lack of coverage costs nothing.
 
 const PORT = 3100
 
 const region = process.env.AWS_REGION
-// Shared with the Lambda via lib/table-names.ts rather than read from this
-// process's own environment. This relay is deployed separately (npm run
-// build:relay, port 3100, its own env), so a private copy of the name is exactly
-// how the two drift apart. It still needs AWS_REGION and VOICE_AUTH_SECRET from
-// its environment; only the table NAME moved.
-const tableName = getTableName('voice_agents')
 const authSecret = process.env.VOICE_AUTH_SECRET
 
 if (!region) {
@@ -31,95 +31,29 @@ if (!authSecret) {
   )
 }
 
-const dynamoClient = DynamoDBDocumentClient.from(new DynamoDBClient({ region }))
-
-interface VoiceAgentRecord {
-  agentId: string
-  clientId: string
-  name: string
-  voice: VoiceAgentVoice
-  greetingMessage: string
+const config: RelayConfig = {
+  authSecret,
+  publicHost: process.env.VOICE_RELAY_PUBLIC_HOST,
+  plivoAuthToken: process.env.PLIVO_AUTH_TOKEN,
+  plivoAuthId: process.env.PLIVO_AUTH_ID,
+  maxConcurrentCalls: Number(process.env.VOICE_MAX_CONCURRENT_CALLS ?? '10'),
 }
 
-async function getVoiceAgentById(agentId: string): Promise<VoiceAgentRecord | null> {
-  const result = await dynamoClient.send(
-    new QueryCommand({
-      TableName: tableName,
-      IndexName: 'agentId-index',
-      KeyConditionExpression: 'agentId = :agentId',
-      ExpressionAttributeValues: { ':agentId': agentId },
-      Limit: 1,
-    })
+const telephonyEnabled = isTelephonyEnabled(config)
+if (!telephonyEnabled) {
+  console.warn(
+    '[VoiceRelay] Telephony disabled: set PLIVO_AUTH_TOKEN and VOICE_RELAY_PUBLIC_HOST to enable inbound calls.'
   )
-  const items = (result.Items as VoiceAgentRecord[] | undefined) ?? []
-  return items[0] ?? null
 }
 
-const server = http.createServer((req, res) => {
-  if (req.method === 'GET' && req.url === '/') {
-    res.writeHead(200, { 'Content-Type': 'text/plain' })
-    res.end('ok')
-    return
-  }
-  res.writeHead(404)
-  res.end()
-})
+const context: RelayContext = { config, sessions: new SessionRegistry() }
+
+const server = http.createServer(createRequestHandler(context))
 
 const wss = new WebSocketServer({ server })
 
-const activeSessions = new Map<string, VoiceSession>()
-
-wss.on('connection', async (ws: WebSocket, req) => {
-  const url = new URL(req.url ?? '', `http://${req.headers.host}`)
-  const agentId = url.searchParams.get('agentId')
-  const token = url.searchParams.get('token')
-
-  if (!agentId || !token) {
-    ws.close(4001, 'Missing agentId or token')
-    return
-  }
-
-  const { valid, agentId: tokenAgentId } = validateToken(token, authSecret)
-  if (!valid || tokenAgentId !== agentId) {
-    ws.close(4001, 'Invalid or expired token')
-    return
-  }
-
-  let agent: VoiceAgentRecord | null
-  try {
-    agent = await getVoiceAgentById(agentId)
-  } catch (error) {
-    console.error(`[VoiceRelay] Failed to look up agent ${agentId}:`, error instanceof Error ? error.message : error)
-    ws.close(4005, 'Lookup failed')
-    return
-  }
-
-  if (!agent) {
-    ws.close(4004, 'Agent not found')
-    return
-  }
-
-  const session = new VoiceSession(ws, {
-    agentId,
-    clientId: agent.clientId,
-    voice: agent.voice,
-    instructions: `You are ${agent.name}, a helpful voice assistant. Start the call by greeting the caller with: "${agent.greetingMessage}"`,
-    firstMessage: agent.greetingMessage,
-  })
-
-  const connectionId = randomUUID()
-  activeSessions.set(connectionId, session)
-
-  ws.on('close', () => {
-    session.cleanup()
-    activeSessions.delete(connectionId)
-  })
-
-  ws.on('error', (err) => {
-    console.error(`[VoiceRelay] Browser socket error for agent ${agentId}:`, err.message)
-    session.cleanup()
-    activeSessions.delete(connectionId)
-  })
+wss.on('connection', (ws: WebSocket, req) => {
+  void handleConnection(ws, req, context)
 })
 
 process.on('uncaughtException', (err) => {
@@ -132,4 +66,7 @@ process.on('unhandledRejection', (reason) => {
 
 server.listen(PORT, () => {
   console.log(`VyostraAI Voice Relay listening on port ${PORT}`)
+  console.log(
+    `  telephony: ${telephonyEnabled ? `enabled (max ${config.maxConcurrentCalls} concurrent)` : 'disabled'}`
+  )
 })

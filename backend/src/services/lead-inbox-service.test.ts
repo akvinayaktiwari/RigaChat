@@ -15,6 +15,10 @@ const getMetaLeadsByClientId = vi.fn()
 const getMetaLeadById = vi.fn()
 vi.mock('../repositories/meta-lead-repository.js', () => ({ getMetaLeadsByClientId, getMetaLeadById }))
 
+const getVoiceLeadsByClientId = vi.fn()
+const getVoiceLeadById = vi.fn()
+vi.mock('../repositories/voice-lead-repository.js', () => ({ getVoiceLeadsByClientId, getVoiceLeadById }))
+
 const getFormsByClientId = vi.fn()
 const getPublicFormConfig = vi.fn()
 vi.mock('../repositories/form-repository.js', () => ({ getFormsByClientId, getPublicFormConfig }))
@@ -97,6 +101,8 @@ beforeEach(() => {
   getLeadsByClientId.mockResolvedValue([])
   getFormLeadsByClientId.mockResolvedValue([])
   getMetaLeadsByClientId.mockResolvedValue([])
+  getVoiceLeadsByClientId.mockResolvedValue([])
+  getVoiceLeadById.mockResolvedValue(null)
   getLeadStatesForClient.mockResolvedValue([])
   getFormsByClientId.mockResolvedValue([])
   getLeadState.mockResolvedValue(null)
@@ -274,6 +280,73 @@ describe('getUnifiedInbox', () => {
     const inbox = (await getUnifiedInbox(CLIENT)).leads
 
     expect(inbox.map((lead) => lead.leadId)).toEqual(['overdue', 'closed'])
+  })
+})
+
+describe('a lead source that fails', () => {
+  // One table having a bad day used to take the entire inbox with it: the
+  // sources shared a Promise.all, so a single rejection meant a client saw no
+  // leads at all rather than three quarters of them.
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  it('still returns the sources that worked', async () => {
+    getLeadsByClientId.mockResolvedValue([chatLead('c1', '2026-08-01T00:00:00.000Z')])
+    getVoiceLeadsByClientId.mockRejectedValue(new Error('ResourceNotFoundException'))
+
+    const page = await getUnifiedInbox(CLIENT)
+
+    expect(page.leads.map((lead) => lead.leadId)).toEqual(['c1'])
+    expect(page.total).toBe(1)
+  })
+
+  it('names the source that failed, so a partial inbox cannot pass for a full one', async () => {
+    // The whole reason this degrades rather than throwing is that losing one
+    // channel beats losing four. That trade is only safe if the gap is
+    // reported -- nobody can notice the leads they were never shown.
+    getVoiceLeadsByClientId.mockRejectedValue(new Error('ResourceNotFoundException'))
+
+    const page = await getUnifiedInbox(CLIENT)
+
+    expect(page.degradedSources).toEqual(['voice'])
+  })
+
+  it('reports every failed source, not just the first', async () => {
+    getMetaLeadsByClientId.mockRejectedValue(new Error('throttled'))
+    getVoiceLeadsByClientId.mockRejectedValue(new Error('ResourceNotFoundException'))
+
+    const page = await getUnifiedInbox(CLIENT)
+
+    expect(page.degradedSources?.sort()).toEqual(['meta', 'voice'])
+  })
+
+  it('omits the field entirely on a healthy read', async () => {
+    // Present-means-broken: an always-present [] invites a UI that renders a
+    // warning banner it has to remember to hide.
+    getLeadsByClientId.mockResolvedValue([chatLead('c1', '2026-08-01T00:00:00.000Z')])
+
+    const page = await getUnifiedInbox(CLIENT)
+
+    expect(page.degradedSources).toBeUndefined()
+    expect('degradedSources' in page).toBe(false)
+  })
+
+  it('still fails loudly when lead states cannot be read', async () => {
+    // Not a source. Without states every row loses its status, owner and
+    // archived flag -- including archived leads reappearing in the queue. An
+    // inbox that looks right and is quietly wrong is worse than an error.
+    getLeadStatesForClient.mockRejectedValue(new Error('DynamoDB unavailable'))
+
+    await expect(getUnifiedInbox(CLIENT)).rejects.toThrow('DynamoDB unavailable')
+  })
+
+  it('still fails loudly when the form definitions cannot be read', async () => {
+    // Same reason: form leads are keyed by fieldId, so without these every one
+    // renders as "Unnamed lead / No contact".
+    getFormsByClientId.mockRejectedValue(new Error('DynamoDB unavailable'))
+
+    await expect(getUnifiedInbox(CLIENT)).rejects.toThrow('DynamoDB unavailable')
   })
 })
 

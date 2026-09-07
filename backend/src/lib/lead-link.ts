@@ -26,7 +26,7 @@ const DELIMITER = '|'
 // The second field of a ref is a different key per source, and which one it is
 // carries meaning: a Meta lead's pageId is NOT a botId (see the LeadRef comment
 // in types/index.ts). Naming it 'scope' here keeps the packed form source-
-// agnostic without pretending the three are the same thing.
+// agnostic without pretending the four are the same thing.
 export function leadRefScopeId(ref: LeadRef): string {
   switch (ref.source) {
     case 'chat':
@@ -35,6 +35,8 @@ export function leadRefScopeId(ref: LeadRef): string {
       return ref.formId
     case 'meta':
       return ref.pageId
+    case 'voice':
+      return ref.agentId
   }
 }
 
@@ -63,6 +65,13 @@ export function unpackLeadRef(token: string): LeadRef | null {
   if (source === 'chat') return { source, botId: scopeId, leadId }
   if (source === 'form') return { source, formId: scopeId, leadId }
   if (source === 'meta') return { source, pageId: scopeId, leadId }
+  // Voice was packable before it was unpackable: leadRefScopeId gained its
+  // voice case, so packLeadRef happily produced `voice|<agentId>|<leadId>`,
+  // and this function had no branch to read it back. The round trip broke at
+  // the worst possible moment -- a caller asks for a human, the handoff alert
+  // goes out with a link button, and the staff member who taps it lands on
+  // nothing. Every source packLeadRef can write must appear here.
+  if (source === 'voice') return { source, agentId: scopeId, leadId }
 
   return null
 }
