@@ -65,6 +65,13 @@ export function unpackLeadRef(token: string): LeadRef | null {
   if (source === 'chat') return { source, botId: scopeId, leadId }
   if (source === 'form') return { source, formId: scopeId, leadId }
   if (source === 'meta') return { source, pageId: scopeId, leadId }
+  // Voice was packable before it was unpackable: leadRefScopeId gained its
+  // voice case, so packLeadRef happily produced `voice|<agentId>|<leadId>`,
+  // and this function had no branch to read it back. The round trip broke at
+  // the worst possible moment -- a caller asks for a human, the handoff alert
+  // goes out with a link button, and the staff member who taps it lands on
+  // nothing. Every source packLeadRef can write must appear here.
+  if (source === 'voice') return { source, agentId: scopeId, leadId }
 
   return null
 }
