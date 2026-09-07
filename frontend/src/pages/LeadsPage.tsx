@@ -382,7 +382,7 @@ export default function LeadsPage() {
       </div>
 
       {degradedSources.length > 0 && !loading && !loadError && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 flex items-start gap-3">
+        <div role="alert" className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 flex items-start gap-3">
           <TriangleAlert size={18} className="text-amber-600 shrink-0 mt-0.5" />
           <div>
             <p className="font-semibold text-sm text-amber-900">

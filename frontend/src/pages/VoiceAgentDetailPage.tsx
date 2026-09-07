@@ -647,23 +647,39 @@ export default function VoiceAgentDetailPage() {
               <div className="h-10 bg-gray-100 rounded-xl animate-pulse" />
             ) : phoneAssignment ? (
               <>
-                <div className="flex items-center justify-between gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+                <div
+                  className={`flex items-center justify-between gap-3 border rounded-xl px-4 py-3 ${
+                    agent.isEnabled
+                      ? 'bg-emerald-50 border-emerald-200'
+                      : 'bg-gray-50 border-gray-200'
+                  }`}
+                >
                   <div>
                     <p className="font-semibold text-gray-900 tabular-nums">
                       {formatPhoneNumber(phoneAssignment.phoneNumber)}
                     </p>
-                    <p className="text-xs text-emerald-700">
-                      Answering since {formatCreatedDate(phoneAssignment.assignedAt)}
+                    <p className={`text-xs ${agent.isEnabled ? 'text-emerald-700' : 'text-gray-500'}`}>
+                      {agent.isEnabled ? 'Answering since' : 'Assigned'}{' '}
+                      {formatCreatedDate(phoneAssignment.assignedAt)}
                     </p>
                   </div>
-                  <span className="inline-flex items-center gap-1 border text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 border-emerald-200 shrink-0">
-                    <Check size={12} />
-                    Live
-                  </span>
+                  {agent.isEnabled ? (
+                    <span className="inline-flex items-center gap-1 border text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 border-emerald-200 shrink-0">
+                      <Check size={12} />
+                      Live
+                    </span>
+                  ) : (
+                    // A green "Live" above a warning saying calls go unanswered
+                    // is a card that argues with itself, and the badge is what
+                    // gets read first.
+                    <span className="border text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-50 text-gray-600 border-gray-200 shrink-0">
+                      Not answering
+                    </span>
+                  )}
                 </div>
 
                 {!agent.isEnabled && (
-                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mt-3">
+                  <p role="alert" className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mt-3">
                     This agent is disabled, so calls to this number are not answered. Enable it in
                     Settings.
                   </p>
