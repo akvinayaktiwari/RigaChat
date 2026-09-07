@@ -55,7 +55,7 @@ import {
   type RelayContext,
   type TelephonyConfig,
 } from './relay.js'
-import { generateToken } from './auth.js'
+import { generateToken, validateToken } from './auth.js'
 import { getVoiceAgentById } from '../repositories/voice-repository.js'
 import { getAgentForPhoneNumber } from '../repositories/voice-phone-lookup-repository.js'
 import { transferCall } from '../providers/plivo-call-provider.js'
@@ -317,8 +317,8 @@ describe('the HTTP endpoints', () => {
   })
 
   describe('the transfer XML endpoint', () => {
-    it('returns dial XML for a valid token', async () => {
-      const token = generateToken('agent-1', AUTH_SECRET)
+    it('returns dial XML for a token scoped to that number', async () => {
+      const token = generateToken('agent-1', AUTH_SECRET, '+919000000000')
       const response = await fetch(
         `${origin}/plivo/transfer?token=${encodeURIComponent(token)}&to=${encodeURIComponent('+919000000000')}`
       )
@@ -326,6 +326,31 @@ describe('the HTTP endpoints', () => {
       expect(response.status).toBe(200)
       const xml = await response.text()
       expect(xml).toContain('+919000000000')
+    })
+
+    it('refuses a token that is valid but not scoped to any number', async () => {
+      // GET /api/voice-agents/token is public and mints exactly this shape for
+      // any agent id -- and agent ids are pasted into the embed snippet on
+      // client websites, so they are not secret. Binding only the agent would
+      // make "somebody asked for a token" the whole check in front of an
+      // endpoint whose answer is "dial this number".
+      const widgetToken = generateToken('agent-1', AUTH_SECRET)
+      const response = await fetch(
+        `${origin}/plivo/transfer?token=${encodeURIComponent(widgetToken)}&to=${encodeURIComponent('+919000000000')}`
+      )
+
+      expect(response.status).toBe(403)
+      expect(await response.text()).not.toContain('+919000000000')
+    })
+
+    it('refuses a token minted for a different number', async () => {
+      const token = generateToken('agent-1', AUTH_SECRET, '+919000000000')
+      const response = await fetch(
+        `${origin}/plivo/transfer?token=${encodeURIComponent(token)}&to=${encodeURIComponent('+919111111111')}`
+      )
+
+      expect(response.status).toBe(403)
+      expect(await response.text()).not.toContain('+919111111111')
     })
 
     it('refuses an unsigned request, which would make this an open relay', async () => {
@@ -614,7 +639,11 @@ describe('buildTransferCapability', () => {
     const transferUrl = new URL(call.transferUrl)
     expect(transferUrl.host).toBe(PUBLIC_HOST)
     expect(transferUrl.searchParams.get('to')).toBe('+919000000000')
-    expect(transferUrl.searchParams.get('token')).toBeTruthy()
+    // Scoped to the handoff number, so it cannot authorise a dial anywhere else.
+    const mintedToken = transferUrl.searchParams.get('token')!
+    expect(validateToken(mintedToken, AUTH_SECRET, '+919000000000').valid).toBe(true)
+    expect(validateToken(mintedToken, AUTH_SECRET).valid).toBe(false)
+    expect(validateToken(mintedToken, AUTH_SECRET, '+919111111111').valid).toBe(false)
   })
 
   it('reports a transfer that Plivo refused rather than claiming success', async () => {

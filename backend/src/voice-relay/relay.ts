@@ -237,10 +237,12 @@ export function handleTransferXml(
   const token = url.searchParams.get('token') ?? ''
   const toNumber = url.searchParams.get('to') ?? ''
 
-  // Signed with the same short-lived HMAC the stream uses. Without this the
-  // endpoint is an open relay: anyone could make our number dial any number
-  // they like, at our expense.
-  const { valid } = validateToken(token, config.authSecret)
+  // The token is scoped to the destination it was minted for, so this rejects a
+  // valid-but-unscoped token (the public /api/voice-agents/token endpoint mints
+  // those for any agent, and agent ids are public) and a token minted for a
+  // different number. Without the scope this check proves only "somebody asked
+  // for a token", which is not the same as "this dial was authorised".
+  const { valid } = validateToken(token, config.authSecret, toNumber)
   if (!valid || !toNumber) {
     console.warn('[VoiceRelay] Rejected transfer XML request with an invalid token or target')
     sendXml(res, buildRejectXml('Sorry, we are unable to connect your call.'), 403)
@@ -360,7 +362,10 @@ export function buildTransferCapability(
       // Freshly minted per transfer, and short-lived like every other token
       // here: the URL is handed to Plivo, and a long-lived one would be a
       // standing instruction to dial a number at our expense.
-      const token = generateToken(agent.agentId, config.authSecret)
+      // Scoped to the destination: a token minted here authorises a dial to
+      // THIS number and nothing else, so the endpoint below cannot be talked
+      // into dialling somewhere else with a token obtained elsewhere.
+      const token = generateToken(agent.agentId, config.authSecret, handoffNumber)
       const transferUrl =
         `https://${config.publicHost}/plivo/transfer?token=${encodeURIComponent(token)}` +
         `&to=${encodeURIComponent(handoffNumber)}`
