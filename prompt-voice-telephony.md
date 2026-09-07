@@ -37,6 +37,17 @@ NOT DONE
 
 ## The order to do it in
 
+### 0. Call-recording consent — settle this BEFORE the first call
+
+A call records both halves into `lead_events` and there is no disclosure line anywhere in
+the code. The design doc lists one as a constraint; the cost-and-pricing doc says get
+counsel to confirm what TRAI actually requires rather than assuming. Neither happened.
+
+Nothing is recording today — telephony is off — so this is not urgent in the way a live
+bug is. It is urgent in the way a legal gap is: the cost of finding out late is a
+complaint, not a stack trace. See the P0 GATE item in `TODOS.md`. Start it with the Plivo
+call; both are calendar time.
+
 ### 1. Plivo account, KYC, DID
 
 The long pole. Nothing else compresses it. Ask on the sales call:
