@@ -93,5 +93,26 @@ describe('leadRefScopeId', () => {
     expect(leadRefScopeId({ source: 'chat', botId: 'bot-1', leadId: 'l' })).toBe('bot-1')
     expect(leadRefScopeId({ source: 'form', formId: 'form-9', leadId: 'l' })).toBe('form-9')
     expect(leadRefScopeId({ source: 'meta', pageId: '102938', leadId: 'l' })).toBe('102938')
+    expect(leadRefScopeId({ source: 'voice', agentId: 'agent-1', leadId: 'l' })).toBe('agent-1')
+  })
+
+  // This helper is the one definition of "which id scopes this lead", and its
+  // switch is exhaustive over the union so a new source fails the build rather
+  // than taking a fallback. inbound-lead-match-service used to inline the same
+  // mapping as a ternary that fell through to clientId, which is how form and
+  // meta candidates would have been scoped to the wrong thing in lead_events.
+  it('covers every source the union declares', () => {
+    const sources: LeadRef['source'][] = ['chat', 'form', 'meta', 'voice']
+    const refs: LeadRef[] = [
+      { source: 'chat', botId: 'bot-1', leadId: 'l' },
+      { source: 'form', formId: 'form-9', leadId: 'l' },
+      { source: 'meta', pageId: '102938', leadId: 'l' },
+      { source: 'voice', agentId: 'agent-1', leadId: 'l' },
+    ]
+
+    expect(refs.map((r) => r.source)).toEqual(sources)
+    for (const ref of refs) {
+      expect(leadRefScopeId(ref), `${ref.source} scope id`).toBeTruthy()
+    }
   })
 })
