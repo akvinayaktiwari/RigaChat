@@ -1,6 +1,7 @@
 import { deleteLead } from '../repositories/lead-repository.js'
 import { deleteFormLead } from '../repositories/form-lead-repository.js'
 import { deleteMetaLead } from '../repositories/meta-lead-repository.js'
+import { deleteVoiceLead } from '../repositories/voice-lead-repository.js'
 import { deleteLeadState } from '../repositories/lead-state-repository.js'
 import { deleteAllEventsForLead } from '../repositories/lead-event-repository.js'
 import { deleteExecutionCountersForLead } from '../repositories/journey-execution-repository.js'
@@ -91,6 +92,24 @@ export async function eraseLead(leadRef: LeadRef, clientId: string): Promise<Lea
     case 'meta':
       await deleteMetaLead(clientId, leadRef.leadId)
       break
+    case 'voice':
+      // Missing until 2026-09-08, and the failure was silent AND inverted: a
+      // voice lead's events, state, pending replies and counters were all
+      // destroyed, the row itself survived, and the report said the erasure
+      // succeeded. That leaves exactly what step 4's comment above exists to
+      // prevent -- an addressable row whose leftovers are already gone -- and
+      // it does it while telling the caller their data is deleted.
+      await deleteVoiceLead(clientId, leadRef.leadId)
+      break
+    default: {
+      // The two sibling mappings (leadRefScopeId, leadParentIdOf) are switches
+      // that RETURN, so a missing case is already a compile error there. This
+      // one returns void with breaks, which is why a whole lead source went
+      // unhandled without the build noticing. The never assignment restores
+      // that protection: a fifth source fails to compile here.
+      const unhandled: never = leadRef
+      throw new Error(`Cannot erase an unhandled lead source: ${JSON.stringify(unhandled)}`)
+    }
   }
 
   return { leadId: leadRef.leadId, source: leadRef.source, eventsDeleted, executionsStopped }
