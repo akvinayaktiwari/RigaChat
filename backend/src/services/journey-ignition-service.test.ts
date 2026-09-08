@@ -99,6 +99,18 @@ describe('igniteJourneysForLead — the happy path that did not exist before', (
 
     await igniteJourneysForLead({ leadRef: { source: 'form', formId: 'form-3', leadId: 'l' }, clientId: 'client-1' })
     expect(startExecution.mock.calls[0]?.[2]).toMatchObject({ leadSource: 'form', leadParentId: 'form-3' })
+
+    vi.clearAllMocks()
+    resolveLeadAgentContext.mockResolvedValue(resolvedContext)
+    getJourneyTriggerClaim.mockResolvedValue({ bundleId: 'bundle-1', botId: 'bot-1' })
+    getJourneyBundleById.mockResolvedValue(publishedBundle)
+    startExecution.mockResolvedValue({ started: true, executionArn: 'arn:exec:1' })
+
+    // A voice lead's parent is the agent that answered. It has no botId at all,
+    // so a mapping that fell back to the client would scope every phone lead's
+    // journey to the wrong thing.
+    await igniteJourneysForLead({ leadRef: { source: 'voice', agentId: 'agent-9', leadId: 'l' }, clientId: 'client-1' })
+    expect(startExecution.mock.calls[0]?.[2]).toMatchObject({ leadSource: 'voice', leadParentId: 'agent-9' })
   })
 
   it('uses a deterministic execution name so a retry cannot double-message a lead', async () => {

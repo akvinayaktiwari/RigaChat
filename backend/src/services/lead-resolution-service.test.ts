@@ -13,13 +13,16 @@ vi.mock('../repositories/form-repository.js', () => ({ getPublicFormConfig }))
 const getMetaLeadById = vi.fn()
 vi.mock('../repositories/meta-lead-repository.js', () => ({ getMetaLeadById }))
 
+const getVoiceLeadById = vi.fn()
+vi.mock('../repositories/voice-lead-repository.js', () => ({ getVoiceLeadById }))
+
 const getAgentForResource = vi.fn()
 vi.mock('../repositories/agent-binding-lookup-repository.js', () => ({ getAgentForResource }))
 
 const getAgents = vi.fn()
 vi.mock('./agent-service.js', () => ({ getAgents }))
 
-const { readJourneyLead, resolveLeadAgentContext, toLeadRef } = await import(
+const { normalizeVoiceLead, readJourneyLead, resolveLeadAgentContext, toLeadRef } = await import(
   './lead-resolution-service.js'
 )
 
@@ -37,7 +40,7 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-describe('readJourneyLead — one shape across three tables', () => {
+describe('readJourneyLead — one shape across four tables', () => {
   it('reads a chat lead by its botId', async () => {
     getLeadById.mockResolvedValue({
       leadId: 'lead-1',
@@ -57,6 +60,35 @@ describe('readJourneyLead — one shape across three tables', () => {
       phone: '+919876543210',
     })
     expect(getLeadById).toHaveBeenCalledWith('bot-1', 'lead-1')
+  })
+
+  // A phone call is the fourth table. It reads by clientId like meta_leads --
+  // voice_leads is partitioned the same way and agentId is a discriminator on
+  // the ref, never an address.
+  it('reads a voice lead by clientId, not by its agentId', async () => {
+    getVoiceLeadById.mockResolvedValue({
+      leadId: 'lead-4',
+      agentId: 'agent-1',
+      clientId: 'client-1',
+      source: 'voice',
+      phone: '+919876543210',
+      dialledNumber: '+912240000000',
+      callId: 'call-1',
+      createdAt: '2026-09-01T00:00:00.000Z',
+    })
+
+    await expect(
+      readJourneyLead({ source: 'voice', agentId: 'agent-1', leadId: 'lead-4' }, 'client-1')
+    ).resolves.toMatchObject({ leadId: 'lead-4', source: 'voice', phone: '+919876543210' })
+    expect(getVoiceLeadById).toHaveBeenCalledWith('client-1', 'lead-4')
+  })
+
+  it('returns null for a voice lead that is not there', async () => {
+    getVoiceLeadById.mockResolvedValue(null)
+
+    await expect(
+      readJourneyLead({ source: 'voice', agentId: 'agent-1', leadId: 'gone' }, 'client-1')
+    ).resolves.toBeNull()
   })
 
   // The case that was structurally broken before this service existed: a Meta
@@ -234,5 +266,49 @@ describe('toLeadRef', () => {
       botId: 'b1',
       leadId: 'l1',
     })
+  })
+})
+
+describe('normalizeVoiceLead', () => {
+  const call = {
+    leadId: 'lead-4',
+    agentId: 'agent-1',
+    clientId: 'client-1',
+    source: 'voice' as const,
+    phone: '+919876543210',
+    dialledNumber: '+912240000000',
+    callId: 'call-1',
+    createdAt: '2026-09-01T00:00:00.000Z',
+  }
+
+  it('carries the DID as sourceUrl, so two numbers stay distinguishable', () => {
+    // A client running a listing ad on one number and a hoarding on another
+    // needs to know which produced the lead, and the call has no URL to put
+    // here instead.
+    expect(normalizeVoiceLead(call)).toMatchObject({
+      leadId: 'lead-4',
+      clientId: 'client-1',
+      source: 'voice',
+      phone: '+919876543210',
+      sourceUrl: '+912240000000',
+    })
+  })
+
+  it('leaves everything caller ID cannot tell you undefined', () => {
+    // A phone call gives you a number and nothing else. Inventing an empty
+    // string here would make "no name" and "name is blank" the same value to
+    // every downstream reader.
+    const normalized = normalizeVoiceLead(call)
+
+    expect(normalized.name).toBeUndefined()
+    expect(normalized.email).toBeUndefined()
+    expect(normalized.propertyInterest).toBeUndefined()
+    expect(normalized.budgetRange).toBeUndefined()
+  })
+
+  it('passes through what the transcript later filled in', () => {
+    expect(
+      normalizeVoiceLead({ ...call, name: 'Asha', email: 'a@example.com', budgetRange: '80L-1Cr' })
+    ).toMatchObject({ name: 'Asha', email: 'a@example.com', budgetRange: '80L-1Cr' })
   })
 })
