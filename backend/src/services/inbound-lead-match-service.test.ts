@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Lead } from '../types/index.js'
 
-const getLeadsForClient = vi.fn()
+const getLeadsByClientId = vi.fn()
 const getPendingReply = vi.fn()
 
 const getVoiceLeadsByClientId = vi.fn()
 const readJourneyLead = vi.fn()
 
-vi.mock('./lead-service.js', () => ({ getLeadsForClient }))
+// lead-identity-service reads the repository directly rather than through
+// lead-service, so the relay bundle does not drag in the services layer.
+vi.mock('../repositories/lead-repository.js', () => ({ getLeadsByClientId }))
 vi.mock('../repositories/journey-pending-reply-repository.js', () => ({ getPendingReply }))
 vi.mock('../repositories/voice-lead-repository.js', () => ({ getVoiceLeadsByClientId }))
 vi.mock('./lead-resolution-service.js', () => ({ readJourneyLead }))
@@ -29,7 +31,7 @@ function lead(leadId: string, createdAt: string, phone: string, botId = 'bot-1')
 }
 
 beforeEach(() => {
-  getLeadsForClient.mockReset().mockResolvedValue([])
+  getLeadsByClientId.mockReset().mockResolvedValue([])
   getVoiceLeadsByClientId.mockReset().mockResolvedValue([])
   getPendingReply.mockReset().mockResolvedValue(null)
   // The chosen candidate's record is read back through the source-agnostic
@@ -43,13 +45,13 @@ beforeEach(() => {
 
 describe('matchLeadForInboundMessage', () => {
   it('returns null when no lead has that phone', async () => {
-    getLeadsForClient.mockResolvedValue([lead('a', '2026-01-01T00:00:00Z', '911111111111')])
+    getLeadsByClientId.mockResolvedValue([lead('a', '2026-01-01T00:00:00Z', '911111111111')])
 
     expect(await matchLeadForInboundMessage('client-1', '919000000001')).toBeNull()
   })
 
   it('matches across phone formats, since one person is one person', async () => {
-    getLeadsForClient.mockResolvedValue([lead('a', '2026-01-01T00:00:00Z', '9000000001')])
+    getLeadsByClientId.mockResolvedValue([lead('a', '2026-01-01T00:00:00Z', '9000000001')])
 
     const match = await matchLeadForInboundMessage('client-1', '919000000001')
 
@@ -61,7 +63,7 @@ describe('matchLeadForInboundMessage', () => {
   // and `.find()` took a July lead on an unrelated bot, so the journey parked
   // on that morning's lead never resumed.
   it('prefers the most recent lead when several share the phone', async () => {
-    getLeadsForClient.mockResolvedValue([
+    getLeadsByClientId.mockResolvedValue([
       lead('july', '2026-07-07T14:17:59Z', '9000000001', 'bot-old'),
       lead('august', '2026-08-16T12:09:43Z', '919000000001', 'bot-new'),
       lead('older', '2026-07-11T17:55:52Z', '9000000001', 'bot-older'),
@@ -77,7 +79,7 @@ describe('matchLeadForInboundMessage', () => {
   // A parked execution is literally waiting for this message, so it outranks
   // recency -- otherwise a newer stray lead would strand a live conversation.
   it('prefers a lead with a parked journey over a newer one without', async () => {
-    getLeadsForClient.mockResolvedValue([
+    getLeadsByClientId.mockResolvedValue([
       lead('parked', '2026-07-07T14:17:59Z', '9000000001'),
       lead('newer', '2026-08-16T12:09:43Z', '9000000001'),
     ])
@@ -92,7 +94,7 @@ describe('matchLeadForInboundMessage', () => {
   })
 
   it('does not probe pending replies when there is only one candidate', async () => {
-    getLeadsForClient.mockResolvedValue([lead('only', '2026-08-16T12:09:43Z', '9000000001')])
+    getLeadsByClientId.mockResolvedValue([lead('only', '2026-08-16T12:09:43Z', '9000000001')])
 
     await matchLeadForInboundMessage('client-1', '9000000001')
 
@@ -102,7 +104,7 @@ describe('matchLeadForInboundMessage', () => {
   // Bounded reads: a client with a long history on one number must not turn
   // every inbound message into an unbounded fan-out of point reads.
   it('caps how many candidates get a pending-reply lookup', async () => {
-    getLeadsForClient.mockResolvedValue(
+    getLeadsByClientId.mockResolvedValue(
       Array.from({ length: 25 }, (_, i) =>
         lead(`l${i}`, `2026-08-${String(i + 1).padStart(2, '0')}T00:00:00Z`, '9000000001')
       )
@@ -145,7 +147,7 @@ describe('matchLeadForInboundMessage', () => {
   // Returning it would have the caller act on a ghost lead; returning null has
   // them create a fresh one, which is recoverable.
   it('returns null when the matched record cannot be read back', async () => {
-    getLeadsForClient.mockResolvedValue([lead('a', '2026-01-01T00:00:00Z', '9000000001')])
+    getLeadsByClientId.mockResolvedValue([lead('a', '2026-01-01T00:00:00Z', '9000000001')])
     readJourneyLead.mockResolvedValue(null)
 
     await expect(matchLeadForInboundMessage('client-1', '9000000001')).resolves.toBeNull()
