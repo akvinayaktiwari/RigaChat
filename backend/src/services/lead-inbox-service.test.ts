@@ -46,6 +46,19 @@ const {
 const NOW = '2026-08-07T12:00:00.000Z'
 const CLIENT = 'client-1'
 
+function voiceLead(leadId: string, createdAt: string) {
+  return {
+    leadId,
+    agentId: 'agent-1',
+    clientId: CLIENT,
+    source: 'voice' as const,
+    phone: '+919876543210',
+    dialledNumber: '+912240000000',
+    callId: `call-${leadId}`,
+    createdAt,
+  }
+}
+
 function chatLead(leadId: string, createdAt: string): Lead {
   return {
     leadId,
@@ -283,6 +296,32 @@ describe('getUnifiedInbox', () => {
   })
 })
 
+describe('a voice lead in the merged inbox', () => {
+  it('appears alongside the other sources with its own ref', async () => {
+    getLeadsByClientId.mockResolvedValue([chatLead('c1', '2026-08-01T00:00:00.000Z')])
+    getVoiceLeadsByClientId.mockResolvedValue([voiceLead('v1', '2026-08-02T00:00:00.000Z')])
+
+    const page = await getUnifiedInbox(CLIENT)
+
+    expect(page.leads.map((lead) => lead.leadId).sort()).toEqual(['c1', 'v1'])
+    expect(page.leads.find((lead) => lead.leadId === 'v1')?.leadRef).toEqual({
+      source: 'voice',
+      agentId: 'agent-1',
+      leadId: 'v1',
+    })
+  })
+
+  it('is archivable like any other source', async () => {
+    getVoiceLeadsByClientId.mockResolvedValue([voiceLead('v1', '2026-08-02T00:00:00.000Z')])
+    getLeadStatesForClient.mockResolvedValue([
+      { leadId: 'v1', clientId: CLIENT, archivedAt: '2026-08-03T00:00:00.000Z', updatedAt: '2026-08-03T00:00:00.000Z' },
+    ])
+
+    expect((await getUnifiedInbox(CLIENT)).leads).toHaveLength(0)
+    expect((await getUnifiedInbox(CLIENT, { includeArchived: true })).leads).toHaveLength(1)
+  })
+})
+
 describe('a lead source that fails', () => {
   // One table having a bad day used to take the entire inbox with it: the
   // sources shared a Promise.all, so a single rejection meant a client saw no
@@ -432,6 +471,34 @@ describe('getUnifiedLeadDetail', () => {
     expect(detail.chatTranscript).toBe('User: hi\nBot: hello')
     expect(detail.leadRef).toEqual({ source: 'chat', botId: 'bot-1', leadId: 'c1' })
     expect(detail.createdAt).toBe('2026-08-01T00:00:00.000Z')
+  })
+
+  it('reads a voice lead, and carries no transcript on the row', async () => {
+    // A call's transcript lives in lead_events, not on the lead, because it is
+    // shared with every other channel the caller used. A chatTranscript field
+    // here would be a second, diverging copy.
+    getVoiceLeadById.mockResolvedValue(voiceLead('v1', '2026-08-03T00:00:00.000Z'))
+
+    const detail = await getUnifiedLeadDetail(
+      { source: 'voice', agentId: 'agent-1', leadId: 'v1' },
+      CLIENT
+    )
+
+    expect(detail.leadRef).toEqual({ source: 'voice', agentId: 'agent-1', leadId: 'v1' })
+    expect(detail.phone).toBe('+919876543210')
+    expect(detail.createdAt).toBe('2026-08-03T00:00:00.000Z')
+    expect(detail.chatTranscript).toBeUndefined()
+    expect(getVoiceLeadById).toHaveBeenCalledWith(CLIENT, 'v1')
+  })
+
+  it('refuses a voice lead owned by another client', async () => {
+    // Same 404 either way, missing or not yours -- telling them apart tells a
+    // stranger the lead exists.
+    getVoiceLeadById.mockResolvedValue({ ...voiceLead('v1', '2026-08-03T00:00:00.000Z'), clientId: 'someone-else' })
+
+    await expect(
+      getUnifiedLeadDetail({ source: 'voice', agentId: 'agent-1', leadId: 'v1' }, CLIENT)
+    ).rejects.toThrow('Lead not found')
   })
 
   it('relabels a form lead’s answers from fieldId to the human label', async () => {

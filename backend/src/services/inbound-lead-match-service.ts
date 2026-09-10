@@ -1,4 +1,5 @@
 import { findLeadByPhone } from './lead-identity-service.js'
+import { leadRefScopeId } from '../lib/lead-link.js'
 import { readJourneyLead } from './lead-resolution-service.js'
 import type { JourneyLead, LeadRef } from '../types/index.js'
 
@@ -66,7 +67,17 @@ export async function matchLeadForInboundMessage(
 
   return {
     leadId: identity.leadId,
-    botId: identity.leadRef.source === 'chat' ? identity.leadRef.botId : identity.leadRef.source === 'voice' ? identity.leadRef.agentId : clientId,
+    // leadRefScopeId rather than an inline ternary. The ternary this replaces
+    // handled chat and voice and fell through to clientId for everything else,
+    // so a form or meta candidate would have been scoped to the client instead
+    // of its form or Page -- silently, in lead_events, where nothing would
+    // notice. Unreachable today because the identity join only produces chat
+    // and voice candidates, and precisely the kind of latent wrong answer that
+    // surfaces the day someone widens it.
+    //
+    // The shared helper is a switch over the discriminated union, so a fifth
+    // lead source fails the build instead of quietly taking a fallback.
+    botId: leadRefScopeId(identity.leadRef),
     leadRef: identity.leadRef,
     journeyLead,
     candidateCount: identity.candidateCount,

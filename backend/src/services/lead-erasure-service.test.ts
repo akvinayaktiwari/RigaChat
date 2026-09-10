@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const deleteLead = vi.fn()
 const deleteFormLead = vi.fn()
 const deleteMetaLead = vi.fn()
+const deleteVoiceLead = vi.fn()
 const deleteLeadState = vi.fn()
 const deleteAllEventsForLead = vi.fn()
 const deleteExecutionCountersForLead = vi.fn()
@@ -15,6 +16,7 @@ const readJourneyLead = vi.fn()
 vi.mock('../repositories/lead-repository.js', () => ({ deleteLead }))
 vi.mock('../repositories/form-lead-repository.js', () => ({ deleteFormLead }))
 vi.mock('../repositories/meta-lead-repository.js', () => ({ deleteMetaLead }))
+vi.mock('../repositories/voice-lead-repository.js', () => ({ deleteVoiceLead }))
 vi.mock('../repositories/lead-state-repository.js', () => ({ deleteLeadState }))
 vi.mock('../repositories/lead-event-repository.js', () => ({ deleteAllEventsForLead }))
 vi.mock('../repositories/journey-execution-repository.js', () => ({ deleteExecutionCountersForLead }))
@@ -169,5 +171,65 @@ describe('eraseLead — report', () => {
     const report = await eraseLead(chatRef, 'client-1')
 
     expect(report).toMatchObject({ leadId: 'lead-1', source: 'chat', eventsDeleted: 23 })
+  })
+})
+
+describe('erasing a voice lead', () => {
+  const voiceRef = { source: 'voice', agentId: 'agent-1', leadId: 'lead-1' } as const
+
+  it('deletes the voice_leads row', async () => {
+    // Missing until 2026-09-08. Without it the row survived an erasure that
+    // reported success -- and reported it AFTER destroying the events and
+    // state that were the only way to find the leftover.
+    await eraseLead(voiceRef, 'client-1')
+
+    expect(deleteVoiceLead).toHaveBeenCalledWith('client-1', 'lead-1')
+  })
+
+  it('is addressed by clientId, since voice_leads is partitioned that way', async () => {
+    await eraseLead(voiceRef, 'client-1')
+
+    // Not by agentId -- that is a discriminator on the ref, never an address.
+    expect(deleteVoiceLead).not.toHaveBeenCalledWith('agent-1', 'lead-1')
+  })
+
+  it('clears the side tables too, and reports what it did', async () => {
+    const report = await eraseLead(voiceRef, 'client-1')
+
+    expect(deletePendingReply).toHaveBeenCalledWith('lead-1')
+    expect(deleteInboundActivity).toHaveBeenCalledWith('lead-1')
+    expect(deleteExecutionCountersForLead).toHaveBeenCalledWith('lead-1')
+    expect(deleteAllEventsForLead).toHaveBeenCalledWith('lead-1')
+    expect(deleteLeadState).toHaveBeenCalledWith('lead-1')
+    expect(report).toMatchObject({ leadId: 'lead-1', source: 'voice', eventsDeleted: 7 })
+  })
+
+  it('still refuses a voice lead owned by someone else', async () => {
+    readJourneyLead.mockResolvedValue({ leadId: 'lead-1', clientId: 'someone-else' })
+
+    await expect(eraseLead(voiceRef, 'client-1')).rejects.toBeInstanceOf(LeadNotFoundError)
+    expect(deleteVoiceLead).not.toHaveBeenCalled()
+  })
+
+  // Every source the LeadRef union declares must be handled here. The switch
+  // returns void, so before the never-guard a missing case compiled cleanly and
+  // silently skipped the delete -- which is exactly how voice went unhandled.
+  it('handles every source the union declares', async () => {
+    const refs = [
+      { ref: { source: 'chat', botId: 'bot-1', leadId: 'lead-1' } as const, deleter: deleteLead },
+      { ref: { source: 'form', formId: 'form-1', leadId: 'lead-1' } as const, deleter: deleteFormLead },
+      { ref: { source: 'meta', pageId: 'page-1', leadId: 'lead-1' } as const, deleter: deleteMetaLead },
+      { ref: { source: 'voice', agentId: 'agent-1', leadId: 'lead-1' } as const, deleter: deleteVoiceLead },
+    ]
+
+    for (const { ref, deleter } of refs) {
+      vi.clearAllMocks()
+      readJourneyLead.mockResolvedValue({ leadId: 'lead-1', clientId: 'client-1' })
+      getActiveJourneys.mockResolvedValue([])
+      deleteAllEventsForLead.mockResolvedValue(0)
+
+      await eraseLead(ref, 'client-1')
+      expect(deleter, `${ref.source} lead row deleted`).toHaveBeenCalledTimes(1)
+    }
   })
 })
