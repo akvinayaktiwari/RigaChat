@@ -62,18 +62,61 @@ export async function getLeadById(botId: string, leadId: string): Promise<Lead |
   }
 }
 
+// A hard stop on how many pages this will walk. Not a correctness limit -- a
+// runaway guard, so a pathological client cannot turn one inbound message into
+// an unbounded read. At 1MB per page this is 50MB of leads, far beyond anything
+// the ordering rule below could meaningfully choose between.
+const MAX_CLIENT_LEAD_PAGES = 50
+
+// Follows LastEvaluatedKey, which it did not before.
+//
+// DynamoDB caps a Query response at 1MB and stops, handing back a cursor. This
+// function ignored the cursor and returned the first page as though it were the
+// whole answer -- so past 1MB a client's lead list was a truncated,
+// non-deterministic subset with nothing to say so.
+//
+// That matters most where it is least visible. lead-identity-service asks this
+// "is this phone number someone we know?" on every inbound WhatsApp message and
+// every phone call. A truncated list answers "no" for someone whose lead is
+// sitting in the part that was not read, and the caller becomes a stranger: a
+// second lead, a second history, no error anywhere.
+//
+// Not reachable in production today (the largest lead table is ~20KB), which is
+// why this is worth fixing now rather than after it starts happening.
 export async function getLeadsByClientId(clientId: string): Promise<Lead[]> {
+  const leads: Lead[] = []
+  let cursor: Record<string, unknown> | undefined
+  let pages = 0
+
   try {
-    const result = await dynamoClient.send(
-      new QueryCommand({
-        TableName: TABLE_NAME(),
-        IndexName: 'clientId-index',
-        KeyConditionExpression: 'clientId = :clientId',
-        ExpressionAttributeValues: { ':clientId': clientId },
-        ScanIndexForward: false,
-      })
-    )
-    return (result.Items as Lead[] | undefined) ?? []
+    do {
+      const result = await dynamoClient.send(
+        new QueryCommand({
+          TableName: TABLE_NAME(),
+          IndexName: 'clientId-index',
+          KeyConditionExpression: 'clientId = :clientId',
+          ExpressionAttributeValues: { ':clientId': clientId },
+          ScanIndexForward: false,
+          ExclusiveStartKey: cursor,
+        })
+      )
+
+      leads.push(...((result.Items as Lead[] | undefined) ?? []))
+      cursor = result.LastEvaluatedKey
+      pages += 1
+    } while (cursor && pages < MAX_CLIENT_LEAD_PAGES)
+
+    // If the guard stopped us, the list IS incomplete -- say so. Silent
+    // truncation is the failure this function just stopped having; swapping it
+    // for a quieter one at a higher threshold would miss the point.
+    if (cursor) {
+      console.error(
+        `[lead-repository] client ${clientId} has more than ${MAX_CLIENT_LEAD_PAGES} pages of leads; ` +
+          `returning ${leads.length} and stopping. Any phone-number match over this client is now unreliable.`
+      )
+    }
+
+    return leads
   } catch (error) {
     throw new Error(
       `Failed to get leads for client ${clientId}: ${error instanceof Error ? error.message : String(error)}`
