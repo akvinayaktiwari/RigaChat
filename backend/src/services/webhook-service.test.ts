@@ -5,13 +5,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // keys to load at all; entitlement-service.js and lead-service.js each
 // reach several more DynamoDB-table-backed repositories). Same "mock the
 // boundary this test doesn't exercise" pattern used elsewhere (e.g.
-// scheduler-service.test.ts's whatsapp-service.js mock). getLeadsForClient
+// scheduler-service.test.ts's whatsapp-service.js mock). The chat-lead read
 // IS exercised directly below, just via its mock rather than real
-// lead-service.ts/lead-repository.ts/conversation-repository.ts behavior.
+// lead-repository.ts behavior.
+//
+// It mocks the REPOSITORY, not lead-service: webhook-service never imports
+// lead-service itself, it reaches the chat leads through the identity join,
+// and that join reads lead-repository directly so the voice relay's bundle
+// does not drag in the whole services layer.
 vi.mock('../providers/razorpay-provider.js', () => ({ razorpayProvider: {} }))
 vi.mock('./entitlement-service.js', () => ({ invalidateEntitlementsCache: vi.fn() }))
-const getLeadsForClient = vi.fn()
-vi.mock('./lead-service.js', () => ({ getLeadsForClient }))
+const getLeadsByClientId = vi.fn()
+vi.mock('../repositories/lead-repository.js', () => ({ getLeadsByClientId }))
 
 // The inbound matcher searches every lead source now, and reads the chosen
 // candidate back through the source-agnostic path.
@@ -76,7 +81,7 @@ function incomingMessage(app: string | undefined, source: string) {
 
 describe('logGupshupWebhookEvent (inbound message resolution)', () => {
   beforeEach(() => {
-    getLeadsForClient.mockReset().mockResolvedValue([])
+    getLeadsByClientId.mockReset().mockResolvedValue([])
     getVoiceLeadsByClientId.mockReset().mockResolvedValue([])
     readJourneyLead.mockReset().mockImplementation(async (ref: { leadId: string }) => ({
       leadId: ref.leadId,
@@ -89,7 +94,7 @@ describe('logGupshupWebhookEvent (inbound message resolution)', () => {
 
   it('records the inbound timestamp for the lead whose phone matches, across differing formats', async () => {
     getClientIdForGupshupApp.mockResolvedValueOnce('client-1')
-    getLeadsForClient.mockResolvedValueOnce([
+    getLeadsByClientId.mockResolvedValueOnce([
       { leadId: 'lead-1', phone: '+91 98765 43210' },
       { leadId: 'lead-2', phone: '9999999999' },
     ])
@@ -112,13 +117,13 @@ describe('logGupshupWebhookEvent (inbound message resolution)', () => {
 
     await logGupshupWebhookEvent(incomingMessage('UnknownApp', '919876543210'))
 
-    expect(getLeadsForClient).not.toHaveBeenCalled()
+    expect(getLeadsByClientId).not.toHaveBeenCalled()
     expect(recordInboundMessage).not.toHaveBeenCalled()
   })
 
   it('does not record anything when no lead matches the phone number', async () => {
     getClientIdForGupshupApp.mockResolvedValueOnce('client-1')
-    getLeadsForClient.mockResolvedValueOnce([{ leadId: 'lead-1', phone: '+1 5551234567' }])
+    getLeadsByClientId.mockResolvedValueOnce([{ leadId: 'lead-1', phone: '+1 5551234567' }])
 
     await logGupshupWebhookEvent(incomingMessage('DemoApp', '919876543210'))
 

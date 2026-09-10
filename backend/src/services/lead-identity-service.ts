@@ -1,6 +1,18 @@
 import { phonesMatch } from '../lib/phone-match.js'
 import { getPendingReply } from '../repositories/journey-pending-reply-repository.js'
-import { getLeadsForClient } from './lead-service.js'
+// The repository directly, NOT lead-service's getLeadsForClient wrapper around
+// it. Two reasons, and the second is why it matters here.
+//
+// Architecture: a service calls repositories, not other services. This file
+// reaching sideways into lead-service was the exception, not the rule.
+//
+// Bundle: voice-relay/session.ts reaches this file, and esbuild follows every
+// edge. lead-service pulls in the rest of the services layer, which dragged
+// four AWS SDK clients the relay has no use for -- Step Functions, SES, KMS,
+// SQS -- into a bundle whose externals must exist on the EC2 box or the process
+// dies at load. The wrapper added an error message this file already discards
+// in its own catch, so nothing is lost by going direct.
+import { getLeadsByClientId } from '../repositories/lead-repository.js'
 import { getVoiceLeadsByClientId } from '../repositories/voice-lead-repository.js'
 import type { LeadRef } from '../types/index.js'
 
@@ -62,7 +74,7 @@ async function collectCandidates(clientId: string, phone: string): Promise<Candi
   // most recent contact across ALL channels is the whole point, and stopping
   // early would silently prefer whichever source was queried first.
   const [chatLeads, voiceLeads] = await Promise.all([
-    getLeadsForClient(clientId).catch((error: unknown) => {
+    getLeadsByClientId(clientId).catch((error: unknown) => {
       console.error(
         `[lead-identity] chat lead lookup failed for ${clientId}:`,
         error instanceof Error ? error.message : error

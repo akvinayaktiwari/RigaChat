@@ -94,6 +94,55 @@ transcribes but does not persist a caller's half. So nothing starts recording on
 **Depends on:** counsel. Start it alongside the Plivo KYC conversation — both are calendar
 time, and neither blocks the other.
 
+## Relay bundle: three of four stray SDK clients are gone, KMS is real
+
+**Done 2026-09-09** (was: "the bundle pulls in the whole services layer"). The identity join
+imported `lead-service` for a thin wrapper over `getLeadsByClientId`; it now reads the
+repository directly, which is also what the architecture rule says a service should do.
+Bundle went **3.5MB -> 244K**, and `client-sfn`, `client-sesv2` and `client-sqs` left the
+externals list with it.
+
+**`@aws-sdk/client-kms` stays, and is correct.** Traced:
+`voice-relay/session.ts -> voice-lead-service -> notification-service -> whatsapp-service ->
+lib/kms.ts`. When a caller asks for a human the relay sends the WhatsApp handoff alert, and
+that decrypts the client's API key. A real dependency, not import bleed.
+
+**Left for a separate cleanup:** the EC2 box still has `client-sfn`, `client-sesv2` and
+`client-sqs` installed from 2026-09-07. Harmless, and deliberately not removed — the
+deployed bundle is still the July one, and the deploy script's preflight resolves what the
+NEW bundle needs. Uninstall them only after the smaller bundle is live and stays live.
+
+## P0 GATE: call-recording consent before telephony goes live
+
+**What:** A phone call records both halves of the conversation into `lead_events`. There
+is no consent or disclosure line anywhere in the runtime code — not in `session.ts`, not
+in the agent instructions, not in the greeting.
+
+**Why it is P0 and not a nice-to-have:** `docs/designs/voice-agent-telephony-v1.md`
+(Constraints) names this explicitly — "a caller consent/disclosure line before recording
+starts" — and points at the TRAI/DPDP uncertainty in
+`docs/voice-calling-cost-and-pricing-plan.md`. That doc's own re-check (§159) says the
+AI-disclosure clause is something TRAI is *considering*, not enacted, and tells you to get
+counsel to confirm before writing it into the product. Neither the check nor the line
+happened. Recording an Indian consumer's phone call with no disclosure is the kind of gap
+you discover from a complaint, not from a test.
+
+**Why it does NOT block the current merge:** telephony is fail-closed. Without
+`PLIVO_AUTH_TOKEN` and `VOICE_RELAY_PUBLIC_HOST` no call can arrive, and the CRM write
+path only engages when `callerPhone` is set, which is telephony-only. Browser voice
+transcribes but does not persist a caller's half. So nothing starts recording on merge.
+
+**Do before the first real call, in this order:**
+1. Get counsel to confirm what disclosure (if any) is currently required for an AI voice
+   agent recording an inbound call in India.
+2. If required, add the line to the agent's opening turn — the greeting is already the
+   first thing spoken, so this is a prompt change, not new machinery.
+3. Decide whether a caller who declines should be transferred or dropped, and build that
+   branch. "Say the line and record anyway" is not consent.
+
+**Depends on:** counsel. Start it alongside the Plivo KYC conversation — both are calendar
+time, and neither blocks the other.
+
 ## The voice relay bundle pulls in the whole services layer
 
 **What:** `npm run build:relay` went from 144KB to 3.5MB when telephony landed, and
