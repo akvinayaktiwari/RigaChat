@@ -1,5 +1,79 @@
 # Week plan — Tue 8 Sep to Sun 13 Sep 2026
 
+## STATUS as of 11 Sep 03:30 (+04) — read this first
+
+Everything below Day 3 is still to do. Days 1-3 are **merged to main and deployed**, CI green.
+
+| Day | State |
+|---|---|
+| 1 — voice branch coverage | **DONE, merged.** Found two real bugs, not just gaps. |
+| 2 — trim the relay bundle | **DONE, merged.** 3.5MB -> 244K. |
+| 3 — keyed read for the identity join | **HALF DONE.** Design written, pagination fixed. **Blocked on your decision.** |
+| 4 — one token validator, kill the hardcoded URL | not started, needs nothing from you |
+| 5 — relay hardening | not started, needs nothing from you |
+| 6 — consent gate, code half | not started, needs counsel's answer for part 2 |
+
+### What Days 1-3 actually found
+
+Three bugs, all the same shape — a `voice` case added to one half of a mirrored pair with
+nothing covering it:
+
+1. **A voice lead survived its own erasure.** `eraseLead`'s switch had no voice case, so the
+   row lived while its events, state, pending replies and counters were destroyed first --
+   and the report said the erasure succeeded. On the endpoint documented as irreversible
+   erasure, for someone exercising a deletion right. Now fixed, with a `never`-guard so a
+   fifth lead source fails the build.
+2. **An inbound match scoped form and meta candidates to the clientId** instead of their form
+   or Page, via an inline ternary that fell through. Latent, now routed through the shared
+   `leadRefScopeId`.
+3. **A client's lead list silently truncated at 1MB.** `getLeadsByClientId` ignored
+   `LastEvaluatedKey`, so the identity join answered "no match" for someone whose lead sat in
+   the unread part -- a returning caller became a stranger, no error anywhere. Now paginated,
+   bounded at 50 pages, and loud if that guard ever fires.
+
+(The fourth, found on 7 Sep: `packLeadRef` could write a voice ref that `unpackLeadRef`
+could not read back, so the handoff alert's link was dead for phone leads.)
+
+### BLOCKED ON YOU — three things, none of which I can do
+
+1. **Call Plivo.** No account, no DID, Indian DIDs need KYC. Still the long pole; blocks
+   every real call and nothing I do compresses it.
+2. **Ask counsel about call-recording disclosure.** The P0 gate in `TODOS.md`. Day 6 builds
+   the mechanism; only you can get the answer.
+3. **Decide the identity-join index.** `docs/designs/phone-indexed-lead-lookup.md` lays out
+   a phone GSI on each of the four lead tables vs. one `lead_phone_lookup`. I recommend the
+   lookup, conditionally -- it adds a second write path that can drift, and this repo has
+   been bitten by that exact class four times now. The doc says what must be true for the
+   recommendation to hold. **Answering this finishes Day 3.**
+
+### Also done this week, outside the plan
+
+- **GitHub issues #17 and #28 closed** — both were already shipped and never closed.
+  Verified against code, not the tracker, with the evidence in each issue's comment.
+- **gstack upgraded** 1.79 -> 1.81; plan-tune hooks installed and `question_tuning` enabled.
+- **Streak: 70 days unbroken, Jul 4 -> Sep 11.** The widget showing "1" was stale cache.
+  Note the mechanic that caused the scare: commits on unmerged branches do not count toward
+  the contribution graph at all. Merging on 11 Sep retroactively surfaced the 8th and 9th at
+  their real dates.
+
+### State of the world
+
+- `main` deployed, CI green. Lambda + frontend only.
+- **The relay box still runs its July bundle.** CI never deploys the relay. Telephony is
+  fail-closed off (no `PLIVO_*` env), so nothing voice-related is live.
+- The box still has `client-sfn`, `client-sesv2`, `client-sqs` installed. Harmless. Remove
+  only after the 244K bundle is live and stays live.
+- **8 older unmerged branches** exist, some from July. `fix/razorpay-go-live-p0` and
+  `feat/whatsapp-embedded-signup-register` look worth a look -- the two GitHub issues turned
+  out to be done-but-never-closed, and these may be the same story. Auditing them needs
+  nothing from you and would fill a day if the week slips.
+
+### To resume
+
+Say "start day 4" (or 5). Day 3 finishes once you answer the index question above.
+
+---
+
 Six days of work you can run while travelling. Paste the day's prompt, and I do the
 work and commit it.
 
