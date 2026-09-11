@@ -90,16 +90,20 @@ const STEP_MS = 1900
 /** The beat at the end of a run, before it starts over. */
 const LOOP_PAUSE_MS = 2600
 
+/** How long the strip waits after the reader leaves before moving again. */
+const RESUME_MS = 1400
+
 type StepState = 'done' | 'active' | 'pending'
 
 /**
  * Plays the journey through, once per loop, so the diagram does the thing the
  * section claims: assembled once, then left running.
  *
- * Playback yields to the reader rather than competing with them. Pointing at a
- * step holds it; clicking one pins it until clicked again. Either way the timer
- * stops, because a diagram that keeps marching while someone is reading one
- * card is just taking the card away from them.
+ * Playback yields to the reader rather than competing with them. A pointer
+ * anywhere in the strip freezes it -- both the timer and the auto-scroll --
+ * and clicking a step pins it until clicked again. A diagram that keeps
+ * marching while someone is reading one card is just taking the card away from
+ * them, and one that scrolls under their pointer is worse.
  */
 function useJourneyPlayback(count: number, reduced: boolean) {
   const trackRef = useRef<HTMLDivElement | null>(null)
@@ -107,10 +111,17 @@ function useJourneyPlayback(count: number, reduced: boolean) {
   const [onScreen, setOnScreen] = useState(false)
   const [hovered, setHovered] = useState<number | null>(null)
   const [pinned, setPinned] = useState<number | null>(null)
+  const [engaged, setEngaged] = useState(false)
 
   // The step being presented. A pin outranks a hover, and either outranks the
   // timer -- the reader's attention always wins over the animation's.
   const focused = pinned ?? hovered ?? active
+
+  // Everything freezes while the reader is in the strip at all. This is a
+  // TRACK-level flag on purpose: gating on the hovered CARD left the gaps
+  // between cards as dead zones, so crossing one cleared the hover, restarted
+  // the timer, and scrolled the strip out from under the pointer mid-reach.
+  const held = engaged || pinned !== null
 
   // Watching is split from advancing so that pausing for a hover does not tear
   // down the observer, and re-entering the section is the ONLY thing that
@@ -136,7 +147,6 @@ function useJourneyPlayback(count: number, reduced: boolean) {
   }, [reduced, onScreen])
 
   useEffect(() => {
-    const held = pinned !== null || hovered !== null
     if (reduced || !onScreen || held) return
 
     let timer: number | undefined
@@ -149,10 +159,13 @@ function useJourneyPlayback(count: number, reduced: boolean) {
       })
     }
 
-    timer = window.setTimeout(advance, 600)
+    // A full step's grace before picking up again. Resuming on the usual 600ms
+    // beat meant the strip lurched the moment the pointer cleared the edge,
+    // which reads as the page shoving the reader out.
+    timer = window.setTimeout(advance, RESUME_MS)
 
     return () => window.clearTimeout(timer)
-  }, [count, reduced, onScreen, hovered, pinned])
+  }, [count, reduced, onScreen, held])
 
   // Retract each edge fade when the track is against that end. Without this
   // the right-hand fade dims the handoff card exactly when playback scrolls it
@@ -184,7 +197,7 @@ function useJourneyPlayback(count: number, reduced: boolean) {
   useEffect(() => {
     const track = trackRef.current
     const target = pinned ?? active
-    if (!track || target < 0 || reduced) return
+    if (!track || target < 0 || reduced || held) return
 
     const card = track.children[target]
     if (!(card instanceof HTMLElement)) return
@@ -200,7 +213,7 @@ function useJourneyPlayback(count: number, reduced: boolean) {
     } else {
       track.scrollLeft = left
     }
-  }, [active, pinned, reduced])
+  }, [active, pinned, reduced, held])
 
   return {
     trackRef,
@@ -208,6 +221,11 @@ function useJourneyPlayback(count: number, reduced: boolean) {
       focused < 0 ? 'pending' : index < focused ? 'done' : index === focused ? 'active' : 'pending',
     isPinned: (index: number) => pinned === index,
     hover: (index: number | null) => setHovered(index),
+    /** Track-level: the reader is in the strip, wherever exactly the pointer is. */
+    engage: (value: boolean) => {
+      setEngaged(value)
+      if (!value) setHovered(null)
+    },
     /** Clicking the pinned step releases it, so a reader is never stuck. */
     togglePin: (index: number) => setPinned((current) => (current === index ? null : index)),
   }
@@ -239,10 +257,8 @@ function TimelineNodeCard({ node, state, pinned, onHover, onToggle }: TimelineNo
       type="button"
       aria-pressed={pinned}
       aria-label={`${node.label}: ${node.title}, ${node.timing}`}
-      onMouseEnter={() => onHover(true)}
-      onMouseLeave={() => onHover(false)}
+      onPointerEnter={() => onHover(true)}
       onFocus={() => onHover(true)}
-      onBlur={() => onHover(false)}
       onClick={onToggle}
       className={`flex h-full w-36 shrink-0 cursor-pointer flex-col rounded-xl border p-3.5 text-left transition-all duration-500 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d0d18] ${style.border} ${STATE_STYLES[state]} ${
         state === 'active' ? style.glow : ''
@@ -367,6 +383,16 @@ export default function RoadmapSection() {
               one-child-per-step shape if this markup changes. */}
           <div
             ref={journey.trackRef}
+            onPointerEnter={() => journey.engage(true)}
+            onPointerLeave={() => journey.engage(false)}
+            onFocusCapture={() => journey.engage(true)}
+            onBlurCapture={(event) => {
+              // Only release when focus has actually left the strip, not on the
+              // blur that fires while tabbing between two steps inside it.
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                journey.engage(false)
+              }
+            }}
             className="journey-track relative flex items-stretch gap-2 overflow-x-auto pb-3"
           >
             {TIMELINE_NODES.map((node, i) => (
