@@ -306,6 +306,20 @@ body {
 /* Faint technical grid, masked to fade out before it reaches the content.
    Light-mode safe: at 0.04 alpha over white it registers as texture, not as
    lines you can actually count. */
+/* The hero canvas's base layer, and its complete fallback.
+
+   This is what paints under the WebGL lattice, and what remains on every path
+   where the canvas never starts: reduced motion, no WebGL, or a viewport under
+   768px. It is deliberately the shader's own resting frame in flat form, so the
+   canvas fading in on top reads as the field lighting up rather than as a
+   second background appearing. */
+.aurora-ground {
+  background:
+    radial-gradient(ellipse 90% 70% at 78% 8%, rgba(167, 139, 250, 0.20), transparent 62%),
+    radial-gradient(ellipse 60% 50% at 96% 34%, rgba(8, 145, 178, 0.10), transparent 68%),
+    linear-gradient(168deg, #FAF5FF 0%, #F6F1FE 46%, #FFFFFF 100%);
+}
+
 .tech-grid {
   background-image:
     linear-gradient(to right, rgba(124, 58, 237, 0.04) 1px, transparent 1px),
