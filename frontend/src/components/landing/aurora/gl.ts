@@ -8,6 +8,12 @@ import { FRAGMENT_SOURCE, VERTEX_SOURCE } from './shaders'
  * against ~150KB gzip for three.js on the page where LCP converts.
  */
 export interface LatticeRenderer {
+  /**
+   * Tells the shader which hero layout it is painting behind, and picks the
+   * render budget to match. Call before resize(): it changes the scale the
+   * drawing buffer is sized at.
+   */
+  setStacked: (stacked: boolean) => void
   /** Matches the drawing buffer to the element's CSS size. Cheap when unchanged. */
   resize: () => void
   draw: (timeSeconds: number) => void
@@ -18,6 +24,7 @@ export interface LatticeRenderer {
 interface Uniforms {
   resolution: WebGLUniformLocation | null
   time: WebGLUniformLocation | null
+  stacked: WebGLUniformLocation | null
 }
 
 /** Browsers cap live contexts at roughly 8-16, so oversampling costs real memory. */
@@ -30,6 +37,13 @@ const MAX_PIXEL_RATIO = 1.5
  * shade every frame. This is the single largest lever on GPU cost here.
  */
 const RESOLUTION_SCALE = 0.75
+
+/**
+ * Phones render at half. They are the devices least able to spend the GPU time
+ * and the ones where the field occupies the least screen -- a corner glow, not
+ * a full backdrop -- so the upscale has even less to give away than on desktop.
+ */
+const STACKED_RESOLUTION_SCALE = 0.5
 
 function compile(gl: WebGLRenderingContext, type: number, source: string): WebGLShader | null {
   const shader = gl.createShader(type)
@@ -106,7 +120,10 @@ export function createLatticeRenderer(canvas: HTMLCanvasElement): LatticeRendere
   const uniforms: Uniforms = {
     resolution: gl.getUniformLocation(program, 'u_resolution'),
     time: gl.getUniformLocation(program, 'u_time'),
+    stacked: gl.getUniformLocation(program, 'u_stacked'),
   }
+
+  let stacked = false
 
   gl.useProgram(program)
   gl.enableVertexAttribArray(position)
@@ -117,8 +134,14 @@ export function createLatticeRenderer(canvas: HTMLCanvasElement): LatticeRendere
   gl.clearColor(0, 0, 0, 0)
 
   return {
+    setStacked: (next: boolean) => {
+      stacked = next
+      gl.uniform1f(uniforms.stacked, next ? 1 : 0)
+    },
+
     resize: () => {
-      const ratio = Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO) * RESOLUTION_SCALE
+      const scale = stacked ? STACKED_RESOLUTION_SCALE : RESOLUTION_SCALE
+      const ratio = Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO) * scale
       const width = Math.max(1, Math.round(canvas.clientWidth * ratio))
       const height = Math.max(1, Math.round(canvas.clientHeight * ratio))
       if (canvas.width === width && canvas.height === height) return

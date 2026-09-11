@@ -1,12 +1,19 @@
 import { useEffect, useRef } from 'react'
 import { createLatticeRenderer } from './aurora/gl'
-import { useAuroraGuards } from './aurora/useAuroraGuards'
+import { isWideLayout, useAuroraGuards } from './aurora/useAuroraGuards'
 
 /**
  * 30fps. At this motion speed 60 is indistinguishable and costs twice the GPU.
  * Expressed as a frame budget so the RAF loop can skip rather than throttle.
  */
 const FRAME_MS = 1000 / 30
+
+/**
+ * Phones run at 24. The motion is slow enough that the difference is invisible,
+ * and a background effect has no business spending a fifth of a phone's frame
+ * budget.
+ */
+const STACKED_FRAME_MS = 1000 / 24
 
 /** Guards against a tab left in the background for an hour returning with a huge dt. */
 const MAX_DELTA_S = 0.05
@@ -50,10 +57,11 @@ export default function AuroraCanvas() {
     let clock = 0
     let last = 0
     let onScreen = true
+    let frameBudget = isWideLayout() ? FRAME_MS : STACKED_FRAME_MS
 
     const tick = (now: number) => {
       frame = requestAnimationFrame(tick)
-      if (now - last < FRAME_MS) return
+      if (now - last < frameBudget) return
 
       const delta = last === 0 ? 0 : Math.min((now - last) / 1000, MAX_DELTA_S)
       last = now
@@ -87,11 +95,21 @@ export default function AuroraCanvas() {
     })
     observer.observe(canvas)
 
+    // The layout can flip under a resize or a device rotation, and both the
+    // falloff and the render budget depend on which one is on screen.
+    const applyLayout = () => {
+      const wide = isWideLayout()
+      frameBudget = wide ? FRAME_MS : STACKED_FRAME_MS
+      renderer.setStacked(!wide)
+    }
+
     const onResize = () => {
+      applyLayout()
       renderer.resize()
       renderer.draw(clock)
     }
 
+    applyLayout()
     renderer.resize()
     renderer.draw(0)
     canvas.style.opacity = '1'

@@ -25,6 +25,11 @@ precision mediump float;
 uniform vec2 u_resolution;
 uniform float u_time;
 
+// 1.0 when the hero is stacked into one column (below the lg breakpoint), 0.0
+// when it is the two-column desktop layout. The field has to hide somewhere
+// different in each: there is no side gutter once the copy runs full width.
+uniform float u_stacked;
+
 // Product tokens, normalised to 0..1.
 const vec3 C_GROUND = vec3(0.980, 0.961, 1.000); // #FAF5FF
 const vec3 C_LOW    = vec3(0.867, 0.839, 0.996); // #DDD6FE
@@ -79,15 +84,32 @@ vec3 ramp(float s) {
 }
 
 /**
- * Keeps the field out of the headline. The left ramp is deliberately wider than
- * the other candidates needed: the lattice's grid lines are the one element
- * that can still read through body copy at low alpha.
+ * Two-column layout: the copy owns the left 60%, so the field lives to the
+ * right of it. The left ramp is deliberately wide -- the lattice's grid lines
+ * are the one element that can still read through body copy at low alpha.
  */
-float falloff(vec2 uv) {
+float falloffWide(vec2 uv) {
   float left = smoothstep(0.10, 0.62, uv.x);
   float low = smoothstep(0.00, 0.30, uv.y);
   float high = 1.0 - smoothstep(0.88, 1.02, uv.y);
   return left * low * high;
+}
+
+/**
+ * Stacked layout: the copy runs the full width, so there is no side gutter to
+ * hide in and the wide falloff would drop the field straight under the
+ * headline. The field retreats to the top-right corner instead, above where
+ * the headline starts, and reads as light entering the frame rather than as a
+ * texture behind the text.
+ */
+float falloffStacked(vec2 uv) {
+  float corner = smoothstep(0.22, 0.95, uv.x) * smoothstep(0.46, 0.98, uv.y);
+  float edge = 1.0 - smoothstep(0.93, 1.03, uv.y);
+  return corner * edge;
+}
+
+float falloff(vec2 uv) {
+  return mix(falloffWide(uv), falloffStacked(uv), u_stacked);
 }
 
 void main() {
@@ -112,7 +134,7 @@ void main() {
   float pulse = smoothstep(0.35, 0.95, fract(p.x * 0.55 - u_time * 0.055));
 
   float s = smoothstep(0.20, 0.90, n * 0.52 + line * (0.30 + pulse * 0.55));
-  float alpha = clamp(s, 0.0, 1.0) * visibility * INTENSITY;
+  float alpha = clamp(s, 0.0, 1.0) * visibility * INTENSITY * mix(1.0, 0.82, u_stacked);
 
   gl_FragColor = vec4(ramp(s), alpha);
 }
