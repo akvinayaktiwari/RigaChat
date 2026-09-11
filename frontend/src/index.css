@@ -284,6 +284,25 @@ body {
    The two widths are driven from JS, and each collapses to 0 when the track is
    against that end. A fixed right-hand fade dimmed the final handoff card —
    the one the section exists to land — precisely when playback delivered it. */
+/* The elevated pillar's halo. It is a response to the pointer, not a permanent
+   state: a 50px violet glow burning continuously reads as something being
+   wrong with the card rather than as emphasis, and it competes with the
+   journey strip below it for the same attention.
+
+   The card keeps a brighter border and a lighter fill at rest, which is enough
+   to mark it as the payoff without shouting. focus-within is included so a
+   keyboard reader gets the same signal a mouse does. */
+.pillar-glow {
+  box-shadow: 0 0 50px 6px rgba(124, 58, 237, 0.45);
+  opacity: 0;
+  transition: opacity 380ms ease;
+}
+
+.pillar-card:hover .pillar-glow,
+.pillar-card:focus-within .pillar-glow {
+  opacity: 1;
+}
+
 .journey-track {
   --fade-left: 0px;
   --fade-right: 44px;
@@ -388,7 +407,6 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .roadmap-journeys-glow,
   .aurora-drift {
     animation: none;
   }

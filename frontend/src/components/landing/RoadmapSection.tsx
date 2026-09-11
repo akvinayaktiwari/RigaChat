@@ -96,54 +96,63 @@ type StepState = 'done' | 'active' | 'pending'
  * Plays the journey through, once per loop, so the diagram does the thing the
  * section claims: assembled once, then left running.
  *
- * It stops the moment it is not being watched, and never fights the reader --
- * a manual scroll ends playback for good rather than yanking the strip back to
- * wherever the timer had got to.
+ * Playback yields to the reader rather than competing with them. Pointing at a
+ * step holds it; clicking one pins it until clicked again. Either way the timer
+ * stops, because a diagram that keeps marching while someone is reading one
+ * card is just taking the card away from them.
  */
 function useJourneyPlayback(count: number, reduced: boolean) {
   const trackRef = useRef<HTMLDivElement | null>(null)
   const [active, setActive] = useState(reduced ? count - 1 : -1)
-  const [playing, setPlaying] = useState(!reduced)
+  const [onScreen, setOnScreen] = useState(false)
+  const [hovered, setHovered] = useState<number | null>(null)
+  const [pinned, setPinned] = useState<number | null>(null)
 
+  // The step being presented. A pin outranks a hover, and either outranks the
+  // timer -- the reader's attention always wins over the animation's.
+  const focused = pinned ?? hovered ?? active
+
+  // Watching is split from advancing so that pausing for a hover does not tear
+  // down the observer, and re-entering the section is the ONLY thing that
+  // rewinds to the start.
   useEffect(() => {
     const track = trackRef.current
-    if (!track || reduced || !playing) return
-
-    let timer: number | undefined
-    let onScreen = false
-
-    const advance = () => {
-      setActive((current) => {
-        const next = current + 1
-        if (next < count) {
-          timer = window.setTimeout(advance, STEP_MS)
-          return next
-        }
-        timer = window.setTimeout(advance, LOOP_PAUSE_MS)
-        return -1
-      })
-    }
+    if (!track || reduced) return
 
     const observer = new IntersectionObserver(
-      (entries) => {
-        onScreen = entries.some((entry) => entry.isIntersecting)
-        window.clearTimeout(timer)
-        // Restarting from the top rather than resuming mid-journey: someone
-        // scrolling back to this section should see it from the beginning.
-        if (onScreen) {
-          setActive(-1)
-          timer = window.setTimeout(advance, 600)
-        }
-      },
+      (entries) => setOnScreen(entries.some((entry) => entry.isIntersecting)),
       { threshold: 0.35 },
     )
     observer.observe(track)
 
-    return () => {
-      window.clearTimeout(timer)
-      observer.disconnect()
+    return () => observer.disconnect()
+  }, [reduced])
+
+  useEffect(() => {
+    if (reduced || !onScreen) return
+    // Someone scrolling back to this section sees the journey from the
+    // beginning rather than wherever the last run left off.
+    setActive(-1)
+  }, [reduced, onScreen])
+
+  useEffect(() => {
+    const held = pinned !== null || hovered !== null
+    if (reduced || !onScreen || held) return
+
+    let timer: number | undefined
+
+    const advance = () => {
+      setActive((current) => {
+        const next = current + 1
+        timer = window.setTimeout(advance, next < count ? STEP_MS : LOOP_PAUSE_MS)
+        return next < count ? next : -1
+      })
     }
-  }, [count, reduced, playing])
+
+    timer = window.setTimeout(advance, 600)
+
+    return () => window.clearTimeout(timer)
+  }, [count, reduced, onScreen, hovered, pinned])
 
   // Retract each edge fade when the track is against that end. Without this
   // the right-hand fade dims the handoff card exactly when playback scrolls it
@@ -168,26 +177,39 @@ function useJourneyPlayback(count: number, reduced: boolean) {
     }
   }, [])
 
-  // Keep the active card in view. scrollTo on the track itself, never
-  // scrollIntoView -- that would scroll the page as well as the strip.
+  // Keep the focused card in view. scrollTo on the track itself, never
+  // scrollIntoView -- that would scroll the page as well as the strip. Hover is
+  // excluded: the reader is already pointing at that card, so moving it would
+  // pull it out from under the cursor.
   useEffect(() => {
     const track = trackRef.current
-    if (!track || active < 0 || reduced || !playing) return
+    const target = pinned ?? active
+    if (!track || target < 0 || reduced) return
 
-    const card = track.children[active]
+    const card = track.children[target]
     if (!(card instanceof HTMLElement)) return
 
-    const target = card.offsetLeft - (track.clientWidth - card.offsetWidth) / 2
-    track.scrollTo({ left: Math.max(0, target), behavior: 'smooth' })
-  }, [active, reduced, playing])
+    const left = Math.max(0, card.offsetLeft - (track.clientWidth - card.offsetWidth) / 2)
+
+    // Feature-detected rather than assumed. Element.scrollTo is missing in a
+    // few environments, and an unguarded call throws during a passive effect,
+    // which unmounts the entire section -- a blank panel where the diagram was,
+    // over a decorative scroll nobody would miss.
+    if (typeof track.scrollTo === 'function') {
+      track.scrollTo({ left, behavior: 'smooth' })
+    } else {
+      track.scrollLeft = left
+    }
+  }, [active, pinned, reduced])
 
   return {
     trackRef,
     stateOf: (index: number): StepState =>
-      active < 0 ? 'pending' : index < active ? 'done' : index === active ? 'active' : 'pending',
-    /** A reader taking manual control ends playback; the strip is theirs now. */
-    surrender: () => setPlaying(false),
-    playing,
+      focused < 0 ? 'pending' : index < focused ? 'done' : index === focused ? 'active' : 'pending',
+    isPinned: (index: number) => pinned === index,
+    hover: (index: number | null) => setHovered(index),
+    /** Clicking the pinned step releases it, so a reader is never stuck. */
+    togglePin: (index: number) => setPinned((current) => (current === index ? null : index)),
   }
 }
 
@@ -197,18 +219,39 @@ const STATE_STYLES: Record<StepState, string> = {
   pending: 'opacity-45 bg-white/[0.02]',
 }
 
-function TimelineNodeCard({ node, state }: { node: TimelineNode; state: StepState }) {
+interface TimelineNodeCardProps {
+  node: TimelineNode
+  state: StepState
+  pinned: boolean
+  onHover: (hovering: boolean) => void
+  onToggle: () => void
+}
+
+/**
+ * A button rather than a div. The card visibly responds to a pointer, so it has
+ * to respond to a click and to a keyboard too -- and as a button it gets Enter,
+ * Space and a focus ring without any of that being reimplemented here.
+ */
+function TimelineNodeCard({ node, state, pinned, onHover, onToggle }: TimelineNodeCardProps) {
   const style = KIND_STYLES[node.kind]
   return (
-    <div
-      className={`flex h-full w-36 shrink-0 flex-col rounded-xl border p-3.5 transition-all duration-500 ${style.border} ${STATE_STYLES[state]} ${
+    <button
+      type="button"
+      aria-pressed={pinned}
+      aria-label={`${node.label}: ${node.title}, ${node.timing}`}
+      onMouseEnter={() => onHover(true)}
+      onMouseLeave={() => onHover(false)}
+      onFocus={() => onHover(true)}
+      onBlur={() => onHover(false)}
+      onClick={onToggle}
+      className={`flex h-full w-36 shrink-0 cursor-pointer flex-col rounded-xl border p-3.5 text-left transition-all duration-500 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d0d18] ${style.border} ${STATE_STYLES[state]} ${
         state === 'active' ? style.glow : ''
-      }`}
+      } ${pinned ? 'ring-1 ring-white/30' : ''}`}
     >
       <p className={`mb-1.5 text-[11px] font-semibold uppercase tracking-wide ${style.labelColor}`}>{node.label}</p>
       <p className="mb-1 text-sm font-semibold text-white">{node.title}</p>
       <p className="mt-auto text-xs text-white/40">{node.timing}</p>
-    </div>
+    </button>
   )
 }
 
@@ -259,18 +302,14 @@ export default function RoadmapSection() {
             return (
               <RevealItem
                 key={pillar.title}
-                className={`relative rounded-2xl border p-6 backdrop-blur-xl transition-all duration-300 ${
+                className={`pillar-card relative rounded-2xl border p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 ${
                   pillar.elevated
-                    ? 'border-violet-400/50 bg-white/[0.06]'
-                    : 'border-white/10 bg-white/[0.04] hover:border-white/20'
+                    ? 'border-violet-400/50 bg-white/[0.06] hover:border-violet-300/70'
+                    : 'border-white/10 bg-white/[0.04] hover:border-white/25 hover:bg-white/[0.06]'
                 }`}
               >
                 {pillar.elevated && (
-                  <div
-                    aria-hidden="true"
-                    className="roadmap-journeys-glow pointer-events-none absolute -inset-px rounded-2xl"
-                    style={{ boxShadow: '0 0 50px 6px rgba(124, 58, 237, 0.45)' }}
-                  />
+                  <div aria-hidden="true" className="pillar-glow pointer-events-none absolute -inset-px rounded-2xl" />
                 )}
                 <div className="relative">
                   <div
@@ -328,14 +367,17 @@ export default function RoadmapSection() {
               one-child-per-step shape if this markup changes. */}
           <div
             ref={journey.trackRef}
-            onPointerDown={journey.surrender}
-            onWheel={journey.surrender}
-            onKeyDown={journey.surrender}
             className="journey-track relative flex items-stretch gap-2 overflow-x-auto pb-3"
           >
             {TIMELINE_NODES.map((node, i) => (
               <div key={node.title} className="flex shrink-0 items-stretch gap-2 snap-center">
-                <TimelineNodeCard node={node} state={journey.stateOf(i)} />
+                <TimelineNodeCard
+                  node={node}
+                  state={journey.stateOf(i)}
+                  pinned={journey.isPinned(i)}
+                  onHover={(hovering) => journey.hover(hovering ? i : null)}
+                  onToggle={() => journey.togglePin(i)}
+                />
                 {i < TIMELINE_NODES.length - 1 && (
                   <div className="relative h-px w-5 shrink-0 self-center overflow-hidden bg-white/10">
                     {/* The fill is the journey moving. It replaces a dot that
