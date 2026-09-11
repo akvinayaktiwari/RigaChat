@@ -657,6 +657,14 @@ describe('the knowledge base tool', () => {
     return fetchMock
   }
 
+  beforeEach(() => {
+    vi.stubEnv('BACKEND_URL', 'https://backend.test')
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
   it('feeds retrieved chunks back to the model', async () => {
     const fetchMock = stubRag({ chunks: ['Two-bedroom units start at 85 lakh.', 'Possession is Q4 2027.'] })
     const { openai } = startSession()
@@ -674,7 +682,29 @@ describe('the knowledge base tool', () => {
     expect(item).toMatchObject({ type: 'function_call_output', call_id: 'call-abc' })
     expect(item.output).toBe('Two-bedroom units start at 85 lakh.\n\nPossession is Q4 2027.')
     expect(openai.eventsOfType('response.create')).toHaveLength(1)
-    expect(fetchMock.mock.calls[0][0]).toContain('/api/voice-agents/rag')
+    expect(fetchMock.mock.calls[0][0]).toBe('https://backend.test/api/voice-agents/rag')
+  })
+
+  // There is no fallback URL any more. server.ts refuses to start without
+  // BACKEND_URL, so this can only happen if the env changes under a running
+  // process -- and the agent must not answer from a guessed backend.
+  it('does not fetch at all when BACKEND_URL is unset', async () => {
+    const fetchMock = stubRag({ chunks: ['should never be read'] })
+    vi.stubEnv('BACKEND_URL', '')
+    const { openai } = startSession()
+    openai.connect()
+
+    openai.receive({
+      type: 'response.function_call_arguments.done',
+      name: 'search_knowledge_base',
+      call_id: 'call-no-url',
+      arguments: JSON.stringify({ query: 'two bedroom price' }),
+    })
+
+    await vi.waitFor(() => expect(openai.eventsOfType('conversation.item.create')).toHaveLength(1))
+    expect(fetchMock).not.toHaveBeenCalled()
+    const item = openai.eventsOfType('conversation.item.create')[0].item as Record<string, unknown>
+    expect(item.output).toBe('No specific information found.')
   })
 
   it('tells the model nothing was found rather than leaving it hanging', async () => {

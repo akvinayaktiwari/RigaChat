@@ -180,15 +180,26 @@ lifetime.
 ### Environment on the box
 
 The relay reads its own `.env`, separate from the Lambda's. Required:
-`AWS_REGION`, `VOICE_AUTH_SECRET`, `OPENAI_API_KEY`. For telephony, also
+`AWS_REGION`, `VOICE_AUTH_SECRET`, `OPENAI_API_KEY`, `BACKEND_URL`. For telephony, also
 `PLIVO_AUTH_TOKEN` and `VOICE_RELAY_PUBLIC_HOST` (both absent = telephony off
 and every Plivo endpoint answers 503 — fail-closed by design),
 `PLIVO_AUTH_ID` (absent = transfer disabled, inbound answering unaffected),
 and optionally `VOICE_MAX_CONCURRENT_CALLS` (default 10).
 
-`BACKEND_URL` is still missing there, which is why `session.ts` carries a
-hardcoded Lambda Function URL as a fallback for its RAG calls. See
-[CHALLENGES.md](./CHALLENGES.md).
+`BACKEND_URL` is where the relay reaches the Lambda for RAG retrieval — the
+Function URL from `scripts/deploy.sh`. `server.ts` refuses to start without it,
+the same way it refuses without `AWS_REGION` or `VOICE_AUTH_SECRET`. It used to
+fall back to a hardcoded Function URL, which would have gone stale silently the
+day that function was recreated, with an agent still answering — just without
+its knowledge base.
+
+**The box's `/home/ubuntu/.env` does not have this line yet.** Add it before
+deploying a relay bundle built from this commit, or the process will refuse to
+come back up:
+
+```
+BACKEND_URL=https://hxtvyv6kgsasppyrvyljaezeii0zxzco.lambda-url.ap-south-1.on.aws
+```
 
 ## Third-party managed services (external, not AWS)
 

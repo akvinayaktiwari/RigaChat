@@ -18,6 +18,7 @@ const PORT = 3100
 
 const region = process.env.AWS_REGION
 const authSecret = process.env.VOICE_AUTH_SECRET
+const backendUrl = process.env.BACKEND_URL
 
 if (!region) {
   throw new Error(
@@ -28,6 +29,16 @@ if (!region) {
 if (!authSecret) {
   throw new Error(
     'Missing required environment variable VOICE_AUTH_SECRET. Set it in your .env file before starting the server.'
+  )
+}
+
+// A relay that cannot reach the backend cannot search a knowledge base, and an
+// agent that answers without its knowledge base sounds exactly like one that
+// has it -- confidently wrong, to a caller, with nothing in the logs saying the
+// URL was missing. So this is fatal at startup rather than a per-call failure.
+if (!backendUrl) {
+  throw new Error(
+    'Missing required environment variable BACKEND_URL. Set it in your .env file before starting the server.'
   )
 }
 

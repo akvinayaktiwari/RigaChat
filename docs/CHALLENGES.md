@@ -2,7 +2,7 @@
 
 > **Verification checklist:** every entry below cites a commit hash or a
 > source file/line for its root cause and fix — re-run `git show <hash>` to
-> confirm before trusting the summary. Two entries are **open, not
+> confirm before trusting the summary. One entry is **open, not
 > resolved** — marked explicitly as such rather than force-fit into a
 > "fixed" narrative. Nothing here is editorialized beyond what the commit
 > message, diff, or code comment itself states.
@@ -58,24 +58,23 @@ Part of the entitlements-foundation work (`feat/entitlements-foundation`,
 merged) — a UI-only fix once entitlement checks started gating bot/voice-agent
 creation.
 
+### The voice relay's hardcoded backend URL
+
+**Root cause:** `BACKEND_URL` was never set in the relay's own `.env` on EC2,
+so `session.ts` carried the main Lambda's Function URL as a fallback constant
+to keep `search_knowledge_base` working. The risk was never the URL being
+wrong today — it was that the day the function is recreated, the fallback goes
+stale silently. The relay is in no deploy workflow, so nothing would catch it,
+and the failure a caller hears is an agent answering confidently without its
+knowledge base.
+
+**Fix:** the fallback is gone. `BACKEND_URL` is now required, failing at
+startup in `voice-relay/server.ts` alongside `AWS_REGION` and
+`VOICE_AUTH_SECRET`. Documented in `backend/.env.example` and
+[INFRASTRUCTURE.md](./INFRASTRUCTURE.md), which carries the exact line the box
+still needs before a bundle built from this commit is deployed there.
+
 ## Open — not yet resolved
-
-### EC2 voice relay is missing `BACKEND_URL` in its own `.env`
-
-**Source:** `backend/src/voice-relay/session.ts`, inline comment above
-`FALLBACK_BACKEND_URL`:
-
-> `// TODO: add BACKEND_URL to the EC2 .env — it is not set there today. This is the current Lambda function URL (from scripts/deploy.sh) used as a fallback until the env var exists.`
-
-**Current state:** the relay hardcodes the main Lambda's Function URL as a
-fallback constant (`https://hxtvyv6kgsasppyrvyljaezeii0zxzco.lambda-url.ap-south-1.on.aws`)
-so the `search_knowledge_base` tool keeps working. This is a real
-maintenance risk: if that Lambda's Function URL ever changes (e.g. the
-function is recreated), this fallback silently goes stale and nothing in
-CI or the deploy pipeline would catch it, since the EC2 relay isn't part of
-any deploy workflow (see [INFRASTRUCTURE.md](./INFRASTRUCTURE.md)). Not
-fixed as part of this doc-generation task, per its own constraints (no
-functional changes) — flagged here as-is.
 
 ### RAG similarity threshold: documented value doesn't match shipped value
 

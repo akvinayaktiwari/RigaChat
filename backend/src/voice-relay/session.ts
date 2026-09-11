@@ -16,10 +16,6 @@ const REALTIME_MODEL = 'gpt-realtime'
 const REALTIME_URL = `wss://api.openai.com/v1/realtime?model=${REALTIME_MODEL}`
 const CONTEXT_TIMEOUT_MS = 5000
 const RAG_FETCH_TIMEOUT_MS = 5000
-// TODO: add BACKEND_URL to the EC2 .env — it is not set there today. This is
-// the current Lambda function URL (from scripts/deploy.sh) used as a fallback
-// until the env var exists.
-const FALLBACK_BACKEND_URL = 'https://hxtvyv6kgsasppyrvyljaezeii0zxzco.lambda-url.ap-south-1.on.aws'
 const FALLBACK_INSTRUCTIONS =
   'You are a helpful voice assistant. Keep responses concise — this is a voice conversation, 2-3 sentences max.'
 
@@ -679,7 +675,14 @@ export class VoiceSession {
 
   private async fetchRagChunks(query: string): Promise<string[]> {
     const token = generateToken(this.agentId, process.env.VOICE_AUTH_SECRET ?? '')
-    const backendUrl = process.env.BACKEND_URL ?? FALLBACK_BACKEND_URL
+    // No fallback. server.ts refuses to start without BACKEND_URL, so reaching
+    // this with it unset means the env changed under a running process -- and
+    // answering from a guessed URL is how a relay ends up quietly serving
+    // another stack's knowledge base, or none at all.
+    const backendUrl = process.env.BACKEND_URL
+    if (!backendUrl) {
+      throw new Error('Missing required environment variable BACKEND_URL')
+    }
 
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), RAG_FETCH_TIMEOUT_MS)

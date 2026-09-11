@@ -173,10 +173,10 @@ from this repo** — mark it TODO rather than trusting the primer (see
 
 It talks to the RAG pipeline as a function-calling tool
 (`search_knowledge_base`, defined inline in `session.ts`) hitting
-`POST /api/voice-agents/rag` on the main backend — and currently does so
-against a **hardcoded fallback URL** because the relay's own `.env` on EC2
-is missing `BACKEND_URL` (see the TODO comment cited in
-[CHALLENGES.md](./CHALLENGES.md)).
+`POST /api/voice-agents/rag` on the main backend, at `BACKEND_URL`. That is a
+required variable: the relay refuses to start without it. It used to fall back
+to a hardcoded Function URL when the relay's `.env` on EC2 did not set it (see
+[INFRASTRUCTURE.md](./INFRASTRUCTURE.md) for the line the box still needs).
 
 There's also an EventBridge Scheduler cron path through the same shared
 Lambda bundle: an event with `source: 'aws.events'` and
