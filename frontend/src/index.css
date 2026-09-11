@@ -213,50 +213,7 @@ body {
   animation: vyostraGlowBreathe 2.5s ease-in-out infinite;
 }
 
-/* RoadmapSection (landing page, dark "futuristic plan" surface) — dot-grid
-   overlay + two motion effects. Kept separate from vyostraGlowBreathe above
-   since that one drives a drop-shadow on the logo, not an opacity pulse on a
-   card glow. */
-.roadmap-dot-grid {
-  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
-  background-size: 24px 24px;
-  mask-image: linear-gradient(to bottom, black, transparent);
-  -webkit-mask-image: linear-gradient(to bottom, black, transparent);
-}
 
-@keyframes roadmapJourneysGlow {
-  0%, 100% {
-    opacity: 0.35;
-  }
-  50% {
-    opacity: 0.7;
-  }
-}
-
-.roadmap-journeys-glow {
-  animation: roadmapJourneysGlow 4s ease-in-out infinite;
-}
-
-@keyframes roadmapSparkTravel {
-  0% {
-    left: 0%;
-    opacity: 0;
-  }
-  8% {
-    opacity: 1;
-  }
-  92% {
-    opacity: 1;
-  }
-  100% {
-    left: 100%;
-    opacity: 0;
-  }
-}
-
-.roadmap-spark {
-  animation: roadmapSparkTravel 5s ease-in-out infinite;
-}
 
 /* ---------------------------------------------------------------------------
    Landing "futuristic depth" layer
@@ -315,6 +272,48 @@ body {
 .aurora-drift-slower {
   animation-duration: 32s;
   animation-delay: -14s;
+}
+
+/* The journey strip. A native horizontal scrollbar ran the full width of this
+   track and read as a rendering bug rather than an affordance; the soft edges
+   say "there is more this way" far better than a grey slab did.
+
+   Both edges are masked, not just the right: once the track has scrolled, the
+   cards leaving on the left need the same treatment as the ones arriving.
+
+   The two widths are driven from JS, and each collapses to 0 when the track is
+   against that end. A fixed right-hand fade dimmed the final handoff card —
+   the one the section exists to land — precisely when playback delivered it. */
+.journey-track {
+  --fade-left: 0px;
+  --fade-right: 44px;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+  scroll-snap-type: x proximity;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black var(--fade-left),
+    black calc(100% - var(--fade-right)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black var(--fade-left),
+    black calc(100% - var(--fade-right)),
+    transparent 100%
+  );
+}
+
+.journey-track::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .journey-track {
+    scroll-behavior: auto;
+  }
 }
 
 .aurora-ground {
@@ -390,7 +389,6 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .roadmap-journeys-glow,
-  .roadmap-spark,
   .aurora-drift {
     animation: none;
   }

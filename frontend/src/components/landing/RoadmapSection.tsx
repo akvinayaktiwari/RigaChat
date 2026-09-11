@@ -1,4 +1,6 @@
+import { useEffect, useRef, useState } from 'react'
 import { Activity, CheckCircle, Clock, Mic, Route, type LucideIcon } from 'lucide-react'
+import { useReducedMotion } from 'motion/react'
 import { Reveal, RevealGroup, RevealItem } from './motion-primitives'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -75,25 +77,145 @@ const TIMELINE_NODES: TimelineNode[] = [
   { kind: 'human', label: 'Hands off', title: 'Over to your team', timing: 'instead of nagging' },
 ]
 
-const KIND_STYLES: Record<NodeKind, { border: string; labelColor: string }> = {
-  agent: { border: 'border-violet-400/40', labelColor: 'text-violet-300' },
-  await: { border: 'border-cyan-400/40', labelColor: 'text-cyan-300' },
-  check: { border: 'border-dashed border-white/25', labelColor: 'text-white/50' },
-  human: { border: 'border-emerald-400/40', labelColor: 'text-emerald-300' },
+const KIND_STYLES: Record<NodeKind, { border: string; labelColor: string; glow: string }> = {
+  agent: { border: 'border-violet-400/40', labelColor: 'text-violet-300', glow: 'shadow-[0_0_0_1px_rgba(167,139,250,0.5),0_0_24px_-4px_rgba(167,139,250,0.55)]' },
+  await: { border: 'border-cyan-400/40', labelColor: 'text-cyan-300', glow: 'shadow-[0_0_0_1px_rgba(34,211,238,0.5),0_0_24px_-4px_rgba(34,211,238,0.55)]' },
+  check: { border: 'border-dashed border-white/25', labelColor: 'text-white/50', glow: 'shadow-[0_0_0_1px_rgba(255,255,255,0.35),0_0_24px_-4px_rgba(255,255,255,0.35)]' },
+  human: { border: 'border-emerald-400/40', labelColor: 'text-emerald-300', glow: 'shadow-[0_0_0_1px_rgba(52,211,153,0.5),0_0_24px_-4px_rgba(52,211,153,0.55)]' },
 }
 
-function TimelineNodeCard({ node }: { node: TimelineNode }) {
+/** How long each step holds before the journey advances to the next one. */
+const STEP_MS = 1900
+
+/** The beat at the end of a run, before it starts over. */
+const LOOP_PAUSE_MS = 2600
+
+type StepState = 'done' | 'active' | 'pending'
+
+/**
+ * Plays the journey through, once per loop, so the diagram does the thing the
+ * section claims: assembled once, then left running.
+ *
+ * It stops the moment it is not being watched, and never fights the reader --
+ * a manual scroll ends playback for good rather than yanking the strip back to
+ * wherever the timer had got to.
+ */
+function useJourneyPlayback(count: number, reduced: boolean) {
+  const trackRef = useRef<HTMLDivElement | null>(null)
+  const [active, setActive] = useState(reduced ? count - 1 : -1)
+  const [playing, setPlaying] = useState(!reduced)
+
+  useEffect(() => {
+    const track = trackRef.current
+    if (!track || reduced || !playing) return
+
+    let timer: number | undefined
+    let onScreen = false
+
+    const advance = () => {
+      setActive((current) => {
+        const next = current + 1
+        if (next < count) {
+          timer = window.setTimeout(advance, STEP_MS)
+          return next
+        }
+        timer = window.setTimeout(advance, LOOP_PAUSE_MS)
+        return -1
+      })
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        onScreen = entries.some((entry) => entry.isIntersecting)
+        window.clearTimeout(timer)
+        // Restarting from the top rather than resuming mid-journey: someone
+        // scrolling back to this section should see it from the beginning.
+        if (onScreen) {
+          setActive(-1)
+          timer = window.setTimeout(advance, 600)
+        }
+      },
+      { threshold: 0.35 },
+    )
+    observer.observe(track)
+
+    return () => {
+      window.clearTimeout(timer)
+      observer.disconnect()
+    }
+  }, [count, reduced, playing])
+
+  // Retract each edge fade when the track is against that end. Without this
+  // the right-hand fade dims the handoff card exactly when playback scrolls it
+  // into view, which is the one moment this section needs to land cleanly.
+  useEffect(() => {
+    const track = trackRef.current
+    if (!track) return
+
+    const sync = () => {
+      const remaining = track.scrollWidth - track.clientWidth - track.scrollLeft
+      track.style.setProperty('--fade-left', track.scrollLeft > 4 ? '28px' : '0px')
+      track.style.setProperty('--fade-right', remaining > 4 ? '44px' : '0px')
+    }
+
+    sync()
+    track.addEventListener('scroll', sync, { passive: true })
+    window.addEventListener('resize', sync)
+
+    return () => {
+      track.removeEventListener('scroll', sync)
+      window.removeEventListener('resize', sync)
+    }
+  }, [])
+
+  // Keep the active card in view. scrollTo on the track itself, never
+  // scrollIntoView -- that would scroll the page as well as the strip.
+  useEffect(() => {
+    const track = trackRef.current
+    if (!track || active < 0 || reduced || !playing) return
+
+    const card = track.children[active]
+    if (!(card instanceof HTMLElement)) return
+
+    const target = card.offsetLeft - (track.clientWidth - card.offsetWidth) / 2
+    track.scrollTo({ left: Math.max(0, target), behavior: 'smooth' })
+  }, [active, reduced, playing])
+
+  return {
+    trackRef,
+    stateOf: (index: number): StepState =>
+      active < 0 ? 'pending' : index < active ? 'done' : index === active ? 'active' : 'pending',
+    /** A reader taking manual control ends playback; the strip is theirs now. */
+    surrender: () => setPlaying(false),
+    playing,
+  }
+}
+
+const STATE_STYLES: Record<StepState, string> = {
+  active: 'opacity-100 scale-[1.03] bg-white/[0.07]',
+  done: 'opacity-100 bg-white/[0.03]',
+  pending: 'opacity-45 bg-white/[0.02]',
+}
+
+function TimelineNodeCard({ node, state }: { node: TimelineNode; state: StepState }) {
   const style = KIND_STYLES[node.kind]
   return (
-    <div className={`w-36 shrink-0 rounded-xl border bg-white/[0.03] p-3.5 ${style.border}`}>
+    <div
+      className={`flex h-full w-36 shrink-0 flex-col rounded-xl border p-3.5 transition-all duration-500 ${style.border} ${STATE_STYLES[state]} ${
+        state === 'active' ? style.glow : ''
+      }`}
+    >
       <p className={`mb-1.5 text-[11px] font-semibold uppercase tracking-wide ${style.labelColor}`}>{node.label}</p>
       <p className="mb-1 text-sm font-semibold text-white">{node.title}</p>
-      <p className="text-xs text-white/40">{node.timing}</p>
+      <p className="mt-auto text-xs text-white/40">{node.timing}</p>
     </div>
   )
 }
 
 export default function RoadmapSection() {
+  const reduced = useReducedMotion() ?? false
+  const journey = useJourneyPlayback(TIMELINE_NODES.length, reduced)
+
   return (
     <section className="relative overflow-hidden bg-[#0d0d18] px-4 py-20">
       <div
@@ -200,19 +322,34 @@ export default function RoadmapSection() {
             site visit, with nobody lifting a finger.
           </p>
 
-          <div className="overflow-x-auto pb-2">
-            <div className="relative flex items-center gap-2 w-max">
-              <div className="pointer-events-none absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-white/10" />
-              <div className="roadmap-spark pointer-events-none absolute top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-violet-300 shadow-[0_0_8px_2px_rgba(196,181,253,0.8)]" />
-              {TIMELINE_NODES.map((node, i) => (
-                <div key={node.title} className="relative flex items-center gap-2 shrink-0">
-                  <TimelineNodeCard node={node} />
-                  {i < TIMELINE_NODES.length - 1 && (
-                    <div className="h-px w-4 shrink-0 bg-gradient-to-r from-violet-400/60 to-cyan-400/60" />
-                  )}
-                </div>
-              ))}
-            </div>
+          {/* The track is the scroll container AND the offset parent, and its
+              direct children are one cell per step — useJourneyPlayback indexes
+              children[active] to scroll the active card into view. Keep that
+              one-child-per-step shape if this markup changes. */}
+          <div
+            ref={journey.trackRef}
+            onPointerDown={journey.surrender}
+            onWheel={journey.surrender}
+            onKeyDown={journey.surrender}
+            className="journey-track relative flex items-stretch gap-2 overflow-x-auto pb-3"
+          >
+            {TIMELINE_NODES.map((node, i) => (
+              <div key={node.title} className="flex shrink-0 items-stretch gap-2 snap-center">
+                <TimelineNodeCard node={node} state={journey.stateOf(i)} />
+                {i < TIMELINE_NODES.length - 1 && (
+                  <div className="relative h-px w-5 shrink-0 self-center overflow-hidden bg-white/10">
+                    {/* The fill is the journey moving. It replaces a dot that
+                        used to travel the whole line on a fixed loop, which
+                        animated whether or not anything was happening. */}
+                    <div
+                      className={`absolute inset-0 origin-left bg-gradient-to-r from-violet-400/70 to-cyan-400/70 transition-transform duration-700 ease-out ${
+                        journey.stateOf(i) === 'done' ? 'scale-x-100' : 'scale-x-0'
+                      }`}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
 
           <div className="mt-6 space-y-2">
