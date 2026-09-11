@@ -1,4 +1,6 @@
+import { useEffect, useRef, useState } from 'react'
 import { Activity, CheckCircle, Clock, Mic, Route, type LucideIcon } from 'lucide-react'
+import { useReducedMotion } from 'motion/react'
 import { Reveal, RevealGroup, RevealItem } from './motion-primitives'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -75,25 +77,204 @@ const TIMELINE_NODES: TimelineNode[] = [
   { kind: 'human', label: 'Hands off', title: 'Over to your team', timing: 'instead of nagging' },
 ]
 
-const KIND_STYLES: Record<NodeKind, { border: string; labelColor: string }> = {
-  agent: { border: 'border-violet-400/40', labelColor: 'text-violet-300' },
-  await: { border: 'border-cyan-400/40', labelColor: 'text-cyan-300' },
-  check: { border: 'border-dashed border-white/25', labelColor: 'text-white/50' },
-  human: { border: 'border-emerald-400/40', labelColor: 'text-emerald-300' },
+const KIND_STYLES: Record<NodeKind, { border: string; labelColor: string; glow: string }> = {
+  agent: { border: 'border-violet-400/40', labelColor: 'text-violet-300', glow: 'shadow-[0_0_0_1px_rgba(167,139,250,0.5),0_0_24px_-4px_rgba(167,139,250,0.55)]' },
+  await: { border: 'border-cyan-400/40', labelColor: 'text-cyan-300', glow: 'shadow-[0_0_0_1px_rgba(34,211,238,0.5),0_0_24px_-4px_rgba(34,211,238,0.55)]' },
+  check: { border: 'border-dashed border-white/25', labelColor: 'text-white/50', glow: 'shadow-[0_0_0_1px_rgba(255,255,255,0.35),0_0_24px_-4px_rgba(255,255,255,0.35)]' },
+  human: { border: 'border-emerald-400/40', labelColor: 'text-emerald-300', glow: 'shadow-[0_0_0_1px_rgba(52,211,153,0.5),0_0_24px_-4px_rgba(52,211,153,0.55)]' },
 }
 
-function TimelineNodeCard({ node }: { node: TimelineNode }) {
+/** How long each step holds before the journey advances to the next one. */
+const STEP_MS = 1900
+
+/** The beat at the end of a run, before it starts over. */
+const LOOP_PAUSE_MS = 2600
+
+/** How long the strip waits after the reader leaves before moving again. */
+const RESUME_MS = 1400
+
+type StepState = 'done' | 'active' | 'pending'
+
+/**
+ * Plays the journey through, once per loop, so the diagram does the thing the
+ * section claims: assembled once, then left running.
+ *
+ * Playback yields to the reader rather than competing with them. A pointer
+ * anywhere in the strip freezes it -- both the timer and the auto-scroll --
+ * and clicking a step pins it until clicked again. A diagram that keeps
+ * marching while someone is reading one card is just taking the card away from
+ * them, and one that scrolls under their pointer is worse.
+ */
+function useJourneyPlayback(count: number, reduced: boolean) {
+  const trackRef = useRef<HTMLDivElement | null>(null)
+  const [active, setActive] = useState(reduced ? count - 1 : -1)
+  const [onScreen, setOnScreen] = useState(false)
+  const [hovered, setHovered] = useState<number | null>(null)
+  const [pinned, setPinned] = useState<number | null>(null)
+  const [engaged, setEngaged] = useState(false)
+
+  // The step being presented. A pin outranks a hover, and either outranks the
+  // timer -- the reader's attention always wins over the animation's.
+  const focused = pinned ?? hovered ?? active
+
+  // Everything freezes while the reader is in the strip at all. This is a
+  // TRACK-level flag on purpose: gating on the hovered CARD left the gaps
+  // between cards as dead zones, so crossing one cleared the hover, restarted
+  // the timer, and scrolled the strip out from under the pointer mid-reach.
+  const held = engaged || pinned !== null
+
+  // Watching is split from advancing so that pausing for a hover does not tear
+  // down the observer, and re-entering the section is the ONLY thing that
+  // rewinds to the start.
+  useEffect(() => {
+    const track = trackRef.current
+    if (!track || reduced) return
+
+    const observer = new IntersectionObserver(
+      (entries) => setOnScreen(entries.some((entry) => entry.isIntersecting)),
+      { threshold: 0.35 },
+    )
+    observer.observe(track)
+
+    return () => observer.disconnect()
+  }, [reduced])
+
+  useEffect(() => {
+    if (reduced || !onScreen) return
+    // Someone scrolling back to this section sees the journey from the
+    // beginning rather than wherever the last run left off.
+    setActive(-1)
+  }, [reduced, onScreen])
+
+  useEffect(() => {
+    if (reduced || !onScreen || held) return
+
+    let timer: number | undefined
+
+    const advance = () => {
+      setActive((current) => {
+        const next = current + 1
+        timer = window.setTimeout(advance, next < count ? STEP_MS : LOOP_PAUSE_MS)
+        return next < count ? next : -1
+      })
+    }
+
+    // A full step's grace before picking up again. Resuming on the usual 600ms
+    // beat meant the strip lurched the moment the pointer cleared the edge,
+    // which reads as the page shoving the reader out.
+    timer = window.setTimeout(advance, RESUME_MS)
+
+    return () => window.clearTimeout(timer)
+  }, [count, reduced, onScreen, held])
+
+  // Retract each edge fade when the track is against that end. Without this
+  // the right-hand fade dims the handoff card exactly when playback scrolls it
+  // into view, which is the one moment this section needs to land cleanly.
+  useEffect(() => {
+    const track = trackRef.current
+    if (!track) return
+
+    const sync = () => {
+      const remaining = track.scrollWidth - track.clientWidth - track.scrollLeft
+      track.style.setProperty('--fade-left', track.scrollLeft > 4 ? '28px' : '0px')
+      track.style.setProperty('--fade-right', remaining > 4 ? '44px' : '0px')
+    }
+
+    sync()
+    track.addEventListener('scroll', sync, { passive: true })
+    window.addEventListener('resize', sync)
+
+    return () => {
+      track.removeEventListener('scroll', sync)
+      window.removeEventListener('resize', sync)
+    }
+  }, [])
+
+  // Keep the focused card in view. scrollTo on the track itself, never
+  // scrollIntoView -- that would scroll the page as well as the strip. Hover is
+  // excluded: the reader is already pointing at that card, so moving it would
+  // pull it out from under the cursor.
+  useEffect(() => {
+    const track = trackRef.current
+    const target = pinned ?? active
+    if (!track || target < 0 || reduced || held) return
+
+    const card = track.children[target]
+    if (!(card instanceof HTMLElement)) return
+
+    const left = Math.max(0, card.offsetLeft - (track.clientWidth - card.offsetWidth) / 2)
+
+    // Feature-detected rather than assumed. Element.scrollTo is missing in a
+    // few environments, and an unguarded call throws during a passive effect,
+    // which unmounts the entire section -- a blank panel where the diagram was,
+    // over a decorative scroll nobody would miss.
+    if (typeof track.scrollTo === 'function') {
+      track.scrollTo({ left, behavior: 'smooth' })
+    } else {
+      track.scrollLeft = left
+    }
+  }, [active, pinned, reduced, held])
+
+  return {
+    trackRef,
+    stateOf: (index: number): StepState =>
+      focused < 0 ? 'pending' : index < focused ? 'done' : index === focused ? 'active' : 'pending',
+    isPinned: (index: number) => pinned === index,
+    hover: (index: number | null) => setHovered(index),
+    /** Track-level: the reader is in the strip, wherever exactly the pointer is. */
+    engage: (value: boolean) => {
+      setEngaged(value)
+      if (!value) setHovered(null)
+    },
+    /** Clicking the pinned step releases it, so a reader is never stuck. */
+    togglePin: (index: number) => setPinned((current) => (current === index ? null : index)),
+  }
+}
+
+const STATE_STYLES: Record<StepState, string> = {
+  active: 'opacity-100 scale-[1.03] bg-white/[0.07]',
+  done: 'opacity-100 bg-white/[0.03]',
+  pending: 'opacity-45 bg-white/[0.02]',
+}
+
+interface TimelineNodeCardProps {
+  node: TimelineNode
+  state: StepState
+  pinned: boolean
+  onHover: (hovering: boolean) => void
+  onToggle: () => void
+}
+
+/**
+ * A button rather than a div. The card visibly responds to a pointer, so it has
+ * to respond to a click and to a keyboard too -- and as a button it gets Enter,
+ * Space and a focus ring without any of that being reimplemented here.
+ */
+function TimelineNodeCard({ node, state, pinned, onHover, onToggle }: TimelineNodeCardProps) {
   const style = KIND_STYLES[node.kind]
   return (
-    <div className={`w-36 shrink-0 rounded-xl border bg-white/[0.03] p-3.5 ${style.border}`}>
+    <button
+      type="button"
+      aria-pressed={pinned}
+      aria-label={`${node.label}: ${node.title}, ${node.timing}`}
+      onPointerEnter={() => onHover(true)}
+      onFocus={() => onHover(true)}
+      onClick={onToggle}
+      className={`flex h-full w-36 shrink-0 cursor-pointer flex-col rounded-xl border p-3.5 text-left transition-all duration-500 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d0d18] ${style.border} ${STATE_STYLES[state]} ${
+        state === 'active' ? style.glow : ''
+      } ${pinned ? 'ring-1 ring-white/30' : ''}`}
+    >
       <p className={`mb-1.5 text-[11px] font-semibold uppercase tracking-wide ${style.labelColor}`}>{node.label}</p>
       <p className="mb-1 text-sm font-semibold text-white">{node.title}</p>
-      <p className="text-xs text-white/40">{node.timing}</p>
-    </div>
+      <p className="mt-auto text-xs text-white/40">{node.timing}</p>
+    </button>
   )
 }
 
 export default function RoadmapSection() {
+  const reduced = useReducedMotion() ?? false
+  const journey = useJourneyPlayback(TIMELINE_NODES.length, reduced)
+
   return (
     <section className="relative overflow-hidden bg-[#0d0d18] px-4 py-20">
       <div
@@ -137,18 +318,14 @@ export default function RoadmapSection() {
             return (
               <RevealItem
                 key={pillar.title}
-                className={`relative rounded-2xl border p-6 backdrop-blur-xl transition-all duration-300 ${
+                className={`pillar-card relative rounded-2xl border p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 ${
                   pillar.elevated
-                    ? 'border-violet-400/50 bg-white/[0.06]'
-                    : 'border-white/10 bg-white/[0.04] hover:border-white/20'
+                    ? 'border-violet-400/50 bg-white/[0.06] hover:border-violet-300/70'
+                    : 'border-white/10 bg-white/[0.04] hover:border-white/25 hover:bg-white/[0.06]'
                 }`}
               >
                 {pillar.elevated && (
-                  <div
-                    aria-hidden="true"
-                    className="roadmap-journeys-glow pointer-events-none absolute -inset-px rounded-2xl"
-                    style={{ boxShadow: '0 0 50px 6px rgba(124, 58, 237, 0.45)' }}
-                  />
+                  <div aria-hidden="true" className="pillar-glow pointer-events-none absolute -inset-px rounded-2xl" />
                 )}
                 <div className="relative">
                   <div
@@ -200,19 +377,47 @@ export default function RoadmapSection() {
             site visit, with nobody lifting a finger.
           </p>
 
-          <div className="overflow-x-auto pb-2">
-            <div className="relative flex items-center gap-2 w-max">
-              <div className="pointer-events-none absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-white/10" />
-              <div className="roadmap-spark pointer-events-none absolute top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-violet-300 shadow-[0_0_8px_2px_rgba(196,181,253,0.8)]" />
-              {TIMELINE_NODES.map((node, i) => (
-                <div key={node.title} className="relative flex items-center gap-2 shrink-0">
-                  <TimelineNodeCard node={node} />
-                  {i < TIMELINE_NODES.length - 1 && (
-                    <div className="h-px w-4 shrink-0 bg-gradient-to-r from-violet-400/60 to-cyan-400/60" />
-                  )}
-                </div>
-              ))}
-            </div>
+          {/* The track is the scroll container AND the offset parent, and its
+              direct children are one cell per step — useJourneyPlayback indexes
+              children[active] to scroll the active card into view. Keep that
+              one-child-per-step shape if this markup changes. */}
+          <div
+            ref={journey.trackRef}
+            onPointerEnter={() => journey.engage(true)}
+            onPointerLeave={() => journey.engage(false)}
+            onFocusCapture={() => journey.engage(true)}
+            onBlurCapture={(event) => {
+              // Only release when focus has actually left the strip, not on the
+              // blur that fires while tabbing between two steps inside it.
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                journey.engage(false)
+              }
+            }}
+            className="journey-track relative flex items-stretch gap-2 overflow-x-auto pb-3"
+          >
+            {TIMELINE_NODES.map((node, i) => (
+              <div key={node.title} className="flex shrink-0 items-stretch gap-2 snap-center">
+                <TimelineNodeCard
+                  node={node}
+                  state={journey.stateOf(i)}
+                  pinned={journey.isPinned(i)}
+                  onHover={(hovering) => journey.hover(hovering ? i : null)}
+                  onToggle={() => journey.togglePin(i)}
+                />
+                {i < TIMELINE_NODES.length - 1 && (
+                  <div className="relative h-px w-5 shrink-0 self-center overflow-hidden bg-white/10">
+                    {/* The fill is the journey moving. It replaces a dot that
+                        used to travel the whole line on a fixed loop, which
+                        animated whether or not anything was happening. */}
+                    <div
+                      className={`absolute inset-0 origin-left bg-gradient-to-r from-violet-400/70 to-cyan-400/70 transition-transform duration-700 ease-out ${
+                        journey.stateOf(i) === 'done' ? 'scale-x-100' : 'scale-x-0'
+                      }`}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
 
           <div className="mt-6 space-y-2">

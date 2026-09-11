@@ -213,50 +213,7 @@ body {
   animation: vyostraGlowBreathe 2.5s ease-in-out infinite;
 }
 
-/* RoadmapSection (landing page, dark "futuristic plan" surface) — dot-grid
-   overlay + two motion effects. Kept separate from vyostraGlowBreathe above
-   since that one drives a drop-shadow on the logo, not an opacity pulse on a
-   card glow. */
-.roadmap-dot-grid {
-  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
-  background-size: 24px 24px;
-  mask-image: linear-gradient(to bottom, black, transparent);
-  -webkit-mask-image: linear-gradient(to bottom, black, transparent);
-}
 
-@keyframes roadmapJourneysGlow {
-  0%, 100% {
-    opacity: 0.35;
-  }
-  50% {
-    opacity: 0.7;
-  }
-}
-
-.roadmap-journeys-glow {
-  animation: roadmapJourneysGlow 4s ease-in-out infinite;
-}
-
-@keyframes roadmapSparkTravel {
-  0% {
-    left: 0%;
-    opacity: 0;
-  }
-  8% {
-    opacity: 1;
-  }
-  92% {
-    opacity: 1;
-  }
-  100% {
-    left: 100%;
-    opacity: 0;
-  }
-}
-
-.roadmap-spark {
-  animation: roadmapSparkTravel 5s ease-in-out infinite;
-}
 
 /* ---------------------------------------------------------------------------
    Landing "futuristic depth" layer
@@ -270,10 +227,24 @@ body {
    content, so none of them can affect text contrast or hit targets, and each
    one is disabled under prefers-reduced-motion at the bottom of this file. */
 
-/* Slowly drifting aurora blob. Applied to the existing hero blur orbs, which
-   were static -- the drift is what turns them from a flat wash into depth.
-   Deliberately 18-24s: slow enough that it never pulls the eye away from the
-   headline, which is the one thing in the hero that should hold attention. */
+
+
+/* Faint technical grid, masked to fade out before it reaches the content.
+   Light-mode safe: at 0.04 alpha over white it registers as texture, not as
+   lines you can actually count. */
+/* The hero background's base layer, and its complete fallback.
+   
+   This is what paints under the WebGL lattice, and what remains on every path
+   where the canvas never starts: reduced motion, no WebGL, or a viewport under
+   768px. It is deliberately the shader's own resting frame in flat form, so the
+   canvas fading in on top reads as the field lighting up rather than as a
+   second background appearing. */
+/* Slowly drifting aurora blob, used by the RoadmapSection and CTASection orbs.
+   The drift is what turns a flat blurred wash into depth. Deliberately 20-32s:
+   slow enough that it never competes with the content in front of it.
+
+   The hero no longer uses this -- its background is a WebGL canvas -- but these
+   two sections still do, so the rules stay. */
 @keyframes auroraDrift {
   0%, 100% {
     transform: translate3d(0, 0, 0);
@@ -291,8 +262,8 @@ body {
   will-change: transform;
 }
 
-/* Offsets so the three hero orbs never drift in lockstep, which would read as
-   the whole background sliding rather than as separate depth layers. */
+/* Offsets so orbs in the same section never drift in lockstep, which would read
+   as the whole background sliding rather than as separate depth layers. */
 .aurora-drift-slow {
   animation-duration: 26s;
   animation-delay: -7s;
@@ -303,16 +274,72 @@ body {
   animation-delay: -14s;
 }
 
-/* Faint technical grid, masked to fade out before it reaches the content.
-   Light-mode safe: at 0.04 alpha over white it registers as texture, not as
-   lines you can actually count. */
-.tech-grid {
-  background-image:
-    linear-gradient(to right, rgba(124, 58, 237, 0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(124, 58, 237, 0.04) 1px, transparent 1px);
-  background-size: 56px 56px;
-  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 20%, transparent 75%);
-  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 20%, transparent 75%);
+/* The journey strip. A native horizontal scrollbar ran the full width of this
+   track and read as a rendering bug rather than an affordance; the soft edges
+   say "there is more this way" far better than a grey slab did.
+
+   Both edges are masked, not just the right: once the track has scrolled, the
+   cards leaving on the left need the same treatment as the ones arriving.
+
+   The two widths are driven from JS, and each collapses to 0 when the track is
+   against that end. A fixed right-hand fade dimmed the final handoff card —
+   the one the section exists to land — precisely when playback delivered it. */
+/* The elevated pillar's halo. It is a response to the pointer, not a permanent
+   state: a 50px violet glow burning continuously reads as something being
+   wrong with the card rather than as emphasis, and it competes with the
+   journey strip below it for the same attention.
+
+   The card keeps a brighter border and a lighter fill at rest, which is enough
+   to mark it as the payoff without shouting. focus-within is included so a
+   keyboard reader gets the same signal a mouse does. */
+.pillar-glow {
+  box-shadow: 0 0 50px 6px rgba(124, 58, 237, 0.45);
+  opacity: 0;
+  transition: opacity 380ms ease;
+}
+
+.pillar-card:hover .pillar-glow,
+.pillar-card:focus-within .pillar-glow {
+  opacity: 1;
+}
+
+.journey-track {
+  --fade-left: 0px;
+  --fade-right: 44px;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+  scroll-snap-type: x proximity;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black var(--fade-left),
+    black calc(100% - var(--fade-right)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black var(--fade-left),
+    black calc(100% - var(--fade-right)),
+    transparent 100%
+  );
+}
+
+.journey-track::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .journey-track {
+    scroll-behavior: auto;
+  }
+}
+
+.aurora-ground {
+  background:
+    radial-gradient(ellipse 90% 70% at 78% 8%, rgba(167, 139, 250, 0.20), transparent 62%),
+    radial-gradient(ellipse 60% 50% at 96% 34%, rgba(8, 145, 178, 0.10), transparent 68%),
+    linear-gradient(168deg, #FAF5FF 0%, #F6F1FE 46%, #FFFFFF 100%);
 }
 
 /* Gradient hairline that brightens on hover. The border itself is the
@@ -380,22 +407,20 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .roadmap-journeys-glow,
-  .roadmap-spark,
   .aurora-drift {
     animation: none;
+  }
+
+  /* Release the compositor layers too. Clearing `animation` alone left the
+     promoted blur-3xl layers pinned for a user who asked for less motion. */
+  .aurora-drift {
+    will-change: auto;
   }
 
   /* The sheen is pure decoration with no state to preserve, so it is removed
      outright rather than shown in a "final" position. */
   .cta-sheen::after {
     display: none;
-  }
-
-  /* Release the compositor layers too. Clearing `animation` alone left ~9
-     promoted blur-3xl layers pinned for a user who asked for less motion. */
-  .aurora-drift {
-    will-change: auto;
   }
 
   /* The edge glow stays -- it is a hover affordance, not motion. Only the

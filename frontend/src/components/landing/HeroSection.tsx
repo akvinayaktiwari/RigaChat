@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'motion/react'
 import { ArrowRight, ChevronRight, Star } from 'lucide-react'
+import AuroraCanvas from './AuroraCanvas'
 import DemoChat from './DemoChat'
 import { DURATION, EASE_OUT, EASE_BACK } from './motion-primitives'
 
@@ -41,14 +42,13 @@ export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
 
   return (
     <section className="relative flex items-center pt-32 pb-20 px-4">
+      {/* One canvas replaces the four blur-3xl orbs and the static grid that
+          used to live here. Not an addition: four large blurred layers each got
+          their own promoted compositor layer, so the swap is close to cost
+          neutral, and the hero's motion budget only has room for one ambient
+          loop. */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-        <div className="tech-grid absolute inset-0" />
-        <div className="aurora-drift absolute top-32 left-1/4 w-96 h-96 bg-violet-200/30 rounded-full blur-3xl" />
-        <div className="aurora-drift aurora-drift-slow absolute top-48 right-1/4 w-80 h-80 bg-pink-200/25 rounded-full blur-3xl" />
-        <div className="aurora-drift aurora-drift-slower absolute bottom-32 left-1/3 w-64 h-64 bg-sky-200/20 rounded-full blur-3xl" />
-        {/* Cyan second-light. One small, low-alpha source is what separates
-            "purple gradient SaaS page" from something that reads as lit. */}
-        <div className="aurora-drift aurora-drift-slow absolute top-24 right-1/3 w-72 h-72 bg-cyan-200/20 rounded-full blur-3xl" />
+        <AuroraCanvas />
       </div>
 
       <div className="relative max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
@@ -56,7 +56,7 @@ export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
           <motion.div
             {...item}
             className="inline-flex items-center gap-2 bg-violet-50 border border-violet-100 text-violet-700 text-xs font-semibold px-3.5 py-1.5 rounded-full mb-6">
-            <span className="w-1.5 h-1.5 bg-violet-500 rounded-full inline-block animate-pulse" />
+            <span className="w-1.5 h-1.5 bg-violet-500 rounded-full inline-block" />
             New: self-running follow-up journeys
             <ChevronRight className="w-3.5 h-3.5" />
           </motion.div>
