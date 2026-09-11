@@ -1,3 +1,4 @@
+import { StrictMode } from 'react'
 import { render, cleanup } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import AuroraCanvas from './AuroraCanvas'
@@ -42,8 +43,9 @@ describe('AuroraCanvas', () => {
     expect(container.querySelector('.aurora-ground')).not.toBeNull()
   })
 
-  it('releases the WebGL context and its listeners on unmount', () => {
+  function stubWebGL(): { loseContext: ReturnType<typeof vi.fn>; contexts: HTMLCanvasElement[] } {
     const loseContext = vi.fn()
+    const contexts: HTMLCanvasElement[] = []
     const gl = {
       createShader: vi.fn(() => ({})),
       shaderSource: vi.fn(),
@@ -86,9 +88,17 @@ describe('AuroraCanvas', () => {
       COLOR_BUFFER_BIT: 10,
       TRIANGLES: 11,
     }
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
-      gl as unknown as WebGLRenderingContext,
-    )
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (
+      this: HTMLCanvasElement,
+    ) {
+      contexts.push(this)
+      return gl as unknown as WebGLRenderingContext
+    })
+    return { loseContext, contexts }
+  }
+
+  it('releases the WebGL context and its listeners on unmount', () => {
+    const { loseContext } = stubWebGL()
     const removeListener = vi.spyOn(document, 'removeEventListener')
 
     const { unmount } = render(<AuroraCanvas />)
@@ -99,5 +109,28 @@ describe('AuroraCanvas', () => {
     // hero silently stops rendering with no error anywhere.
     expect(loseContext).toHaveBeenCalled()
     expect(removeListener).toHaveBeenCalledWith('visibilitychange', expect.any(Function))
+  })
+
+  // The regression this file exists for. The canvas used to live in the JSX
+  // behind a ref, so React handed the same DOM node to every run of the effect.
+  // dispose() ends in loseContext(), which kills that element's context for
+  // good -- so the second run got a dead context, drew nothing, and the hero
+  // background never came back. Visible in dev via StrictMode's double-invoke,
+  // but it fired in production too: `allowed` flips on any resize across 768px
+  // or when the motion preference changes.
+  //
+  // Asserting "a canvas is present" would NOT catch it -- the dead canvas is
+  // still in the DOM. Only "no canvas is ever asked for a context twice" does.
+  it('never reuses a canvas whose context has been released', () => {
+    const { contexts } = stubWebGL()
+
+    render(
+      <StrictMode>
+        <AuroraCanvas />
+      </StrictMode>,
+    )
+
+    expect(contexts.length).toBeGreaterThan(1)
+    expect(new Set(contexts).size).toBe(contexts.length)
   })
 })
