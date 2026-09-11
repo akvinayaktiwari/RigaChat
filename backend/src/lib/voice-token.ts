@@ -1,3 +1,19 @@
+// The ONE voice token implementation. It lives in lib/ rather than voice-relay/
+// because both builds need it and neither owns it: the Lambda bundle mints
+// tokens on GET /api/voice-agents/token and validates them on POST
+// /api/voice-agents/rag, while the relay's separate EC2 bundle mints and
+// validates them on the socket and transfer paths.
+//
+// It had been two implementations -- this one, and a copy in voice-routes.ts
+// that predated the signature scope below and so could not express it. They
+// agreed only because an omitted scope is byte-compatible; the next change to
+// the token format would have split them silently, on the half that guards
+// "dial this number".
+//
+// KEEP THIS FILE DEPENDENCY-FREE. node:crypto and nothing else. It is imported
+// by the relay bundle, which is 244K precisely because it does not reach into
+// the services layer, and one convenience import here would undo that.
+
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
 const TOKEN_MAX_AGE_MS = 5 * 60 * 1000

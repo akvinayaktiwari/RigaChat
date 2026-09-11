@@ -2,7 +2,7 @@ import http from 'node:http'
 import { randomUUID } from 'node:crypto'
 import type { WebSocket } from 'ws'
 import type { VoiceAgent } from '../types/index.js'
-import { generateToken, validateToken } from './auth.js'
+import { generateToken, validateToken } from '../lib/voice-token.js'
 import { VoiceSession } from './session.js'
 import { PlivoAudioAdapter } from './transports/plivo-audio-adapter.js'
 import {

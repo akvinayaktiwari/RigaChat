@@ -1,4 +1,3 @@
-import { createHmac, timingSafeEqual } from 'node:crypto'
 import { Hono } from 'hono'
 import { requireAuth } from '../lib/cognito.js'
 import {
@@ -27,7 +26,7 @@ import {
 } from '../services/voice-service.js'
 import type { KBFileType, KBUploadUrlResult } from '../services/kb-service.js'
 import { retrieveContext } from '../services/rag-service.js'
-import { generateToken } from '../voice-relay/auth.js'
+import { generateToken, validateToken } from '../lib/voice-token.js'
 import { checkEntitlement, EntitlementError, toEntitlementErrorResponse } from '../services/entitlement-service.js'
 import type {
   ApiResponse,
@@ -103,51 +102,6 @@ function isNotFoundError(error: unknown): boolean {
       error.message === 'Voice agent is not enabled' ||
       error.message === 'Knowledge base entry not found')
   )
-}
-
-const VOICE_TOKEN_MAX_AGE_MS = 5 * 60 * 1000
-
-// Lambda-side mirror of voice-relay/auth.ts's validateToken — duplicated
-// rather than imported since voice-relay/ is a separate EC2-only bundle
-// not built into this Lambda.
-function validateVoiceToken(token: string, secret: string): { valid: boolean; agentId?: string } {
-  let decoded: string
-  try {
-    decoded = Buffer.from(token, 'base64url').toString('utf8')
-  } catch {
-    return { valid: false }
-  }
-
-  const separatorIndex = decoded.lastIndexOf('.')
-  if (separatorIndex === -1) {
-    return { valid: false }
-  }
-
-  const payload = decoded.slice(0, separatorIndex)
-  const signature = decoded.slice(separatorIndex + 1)
-
-  const expectedSignature = createHmac('sha256', secret).update(payload).digest('hex')
-
-  const signatureBuffer = Buffer.from(signature, 'hex')
-  const expectedBuffer = Buffer.from(expectedSignature, 'hex')
-
-  if (signatureBuffer.length !== expectedBuffer.length || !timingSafeEqual(signatureBuffer, expectedBuffer)) {
-    return { valid: false }
-  }
-
-  const timestampIndex = payload.lastIndexOf(':')
-  if (timestampIndex === -1) {
-    return { valid: false }
-  }
-
-  const agentId = payload.slice(0, timestampIndex)
-  const timestamp = Number(payload.slice(timestampIndex + 1))
-
-  if (!Number.isFinite(timestamp) || Date.now() - timestamp > VOICE_TOKEN_MAX_AGE_MS) {
-    return { valid: false }
-  }
-
-  return { valid: true, agentId }
 }
 
 voiceRoutes.post('/', requireAuth, async (c) => {
@@ -287,7 +241,7 @@ voiceRoutes.post('/rag', async (c) => {
     return c.json({ error: 'agentId and query required' }, 400)
   }
 
-  const { valid, agentId: tokenAgentId } = validateVoiceToken(body.token ?? '', process.env.VOICE_AUTH_SECRET ?? '')
+  const { valid, agentId: tokenAgentId } = validateToken(body.token ?? '', process.env.VOICE_AUTH_SECRET ?? '')
   if (!valid || tokenAgentId !== body.agentId) {
     return c.json({ error: 'Invalid or missing token' }, 401)
   }
