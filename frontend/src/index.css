@@ -282,6 +282,41 @@ body {
    768px. It is deliberately the shader's own resting frame in flat form, so the
    canvas fading in on top reads as the field lighting up rather than as a
    second background appearing. */
+/* Slowly drifting aurora blob, used by the RoadmapSection and CTASection orbs.
+   The drift is what turns a flat blurred wash into depth. Deliberately 20-32s:
+   slow enough that it never competes with the content in front of it.
+
+   The hero no longer uses this -- its background is a WebGL canvas -- but these
+   two sections still do, so the rules stay. */
+@keyframes auroraDrift {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+  33% {
+    transform: translate3d(3%, -4%, 0);
+  }
+  66% {
+    transform: translate3d(-3%, 3%, 0);
+  }
+}
+
+.aurora-drift {
+  animation: auroraDrift 20s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Offsets so orbs in the same section never drift in lockstep, which would read
+   as the whole background sliding rather than as separate depth layers. */
+.aurora-drift-slow {
+  animation-duration: 26s;
+  animation-delay: -7s;
+}
+
+.aurora-drift-slower {
+  animation-duration: 32s;
+  animation-delay: -14s;
+}
+
 .aurora-ground {
   background:
     radial-gradient(ellipse 90% 70% at 78% 8%, rgba(167, 139, 250, 0.20), transparent 62%),
@@ -355,8 +390,15 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .roadmap-journeys-glow,
-  .roadmap-spark {
+  .roadmap-spark,
+  .aurora-drift {
     animation: none;
+  }
+
+  /* Release the compositor layers too. Clearing `animation` alone left the
+     promoted blur-3xl layers pinned for a user who asked for less motion. */
+  .aurora-drift {
+    will-change: auto;
   }
 
   /* The sheen is pure decoration with no state to preserve, so it is removed
