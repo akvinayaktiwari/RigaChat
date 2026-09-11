@@ -1,15 +1,16 @@
 # Week plan — Tue 8 Sep to Sun 13 Sep 2026
 
-## STATUS as of 11 Sep 03:30 (+04) — read this first
+## STATUS as of 11 Sep 15:30 (+04) — read this first
 
-Everything below Day 3 is still to do. Days 1-3 are **merged to main and deployed**, CI green.
+Days 1-3 are **merged to main and deployed**, CI green. Day 4 is **written and pushed,
+not merged** — see below. Days 5 and 6 are still to do and need nothing from me.
 
 | Day | State |
 |---|---|
 | 1 — voice branch coverage | **DONE, merged.** Found two real bugs, not just gaps. |
 | 2 — trim the relay bundle | **DONE, merged.** 3.5MB -> 244K. |
 | 3 — keyed read for the identity join | **HALF DONE.** Design written, pagination fixed. **Blocked on your decision.** |
-| 4 — one token validator, kill the hardcoded URL | not started, needs nothing from you |
+| 4 — one token validator, kill the hardcoded URL | **DONE, pushed, NOT merged.** Branch `refactor/one-voice-token-validator`, 2 commits. |
 | 5 — relay hardening | not started, needs nothing from you |
 | 6 — consent gate, code half | not started, needs counsel's answer for part 2 |
 
@@ -68,9 +69,39 @@ could not read back, so the handoff alert's link was dead for phone leads.)
   out to be done-but-never-closed, and these may be the same story. Auditing them needs
   nothing from you and would fill a day if the week slips.
 
+### Day 4 — done 11 Sep, on a branch, waiting for you
+
+Branch `refactor/one-voice-token-validator`, pushed, **no PR opened and nothing merged**.
+Both suites green (backend 1284, frontend 387), typecheck clean.
+
+- `3349fa2` — the Lambda's `validateVoiceToken` was a copy of the relay's `validateToken`
+  that predated the signature scope, so it could not express the binding that guards "dial
+  this number". The module is now `backend/src/lib/voice-token.ts`, imported by both builds;
+  the copy is gone. Relay bundle 249,493 -> 249,492 bytes, no new `@aws-sdk` requires --
+  measured against main, not assumed. Tests cover both directions: a widget token (no scope)
+  cannot authorise a transfer, and a scoped transfer token cannot open a socket.
+- `2e17bc0` — `FALLBACK_BACKEND_URL` is gone; `BACKEND_URL` now fails at startup in
+  `server.ts` like `AWS_REGION` and `VOICE_AUTH_SECRET` do. Two existing tests had been
+  passing on the fallback (they asserted the URL only *contained* the path) and now assert
+  it in full.
+
+**BEFORE ANY RELAY DEPLOY FROM THIS CODE**, `/home/ubuntu/.env` on the box needs:
+
+```
+BACKEND_URL=https://hxtvyv6kgsasppyrvyljaezeii0zxzco.lambda-url.ap-south-1.on.aws
+```
+
+That is the value the fallback already held, so it changes nothing about where RAG calls go.
+Without it the process refuses to boot, and that takes browser voice down with it. The
+running relay is still on the July bundle and is unaffected either way. I did not SSH.
+
+Merging the branch deploys the Lambda and frontend only — CI never touches the relay, so
+merging alone cannot break the box.
+
 ### To resume
 
-Say "start day 4" (or 5). Day 3 finishes once you answer the index question above.
+Say "start day 5" (or 6) — they are independent, take either. Day 3 finishes once you answer
+the index question above. Day 4 needs only a merge.
 
 ---
 
