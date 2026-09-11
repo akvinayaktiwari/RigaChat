@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react'
-import { CheckCircle } from 'lucide-react'
-import { WhatsAppIcon, ZohoIcon, HubSpotIcon, SalesforceIcon } from './BrandIcons'
+import { CheckCircle, PhoneCall } from 'lucide-react'
+import { WhatsAppIcon, MetaIcon, ZohoIcon, HubSpotIcon, SalesforceIcon } from './BrandIcons'
 import { Reveal, RevealGroup, RevealItem } from './motion-primitives'
 
 interface Integration {
@@ -23,6 +23,16 @@ const INTEGRATIONS: Integration[] = [
     iconBg: 'bg-green-100',
     bg: 'from-green-50 to-emerald-50',
     perks: ['Lead notifications', 'Rich media support', 'Two-way AI conversations'],
+    status: 'live',
+  },
+  {
+    name: 'Meta Lead Ads',
+    icon: MetaIcon,
+    border: 'border-blue-100',
+    iconColor: 'text-blue-600',
+    iconBg: 'bg-blue-100',
+    bg: 'from-blue-50 to-indigo-50',
+    perks: ['Every approved Page, not just one', 'Instant lead delivery', 'Per-Page connect and disconnect'],
     status: 'live',
   },
   {
@@ -55,6 +65,20 @@ const INTEGRATIONS: Integration[] = [
     perks: ['Real-time sync', 'Custom object support', 'Flow builder integration'],
     status: 'soon',
   },
+  {
+    // 'soon', deliberately. The transport is built and tested, but no phone
+    // number is connected yet, so nothing on this card can be used today.
+    // Marking it live would be a claim the product cannot honour the moment
+    // someone dials.
+    name: 'Phone calls',
+    icon: PhoneCall,
+    border: 'border-violet-100',
+    iconColor: 'text-violet-600',
+    iconBg: 'bg-violet-100',
+    bg: 'from-violet-50 to-purple-50',
+    perks: ['Your agent answers the call', 'Every call written into the CRM', 'Puts the caller through to a person'],
+    status: 'soon',
+  },
 ]
 
 function StatusBadge({ status }: { status: 'live' | 'soon' }) {
@@ -85,7 +109,11 @@ export default function IntegrationsSection() {
             Plugs into your <br className="hidden sm:block" />
             existing stack
           </h2>
-          <p className="text-gray-500 text-lg max-w-xl mx-auto">One OAuth click. Your tools stay in sync.</p>
+          {/* Covers both halves of this list now. "One OAuth click" described
+              the CRMs and was never true of a phone call. */}
+          <p className="text-gray-500 text-lg max-w-xl mx-auto">
+            Every channel your leads arrive on, and every tool they need to reach.
+          </p>
         </Reveal>
 
         <RevealGroup className="grid grid-cols-1 sm:grid-cols-2 gap-5" stagger={0.08}>
