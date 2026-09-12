@@ -435,6 +435,11 @@ export class VoiceSession {
     }
   }
 
+  // A dispatch, not a decision. Every branch below used to be inline here and
+  // the function ran past 80 lines, which the 40-line rule in CLAUDE.md exists
+  // to prevent -- the barge-in check and the usage accounting were the same
+  // depth as the audio passthrough, so the two that can end a call read like
+  // the one that cannot.
   private handleOpenAIMessage(data: WebSocket.RawData): void {
     let event: OpenAIRealtimeEvent
     try {
@@ -443,79 +448,105 @@ export class VoiceSession {
       return
     }
 
-    if (event.type === 'response.created') {
-      this.isAgentSpeaking = true
-      this.currentResponseId = event.response?.id ?? null
-      return
+    switch (event.type) {
+      case 'response.created':
+        return this.onResponseCreated(event)
+      case 'response.done':
+        return this.onResponseDone(event)
+      case 'response.output_audio.delta':
+        return this.onAudioDelta(event)
+      case 'response.output_audio_transcript.delta':
+        return this.onAgentTranscriptDelta(event)
+      case 'conversation.item.input_audio_transcription.completed':
+        return this.onCallerTranscriptCompleted(event)
+      case 'input_audio_buffer.speech_started':
+        return this.onSpeechStarted()
+      case 'response.function_call_arguments.done':
+        return this.onFunctionCallDone(event)
+      case 'error':
+        return this.onErrorEvent(event)
+      default:
+        return
     }
+  }
 
-    if (event.type === 'response.done') {
-      if (event.response?.usage) {
-        this.totalInputTokens += event.response.usage.input_tokens ?? 0
-        this.totalOutputTokens += event.response.usage.output_tokens ?? 0
-        this.totalAudioTokens +=
-          (event.response.usage.input_token_details?.audio_tokens ?? 0) +
-          (event.response.usage.output_token_details?.audio_tokens ?? 0)
-      }
-      this.isAgentSpeaking = false
-      this.currentResponseId = null
-      this.flushAgentUtterance()
+  private onResponseCreated(event: OpenAIRealtimeEvent): void {
+    this.isAgentSpeaking = true
+    this.currentResponseId = event.response?.id ?? null
+  }
 
-      // Acted on only AFTER the closing line has been spoken. Doing either
-      // when the tool fires would cut the caller off mid-sentence, at the exact
-      // moment they asked for help.
-      if (this.pendingAction !== 'none') {
-        void this.runPendingAction()
-      }
-      return
+  private onResponseDone(event: OpenAIRealtimeEvent): void {
+    this.accumulateUsage(event)
+    this.isAgentSpeaking = false
+    this.currentResponseId = null
+    this.flushAgentUtterance()
+
+    // Acted on only AFTER the closing line has been spoken. Doing either
+    // when the tool fires would cut the caller off mid-sentence, at the exact
+    // moment they asked for help.
+    if (this.pendingAction !== 'none') {
+      void this.runPendingAction()
     }
+  }
 
-    if (event.type === 'response.output_audio.delta' && event.delta) {
-      this.sendToClient({ type: 'audio', data: event.delta })
-      return
+  private accumulateUsage(event: OpenAIRealtimeEvent): void {
+    const usage = event.response?.usage
+    if (!usage) return
+
+    this.totalInputTokens += usage.input_tokens ?? 0
+    this.totalOutputTokens += usage.output_tokens ?? 0
+    this.totalAudioTokens +=
+      (usage.input_token_details?.audio_tokens ?? 0) + (usage.output_token_details?.audio_tokens ?? 0)
+  }
+
+  private onAudioDelta(event: OpenAIRealtimeEvent): void {
+    if (!event.delta) return
+    this.sendToClient({ type: 'audio', data: event.delta })
+  }
+
+  private onAgentTranscriptDelta(event: OpenAIRealtimeEvent): void {
+    const transcript = event.delta?.transcript
+    if (!transcript) return
+
+    // Accumulated rather than written per delta: a delta is a word fragment,
+    // and fifty rows saying "the", "unit", "is" is not a transcript anyone
+    // can read. Flushed as one turn on response.done.
+    this.agentUtterance += transcript
+    this.sendToClient({ type: 'transcript', text: transcript })
+  }
+
+  // The caller's half. Requires TRANSCRIPTION to be set in session.update --
+  // without it this event never fires and only the agent is ever recorded.
+  private onCallerTranscriptCompleted(event: OpenAIRealtimeEvent): void {
+    const callerText = event.transcript
+    if (!callerText) return
+
+    void this.withIdentity((identity) =>
+      recordCallTurn({ identity, clientId: this.clientId, role: 'caller', text: callerText })
+    )
+  }
+
+  private onSpeechStarted(): void {
+    if (this.isAgentSpeaking) {
+      this.bargeIn()
     }
+  }
 
-    if (event.type === 'response.output_audio_transcript.delta' && event.delta?.transcript) {
-      // Accumulated rather than written per delta: a delta is a word fragment,
-      // and fifty rows saying "the", "unit", "is" is not a transcript anyone
-      // can read. Flushed as one turn on response.done below.
-      this.agentUtterance += event.delta.transcript
-      this.sendToClient({ type: 'transcript', text: event.delta.transcript })
-      return
-    }
-
-    // The caller's half. Requires TRANSCRIPTION to be set in session.update --
-    // without it this event never fires and only the agent is ever recorded.
-    if (event.type === 'conversation.item.input_audio_transcription.completed' && event.transcript) {
-      const callerText = event.transcript
-      void this.withIdentity((identity) =>
-        recordCallTurn({ identity, clientId: this.clientId, role: 'caller', text: callerText })
-      )
-      return
-    }
-
-    if (event.type === 'input_audio_buffer.speech_started') {
-      if (this.isAgentSpeaking) {
-        this.bargeIn()
-      }
-      return
-    }
-
-    if (event.type === 'response.function_call_arguments.done' && event.name === 'search_knowledge_base') {
+  private onFunctionCallDone(event: OpenAIRealtimeEvent): void {
+    if (event.name === 'search_knowledge_base') {
       console.log('[VoiceRelay] OpenAI requested tool call')
-      this.handleToolCall(event)
+      void this.handleToolCall(event)
       return
     }
 
-    if (event.type === 'response.function_call_arguments.done' && event.name === 'request_human') {
-      this.handleHandoffRequest(event)
-      return
+    if (event.name === 'request_human') {
+      void this.handleHandoffRequest(event)
     }
+  }
 
-    if (event.type === 'error') {
-      console.error('[VoiceRelay] OpenAI error event:', event.error?.message)
-      this.sendToClient({ type: 'error', message: event.error?.message ?? 'Unknown error' })
-    }
+  private onErrorEvent(event: OpenAIRealtimeEvent): void {
+    console.error('[VoiceRelay] OpenAI error event:', event.error?.message)
+    this.sendToClient({ type: 'error', message: event.error?.message ?? 'Unknown error' })
   }
 
   private bargeIn(): void {
