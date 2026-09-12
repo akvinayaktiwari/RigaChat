@@ -170,9 +170,16 @@ The deploy script now resolves every bare specifier in the bundle against the bo
 before shipping anything, and refuses if one is missing. `TODOS.md` records why
 the import graph grew — the check is a guard, not the fix.
 
-**The relay's own `package.json` lives only on that box** and is not in this repo,
-so the dependency list has no source of truth outside the instance. Worth
-correcting the next time the relay's build is touched.
+**The relay's own dependency list is now in the repo**, at
+`deploy/voice-relay/package.json` — it mirrors what `/home/ubuntu/package.json`
+on the box should contain, and nothing in this repo installs it. Before
+2026-09-12 it existed only on the instance, and it was already stale: it listed
+`ws`, which the bundle includes, and not `client-kms`, which the bundle
+externalises and needs. The deploy script now fails when the bundle requires an
+`@aws-sdk` package the manifest does not declare, and warns (only) when the
+manifest declares one the bundle no longer needs — the box still carries
+`client-sfn`, `client-sesv2` and `client-sqs` on purpose, so a rollback to the
+July bundle still works. `deploy/voice-relay/README.md` has the reasoning.
 
 **Restarting drops every call in progress.** Sessions are held in memory in one
 Node process — no draining, nothing to fail over to. The script confirms before
