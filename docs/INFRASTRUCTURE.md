@@ -90,10 +90,30 @@ Public IP    not an Elastic IP — it changes on stop/start, so verify before
              pinning DNS at it
 ```
 
-**Security-group review is outstanding.** The relay's inbound rules are wider
-than a box running one service on one port needs. Check them against what it
-actually serves (443 in front of 3100) and close the rest — the SSM deploy path
-below exists partly so that shutting the remainder costs nothing.
+**The relay's inbound rules are wider than a box serving one port needs.**
+`scripts/provision-voice-relay-sg.sh` works out the minimum set, reports the
+diff, and changes nothing without `--apply`:
+
+```bash
+./scripts/provision-voice-relay-sg.sh            # report, change nothing
+./scripts/provision-voice-relay-sg.sh --apply    # apply it
+```
+
+The minimum is **443 and 80, both from anywhere**. 443 is Caddy in front of
+3100 and cannot be narrowed to Plivo's ranges — the browser widget's WebSocket
+arrives there too, from whatever network the visitor is on. 80 stays open for
+Caddy's ACME HTTP-01 challenge: closing it looks tidy and then the certificate
+fails to renew 60 days later, taking browser voice and telephony down together.
+
+Everything else goes, and **22 is the point of the exercise** — SSM replaces it,
+which is why the SSM work came first. The script refuses `--apply` unless SSM
+reports `Online`, because closing SSH while SSM is misconfigured leaves the box
+unreachable. `Online` means the agent registered; `deploy-voice-relay.sh --probe`
+is the proof a command actually runs, and is worth having first.
+
+Egress is left alone: the relay dials OpenAI, the Lambda Function URL, DynamoDB
+and Plivo, and pinning that to addresses those four are free to change is a
+self-inflicted outage waiting for a Tuesday.
 
 The relay listens on **port 3100** (`voice-relay/server.ts`), so something in
 front of it terminates TLS and proxies 443 → 3100. The primer says Caddy + PM2;
