@@ -63,37 +63,48 @@ writing a test that pins dead code in place.
 
 **Depends on:** None. Each is a small, independent test file.
 
-## P0 GATE: call-recording consent before telephony goes live
+## P0 GATE: call-recording consent — the mechanism exists, the legal answer does not
 
-**What:** A phone call records both halves of the conversation into `lead_events`. There
-is no consent or disclosure line anywhere in the runtime code — not in `session.ts`, not
-in the agent instructions, not in the greeting.
+**Part 1 landed 2026-09-13.** `VoiceAgent.recordingDisclosure` is an optional line spoken
+as the opening turn, word for word, before the greeting. **Absent by default, and absent
+means nothing is said** — every agent that exists today is byte-identical to before. There
+is no UI for it, deliberately: nothing can be switched on by accident while the question
+below is open.
+
+It is assembled in `backend/src/lib/voice-instructions.ts`, imported by both the relay and
+`GET /api/voice-agents/context/:agentId`. That sharing is the point. The browser widget
+fetches the route's instructions and sends them back over the relay socket, where they
+REPLACE what the relay built — so a disclosure added to the relay alone would be spoken on
+telephony and silently skipped in the widget. The two had already drifted before this: only
+the browser path told the model to keep answers short, and a whitespace-only systemPrompt
+left the browser path with no persona at all. Both fixed by the shared module.
+
+**What a phone call records:** both halves of the conversation, into `lead_events`.
 
 **Why it is P0 and not a nice-to-have:** `docs/designs/voice-agent-telephony-v1.md`
 (Constraints) names this explicitly — "a caller consent/disclosure line before recording
 starts" — and points at the TRAI/DPDP uncertainty in
 `docs/voice-calling-cost-and-pricing-plan.md`. That doc's own re-check (§159) says the
 AI-disclosure clause is something TRAI is *considering*, not enacted, and tells you to get
-counsel to confirm before writing it into the product. Neither the check nor the line
-happened. Recording an Indian consumer's phone call with no disclosure is the kind of gap
-you discover from a complaint, not from a test.
+counsel to confirm before writing it into the product. Recording an Indian consumer's phone
+call with no disclosure is the kind of gap you discover from a complaint, not from a test.
 
-**Why it does NOT block the current merge:** telephony is fail-closed. Without
-`PLIVO_AUTH_TOKEN` and `VOICE_RELAY_PUBLIC_HOST` no call can arrive, and the CRM write
-path only engages when `callerPhone` is set, which is telephony-only. Browser voice
-transcribes but does not persist a caller's half. So nothing starts recording on merge.
+**Why nothing is recording today:** telephony is fail-closed. Without `PLIVO_AUTH_TOKEN`
+and `VOICE_RELAY_PUBLIC_HOST` no call can arrive, and the CRM write path only engages when
+`callerPhone` is set, which is telephony-only. Browser voice transcribes but does not
+persist a caller's half.
 
-**Do before the first real call, in this order:**
-1. Get counsel to confirm what disclosure (if any) is currently required for an AI voice
-   agent recording an inbound call in India.
-2. If required, add the line to the agent's opening turn — the greeting is already the
-   first thing spoken, so this is a prompt change, not new machinery.
-3. Decide whether a caller who declines should be transferred or dropped, and build that
-   branch. "Say the line and record anyway" is not consent.
+**Still to do before the first real call:**
+1. **Counsel.** What disclosure, if any, is required for an AI voice agent recording an
+   inbound call in India. Nobody here can answer this, and a default line would be us
+   guessing at a legal question. Until it is answered the field stays unset.
+2. **Part 2 — the decline path.** A caller who says no needs somewhere to go, and that is
+   a product decision (transfer to a human, or end the call) as well as a legal one. "Say
+   the line and record anyway" is not consent, so the mechanism above is not the whole
+   gate. Not built.
 
 **Depends on:** counsel. Start it alongside the Plivo KYC conversation — both are calendar
 time, and neither blocks the other.
-
 ## Relay bundle: three of four stray SDK clients are gone, KMS is real
 
 **Done 2026-09-09** (was: "the bundle pulls in the whole services layer"). The identity join
@@ -111,37 +122,6 @@ that decrypts the client's API key. A real dependency, not import bleed.
 `client-sqs` installed from 2026-09-07. Harmless, and deliberately not removed — the
 deployed bundle is still the July one, and the deploy script's preflight resolves what the
 NEW bundle needs. Uninstall them only after the smaller bundle is live and stays live.
-
-## P0 GATE: call-recording consent before telephony goes live
-
-**What:** A phone call records both halves of the conversation into `lead_events`. There
-is no consent or disclosure line anywhere in the runtime code — not in `session.ts`, not
-in the agent instructions, not in the greeting.
-
-**Why it is P0 and not a nice-to-have:** `docs/designs/voice-agent-telephony-v1.md`
-(Constraints) names this explicitly — "a caller consent/disclosure line before recording
-starts" — and points at the TRAI/DPDP uncertainty in
-`docs/voice-calling-cost-and-pricing-plan.md`. That doc's own re-check (§159) says the
-AI-disclosure clause is something TRAI is *considering*, not enacted, and tells you to get
-counsel to confirm before writing it into the product. Neither the check nor the line
-happened. Recording an Indian consumer's phone call with no disclosure is the kind of gap
-you discover from a complaint, not from a test.
-
-**Why it does NOT block the current merge:** telephony is fail-closed. Without
-`PLIVO_AUTH_TOKEN` and `VOICE_RELAY_PUBLIC_HOST` no call can arrive, and the CRM write
-path only engages when `callerPhone` is set, which is telephony-only. Browser voice
-transcribes but does not persist a caller's half. So nothing starts recording on merge.
-
-**Do before the first real call, in this order:**
-1. Get counsel to confirm what disclosure (if any) is currently required for an AI voice
-   agent recording an inbound call in India.
-2. If required, add the line to the agent's opening turn — the greeting is already the
-   first thing spoken, so this is a prompt change, not new machinery.
-3. Decide whether a caller who declines should be transferred or dropped, and build that
-   branch. "Say the line and record anyway" is not consent.
-
-**Depends on:** counsel. Start it alongside the Plivo KYC conversation — both are calendar
-time, and neither blocks the other.
 
 ## The voice relay bundle pulls in the whole services layer
 

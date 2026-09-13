@@ -134,7 +134,15 @@ export async function updateVoiceAgent(
   updates: Partial<
     Pick<
       VoiceAgent,
-      'name' | 'voice' | 'greetingMessage' | 'systemPrompt' | 'brandColor' | 'widgetPosition' | 'maxSessionDuration' | 'isEnabled'
+      | 'name'
+      | 'voice'
+      | 'greetingMessage'
+      | 'systemPrompt'
+      | 'brandColor'
+      | 'widgetPosition'
+      | 'maxSessionDuration'
+      | 'isEnabled'
+      | 'recordingDisclosure'
     >
   >
 ): Promise<VoiceAgent> {
@@ -144,7 +152,9 @@ export async function updateVoiceAgent(
 
 export async function getVoiceAgentContext(
   agentId: string
-): Promise<Pick<VoiceAgent, 'name' | 'voice' | 'greetingMessage' | 'systemPrompt' | 'botId'>> {
+): Promise<
+  Pick<VoiceAgent, 'name' | 'voice' | 'greetingMessage' | 'systemPrompt' | 'botId' | 'recordingDisclosure'>
+> {
   const agent = await getVoiceAgentByIdRecord(agentId)
   if (!agent) {
     throw new Error('Voice agent not found')
@@ -156,6 +166,10 @@ export async function getVoiceAgentContext(
     greetingMessage: agent.greetingMessage,
     systemPrompt: agent.systemPrompt,
     botId: agent.botId,
+    // Projected because the browser path builds its instructions from this and
+    // overrides the relay's. Omit it here and the disclosure is spoken on
+    // telephony and silently skipped in the widget.
+    recordingDisclosure: agent.recordingDisclosure,
   }
 }
 

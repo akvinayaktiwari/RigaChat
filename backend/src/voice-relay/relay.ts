@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import type { WebSocket } from 'ws'
 import type { VoiceAgent } from '../types/index.js'
 import { generateToken, validateToken } from './auth.js'
+import { buildVoiceInstructions } from '../lib/voice-instructions.js'
 import { VoiceSession } from './session.js'
 import { PlivoAudioAdapter } from './transports/plivo-audio-adapter.js'
 import {
@@ -78,13 +79,14 @@ export interface RelayContext {
   sessions: SessionRegistry
 }
 
-// One place that turns an agent record into the session's persona, so the
-// browser and telephony paths cannot describe the same agent differently.
+// Kept as a name the relay's call sites and tests already use; the assembly
+// itself moved to lib/voice-instructions.ts so the browser path -- which builds
+// its instructions in GET /api/voice-agents/context/:agentId and overrides the
+// relay's over the socket -- cannot describe the same agent differently. It had
+// already drifted before the disclosure line gave it something that matters to
+// drift about.
 export function buildInstructions(agent: VoiceAgent): string {
-  return (
-    agent.systemPrompt?.trim() ||
-    `You are ${agent.name}, a helpful voice assistant. Start the call by greeting the caller with: "${agent.greetingMessage}"`
-  )
+  return buildVoiceInstructions(agent)
 }
 
 function readBody(req: http.IncomingMessage): Promise<string> {
