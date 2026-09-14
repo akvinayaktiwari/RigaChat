@@ -853,6 +853,12 @@ export interface VoiceAgent {
   // Opt-in on purpose: transferring to an unattended number is worse than not
   // offering, because the caller waits through ringing before being dropped.
   handoffNumber?: string
+  // Spoken as the opening turn, word for word, before the greeting. Absent by
+  // default and absent means nothing is said -- the P0 GATE item in TODOS.md is
+  // waiting on counsel for what an AI agent recording an inbound Indian call
+  // must disclose, and a default line would be us answering a legal question by
+  // guessing. Built now, switched on per agent later.
+  recordingDisclosure?: string
   isEnabled: boolean
   // True once this agent's own websiteUrl has been crawled, chunked, and
   // embedded into its Pinecone namespace (see feat/voice-agent-rag) — or

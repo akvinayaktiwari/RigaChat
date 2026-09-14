@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import type { WebSocket } from 'ws'
 import type { VoiceAgent } from '../types/index.js'
 import { generateToken, validateToken } from './auth.js'
+import { buildVoiceInstructions } from '../lib/voice-instructions.js'
 import { VoiceSession } from './session.js'
 import { PlivoAudioAdapter } from './transports/plivo-audio-adapter.js'
 import {
@@ -78,13 +79,14 @@ export interface RelayContext {
   sessions: SessionRegistry
 }
 
-// One place that turns an agent record into the session's persona, so the
-// browser and telephony paths cannot describe the same agent differently.
+// Kept as a name the relay's call sites and tests already use; the assembly
+// itself moved to lib/voice-instructions.ts so the browser path -- which builds
+// its instructions in GET /api/voice-agents/context/:agentId and overrides the
+// relay's over the socket -- cannot describe the same agent differently. It had
+// already drifted before the disclosure line gave it something that matters to
+// drift about.
 export function buildInstructions(agent: VoiceAgent): string {
-  return (
-    agent.systemPrompt?.trim() ||
-    `You are ${agent.name}, a helpful voice assistant. Start the call by greeting the caller with: "${agent.greetingMessage}"`
-  )
+  return buildVoiceInstructions(agent)
 }
 
 function readBody(req: http.IncomingMessage): Promise<string> {
@@ -117,27 +119,22 @@ function sendXml(res: http.ServerResponse, xml: string, status = 200): void {
   res.end(xml)
 }
 
-// Plivo POSTs here when a call reaches one of our DIDs. It answers with the XML
-// that tells Plivo where to stream the audio -- so this handler decides, before
-// a single audio frame exists, whether the call is answered at all.
-export async function handlePlivoAnswer(
+// Reads the body and proves the request came from Plivo. Returns null having
+// ALREADY answered -- each refusal here has its own status code, and folding
+// them into one would make a 413 and a 403 indistinguishable to whoever is
+// reading the logs after a bad night.
+async function readVerifiedPlivoRequest(
   req: http.IncomingMessage,
   res: http.ServerResponse,
-  { config, sessions }: RelayContext
-): Promise<void> {
-  if (!isTelephonyEnabled(config)) {
-    res.writeHead(503)
-    res.end('Telephony not configured')
-    return
-  }
-
+  config: TelephonyConfig
+): Promise<Record<string, string> | null> {
   let body: string
   try {
     body = await readBody(req)
   } catch {
     res.writeHead(413, { Connection: 'close' })
     res.end()
-    return
+    return null
   }
 
   // Verified before anything else is trusted: this endpoint is public, and
@@ -150,16 +147,25 @@ export async function handlePlivoAnswer(
     console.warn('[VoiceRelay] Rejected Plivo webhook with an invalid signature')
     res.writeHead(403)
     res.end('Invalid signature')
-    return
+    return null
   }
 
-  const params = parseFormBody(body)
-  const dialledNumber = extractDialledNumber(params)
+  return parseFormBody(body)
+}
 
+// Decides whether this call is answered at all. Every "no" is spoken to the
+// caller as a sentence rather than returned as a status code -- they are on a
+// phone, and a 503 is silence. Returns null having already sent that XML.
+async function resolveAnsweringAgent(
+  res: http.ServerResponse,
+  params: Record<string, string>,
+  { config, sessions }: RelayContext
+): Promise<{ agentId: string; dialledNumber: string } | null> {
+  const dialledNumber = extractDialledNumber(params)
   if (!dialledNumber) {
     console.error('[VoiceRelay] Plivo webhook carried no destination number', Object.keys(params))
     sendXml(res, buildRejectXml('Sorry, this number is not available right now.'))
-    return
+    return null
   }
 
   // The ceiling is checked here rather than at stream time because this is the
@@ -170,9 +176,23 @@ export async function handlePlivoAnswer(
       `[VoiceRelay] Rejecting call to ${dialledNumber}: at capacity (${sessions.size}/${config.maxConcurrentCalls})`
     )
     sendXml(res, buildRejectXml('All our lines are busy at the moment. Please call back shortly.'))
-    return
+    return null
   }
 
+  const agentId = await lookupClaimedAgent(res, dialledNumber)
+  if (!agentId) return null
+
+  return { agentId, dialledNumber }
+}
+
+// Separated from the gates above so the two ways this can fail keep different
+// sentences: a lookup that threw is our infrastructure, a lookup that found
+// nothing is a number nobody claimed. Answering both with one line would make
+// an outage indistinguishable from a typo in the dashboard.
+async function lookupClaimedAgent(
+  res: http.ServerResponse,
+  dialledNumber: string
+): Promise<string | null> {
   let mapping
   try {
     mapping = await getAgentForPhoneNumber(dialledNumber)
@@ -185,38 +205,76 @@ export async function handlePlivoAnswer(
       error instanceof Error ? error.message : error
     )
     sendXml(res, buildRejectXml('Sorry, we are unable to take your call right now.'))
-    return
+    return null
   }
 
   if (!mapping) {
     console.warn(`[VoiceRelay] Call to unclaimed number ${dialledNumber}`)
     sendXml(res, buildRejectXml('Sorry, this number is not in service.'))
+    return null
+  }
+
+  return mapping.agentId
+}
+
+// The stream socket is authenticated with the same short-lived HMAC token the
+// browser path uses. Plivo cannot carry custom auth on the stream, but we
+// control the URL we hand it, and the token expires in five minutes -- so a
+// leaked stream URL is not a standing door into a client's agent.
+//
+// The caller's number and the DID travel on the URL because Plivo's media
+// stream carries neither, and they are what the CRM record is built from.
+// TRUST BOUNDARY, stated plainly: the HMAC token binds only the agentId, so
+// these two are not themselves signed. The URL is minted here and handed to
+// Plivo over TLS, so forging them means already holding a valid, unexpired
+// token for that agent -- but a forged `from` would attach a call to the wrong
+// lead, so widening the token to cover them is the right fix when the auth
+// helper is next touched.
+function buildPlivoStreamUrl(
+  agentId: string,
+  dialledNumber: string,
+  params: Record<string, string>,
+  config: TelephonyConfig
+): string {
+  const streamToken = generateToken(agentId, config.authSecret)
+  return (
+    `wss://${config.publicHost}/plivo/stream?agentId=${encodeURIComponent(agentId)}` +
+    `&token=${encodeURIComponent(streamToken)}` +
+    `&from=${encodeURIComponent(params.From ?? '')}` +
+    `&to=${encodeURIComponent(dialledNumber)}` +
+    `&callUuid=${encodeURIComponent(params.CallUUID ?? '')}`
+  )
+}
+
+// Plivo POSTs here when a call reaches one of our DIDs. It answers with the XML
+// that tells Plivo where to stream the audio -- so this handler decides, before
+// a single audio frame exists, whether the call is answered at all.
+//
+// A sequence of gates, each of which can answer and stop. Kept as a pipeline
+// of three named steps rather than one 90-line function: the guards are what
+// this endpoint IS, and at one depth the capacity check reads like the
+// signature check, which is the kind of flattening that hides a missing return.
+export async function handlePlivoAnswer(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  context: RelayContext
+): Promise<void> {
+  const { config } = context
+  if (!isTelephonyEnabled(config)) {
+    res.writeHead(503)
+    res.end('Telephony not configured')
     return
   }
 
-  // The stream socket is authenticated with the same short-lived HMAC token the
-  // browser path uses. Plivo cannot carry custom auth on the stream, but we
-  // control the URL we hand it, and the token expires in five minutes -- so a
-  // leaked stream URL is not a standing door into a client's agent.
-  const streamToken = generateToken(mapping.agentId, config.authSecret)
-  // The caller's number and the DID travel on the stream URL because Plivo's
-  // media stream carries neither, and they are what the CRM record is built
-  // from. TRUST BOUNDARY, stated plainly: the HMAC token binds only the
-  // agentId, so these two are not themselves signed. The URL is minted here and
-  // handed to Plivo over TLS, so forging them means already holding a valid,
-  // unexpired token for that agent -- but a forged `from` would attach a call
-  // to the wrong lead, so widening the token to cover them is the right fix
-  // when the auth helper is next touched.
-  const callerPhone = params.From ?? ''
-  const streamUrl =
-    `wss://${config.publicHost}/plivo/stream?agentId=${encodeURIComponent(mapping.agentId)}` +
-    `&token=${encodeURIComponent(streamToken)}` +
-    `&from=${encodeURIComponent(callerPhone)}` +
-    `&to=${encodeURIComponent(dialledNumber)}` +
-    `&callUuid=${encodeURIComponent(params.CallUUID ?? '')}`
+  const params = await readVerifiedPlivoRequest(req, res, config)
+  if (!params) return
 
-  console.log(`[VoiceRelay] Answering call to ${dialledNumber} with agent ${mapping.agentId}`)
-  sendXml(res, buildStreamXml({ streamUrl }))
+  const target = await resolveAnsweringAgent(res, params, context)
+  if (!target) return
+
+  const { agentId, dialledNumber } = target
+  console.log(`[VoiceRelay] Answering call to ${dialledNumber} with agent ${agentId}`)
+  sendXml(res, buildStreamXml({ streamUrl: buildPlivoStreamUrl(agentId, dialledNumber, params, config) }))
 }
 
 // Fetched by Plivo once a transfer is accepted. GET, because that is what the

@@ -287,6 +287,74 @@ if [ -n "$(echo "$MISSING" | tr -d '[:space:]')" ]; then
 fi
 echo "    all $(echo "$REQUIRED" | wc -w | tr -d ' ') external modules present"
 
+# The check above answers "will the require succeed on the box" -- the question
+# that decides whether the relay boots -- by asking node on the box itself. It
+# cannot answer the other one: whether what the box has is what anyone
+# INTENDED it to have. Until 2026-09-12 the intended list existed only as
+# /home/ubuntu/package.json on the instance, readable from nowhere else, and it
+# was already stale (it listed ws, which is bundled, and not client-kms, which
+# is not).
+#
+# deploy/voice-relay/package.json is now that list, in the repo. Comparing the
+# bundle against it catches the drift a box-only resolution check cannot see:
+# a module that resolves today because someone installed it by hand, with
+# nothing recording that it is needed, so the next box built from the manifest
+# crashes at load.
+#
+# One-directional, deliberately. Undeclared-but-required fails: the manifest is
+# wrong and a rebuilt box would not boot. Declared-but-unused only warns: the
+# box still carries client-sfn, client-sesv2 and client-sqs from before the
+# bundle was trimmed, kept on purpose so a rollback to the July bundle still
+# works. See deploy/voice-relay/README.md.
+MANIFEST="${REPO_ROOT}/deploy/voice-relay/package.json"
+if [ ! -f "$MANIFEST" ]; then
+  echo "    no deploy/voice-relay/package.json -- skipping the manifest check"
+else
+  DECLARED=$(node -e '
+    const m = require(process.argv[1])
+    const names = Object.keys({ ...m.dependencies, ...m.optionalDependencies })
+    console.log(names.join(" "))
+  ' "$MANIFEST")
+
+  # Only the externalised @aws-sdk packages are compared. The bundle also
+  # requires unprefixed node builtins (crypto, http, stream...) which resolve
+  # everywhere and belong in no manifest, and ws's two optional speedups, which
+  # the manifest lists as optional precisely so they are not required here.
+  UNDECLARED=""
+  for M in $REQUIRED; do
+    case "$M" in
+      @aws-sdk/*) ;;
+      *) continue ;;
+    esac
+    echo " $DECLARED " | grep -q " $M " || UNDECLARED="${UNDECLARED} ${M}"
+  done
+
+  UNUSED=""
+  for M in $DECLARED; do
+    case "$M" in
+      @aws-sdk/*) ;;
+      *) continue ;;
+    esac
+    echo " $REQUIRED " | grep -q " $M " || UNUSED="${UNUSED} ${M}"
+  done
+
+  if [ -n "$(echo "$UNDECLARED" | tr -d '[:space:]')" ]; then
+    echo "    NOT DECLARED in deploy/voice-relay/package.json:${UNDECLARED}"
+    echo
+    echo "Refusing to deploy. These resolve on this box, so the relay would"
+    echo "start -- but the manifest is the only record of what a box needs, and"
+    echo "a replacement built from it would crash at load. Add them there (with"
+    echo "the version backend/package.json pins) and re-run."
+    exit 1
+  fi
+
+  if [ -n "$(echo "$UNUSED" | tr -d '[:space:]')" ]; then
+    echo "    declared but no longer required by the bundle:${UNUSED}"
+    echo "    (not fatal -- remove from the manifest once the smaller bundle is live)"
+  fi
+  echo "    manifest agrees with the bundle"
+fi
+
 if [ "$ASSUME_YES" != true ]; then
   echo
   echo "Restarting the relay DROPS EVERY CALL IN PROGRESS -- sessions are held"

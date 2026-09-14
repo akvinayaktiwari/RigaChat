@@ -127,13 +127,34 @@ describe('isTelephonyEnabled', () => {
 
 describe('buildInstructions', () => {
   it('uses the agent system prompt when it has one', () => {
-    expect(buildInstructions({ ...AGENT, systemPrompt: '  You are Ravi.  ' })).toBe('You are Ravi.')
+    // The brevity line is now part of it, because this delegates to
+    // lib/voice-instructions.ts -- shared with the browser path, which always
+    // appended it. This test asserted the drift: telephony was the only path
+    // that did not tell the model it was on a phone call.
+    const instructions = buildInstructions({ ...AGENT, systemPrompt: '  You are Ravi.  ' })
+    expect(instructions).toBe('You are Ravi.\nKeep responses concise — this is a voice conversation, 2-3 sentences max.')
   })
 
   it('builds a greeting persona when the prompt is blank', () => {
     const instructions = buildInstructions({ ...AGENT, systemPrompt: '   ' })
     expect(instructions).toContain('You are Ravi')
     expect(instructions).toContain('Hello, Acme Estates.')
+  })
+
+  it('says nothing about recording when no disclosure is configured', () => {
+    const withoutField = buildInstructions({ ...AGENT, systemPrompt: 'You are Ravi.' })
+    const withUndefined = buildInstructions({ ...AGENT, systemPrompt: 'You are Ravi.', recordingDisclosure: undefined })
+    expect(withoutField).toBe(withUndefined)
+    expect(withoutField.toLowerCase()).not.toContain('record')
+  })
+
+  it('puts a configured disclosure ahead of the persona', () => {
+    const instructions = buildInstructions({
+      ...AGENT,
+      systemPrompt: 'You are Ravi.',
+      recordingDisclosure: 'This call is recorded.',
+    })
+    expect(instructions.indexOf('This call is recorded.')).toBeLessThan(instructions.indexOf('You are Ravi.'))
   })
 })
 

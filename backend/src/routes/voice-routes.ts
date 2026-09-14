@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { Hono } from 'hono'
+import { buildVoiceInstructions } from '../lib/voice-instructions.js'
 import { requireAuth } from '../lib/cognito.js'
 import {
   addVoiceKBEntry,
@@ -58,7 +59,15 @@ interface CreateVoiceAgentBody {
 type UpdateVoiceAgentBody = Partial<
   Pick<
     VoiceAgent,
-    'name' | 'voice' | 'greetingMessage' | 'systemPrompt' | 'brandColor' | 'widgetPosition' | 'maxSessionDuration' | 'isEnabled'
+    | 'name'
+    | 'voice'
+    | 'greetingMessage'
+    | 'systemPrompt'
+    | 'brandColor'
+    | 'widgetPosition'
+    | 'maxSessionDuration'
+    | 'isEnabled'
+    | 'recordingDisclosure'
   >
 >
 
@@ -261,12 +270,11 @@ voiceRoutes.get('/context/:agentId', async (c) => {
   try {
     const agent = await getVoiceAgentContext(agentId)
 
-    const base =
-      agent.systemPrompt && agent.systemPrompt.length > 0
-        ? agent.systemPrompt
-        : `You are ${agent.name}, a helpful voice assistant. Start the call by greeting the caller with: "${agent.greetingMessage}"`
-
-    const instructions = `${base}\nKeep responses concise — this is a voice conversation, 2-3 sentences max.`
+    // Shared with the relay's own buildInstructions. The widget sends what
+    // this returns back over the socket, where it REPLACES what the relay
+    // built -- so these two agreeing is the only thing that makes an agent's
+    // persona, and now its recording disclosure, the same on both paths.
+    const instructions = buildVoiceInstructions(agent)
 
     return c.json({ instructions, voice: agent.voice, botName: agent.name }, 200)
   } catch (error) {
@@ -332,6 +340,13 @@ voiceRoutes.patch('/:id', requireAuth, async (c) => {
 
   if (typeof updates.systemPrompt === 'string' && updates.systemPrompt.length > 1000) {
     return c.json({ error: 'systemPrompt must be 1000 characters or fewer' }, 400)
+  }
+
+  // Bounded because the agent must say it verbatim before anything else: a
+  // paragraph here is a caller listening to a paragraph before they can speak,
+  // and a model that starts summarising it instead of reading it.
+  if (typeof updates.recordingDisclosure === 'string' && updates.recordingDisclosure.length > 300) {
+    return c.json({ error: 'recordingDisclosure must be 300 characters or fewer' }, 400)
   }
 
   try {
