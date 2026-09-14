@@ -501,15 +501,19 @@ same change.
 **Priority:** P2 — but (3) is P1-shaped the day a client has two bots under one Agent
 **Depends on:** Nothing outstanding
 
-### [RESOLVED 2026-08-11] Frontend has no test runner — runner added; three libs still uncovered
+### [RESOLVED 2026-09-14] Frontend has no test runner — runner added, and the three named libs are covered
 
 **What it was:** `frontend/` had no vitest/jest config and zero test files, so the frontend shipped with no automated cover at all while the backend had 300+ tests.
 
 **Fixed:** vitest + jsdom + @testing-library/react, pinned to the same vitest version as the backend so both halves run the same way. `frontend/vitest.config.ts`, a `test` script, and a "Run frontend tests" step in `ci.yml`'s check-frontend job (which previously only type-checked and built). 28 tests land with it, covering `lib/subscription-cache.ts` and `hooks/useSubscription.ts`.
 
-**Still open, narrower:** the three libs this item originally named remain untested — `lib/phone.ts` (E.164 normalization), `lib/lead-ref.ts` (URL <-> LeadRef round-tripping) and `lib/lead-display.ts` (the urgency tiers the lead queue is ordered by). They are pure functions, need no DOM, and `leadUrgency`'s tiers still have to agree exactly with `lead-inbox-service.ts`'s server-side sort with nothing enforcing it. The setup cost that used to block this is now zero.
+**Closed 2026-09-14.** All three named libs are covered. `lib/lead-ref.ts` landed earlier with the inbox work; `lib/phone.ts` (wa.me/tel normalization, including the explicit-`+` and `00` international paths that must never take the India default) and `lib/lead-display.ts` (urgency labels and tiers) were written on `test/frontend-lib-coverage` on 2026-08-14, never merged, and were recovered from that branch in the stale-branch audit — see `docs/stale-branch-audit-2026-09-14.md`. 45 tests, taking the frontend suite from 396 to 441.
 
-**Effort:** S (runner done; the three libs are ~30 min of CC time)
+They did not apply unchanged: `UnifiedLead` has since gained a required `urgencyTier`, because the server now stamps the tier rather than letting each client recompute it, so every fixture in the file failed to typecheck. `npm test` passed regardless — only `npm run build` runs `tsc`, which is the fourth time that gap has hidden a mock or fixture drifting.
+
+The `leadUrgency` half carries a tier cross-check: a fixture matrix asserts the frontend's tone lands in the same tier `lead-inbox-service.ts` sorts by, so a row labelled "Overdue" can never render below one that is not. **Its `TIER_*` block is a hand-copy** — nothing imports across the two packages, so it does not auto-fail when the server's constants change. Re-checked against `TIER_RANK` and `urgencyTierOf` on 2026-09-14 and still exact. The server side is held by `lead-inbox-service.test.ts`'s own ordering tests; changing the tiers means updating both in the same commit. The pairing is the guard, not either file alone.
+
+**Effort:** done
 **Priority:** P2
 **Depends on:** None
 
