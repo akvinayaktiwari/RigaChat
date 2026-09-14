@@ -1,9 +1,10 @@
 # Week plan — Tue 8 Sep to Sun 13 Sep 2026
 
-## STATUS as of 11 Sep 15:30 (+04) — read this first
+## STATUS as of 14 Sep 15:30 (+04) — read this first
 
-Days 1-3 are **merged to main and deployed**, CI green. Day 4 is **written and pushed,
-not merged** — see below. Days 5 and 6 are still to do and need nothing from me.
+Days 1-3 are **merged to main and deployed**, CI green. Days 4, 5 and 6 are **written and
+on branches, nothing merged**. The week's work is done except the parts only you can
+unblock.
 
 | Day | State |
 |---|---|
@@ -11,8 +12,35 @@ not merged** — see below. Days 5 and 6 are still to do and need nothing from m
 | 2 — trim the relay bundle | **DONE, merged.** 3.5MB -> 244K. |
 | 3 — keyed read for the identity join | **HALF DONE.** Design written, pagination fixed. **Blocked on your decision.** |
 | 4 — one token validator, kill the hardcoded URL | **DONE, pushed, NOT merged.** Branch `refactor/one-voice-token-validator`, 2 commits. |
-| 5 — relay hardening | not started, needs nothing from you |
-| 6 — consent gate, code half | not started, needs counsel's answer for part 2 |
+| 5 — relay hardening | **DONE, NOT merged.** 3 commits on `feat/relay-hardening-and-consent-gate`. |
+| 6 — consent gate, code half | **PART 1 DONE, NOT merged.** Same branch. Part 2 still needs counsel. |
+| + a seventh day — stale branch audit | **DONE, NOT merged.** Same branch. The spare-day item from below. |
+
+### Days 5, 6 and the branch audit — one branch, seven commits
+
+`feat/relay-hardening-and-consent-gate`, not pushed, no PR. Backend 1287 tests, frontend
+441, typecheck clean, relay bundle 251,852 bytes.
+
+**Day 5 — relay hardening.** `scripts/provision-voice-relay-sg.sh` works out the box's
+minimum inbound set (443 and 80 only; 22 goes, SSM replaced it), reports the diff, and
+refuses `--apply` unless SSM says Online. **Not run.** The relay's dependency list is now
+`deploy/voice-relay/package.json` instead of living only on the instance, and the deploy
+script fails when the bundle needs an `@aws-sdk` package the manifest omits. The two
+functions over the 40-line rule are split, with every existing test untouched.
+
+**Day 6 — the consent gate, Part 1.** `VoiceAgent.recordingDisclosure`, spoken verbatim as
+the opening turn, **absent by default and no UI**, so nothing can be switched on while the
+legal question is open. Wiring it found a live drift: the browser widget's instructions
+come from `GET /context/:agentId` and override the relay's, and the two builders had
+already diverged. Both now import `lib/voice-instructions.ts`, with a test asserting they
+agree. **Part 2 (a caller who declines) is not built** — it needs counsel's answer and a
+product call on transfer vs hang up.
+
+**The seventh day — the stale branch audit**, the spare-day item this file suggested.
+`docs/stale-branch-audit-2026-09-14.md`. Four of the eight are fully shipped, one was two
+thirds shipped (its missing tests are recovered, +45), and three are real. One of those
+three, `fix/razorpay-go-live-p0`, **must not be merged**: its test cards and its diagnosis
+have both been superseded, so following it would cost a day.
 
 ### What Days 1-3 actually found
 
@@ -100,8 +128,15 @@ merging alone cannot break the box.
 
 ### To resume
 
-Say "start day 5" (or 6) — they are independent, take either. Day 3 finishes once you answer
-the index question above. Day 4 needs only a merge.
+Nothing is left to write. What remains is yours:
+
+1. **Merge.** `refactor/one-voice-token-validator` and
+   `feat/relay-hardening-and-consent-gate`. Merging deploys the Lambda and frontend only —
+   CI never touches the relay box.
+2. **Answer the index question** to finish Day 3.
+3. **The three calendar-bound things** below: Plivo, counsel, and — before any relay
+   deploy from Day 4's code — the `BACKEND_URL` line on the box.
+4. **Optionally delete six branches.** The audit lists them and what to keep.
 
 ---
 
