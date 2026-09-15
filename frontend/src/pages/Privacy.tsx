@@ -22,6 +22,7 @@ import {
 import Navbar from '../components/landing/Navbar'
 import Footer from '../components/landing/Footer'
 import DemoModal from '../components/landing/modals/DemoModal'
+import { absoluteUrl } from '../lib/site'
 
 interface TOCItem {
   id: string
@@ -466,7 +467,7 @@ export default function Privacy() {
           name="description"
           content="How Vyostra AI collects, stores, retains and deletes personal and lead data, including leads retrieved from Meta (Facebook/Instagram) Lead Ads."
         />
-        <link rel="canonical" href="https://vyostra.com/privacy-policy" />
+        <link rel="canonical" href={absoluteUrl('/privacy-policy/')} />
       </Helmet>
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 

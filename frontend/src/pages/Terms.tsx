@@ -4,6 +4,7 @@ import { Calendar, Download, Mail, MapPin, FileCheck, Settings2, ShieldCheck, Cr
 import Navbar from '../components/landing/Navbar'
 import Footer from '../components/landing/Footer'
 import DemoModal from '../components/landing/modals/DemoModal'
+import { absoluteUrl } from '../lib/site'
 
 // Must match Privacy.tsx and the site footer exactly -- Meta App Review
 // cross-checks the declared legal entity against what is published.
@@ -286,7 +287,7 @@ export default function Terms() {
           name="description"
           content="The terms governing use of the Vyostra AI platform, including acceptable use, data handling and subscription conditions."
         />
-        <link rel="canonical" href="https://vyostra.com/terms-of-service" />
+        <link rel="canonical" href={absoluteUrl('/terms-of-service/')} />
       </Helmet>
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 

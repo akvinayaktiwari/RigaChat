@@ -43,6 +43,22 @@ function composePage(template, { html, head }) {
   return page.replace(rootDiv, `<div id="root">${html}</div>`)
 }
 
+/**
+ * Canonical URLs are absolute and built from VITE_COGNITO_REDIRECT_URI's origin
+ * (src/lib/site.ts). A production build with that variable missing would ship
+ * relative or localhost canonicals, which is worse than none -- so CI refuses.
+ * Local builds only warn: their redirect URI is legitimately localhost.
+ */
+function assertPublicOrigin(siteUrl) {
+  if (siteUrl.startsWith('https://')) return
+
+  const message = `[prerender] site origin is "${siteUrl}" (from VITE_COGNITO_REDIRECT_URI); canonical URLs will not be public.`
+  if (process.env.CI === 'true') {
+    throw new Error(`${message} Set the variable to the live https URL.`)
+  }
+  console.warn(message)
+}
+
 async function main() {
   const template = await readFile(path.join(distDir, 'index.html'), 'utf-8').catch(() => {
     throw new Error('dist/index.html not found. Run `vite build` before prerendering.')
@@ -61,7 +77,8 @@ async function main() {
   })
 
   const entryPath = path.join(ssrOutDir, 'prerender-entry.mjs')
-  const { renderRoute, getRoutes } = await import(pathToFileURL(entryPath).href)
+  const { renderRoute, getRoutes, SITE_URL } = await import(pathToFileURL(entryPath).href)
+  assertPublicOrigin(SITE_URL)
 
   const routes = getRoutes()
   if (routes.length === 0) {

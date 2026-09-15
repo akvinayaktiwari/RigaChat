@@ -9,8 +9,7 @@ import { getAllPosts } from '../content/blog/registry'
 import { BlogSurface, PostMetaLine, PostTags } from '../components/blog/BlogChrome'
 import { JAKARTA_FONT, ScrollReveal, StatTile } from '../components/blog/BlogPrimitives'
 import type { BlogPost } from '../types/blog'
-
-const SITE_URL = 'https://vyostra.com'
+import { absoluteUrl } from '../lib/site'
 
 function FeaturedPost({ post }: { post: BlogPost }) {
   const { meta } = post
@@ -101,11 +100,11 @@ export default function BlogIndex() {
       <Helmet>
         <title>Blog — Vyostra AI</title>
         <meta name="description" content="Research, breakdowns and field notes from the Vyostra AI team on AI, lead generation and the markets our customers build in." />
-        <link rel="canonical" href={`${SITE_URL}/blog`} />
+        <link rel="canonical" href={absoluteUrl('/blog/')} />
         <meta property="og:type" content="website" />
         <meta property="og:title" content="Blog — Vyostra AI" />
         <meta property="og:description" content="Research, breakdowns and field notes from the Vyostra AI team." />
-        <meta property="og:url" content={`${SITE_URL}/blog`} />
+        <meta property="og:url" content={absoluteUrl('/blog/')} />
         <meta name="twitter:card" content="summary_large_image" />
       </Helmet>
 

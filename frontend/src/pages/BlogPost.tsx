@@ -8,8 +8,7 @@ import DemoModal from '../components/landing/modals/DemoModal'
 import { getPostBySlug } from '../content/blog/registry'
 import { AttachmentCard, BlogSurface, PostMetaLine, PostTags } from '../components/blog/BlogChrome'
 import { JAKARTA_FONT, ScrollReveal, StatRow, StatTile } from '../components/blog/BlogPrimitives'
-
-const SITE_URL = 'https://vyostra.com'
+import { absoluteUrl } from '../lib/site'
 
 function BackToBlog() {
   return (
@@ -77,7 +76,8 @@ export default function BlogPost() {
   }
 
   const { meta } = post
-  const canonical = `${SITE_URL}/blog/${meta.slug}`
+  // Trailing slash: the prerendered post is served from blog/<slug>/index.html.
+  const canonical = absoluteUrl(`/blog/${meta.slug}/`)
 
   return (
     <div className="landing-page bg-background">

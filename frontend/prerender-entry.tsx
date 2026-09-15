@@ -9,6 +9,8 @@ import Privacy from './src/pages/Privacy'
 import Terms from './src/pages/Terms'
 import { getAllSlugs } from './src/content/blog/registry'
 
+export { SITE_URL } from './src/lib/site'
+
 /**
  * SSR entry used only at build time by scripts/prerender.mjs.
  *
