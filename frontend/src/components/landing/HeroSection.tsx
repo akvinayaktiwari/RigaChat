@@ -1,9 +1,10 @@
 import { useNavigate } from 'react-router-dom'
-import { motion, useReducedMotion } from 'motion/react'
+import { motion } from 'motion/react'
+import { bootedFromPrerender } from '../../lib/prerender-boot'
 import { ArrowRight, ChevronRight, Star } from 'lucide-react'
 import AuroraCanvas from './AuroraCanvas'
 import DemoChat from './DemoChat'
-import { DURATION, EASE_OUT, EASE_BACK } from './motion-primitives'
+import { DURATION, EASE_OUT, EASE_BACK, useStaticMotion } from './motion-primitives'
 
 interface HeroSectionProps {
   onOpenDemo: () => void
@@ -18,7 +19,9 @@ const AVATARS = [
 
 export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
   const navigate = useNavigate()
-  const reduced = useReducedMotion()
+  // Also static when this page booted from prerendered HTML: the hero was
+  // already on screen, and replaying its entrance would blink it out and back.
+  const reduced = useStaticMotion() || bootedFromPrerender()
 
   // The hero is above the fold, so it animates on mount rather than on scroll
   // -- a whileInView trigger here would either fire instantly anyway or, worse,

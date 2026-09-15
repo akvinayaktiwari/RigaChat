@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Activity, CheckCircle, Clock, Mic, Route, type LucideIcon } from 'lucide-react'
-import { useReducedMotion } from 'motion/react'
-import { Reveal, RevealGroup, RevealItem } from './motion-primitives'
+import { Reveal, RevealGroup, RevealItem, useStaticMotion } from './motion-primitives'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -272,7 +271,7 @@ function TimelineNodeCard({ node, state, pinned, onHover, onToggle }: TimelineNo
 }
 
 export default function RoadmapSection() {
-  const reduced = useReducedMotion() ?? false
+  const reduced = useStaticMotion()
   const journey = useJourneyPlayback(TIMELINE_NODES.length, reduced)
 
   return (

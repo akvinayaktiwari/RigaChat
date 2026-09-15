@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { useInView, useReducedMotion } from 'motion/react'
-import { RevealGroup, RevealItem } from './motion-primitives'
+import { useInView } from 'motion/react'
+import { RevealGroup, RevealItem, useStaticMotion } from './motion-primitives'
 
 interface Stat {
   /** The numeric part that counts up. */
@@ -81,7 +81,7 @@ function StatValue({ stat, active, reduced }: { stat: Stat; active: boolean; red
 
 export default function StatsBar() {
   const sectionRef = useRef<HTMLElement>(null)
-  const reduced = useReducedMotion()
+  const reduced = useStaticMotion()
   const inView = useInView(sectionRef, { once: true, amount: 0.5 })
 
   // `reduced` and `inView` stay separate signals all the way down. Folding

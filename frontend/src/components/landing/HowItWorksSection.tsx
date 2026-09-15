@@ -1,4 +1,5 @@
-import { motion, useReducedMotion } from 'motion/react'
+import { motion } from 'motion/react'
+import { useStaticMotion } from './motion-primitives'
 import { Reveal, RevealGroup, RevealItem, DURATION, EASE_OUT } from './motion-primitives'
 
 const STEPS = [
@@ -23,7 +24,7 @@ const STEPS = [
 ]
 
 export default function HowItWorksSection() {
-  const reduced = useReducedMotion()
+  const reduced = useStaticMotion()
 
   return (
     <section id="how-it-works" className="py-24 px-4">
