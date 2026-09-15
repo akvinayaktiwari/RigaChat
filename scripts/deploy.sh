@@ -412,8 +412,21 @@ echo "==> Step 8: Deploying frontend to S3..."
 # which is the path that actually deploys.
 aws s3 sync frontend/dist/ s3://"$S3_BUCKET_FRONTEND" \
   --exclude "*.html" \
+  --exclude "robots.txt" \
+  --exclude "sitemap.xml" \
   --cache-control "public, max-age=31536000, immutable" \
   --delete \
+  --region "$AWS_REGION"
+
+# robots.txt and sitemap.xml change every build but carry no content hash, so
+# they must not get the immutable header above. Mirrors ci.yml.
+aws s3 cp frontend/dist/robots.txt s3://"$S3_BUCKET_FRONTEND"/robots.txt \
+  --content-type "text/plain; charset=utf-8" \
+  --cache-control "public, max-age=3600" \
+  --region "$AWS_REGION"
+aws s3 cp frontend/dist/sitemap.xml s3://"$S3_BUCKET_FRONTEND"/sitemap.xml \
+  --content-type "application/xml; charset=utf-8" \
+  --cache-control "public, max-age=3600" \
   --region "$AWS_REGION"
 
 # cp --recursive, not sync: sync skips files whose size and mtime match, which

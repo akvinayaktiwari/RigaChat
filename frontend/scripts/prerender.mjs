@@ -1,5 +1,5 @@
 /**
- * Build-time prerender for blog routes.
+ * Build-time prerender for blog and legal routes, plus robots.txt and sitemap.xml.
  *
  * Runs after `vite build`. Builds an SSR bundle of prerender-entry.tsx, renders
  * each blog route to HTML, and writes it into dist/ as a real static file so
@@ -9,6 +9,8 @@
  * Emits:
  *   dist/blog/index.html
  *   dist/blog/<slug>/index.html
+ *   dist/privacy-policy/index.html, dist/terms-of-service/index.html
+ *   dist/robots.txt, dist/sitemap.xml
  */
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -77,8 +79,13 @@ async function main() {
   })
 
   const entryPath = path.join(ssrOutDir, 'prerender-entry.mjs')
-  const { renderRoute, getRoutes, SITE_URL } = await import(pathToFileURL(entryPath).href)
+  const { renderRoute, getRoutes, getCrawlFiles, SITE_URL } = await import(pathToFileURL(entryPath).href)
   assertPublicOrigin(SITE_URL)
+
+  for (const [fileName, contents] of Object.entries(getCrawlFiles())) {
+    await writeFile(path.join(distDir, fileName), contents, 'utf-8')
+    console.log(`[prerender] ${fileName} -> dist/${fileName}`)
+  }
 
   const routes = getRoutes()
   if (routes.length === 0) {
