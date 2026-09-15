@@ -10,9 +10,10 @@ set -euo pipefail
 # 2026-09-16 its only copy lived in AWS. Neither CI nor scripts/deploy.sh ships
 # it; this script is the one way it changes.
 #
-# ORDER MATTERS when the rewrite target changes. The function rewrites
-# client-rendered routes to /app-shell.html, so that file must already be in
-# the bucket before this publishes, or every one of those routes 404s.
+# ORDER MATTERS. Whatever this function points a path at must already be in the
+# bucket before it publishes: /app-shell.html for client-rendered routes, and
+# <route>/index.html for every PRERENDERED_PREFIXES entry -- deploy the build
+# that writes those files first, or the route 404s.
 #
 #   ./scripts/deploy-cloudfront-function.sh --test   upload to DEVELOPMENT and test, publish nothing
 #   ./scripts/deploy-cloudfront-function.sh          test, then publish to LIVE
@@ -71,15 +72,20 @@ echo "==> Testing routing against the CloudFront runtime"
 expect www.vyostra.com /pricing '.response.statusCode'                         '301'
 expect www.vyostra.com /pricing '.response.headers.location.value'             'https://vyostra.com/pricing'
 expect vyostra.com     /        '.request.uri'                                 '/'
-expect vyostra.com     /features '.request.uri'                                '/app-shell.html'
+expect vyostra.com     /help    '.request.uri'                                 '/app-shell.html'
 expect vyostra.com     /dashboard/leads '.request.uri'                         '/app-shell.html'
 expect vyostra.com     /robots.txt '.request.uri'                              '/robots.txt'
 expect vyostra.com     /assets/index-abc.js '.request.uri'                     '/assets/index-abc.js'
-expect vyostra.com     /blog/   '.request.uri'                                 '/blog/'
-expect vyostra.com     /blog/some-post '.request.uri'                          '/blog/some-post'
-expect vyostra.com     /privacy-policy '.request.uri'                          '/privacy-policy'
+# Prerendered directories: the slash form is served, the bare form 301s to it.
+expect vyostra.com     /features/ '.request.uri'                               '/features/'
+expect vyostra.com     /features/crm/ '.request.uri'                           '/features/crm/'
+expect vyostra.com     /features '.response.statusCode'                        '301'
+expect vyostra.com     /features/crm '.response.headers.location.value'        '/features/crm/'
+expect vyostra.com     /blog    '.response.headers.location.value'             '/blog/'
+expect vyostra.com     /privacy-policy '.response.statusCode'                  '301'
 # A path that merely STARTS with a prerendered prefix is not one.
 expect vyostra.com     /blogging '.request.uri'                                '/app-shell.html'
+expect vyostra.com     /featuresx '.request.uri'                               '/app-shell.html'
 
 if (( FAILURES > 0 )); then
   echo "==> $FAILURES case(s) failed. LIVE is unchanged; DEVELOPMENT holds the failing code." >&2

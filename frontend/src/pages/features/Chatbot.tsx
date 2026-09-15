@@ -45,7 +45,7 @@ export default function Chatbot() {
       <PageMeta
         title="AI Agent for Lead Generation — Vyostra AI"
         description="Capture leads 24/7 with an AI agent trained on your business data. No code required. Set up in under 5 minutes."
-        path="/features/chatbot"
+        path="/features/chatbot/"
       />
       <UseCaseLayout
         badge="AI AGENT"

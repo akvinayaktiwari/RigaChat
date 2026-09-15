@@ -23,7 +23,7 @@ export default function Forms() {
       <PageMeta
         title="Smart Form Builder — Vyostra AI"
         description="Build beautiful lead capture forms in minutes. Embed anywhere. Every submission captured and notified instantly via WhatsApp."
-        path="/features/forms"
+        path="/features/forms/"
       />
       <UseCaseLayout
         badge="FORM BUILDER"

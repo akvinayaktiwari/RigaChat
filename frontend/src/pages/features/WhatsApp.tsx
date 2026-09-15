@@ -32,7 +32,7 @@ export default function WhatsAppFeaturePage() {
       <PageMeta
         title="WhatsApp Lead Notifications — Vyostra AI"
         description="Get instant WhatsApp alerts every time a new lead is captured. Weekly reports every Monday. Powered by Gupshup."
-        path="/features/whatsapp"
+        path="/features/whatsapp/"
       />
       <UseCaseLayout
         badge="WHATSAPP AUTOMATION"
