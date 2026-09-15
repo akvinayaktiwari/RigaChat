@@ -175,7 +175,7 @@ export default function Features() {
       <PageMeta
         title="Features — Vyostra AI Lead Generation"
         description="AI chat and voice agents, two-way WhatsApp, follow-up journeys, Lead CRM, Form Builder, and Zoho integration. Everything you need to capture and convert leads."
-        path="/features"
+        path="/features/"
       />
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 

@@ -9,11 +9,6 @@
 /** Marketing routes rendered client-side. Served at the bare path, no trailing slash. */
 export const SPA_MARKETING_ROUTES: readonly string[] = [
   '/',
-  '/features',
-  '/features/chatbot',
-  '/features/whatsapp',
-  '/features/crm',
-  '/features/forms',
   '/about-us',
   '/help',
   '/contact',
@@ -25,7 +20,16 @@ export const SPA_MARKETING_ROUTES: readonly string[] = [
  * Written without the trailing slash because that is how React Router and
  * prerender-entry.tsx name them; see servedPath() for the URL S3 answers on.
  */
-export const PRERENDERED_STATIC_ROUTES: readonly string[] = ['/blog', '/privacy-policy', '/terms-of-service']
+export const PRERENDERED_STATIC_ROUTES: readonly string[] = [
+  '/features',
+  '/features/chatbot',
+  '/features/whatsapp',
+  '/features/crm',
+  '/features/forms',
+  '/blog',
+  '/privacy-policy',
+  '/terms-of-service',
+]
 
 /**
  * App areas no crawler has a reason to fetch. Disallowing them only saves crawl

@@ -5,6 +5,11 @@ import { Route, Routes } from 'react-router-dom'
 import { StaticRouter } from 'react-router-dom/server'
 import BlogIndex from './src/pages/BlogIndex'
 import LandingPage from './src/pages/LandingPage'
+import Features from './src/pages/Features'
+import Chatbot from './src/pages/features/Chatbot'
+import WhatsAppFeature from './src/pages/features/WhatsApp'
+import Crm from './src/pages/features/Crm'
+import Forms from './src/pages/features/Forms'
 import { AuthProvider } from './src/hooks/useAuth'
 import { SubscriptionProvider } from './src/hooks/useSubscription'
 import BlogPost from './src/pages/BlogPost'
@@ -23,7 +28,7 @@ export { SITE_URL }
  * land in dist/ as real static HTML, which is what search crawlers and
  * link-preview scrapers (which never run JS) actually read.
  *
- * The homepage, blog routes and the two legal pages are mounted. The homepage is
+ * The homepage, the feature pages, blog routes and the two legal pages are mounted. The homepage is
  * the page most likely to rank and the one AI crawlers most often fetch. The legal pages matter for a
  * different reader than crawlers: Meta App Review fetches the Privacy Policy and
  * Terms URLs declared in App Settings, and a client-rendered page answers that
@@ -55,6 +60,11 @@ export async function renderRoute(url: string): Promise<{ html: string; head: st
           <StaticRouter location={url}>
             <Routes>
               <Route path="/" element={<LandingPage />} />
+              <Route path="/features" element={<Features />} />
+              <Route path="/features/chatbot" element={<Chatbot />} />
+              <Route path="/features/whatsapp" element={<WhatsAppFeature />} />
+              <Route path="/features/crm" element={<Crm />} />
+              <Route path="/features/forms" element={<Forms />} />
               <Route path="/blog" element={<BlogIndex />} />
               <Route path="/blog/:slug" element={<BlogPost />} />
               <Route path="/privacy-policy" element={<Privacy />} />

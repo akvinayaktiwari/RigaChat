@@ -49,7 +49,7 @@ export default function Crm() {
       <PageMeta
         title="Built-in Lead CRM — Vyostra AI"
         description="Every lead captured, stored, and organized automatically. Filter, track, and sync to Zoho CRM in real-time."
-        path="/features/crm"
+        path="/features/crm/"
       />
       <UseCaseLayout
         badge="LEAD CRM"
