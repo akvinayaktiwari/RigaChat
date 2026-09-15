@@ -46,10 +46,13 @@ event_for() {
 FAILURES=0
 expect() {
   local host="$1" uri="$2" filter="$3" want="$4"
-  local event output got
-  event="$(event_for "$host" "$uri")"
+  local event_file output got
+  # A file, not an inline string: CLI v2 reads blob arguments as base64.
+  event_file="$(mktemp)"
+  event_for "$host" "$uri" > "$event_file"
   output="$(aws cloudfront test-function --name "$FUNCTION_NAME" --if-match "$(etag_of)" \
-    --stage DEVELOPMENT --event-object "$event" --query 'TestResult.FunctionOutput' --output text)"
+    --stage DEVELOPMENT --event-object "fileb://$event_file" --query 'TestResult.FunctionOutput' --output text)"
+  rm -f "$event_file"
   got="$(printf '%s' "$output" | jq -r "$filter")"
   if [[ "$got" == "$want" ]]; then
     echo "  ok    $host$uri -> $got"
