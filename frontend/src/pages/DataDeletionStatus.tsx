@@ -166,8 +166,8 @@ export default function DataDeletionStatus() {
             <>
               <p className="mt-3 text-base text-on-surface-variant leading-relaxed">
                 {isComplete
-                  ? 'Your request to delete the data VyostraAI holds about you has been completed. Keep the confirmation code below for your records.'
-                  : 'Your request to delete the data VyostraAI holds about you has been received and verified. Keep the confirmation code below — you’ll need it if you contact us about this request.'}
+                  ? 'Your request to delete the data Vyostra AI holds about you has been completed. Keep the confirmation code below for your records.'
+                  : 'Your request to delete the data Vyostra AI holds about you has been received and verified. Keep the confirmation code below — you’ll need it if you contact us about this request.'}
               </p>
 
               <div className="mt-8 p-6 bg-white border border-outline-variant/30 rounded-2xl shadow-xs">
@@ -222,7 +222,7 @@ export default function DataDeletionStatus() {
                   What we delete
                 </h2>
                 <p className="text-sm text-on-surface-variant leading-relaxed mt-2">
-                  VyostraAI stores the information you submitted to a business’s lead form or chat —
+                  Vyostra AI stores the information you submitted to a business’s lead form or chat —
                   typically your name, phone number and email address, along with any answers you
                   gave. We remove that information, and the record of the conversation it came from.
                 </p>
@@ -235,7 +235,7 @@ export default function DataDeletionStatus() {
           ) : (
             !confirmationCode && (
               <p className="mt-3 text-base text-on-surface-variant leading-relaxed">
-                This page shows the status of a request to delete the data VyostraAI holds about
+                This page shows the status of a request to delete the data Vyostra AI holds about
                 you. You’ll normally arrive here from a link with a confirmation code. If you’d like
                 to request deletion directly, email us at the address below and we’ll handle it.
               </p>

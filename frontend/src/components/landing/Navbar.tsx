@@ -47,7 +47,7 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
             className="font-bold text-gray-900 text-lg tracking-tight"
             style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
           >
-            VyostraAI
+            Vyostra AI
           </span>
         </a>
 

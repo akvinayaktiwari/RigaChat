@@ -173,7 +173,7 @@ export default function Features() {
   return (
     <div className="landing-page bg-background">
       <Helmet>
-        <title>Features — VyostraAI Lead Generation</title>
+        <title>Features — Vyostra AI Lead Generation</title>
         <meta
           name="description"
           content="AI chat and voice agents, two-way WhatsApp, follow-up journeys, Lead CRM, Form Builder, and Zoho integration. Everything you need to capture and convert leads."

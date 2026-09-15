@@ -10,12 +10,12 @@ const BACKEND_URL = import.meta.env.VITE_API_URL as string
 // VITE_STREAM_URL is unset so a build that predates the variable still works.
 const STREAM_URL = (import.meta.env.VITE_STREAM_URL as string | undefined) || BACKEND_URL
 const BOT_ID = 'bda51d13-2060-4a8c-9650-d623e344c80e'
-const BOT_NAME = 'VyostraAI'
+const BOT_NAME = 'Vyostra AI'
 const SUPPORT_EMAIL = 'support@vyostra.com'
-const FALLBACK_GREETING = "Hi! I'm here to help. Ask me anything about VyostraAI."
+const FALLBACK_GREETING = "Hi! I'm here to help. Ask me anything about Vyostra AI."
 
 const SUGGESTED_QUESTIONS = [
-  'What is VyostraAI?',
+  'What is Vyostra AI?',
   'How does pricing work?',
   'How do I set up an AI agent?',
   'Does it work with WhatsApp?',
@@ -182,7 +182,7 @@ export default function DemoChat() {
   }
 
   function handleMailClick() {
-    window.open(`mailto:${SUPPORT_EMAIL}?subject=VyostraAI Enquiry`, '_blank')
+    window.open(`mailto:${SUPPORT_EMAIL}?subject=Vyostra AI Enquiry`, '_blank')
   }
 
   return (

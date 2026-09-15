@@ -40,14 +40,14 @@ const TERMS_SECTIONS: TermsSection[] = [
     order: '1',
     title: 'Acceptance of Terms',
     icon: 'FileCheck',
-    body: 'By using VyostraAI you agree to these terms.',
+    body: 'By using Vyostra AI you agree to these terms.',
   },
   {
     id: 'section-2',
     order: '2',
     title: 'Use of Service',
     icon: 'Settings2',
-    body: 'You must provide accurate information. You are responsible for your agent content. Do not use VyostraAI for spam or illegal activity.',
+    body: 'You must provide accurate information. You are responsible for your agent content. Do not use Vyostra AI for spam or illegal activity.',
   },
   {
     id: 'section-3',
@@ -68,7 +68,7 @@ const TERMS_SECTIONS: TermsSection[] = [
     order: '5',
     title: 'Limitation of Liability',
     icon: 'AlertTriangle',
-    body: 'VyostraAI is provided as-is. We are not liable for lead loss, missed notifications, or third-party service outages.',
+    body: 'Vyostra AI is provided as-is. We are not liable for lead loss, missed notifications, or third-party service outages.',
   },
   {
     id: 'section-6',
@@ -107,14 +107,14 @@ function TermsHeader({ onDownload }: { onDownload: () => void }) {
           </div>
           <h1 className="text-4xl md:text-5xl font-extrabold text-on-surface tracking-tight">Terms of Service</h1>
           <p className="mt-3 text-base text-on-surface-variant max-w-xl leading-relaxed">
-            These terms govern your use of VyostraAI. By creating an account or using our agent, you agree to the
+            These terms govern your use of Vyostra AI. By creating an account or using our agent, you agree to the
             terms outlined below.
           </p>
           {/* Same entity string as Privacy.tsx and the site footer. Meta App
               Review checks the declared legal entity against what is actually
               published, so these three must agree. */}
           <p className="mt-3 text-sm text-on-surface-variant max-w-xl leading-relaxed">
-            VyostraAI is operated by{' '}
+            Vyostra AI is operated by{' '}
             <span className="font-semibold text-on-surface">{LEGAL_ENTITY}</span>, {ENTITY_LOCATION}. These
             terms form an agreement between you and {LEGAL_ENTITY}.
           </p>
@@ -271,7 +271,7 @@ export default function Terms() {
 
   function handleDownload() {
     const previousTitle = document.title
-    document.title = 'VyostraAI - Terms of Service'
+    document.title = 'Vyostra AI - Terms of Service'
     window.print()
     document.title = previousTitle
   }
@@ -281,10 +281,10 @@ export default function Terms() {
       {/* Prerendered into dist/terms-of-service/index.html -- see the note in
           Privacy.tsx; Meta App Review fetches this URL too. */}
       <Helmet>
-        <title>Terms of Service — VyostraAI</title>
+        <title>Terms of Service — Vyostra AI</title>
         <meta
           name="description"
-          content="The terms governing use of the VyostraAI platform, including acceptable use, data handling and subscription conditions."
+          content="The terms governing use of the Vyostra AI platform, including acceptable use, data handling and subscription conditions."
         />
         <link rel="canonical" href="https://vyostra.com/terms-of-service" />
       </Helmet>

@@ -142,7 +142,7 @@ export function useTierCheckout(onConfirmed?: () => void): UseTierCheckoutResult
     const checkout = new window.Razorpay({
       key: razorpayKeyId,
       subscription_id: subscriptionId,
-      name: 'VyostraAI',
+      name: 'Vyostra AI',
       description: tier ? `${PRICING_TIERS.find((t) => t.tier === tier)?.name ?? tier} plan` : 'your plan',
       theme: { color: '#7c3aed' },
       handler: () => {

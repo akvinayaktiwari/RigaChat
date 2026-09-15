@@ -80,7 +80,7 @@ export default function LoginPage() {
           <h1 className="font-extrabold text-2xl text-gray-900 mb-2" style={JAKARTA_FONT}>
             Welcome back
           </h1>
-          <p className="text-sm text-gray-500 mb-8">Sign in to your VyostraAI dashboard</p>
+          <p className="text-sm text-gray-500 mb-8">Sign in to your Vyostra AI dashboard</p>
 
           <button
             type="button"

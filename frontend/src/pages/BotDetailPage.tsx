@@ -44,7 +44,7 @@ function isValidEmail(value: string): boolean {
 
 function getEmbedSnippet(botId: string): string {
   const cdnUrl = import.meta.env.VITE_CDN_URL
-  return `<!-- VyostraAI Widget -->
+  return `<!-- Vyostra AI Widget -->
 <script
   src="${cdnUrl}/widget.js"
   data-bot-id="${botId}"

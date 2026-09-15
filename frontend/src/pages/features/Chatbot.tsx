@@ -10,7 +10,7 @@ function ChatWidgetMockup() {
           <Bot className="w-5 h-5" />
         </div>
         <div>
-          <p className="font-bold text-on-surface text-sm">VyostraAI Assistant</p>
+          <p className="font-bold text-on-surface text-sm">Vyostra AI Assistant</p>
           <div className="flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             <span className="text-xs text-on-surface-variant">Online</span>
@@ -43,7 +43,7 @@ export default function Chatbot() {
   return (
     <>
       <Helmet>
-        <title>AI Agent for Lead Generation — VyostraAI</title>
+        <title>AI Agent for Lead Generation — Vyostra AI</title>
         <meta
           name="description"
           content="Capture leads 24/7 with an AI agent trained on your business data. No code required. Set up in under 5 minutes."
@@ -52,13 +52,13 @@ export default function Chatbot() {
       <UseCaseLayout
         badge="AI AGENT"
         headline="Your 24/7 AI sales assistant"
-        subheadline="VyostraAI's AI agent engages every visitor, answers their questions, and captures their contact details automatically — even when you are not there."
+        subheadline="Vyostra AI's AI agent engages every visitor, answers their questions, and captures their contact details automatically — even when you are not there."
         heroVisual={<ChatWidgetMockup />}
         howItWorksSteps={[
           {
             number: '1',
             title: 'Create Your Bot',
-            body: 'Enter your website URL. VyostraAI reads your content and trains your AI agent automatically. No prompts, no configuration needed.',
+            body: 'Enter your website URL. Vyostra AI reads your content and trains your AI agent automatically. No prompts, no configuration needed.',
             icon: <Bot className="w-6 h-6" />,
           },
           {
@@ -78,7 +78,7 @@ export default function Chatbot() {
           {
             icon: <Brain className="w-5 h-5" />,
             title: 'Trained on Your Content',
-            body: 'VyostraAI reads your website, FAQs, and product pages to build a knowledge base automatically. Answers are always accurate and on-brand.',
+            body: 'Vyostra AI reads your website, FAQs, and product pages to build a knowledge base automatically. Answers are always accurate and on-brand.',
           },
           {
             icon: <Clock className="w-5 h-5" />,

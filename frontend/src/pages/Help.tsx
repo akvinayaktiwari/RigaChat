@@ -70,7 +70,7 @@ const HELP_ARTICLES: HelpArticle[] = [
     categoryId: 'getting-started',
     question: 'How do I create my first agent?',
     answer:
-      'Go to Agents in the sidebar and click Create New Bot. Enter your website URL and VyostraAI trains your AI agent automatically. It takes under 5 minutes.',
+      'Go to Agents in the sidebar and click Create New Bot. Enter your website URL and Vyostra AI trains your AI agent automatically. It takes under 5 minutes.',
   },
   {
     id: 'art-2',
@@ -84,7 +84,7 @@ const HELP_ARTICLES: HelpArticle[] = [
     categoryId: 'getting-started',
     question: 'What is the knowledge base?',
     answer:
-      'The knowledge base is the information your agent uses to answer questions. VyostraAI builds it automatically from your website URL. You can also add custom entries manually.',
+      'The knowledge base is the information your agent uses to answer questions. Vyostra AI builds it automatically from your website URL. You can also add custom entries manually.',
   },
   {
     id: 'art-4',
@@ -98,7 +98,7 @@ const HELP_ARTICLES: HelpArticle[] = [
     categoryId: 'whatsapp',
     question: 'What is Gupshup and do I need an account?',
     answer:
-      'Gupshup is a WhatsApp Business API provider. Sign up free at platform.gupshup.io, create an app, and paste your API key into VyostraAI.',
+      'Gupshup is a WhatsApp Business API provider. Sign up free at platform.gupshup.io, create an app, and paste your API key into Vyostra AI.',
   },
   {
     id: 'art-6',
@@ -112,13 +112,13 @@ const HELP_ARTICLES: HelpArticle[] = [
     categoryId: 'integrations',
     question: 'How do I connect Zoho CRM?',
     answer:
-      'Go to Settings, Integrations, Zoho CRM, Connect. Authorize VyostraAI in Zoho. All new leads sync automatically after that.',
+      'Go to Settings, Integrations, Zoho CRM, Connect. Authorize Vyostra AI in Zoho. All new leads sync automatically after that.',
   },
   {
     id: 'art-8',
     categoryId: 'integrations',
-    question: 'Which CRMs does VyostraAI support?',
-    answer: 'VyostraAI currently supports Zoho CRM. HubSpot and Salesforce are coming soon.',
+    question: 'Which CRMs does Vyostra AI support?',
+    answer: 'Vyostra AI currently supports Zoho CRM. HubSpot and Salesforce are coming soon.',
   },
   {
     id: 'art-9',
@@ -136,7 +136,7 @@ const HELP_ARTICLES: HelpArticle[] = [
     id: 'art-11',
     categoryId: 'billing',
     question: 'Is there a free trial?',
-    answer: 'Yes. VyostraAI is free to start. No credit card required.',
+    answer: 'Yes. Vyostra AI is free to start. No credit card required.',
   },
   {
     id: 'art-12',
@@ -181,7 +181,7 @@ function HelpHero({ searchQuery, onSearchChange }: { searchQuery: string; onSear
           Help Center &amp; Knowledge Base
         </h1>
         <p className="text-base md:text-lg text-on-surface-variant max-w-2xl mx-auto mb-8 leading-relaxed">
-          Search articles, explore features, and find answers to get the most out of VyostraAI.
+          Search articles, explore features, and find answers to get the most out of Vyostra AI.
         </p>
         <div className="relative max-w-2xl mx-auto w-full group">
           <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-primary w-5 h-5" />
@@ -312,7 +312,7 @@ function SupportCta() {
       <div className="relative z-10 max-w-2xl mx-auto">
         <h2 className="text-2xl md:text-3xl font-extrabold text-white mb-4">Still need help?</h2>
         <p className="text-sm md:text-base text-white/80 max-w-xl mx-auto mb-8 leading-relaxed">
-          Our team is available to help with any questions about VyostraAI.
+          Our team is available to help with any questions about Vyostra AI.
         </p>
         <div className="flex flex-wrap justify-center gap-4">
           <a
