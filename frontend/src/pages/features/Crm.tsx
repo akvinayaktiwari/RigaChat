@@ -96,7 +96,7 @@ export default function Crm() {
           },
         ]}
         integrations={[
-          { icon: <Bot className="w-4 h-4" />, title: 'AI Agent', href: '/features/agent' },
+          { icon: <Bot className="w-4 h-4" />, title: 'AI Agent', href: '/features/chatbot' },
           { icon: <MessageSquare className="w-4 h-4" />, title: 'WhatsApp Alerts', href: '/features/whatsapp' },
           { icon: <FileText className="w-4 h-4" />, title: 'Form Builder', href: '/features/forms' },
         ]}

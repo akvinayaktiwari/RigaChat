@@ -79,7 +79,7 @@ export default function WhatsAppFeaturePage() {
           },
         ]}
         integrations={[
-          { icon: <Bot className="w-4 h-4" />, title: 'AI Agent', href: '/features/agent' },
+          { icon: <Bot className="w-4 h-4" />, title: 'AI Agent', href: '/features/chatbot' },
           { icon: <Users className="w-4 h-4" />, title: 'Lead CRM', href: '/features/crm' },
           { icon: <RefreshCw className="w-4 h-4" />, title: 'Zoho Sync', href: '/features/crm' },
         ]}

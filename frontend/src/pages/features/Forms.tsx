@@ -70,7 +70,7 @@ export default function Forms() {
           },
         ]}
         integrations={[
-          { icon: <Bot className="w-4 h-4" />, title: 'AI Agent', href: '/features/agent' },
+          { icon: <Bot className="w-4 h-4" />, title: 'AI Agent', href: '/features/chatbot' },
           { icon: <MessageSquare className="w-4 h-4" />, title: 'WhatsApp Alerts', href: '/features/whatsapp' },
           { icon: <Users className="w-4 h-4" />, title: 'Lead CRM', href: '/features/crm' },
         ]}
