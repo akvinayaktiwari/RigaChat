@@ -429,7 +429,7 @@ export default function DashboardHome() {
             <Bot className="w-7 h-7 text-violet-400" />
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-            Welcome to VyostraAI
+            Welcome to Vyostra AI
           </h2>
           <p className="text-sm text-gray-500 text-center max-w-xs mb-6">
             Set up your first agent to start capturing leads from your website

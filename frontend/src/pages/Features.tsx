@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { Helmet } from 'react-helmet-async'
+import PageMeta from '../components/seo/PageMeta'
 import { useNavigate } from 'react-router-dom'
 import { Bot, MessageSquare, Users, FileText, Mic, Route, CalendarCheck } from 'lucide-react'
 import Navbar from '../components/landing/Navbar'
@@ -11,14 +11,14 @@ interface FeatureCardData {
   title: string
   body: string
   // Absent for features that are live but don't have a marketing deep-dive page
-  // yet. Only /features/agent, /whatsapp, /crm and /forms exist as routes --
+  // yet. Only /features/chatbot, /whatsapp, /crm and /forms exist as routes --
   // giving a card an href that has no route would 404, so the card renders
   // static instead of guessing at a URL.
   href?: string
 }
 
 const FEATURE_CARDS: FeatureCardData[] = [
-  { icon: <Bot className="w-6 h-6" />, title: 'AI Agent', body: '24/7 lead capture. Trained on your content. No code required.', href: '/features/agent' },
+  { icon: <Bot className="w-6 h-6" />, title: 'AI Agent', body: '24/7 lead capture. Trained on your content. No code required.', href: '/features/chatbot' },
   {
     icon: <MessageSquare className="w-6 h-6" />,
     title: 'WhatsApp Automation',
@@ -172,13 +172,11 @@ export default function Features() {
 
   return (
     <div className="landing-page bg-background">
-      <Helmet>
-        <title>Features — VyostraAI Lead Generation</title>
-        <meta
-          name="description"
-          content="AI chat and voice agents, two-way WhatsApp, follow-up journeys, Lead CRM, Form Builder, and Zoho integration. Everything you need to capture and convert leads."
-        />
-      </Helmet>
+      <PageMeta
+        title="Features — Vyostra AI Lead Generation"
+        description="AI chat and voice agents, two-way WhatsApp, follow-up journeys, Lead CRM, Form Builder, and Zoho integration. Everything you need to capture and convert leads."
+        path="/features"
+      />
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 
       <main className="pt-36 pb-24 px-6 lg:px-8">

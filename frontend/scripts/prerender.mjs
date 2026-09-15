@@ -1,5 +1,5 @@
 /**
- * Build-time prerender for blog routes.
+ * Build-time prerender for blog and legal routes, plus robots.txt and sitemap.xml.
  *
  * Runs after `vite build`. Builds an SSR bundle of prerender-entry.tsx, renders
  * each blog route to HTML, and writes it into dist/ as a real static file so
@@ -7,8 +7,11 @@
  * <div id="root">. The client bundle still boots normally on top of it.
  *
  * Emits:
+ *   dist/index.html (the homepage) and dist/app-shell.html (the empty SPA shell)
  *   dist/blog/index.html
  *   dist/blog/<slug>/index.html
+ *   dist/privacy-policy/index.html, dist/terms-of-service/index.html
+ *   dist/robots.txt, dist/sitemap.xml
  */
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -18,6 +21,9 @@ import { build } from 'vite'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const distDir = path.join(root, 'dist')
 const ssrOutDir = path.join(root, '.prerender-ssr')
+
+/** Served by the CloudFront function for client-rendered routes. Keep in step with deploy/cloudfront/viewer-request.js. */
+const APP_SHELL_FILE = 'app-shell.html'
 
 /** Injects rendered markup and head tags into the built index.html shell. */
 function composePage(template, { html, head }) {
@@ -32,6 +38,13 @@ function composePage(template, { html, head }) {
       page = page.replace(/[ \t]*<title>[\s\S]*?<\/title>\r?\n?/i, '')
     }
 
+    // Same for the shell's default description: two description tags leave the
+    // crawler to pick one.
+    if (/<meta[^>]+name="description"/i.test(head)) {
+      page = page.replace(/[ \t]*<!--(?:(?!-->)[\s\S])*-->\r?\n?(?=\s*<meta\s+name="description")/i, '')
+      page = page.replace(/[ \t]*<meta\s+name="description"[\s\S]*?\/>\r?\n?/i, '')
+    }
+
     page = page.replace('</head>', `  ${head}\n  </head>`)
   }
 
@@ -43,10 +56,34 @@ function composePage(template, { html, head }) {
   return page.replace(rootDiv, `<div id="root">${html}</div>`)
 }
 
+/**
+ * Canonical URLs are absolute and built from VITE_COGNITO_REDIRECT_URI's origin
+ * (src/lib/site.ts). A production build with that variable missing would ship
+ * relative or localhost canonicals, which is worse than none -- so CI refuses.
+ * Local builds only warn: their redirect URI is legitimately localhost.
+ */
+function assertPublicOrigin(siteUrl) {
+  if (siteUrl.startsWith('https://')) return
+
+  const message = `[prerender] site origin is "${siteUrl}" (from VITE_COGNITO_REDIRECT_URI); canonical URLs will not be public.`
+  if (process.env.CI === 'true') {
+    throw new Error(`${message} Set the variable to the live https URL.`)
+  }
+  console.warn(message)
+}
+
 async function main() {
   const template = await readFile(path.join(distDir, 'index.html'), 'utf-8').catch(() => {
     throw new Error('dist/index.html not found. Run `vite build` before prerendering.')
   })
+
+  // "/" is prerendered into dist/index.html, which overwrites the empty shell --
+  // but the CloudFront viewer-request function serves a shell for every other
+  // client-rendered route (/login, /dashboard, /features, ...). Serving them the
+  // homepage instead would give each one the homepage's title and canonical and
+  // flash the landing page at app users. The shell keeps its own file.
+  await writeFile(path.join(distDir, APP_SHELL_FILE), template, 'utf-8')
+  console.log(`[prerender] SPA shell -> dist/${APP_SHELL_FILE}`)
 
   // Build the SSR bundle. `ssr: true` keeps React external and targets Node.
   await build({
@@ -61,7 +98,13 @@ async function main() {
   })
 
   const entryPath = path.join(ssrOutDir, 'prerender-entry.mjs')
-  const { renderRoute, getRoutes } = await import(pathToFileURL(entryPath).href)
+  const { renderRoute, getRoutes, getCrawlFiles, SITE_URL } = await import(pathToFileURL(entryPath).href)
+  assertPublicOrigin(SITE_URL)
+
+  for (const [fileName, contents] of Object.entries(getCrawlFiles())) {
+    await writeFile(path.join(distDir, fileName), contents, 'utf-8')
+    console.log(`[prerender] ${fileName} -> dist/${fileName}`)
+  }
 
   const routes = getRoutes()
   if (routes.length === 0) {

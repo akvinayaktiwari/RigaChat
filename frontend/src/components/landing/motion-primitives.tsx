@@ -1,5 +1,6 @@
 import { motion, useReducedMotion, type Variants } from 'motion/react'
 import type { ReactNode } from 'react'
+import { isServerRender } from '../../lib/prerender-boot'
 
 // Shared motion tokens for the landing page. They live here rather than inline
 // per section so a duration is never copy-pasted -- one duration reused for
@@ -28,6 +29,17 @@ const TRAVEL = 18
 /** Fires once, slightly before the element is fully on screen. */
 const VIEWPORT = { once: true, amount: 0.25, margin: '0px 0px -80px 0px' } as const
 
+/**
+ * True when entrance animations must not hide content: the visitor asked for
+ * reduced motion, or this is the build-time prerender, where nothing will ever
+ * run the animation that brings the content back. Use it wherever a component
+ * would otherwise read `useReducedMotion()` to pick its initial state.
+ */
+export function useStaticMotion(): boolean {
+  const reduced = useReducedMotion()
+  return reduced === true || isServerRender()
+}
+
 interface RevealProps {
   children: ReactNode
   className?: string
@@ -41,7 +53,7 @@ interface RevealProps {
  * either way, so crawlers and no-JS readers see it regardless.
  */
 export function Reveal({ children, className }: RevealProps) {
-  const reduced = useReducedMotion()
+  const reduced = useStaticMotion()
 
   if (reduced) {
     return <motion.div className={className}>{children}</motion.div>
@@ -78,7 +90,7 @@ interface RevealGroupProps {
  * enough that it reads as lag rather than choreography.
  */
 export function RevealGroup({ children, className, stagger = 0.06 }: RevealGroupProps) {
-  const reduced = useReducedMotion()
+  const reduced = useStaticMotion()
 
   if (reduced) {
     return <motion.div className={className}>{children}</motion.div>
@@ -114,7 +126,7 @@ interface RevealItemProps {
 
 /** A single card in a `RevealGroup`. Inert on its own outside one. */
 export function RevealItem({ children, className }: RevealItemProps) {
-  const reduced = useReducedMotion()
+  const reduced = useStaticMotion()
 
   if (reduced) {
     return <motion.div className={className}>{children}</motion.div>

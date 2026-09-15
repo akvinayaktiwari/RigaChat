@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Helmet } from 'react-helmet-async'
 import { Link } from 'react-router-dom'
 import { ArrowRight, FileText } from 'lucide-react'
 import Navbar from '../components/landing/Navbar'
@@ -9,8 +8,7 @@ import { getAllPosts } from '../content/blog/registry'
 import { BlogSurface, PostMetaLine, PostTags } from '../components/blog/BlogChrome'
 import { JAKARTA_FONT, ScrollReveal, StatTile } from '../components/blog/BlogPrimitives'
 import type { BlogPost } from '../types/blog'
-
-const SITE_URL = 'https://vyostra.com'
+import PageMeta from '../components/seo/PageMeta'
 
 function FeaturedPost({ post }: { post: BlogPost }) {
   const { meta } = post
@@ -98,16 +96,11 @@ export default function BlogIndex() {
 
   return (
     <div className="landing-page bg-background">
-      <Helmet>
-        <title>Blog — VyostraAI</title>
-        <meta name="description" content="Research, breakdowns and field notes from the VyostraAI team on AI, lead generation and the markets our customers build in." />
-        <link rel="canonical" href={`${SITE_URL}/blog`} />
-        <meta property="og:type" content="website" />
-        <meta property="og:title" content="Blog — VyostraAI" />
-        <meta property="og:description" content="Research, breakdowns and field notes from the VyostraAI team." />
-        <meta property="og:url" content={`${SITE_URL}/blog`} />
-        <meta name="twitter:card" content="summary_large_image" />
-      </Helmet>
+      <PageMeta
+        title="Blog — Vyostra AI"
+        description="Research, breakdowns and field notes from the Vyostra AI team on AI, lead generation and the markets our customers build in."
+        path="/blog/"
+      />
 
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 
@@ -115,7 +108,7 @@ export default function BlogIndex() {
         <main className="mx-auto max-w-5xl px-6 pb-24 pt-36 lg:px-8">
           <ScrollReveal>
             <span className="inline-flex items-center rounded-full border border-violet-400/30 bg-violet-500/10 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-violet-300">
-              The VyostraAI Blog
+              The Vyostra AI Blog
             </span>
             <h1 className="mt-6 text-4xl font-extrabold leading-[1.1] text-white md:text-6xl" style={JAKARTA_FONT}>
               Research from the{' '}

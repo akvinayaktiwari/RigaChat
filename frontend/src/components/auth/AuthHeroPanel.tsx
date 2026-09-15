@@ -41,7 +41,7 @@ export default function AuthHeroPanel({ tagline, features, footnote }: AuthHeroP
           <VyostraLogo size={56} variant="white" animate />
         </div>
         <span className="text-4xl font-extrabold text-white" style={JAKARTA_FONT}>
-          VyostraAI
+          Vyostra AI
         </span>
         <p className="text-white/70 text-lg mt-3 mb-10">{tagline}</p>
 
@@ -70,7 +70,7 @@ export default function AuthHeroPanel({ tagline, features, footnote }: AuthHeroP
           <VyostraLogo size={32} variant="white" animate />
         </div>
         <span className="text-xl font-extrabold text-white" style={JAKARTA_FONT}>
-          VyostraAI
+          Vyostra AI
         </span>
         <p className="text-white/70 text-sm mt-1.5">{tagline}</p>
 

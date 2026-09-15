@@ -22,6 +22,7 @@ import {
 import Navbar from '../components/landing/Navbar'
 import Footer from '../components/landing/Footer'
 import DemoModal from '../components/landing/modals/DemoModal'
+import { absoluteUrl } from '../lib/site'
 
 interface TOCItem {
   id: string
@@ -47,7 +48,7 @@ interface Partner {
   icon: 'Cloud' | 'Send' | 'Layers' | 'Sparkles'
 }
 
-// The registered legal entity behind VyostraAI. Defined once and reused in the
+// The registered legal entity behind Vyostra AI. Defined once and reused in the
 // policy body and the contact block: Meta App Review cross-checks this string
 // against Business Verification, so it must not drift between places.
 const LEGAL_ENTITY = 'Aashirwad Trading Enterprises'
@@ -69,7 +70,7 @@ const COLLECT_BULLETS: InfoBullet[] = [
 ]
 
 const USE_BLOCKS: UseBlock[] = [
-  { icon: 'Activity', label: 'Improve Platform', text: 'To provide, maintain, and improve VyostraAI service and interface performance.' },
+  { icon: 'Activity', label: 'Improve Platform', text: 'To provide, maintain, and improve Vyostra AI service and interface performance.' },
   { icon: 'Bell', label: 'Lead Alerts', text: 'To send lead notifications via WhatsApp and other integrated channels.' },
   {
     icon: 'RefreshCw',
@@ -141,14 +142,14 @@ function PolicyHeader({ onDownload }: { onDownload: () => void }) {
           </div>
           <h1 className="text-4xl md:text-5xl font-extrabold text-on-surface tracking-tight">Privacy Policy</h1>
           <p className="mt-3 text-base text-on-surface-variant max-w-xl leading-relaxed">
-            At VyostraAI, we value your privacy. This policy explains how we collect, protect, and use your data.
+            At Vyostra AI, we value your privacy. This policy explains how we collect, protect, and use your data.
           </p>
           {/* Names the data controller. Required by GDPR/DPDP, and checked by
               Meta App Review against the legal entity declared on the data
               handling form -- a policy naming no controller is a routine query
               or rejection. */}
           <p className="mt-3 text-sm text-on-surface-variant max-w-xl leading-relaxed">
-            VyostraAI is operated by{' '}
+            Vyostra AI is operated by{' '}
             <span className="font-semibold text-on-surface">{LEGAL_ENTITY}</span>, {ENTITY_LOCATION}.{' '}
             {LEGAL_ENTITY} is the data controller responsible for personal data processed through the
             platform.
@@ -450,7 +451,7 @@ export default function Privacy() {
 
   function handleDownload() {
     const previousTitle = document.title
-    document.title = 'VyostraAI - Privacy Policy'
+    document.title = 'Vyostra AI - Privacy Policy'
     window.print()
     document.title = previousTitle
   }
@@ -461,12 +462,12 @@ export default function Privacy() {
           this URL from App Settings, so the title and description must be present
           in the static HTML, not only after the client bundle boots. */}
       <Helmet>
-        <title>Privacy Policy — VyostraAI</title>
+        <title>Privacy Policy — Vyostra AI</title>
         <meta
           name="description"
-          content="How VyostraAI collects, stores, retains and deletes personal and lead data, including leads retrieved from Meta (Facebook/Instagram) Lead Ads."
+          content="How Vyostra AI collects, stores, retains and deletes personal and lead data, including leads retrieved from Meta (Facebook/Instagram) Lead Ads."
         />
-        <link rel="canonical" href="https://vyostra.com/privacy-policy" />
+        <link rel="canonical" href={absoluteUrl('/privacy-policy/')} />
       </Helmet>
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 

@@ -4,10 +4,17 @@ import { HelmetProvider, type HelmetServerState } from 'react-helmet-async'
 import { Route, Routes } from 'react-router-dom'
 import { StaticRouter } from 'react-router-dom/server'
 import BlogIndex from './src/pages/BlogIndex'
+import LandingPage from './src/pages/LandingPage'
+import { AuthProvider } from './src/hooks/useAuth'
+import { SubscriptionProvider } from './src/hooks/useSubscription'
 import BlogPost from './src/pages/BlogPost'
 import Privacy from './src/pages/Privacy'
 import Terms from './src/pages/Terms'
-import { getAllSlugs } from './src/content/blog/registry'
+import { getAllPosts, getAllSlugs } from './src/content/blog/registry'
+import { PRERENDERED_STATIC_ROUTES, buildRobotsTxt, buildSitemapXml, sitemapEntries } from './src/lib/crawl-files'
+import { SITE_URL } from './src/lib/site'
+
+export { SITE_URL }
 
 /**
  * SSR entry used only at build time by scripts/prerender.mjs.
@@ -16,7 +23,8 @@ import { getAllSlugs } from './src/content/blog/registry'
  * land in dist/ as real static HTML, which is what search crawlers and
  * link-preview scrapers (which never run JS) actually read.
  *
- * Blog routes plus the two legal pages are mounted. The legal pages matter for a
+ * The homepage, blog routes and the two legal pages are mounted. The homepage is
+ * the page most likely to rank and the one AI crawlers most often fetch. The legal pages matter for a
  * different reader than crawlers: Meta App Review fetches the Privacy Policy and
  * Terms URLs declared in App Settings, and a client-rendered page answers that
  * fetch with an empty <div id="root"> -- a documented App Review rejection, even
@@ -42,14 +50,19 @@ export async function renderRoute(url: string): Promise<{ html: string; head: st
 
   const app = (
     <HelmetProvider context={helmetContext}>
-      <StaticRouter location={url}>
-        <Routes>
-          <Route path="/blog" element={<BlogIndex />} />
-          <Route path="/blog/:slug" element={<BlogPost />} />
-          <Route path="/privacy-policy" element={<Privacy />} />
-          <Route path="/terms-of-service" element={<Terms />} />
-        </Routes>
-      </StaticRouter>
+      <AuthProvider>
+        <SubscriptionProvider>
+          <StaticRouter location={url}>
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/blog" element={<BlogIndex />} />
+              <Route path="/blog/:slug" element={<BlogPost />} />
+              <Route path="/privacy-policy" element={<Privacy />} />
+              <Route path="/terms-of-service" element={<Terms />} />
+            </Routes>
+          </StaticRouter>
+        </SubscriptionProvider>
+      </AuthProvider>
     </HelmetProvider>
   )
 
@@ -87,7 +100,9 @@ export async function renderRoute(url: string): Promise<{ html: string; head: st
 
   const helmet = helmetContext.helmet
   const head = helmet
-    ? [helmet.title.toString(), helmet.meta.toString(), helmet.link.toString()].filter(Boolean).join('\n    ')
+    ? [helmet.title.toString(), helmet.meta.toString(), helmet.link.toString(), helmet.script.toString()]
+        .filter(Boolean)
+        .join('\n    ')
     : ''
 
   return { html, head }
@@ -96,17 +111,26 @@ export async function renderRoute(url: string): Promise<{ html: string; head: st
 /**
  * Every route the prerender script should emit.
  *
- * Only routes that render without the app's providers belong here. The tree
- * mounted above is deliberately provider-free so Cognito and other
- * browser-only code stays out of the Node render, which means any route
- * reaching `useSubscription()` will throw "useSubscription must be used within
- * a SubscriptionProvider" at build time, in a file nobody edited.
+ * The tree above is wrapped in AuthProvider and SubscriptionProvider because
+ * the landing page reaches useSubscription() through useTierCheckout. That is
+ * safe in Node only because both providers touch sessionStorage and the API
+ * inside effects, which never run during SSR -- a provider that reads storage
+ * during render would break this build. StaffAuthProvider is left out: no
+ * prerendered route uses it.
  *
- * `/` is the trap: the landing page calls `useTierCheckout`, which calls
- * `useSubscription()`. Adding it here fails the build. Prerendering it means
- * wrapping the tree in the providers first, and that is a real change, not a
- * one-line addition to this array.
+ * A route rendered here must also render its FINAL state: see useStaticMotion()
+ * in components/landing/motion-primitives.tsx for why entrance animations would
+ * otherwise ship content at opacity 0.
  */
 export function getRoutes(): string[] {
-  return ['/blog', ...getAllSlugs().map((slug) => `/blog/${slug}`), '/privacy-policy', '/terms-of-service']
+  return ['/', ...PRERENDERED_STATIC_ROUTES, ...getAllSlugs().map((slug) => `/blog/${slug}`)]
+}
+
+/** robots.txt and sitemap.xml contents, keyed by the file name to write under dist/. */
+export function getCrawlFiles(): Record<string, string> {
+  const posts = getAllPosts().map(({ meta }) => ({ slug: meta.slug, publishedAt: meta.publishedAt }))
+  return {
+    'robots.txt': buildRobotsTxt(SITE_URL),
+    'sitemap.xml': buildSitemapXml(SITE_URL, sitemapEntries(posts)),
+  }
 }

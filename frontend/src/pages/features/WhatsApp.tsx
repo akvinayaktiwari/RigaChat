@@ -1,4 +1,4 @@
-import { Helmet } from 'react-helmet-async'
+import PageMeta from '../../components/seo/PageMeta'
 import { Key, ToggleRight, BarChart2, Bell, Lock, Bot, Users, RefreshCw } from 'lucide-react'
 import UseCaseLayout from '../../components/landing/UseCaseLayout'
 
@@ -15,7 +15,7 @@ function WhatsAppNotificationMockup() {
 
       <div className="bg-[#005C4B] rounded-2xl rounded-tl-none p-4">
         <p className="text-white font-mono text-xs leading-relaxed whitespace-pre-line">
-          {'🔔 New Lead — VyostraAI\n\nName: Rahul Sharma\nPhone: +91 98765 43210\nEmail: rahul@example.com\nBot: Property Assistant\nTime: Today, 2:34 PM\n\nvyostra.com/leads'}
+          {'🔔 New Lead — Vyostra AI\n\nName: Rahul Sharma\nPhone: +91 98765 43210\nEmail: rahul@example.com\nBot: Property Assistant\nTime: Today, 2:34 PM\n\nvyostra.com/leads'}
         </p>
         <div className="flex items-center justify-end gap-1 mt-2">
           <span className="text-white/50 text-[10px]">2:34 PM</span>
@@ -29,23 +29,21 @@ function WhatsAppNotificationMockup() {
 export default function WhatsAppFeaturePage() {
   return (
     <>
-      <Helmet>
-        <title>WhatsApp Lead Notifications — VyostraAI</title>
-        <meta
-          name="description"
-          content="Get instant WhatsApp alerts every time a new lead is captured. Weekly reports every Monday. Powered by Gupshup."
-        />
-      </Helmet>
+      <PageMeta
+        title="WhatsApp Lead Notifications — Vyostra AI"
+        description="Get instant WhatsApp alerts every time a new lead is captured. Weekly reports every Monday. Powered by Gupshup."
+        path="/features/whatsapp"
+      />
       <UseCaseLayout
         badge="WHATSAPP AUTOMATION"
         headline="Never miss a lead — get notified instantly"
-        subheadline="VyostraAI sends a WhatsApp message to your number the moment a lead is captured — from your agent or your forms. No app switching. No delays."
+        subheadline="Vyostra AI sends a WhatsApp message to your number the moment a lead is captured — from your agent or your forms. No app switching. No delays."
         heroVisual={<WhatsAppNotificationMockup />}
         howItWorksSteps={[
           {
             number: '1',
             title: 'Connect Your Gupshup Account',
-            body: 'Enter your Gupshup API key and WhatsApp Business number in VyostraAI settings. VyostraAI encrypts your credentials with AWS KMS — never stored in plain text.',
+            body: 'Enter your Gupshup API key and WhatsApp Business number in Vyostra AI settings. Vyostra AI encrypts your credentials with AWS KMS — never stored in plain text.',
             icon: <Key className="w-6 h-6" />,
           },
           {
@@ -70,7 +68,7 @@ export default function WhatsAppFeaturePage() {
           {
             icon: <Lock className="w-5 h-5" />,
             title: 'Your Credentials, Your Control',
-            body: 'VyostraAI never stores your API key in plain text. It is encrypted with AWS KMS and only decrypted in memory when sending a message.',
+            body: 'Vyostra AI never stores your API key in plain text. It is encrypted with AWS KMS and only decrypted in memory when sending a message.',
           },
           {
             icon: <BarChart2 className="w-5 h-5" />,
@@ -79,7 +77,7 @@ export default function WhatsAppFeaturePage() {
           },
         ]}
         integrations={[
-          { icon: <Bot className="w-4 h-4" />, title: 'AI Agent', href: '/features/agent' },
+          { icon: <Bot className="w-4 h-4" />, title: 'AI Agent', href: '/features/chatbot' },
           { icon: <Users className="w-4 h-4" />, title: 'Lead CRM', href: '/features/crm' },
           { icon: <RefreshCw className="w-4 h-4" />, title: 'Zoho Sync', href: '/features/crm' },
         ]}

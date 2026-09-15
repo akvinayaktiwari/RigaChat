@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Rocket, Link as LinkIcon, CheckCircle2, MessageCircle, TrendingUp, Zap, Globe, Compass } from 'lucide-react'
 import Navbar from '../components/landing/Navbar'
 import Footer from '../components/landing/Footer'
+import PageMeta from '../components/seo/PageMeta'
 import DemoModal from '../components/landing/modals/DemoModal'
 
 interface StatItem {
@@ -30,14 +31,14 @@ const FOUNDERS: FounderInfo[] = [
     name: 'Adarsh Jee Pandey',
     role: 'Co-Founder & Performance Marketer',
     description:
-      'Drives growth and customer acquisition for VyostraAI. Performance marketer at VyostraAI, Bangalore.',
+      'Drives growth and customer acquisition for Vyostra AI. Performance marketer at Vyostra AI, Bangalore.',
     avatarGradient: 'from-emerald-600 to-teal-500',
   },
   {
     name: 'Vinayak Tiwari',
     role: 'Co-Founder & Builder',
     description:
-      'Built VyostraAI to help businesses capture every lead automatically. Full-stack engineer at VyostraAI, Bangalore.',
+      'Built Vyostra AI to help businesses capture every lead automatically. Full-stack engineer at Vyostra AI, Bangalore.',
     avatarGradient: 'from-purple-600 to-indigo-500',
   },
 ]
@@ -74,7 +75,7 @@ function HeroBanner() {
           </span>
         </h1>
         <p className="mt-4 text-base md:text-lg text-on-surface-variant max-w-2xl mx-auto leading-relaxed">
-          VyostraAI is an AI-powered lead generation platform built by VyostraAI, Bangalore. We bridge the gap
+          Vyostra AI is an AI-powered lead generation platform built by Vyostra AI, Bangalore. We bridge the gap
           between initial customer contact and closed deals.
         </p>
       </div>
@@ -89,8 +90,8 @@ function StoryBlockOneText() {
         Every business deserves to capture every lead.
       </h2>
       <p className="text-base md:text-lg text-on-surface-variant leading-relaxed">
-        We built VyostraAI because we saw too many businesses losing leads to slow response times, missed form
-        submissions, and disconnected tools. VyostraAI fixes that with an AI agent, WhatsApp automation, and CRM
+        We built Vyostra AI because we saw too many businesses losing leads to slow response times, missed form
+        submissions, and disconnected tools. Vyostra AI fixes that with an AI agent, WhatsApp automation, and CRM
         sync — all in one platform.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
@@ -147,7 +148,7 @@ function StoryBlockTwo() {
         <div className="relative h-80 rounded-3xl overflow-hidden border border-outline-variant/30 bg-gradient-to-br from-indigo-900 via-slate-900 to-primary p-8 text-white flex flex-col justify-between shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-xs bg-white/10 border border-white/10 px-3 py-1 rounded-full font-bold uppercase tracking-widest">
-              VyostraAI
+              Vyostra AI
             </span>
             <Globe className="w-5 h-5 text-white/50" />
           </div>
@@ -156,20 +157,20 @@ function StoryBlockTwo() {
               "Integrating AI with WhatsApp to make sure no lead ever goes unanswered."
             </p>
             <p className="text-xs text-white/70 mt-2 font-medium tracking-wide">
-              VyostraAI Headquarters, Bangalore, India
+              Vyostra AI Headquarters, Bangalore, India
             </p>
           </div>
         </div>
       </div>
       <div className="lg:col-span-6 flex flex-col gap-6">
         <div className="text-xs font-extrabold uppercase tracking-widest text-secondary bg-secondary/10 px-3 py-1.5 rounded-full w-fit">
-          VyostraAI
+          Vyostra AI
         </div>
         <h2 className="text-3xl md:text-4xl font-extrabold text-on-surface tracking-tight leading-tight">
           Built in Bangalore. Designed for growth.
         </h2>
         <p className="text-base md:text-lg text-on-surface-variant leading-relaxed">
-          VyostraAI is a performance marketing and technology company based in Bangalore, India. We build tools
+          Vyostra AI is a performance marketing and technology company based in Bangalore, India. We build tools
           that help businesses grow faster using AI, automation, and data.
         </p>
       </div>
@@ -246,6 +247,11 @@ export default function About() {
 
   return (
     <div className="landing-page bg-background">
+      <PageMeta
+        title="About Vyostra AI — AI Lead Generation, Built in Bangalore"
+        description="Vyostra AI is a Bangalore-built platform that helps businesses capture every lead with AI chat and voice agents, WhatsApp follow-up and a built-in lead CRM. Meet the founders."
+        path="/about-us"
+      />
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 
       <main className="pt-36 pb-24 px-6 lg:px-8">

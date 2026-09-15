@@ -5,6 +5,7 @@ import { AdminProtectedRoute } from './src/components/AdminProtectedRoute/AdminP
 import { DashboardLayout } from './src/components/DashboardLayout/DashboardLayout'
 import { ToastContainer } from './src/components/Toast/Toast'
 import LandingPage from './src/pages/LandingPage'
+import NotFound from './src/pages/NotFound'
 import LoginPage from './src/pages/LoginPage'
 import SignupPage from './src/pages/SignupPage'
 import ForgotPasswordPage from './src/pages/ForgotPasswordPage'
@@ -165,6 +166,7 @@ function App() {
           <Route path="billing" element={<BillingPage />} />
           <Route path="settings" element={<Settings />} />
         </Route>
+        <Route path="*" element={<NotFound />} />
       </Routes>
       <ToastContainer />
     </BrowserRouter>

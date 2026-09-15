@@ -32,7 +32,7 @@ export function StaffConsoleShell({ title, subtitle, children }: StaffConsoleShe
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
             <ShieldCheck className="text-violet-600" size={20} />
-            <span className="font-semibold text-gray-900">VyostraAI Staff Console</span>
+            <span className="font-semibold text-gray-900">Vyostra AI Staff Console</span>
           </div>
           <nav className="flex items-center gap-5">
             {NAV_ITEMS.map((item) => (

@@ -89,7 +89,7 @@ function SidebarContent({ initials, userName, userEmail, onLogout }: SidebarCont
       <div className="flex items-center gap-3 px-2 mb-10">
         <VyostraLogo size={28} animate={true} />
         <span className="font-bold text-lg text-gray-900" style={JAKARTA_FONT}>
-          VyostraAI
+          Vyostra AI
         </span>
       </div>
 

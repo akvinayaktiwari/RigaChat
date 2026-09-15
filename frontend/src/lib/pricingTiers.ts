@@ -81,6 +81,12 @@ export function formatPrice(amount: number, region: Region): string {
 const INDIA_TIMEZONES = ['Asia/Kolkata', 'Asia/Calcutta']
 
 export function detectRegion(): Region {
+  // The build-time prerender has no visitor to detect, only the build machine's
+  // timezone -- UTC in CI, which would bake dollar prices into the static HTML
+  // that crawlers index. India is the market and the only region with a real
+  // checkout, so a server render always shows rupees.
+  if (typeof window === 'undefined') return 'in'
+
   try {
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
     return INDIA_TIMEZONES.includes(timeZone) ? 'in' : 'intl'

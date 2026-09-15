@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { CheckCircle2, Mail, MessageSquare, Send } from 'lucide-react'
 import Navbar from '../components/landing/Navbar'
 import Footer from '../components/landing/Footer'
+import PageMeta from '../components/seo/PageMeta'
 import DemoModal from '../components/landing/modals/DemoModal'
 import { submitContactMessage } from '../services/api'
 
@@ -75,6 +76,11 @@ export default function Contact() {
 
   return (
     <div className="landing-page bg-background">
+      <PageMeta
+        title="Contact Vyostra AI — Sales and Support"
+        description="Talk to the Vyostra AI team about AI chat and voice agents, WhatsApp follow-up, pricing or an existing account. We respond within 24 hours."
+        path="/contact"
+      />
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 
       <main className="pt-36 pb-24 px-6 lg:px-8">
@@ -234,7 +240,7 @@ export default function Contact() {
                 </div>
                 <h3 className="text-xl font-bold text-on-surface">Technical Support</h3>
                 <p className="text-sm text-on-surface-variant leading-relaxed">
-                  For help with your VyostraAI account, agents, or integrations.
+                  For help with your Vyostra AI account, agents, or integrations.
                 </p>
                 <p className="text-xs text-on-surface-variant">Mon-Fri, 9am-6pm IST</p>
               </div>

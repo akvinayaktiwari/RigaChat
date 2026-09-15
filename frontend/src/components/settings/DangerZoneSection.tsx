@@ -15,7 +15,7 @@ export default function DangerZoneSection({ onSignOut, onDeleteAccount }: Danger
       </h4>
 
       <div className="flex items-center justify-between pb-4 mb-4 mt-4 border-b border-red-100">
-        <p className="text-sm text-red-600 max-w-md">Sign out of your VyostraAI account on this device.</p>
+        <p className="text-sm text-red-600 max-w-md">Sign out of your Vyostra AI account on this device.</p>
         <button
           type="button"
           onClick={onSignOut}

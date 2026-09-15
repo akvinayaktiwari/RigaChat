@@ -793,7 +793,7 @@ export default function WhatsApp() {
               </p>
               <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 border border-gray-100">
                 <p className="font-mono text-xs text-gray-400 mb-1">Example message</p>
-                Your weekly VyostraAI report
+                Your weekly Vyostra AI report
                 <br />
                 New leads this week: 12
                 <br />

@@ -8,8 +8,9 @@ import DemoModal from '../components/landing/modals/DemoModal'
 import { getPostBySlug } from '../content/blog/registry'
 import { AttachmentCard, BlogSurface, PostMetaLine, PostTags } from '../components/blog/BlogChrome'
 import { JAKARTA_FONT, ScrollReveal, StatRow, StatTile } from '../components/blog/BlogPrimitives'
-
-const SITE_URL = 'https://vyostra.com'
+import { absoluteUrl } from '../lib/site'
+import StructuredData from '../components/seo/StructuredData'
+import { blogPostingSchema, jsonLdGraph, organizationSchema } from '../lib/structured-data'
 
 function BackToBlog() {
   return (
@@ -39,7 +40,7 @@ function PostNotFound() {
   return (
     <div className="landing-page bg-background">
       <Helmet>
-        <title>Post not found — VyostraAI</title>
+        <title>Post not found — Vyostra AI</title>
         <meta name="robots" content="noindex" />
       </Helmet>
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
@@ -77,14 +78,16 @@ export default function BlogPost() {
   }
 
   const { meta } = post
-  const canonical = `${SITE_URL}/blog/${meta.slug}`
+  // Trailing slash: the prerendered post is served from blog/<slug>/index.html.
+  const canonical = absoluteUrl(`/blog/${meta.slug}/`)
 
   return (
     <div className="landing-page bg-background">
       <Helmet>
-        <title>{`${meta.title} — VyostraAI`}</title>
+        <title>{`${meta.title} — Vyostra AI`}</title>
         <meta name="description" content={meta.excerpt} />
         <link rel="canonical" href={canonical} />
+        <meta property="og:site_name" content="Vyostra AI" />
         <meta property="og:type" content="article" />
         <meta property="og:title" content={meta.title} />
         <meta property="og:description" content={meta.excerpt} />
@@ -96,8 +99,16 @@ export default function BlogPost() {
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={meta.title} />
         <meta name="twitter:description" content={meta.excerpt} />
+        <meta property="og:image" content={absoluteUrl('/og-image.png')} />
+        <meta name="twitter:image" content={absoluteUrl('/og-image.png')} />
       </Helmet>
 
+      <StructuredData
+        data={jsonLdGraph([
+          organizationSchema(),
+          blogPostingSchema({ ...meta, path: `/blog/${meta.slug}/` }),
+        ])}
+      />
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 
       <BlogSurface>

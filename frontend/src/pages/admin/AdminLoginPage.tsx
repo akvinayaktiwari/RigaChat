@@ -54,7 +54,7 @@ export default function AdminLoginPage() {
       <div className="w-full max-w-sm bg-white border border-gray-200 rounded-2xl p-8 shadow-sm">
         <div className="flex items-center gap-2 mb-6">
           <ShieldCheck className="text-violet-600" size={22} />
-          <span className="font-bold text-lg text-gray-900">VyostraAI Staff Console</span>
+          <span className="font-bold text-lg text-gray-900">Vyostra AI Staff Console</span>
         </div>
 
         {!session ? (

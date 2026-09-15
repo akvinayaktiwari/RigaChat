@@ -1,4 +1,4 @@
-import { Helmet } from 'react-helmet-async'
+import PageMeta from '../../components/seo/PageMeta'
 import { Bot, Filter, RefreshCw, Database, MessageSquare, FileText } from 'lucide-react'
 import UseCaseLayout from '../../components/landing/UseCaseLayout'
 
@@ -46,17 +46,15 @@ function CrmTableMockup() {
 export default function Crm() {
   return (
     <>
-      <Helmet>
-        <title>Built-in Lead CRM — VyostraAI</title>
-        <meta
-          name="description"
-          content="Every lead captured, stored, and organized automatically. Filter, track, and sync to Zoho CRM in real-time."
-        />
-      </Helmet>
+      <PageMeta
+        title="Built-in Lead CRM — Vyostra AI"
+        description="Every lead captured, stored, and organized automatically. Filter, track, and sync to Zoho CRM in real-time."
+        path="/features/crm"
+      />
       <UseCaseLayout
         badge="LEAD CRM"
         headline="Every lead, organized automatically"
-        subheadline="VyostraAI stores every lead captured by your agents and forms in a built-in CRM dashboard. Filter, track status, and sync to Zoho CRM in one click."
+        subheadline="Vyostra AI stores every lead captured by your agents and forms in a built-in CRM dashboard. Filter, track status, and sync to Zoho CRM in one click."
         heroVisual={<CrmTableMockup />}
         howItWorksSteps={[
           {
@@ -96,12 +94,12 @@ export default function Crm() {
           },
         ]}
         integrations={[
-          { icon: <Bot className="w-4 h-4" />, title: 'AI Agent', href: '/features/agent' },
+          { icon: <Bot className="w-4 h-4" />, title: 'AI Agent', href: '/features/chatbot' },
           { icon: <MessageSquare className="w-4 h-4" />, title: 'WhatsApp Alerts', href: '/features/whatsapp' },
           { icon: <FileText className="w-4 h-4" />, title: 'Form Builder', href: '/features/forms' },
         ]}
         ctaHeadline="See every lead in one place"
-        ctaBody="VyostraAI captures and organizes your leads automatically. Connect Zoho CRM in one click."
+        ctaBody="Vyostra AI captures and organizes your leads automatically. Connect Zoho CRM in one click."
       />
     </>
   )
