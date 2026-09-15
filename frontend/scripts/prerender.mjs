@@ -7,6 +7,7 @@
  * <div id="root">. The client bundle still boots normally on top of it.
  *
  * Emits:
+ *   dist/index.html (the homepage) and dist/app-shell.html (the empty SPA shell)
  *   dist/blog/index.html
  *   dist/blog/<slug>/index.html
  *   dist/privacy-policy/index.html, dist/terms-of-service/index.html
@@ -20,6 +21,9 @@ import { build } from 'vite'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const distDir = path.join(root, 'dist')
 const ssrOutDir = path.join(root, '.prerender-ssr')
+
+/** Served by the CloudFront function for client-rendered routes. Keep in step with deploy/cloudfront/viewer-request.js. */
+const APP_SHELL_FILE = 'app-shell.html'
 
 /** Injects rendered markup and head tags into the built index.html shell. */
 function composePage(template, { html, head }) {
@@ -72,6 +76,14 @@ async function main() {
   const template = await readFile(path.join(distDir, 'index.html'), 'utf-8').catch(() => {
     throw new Error('dist/index.html not found. Run `vite build` before prerendering.')
   })
+
+  // "/" is prerendered into dist/index.html, which overwrites the empty shell --
+  // but the CloudFront viewer-request function serves a shell for every other
+  // client-rendered route (/login, /dashboard, /features, ...). Serving them the
+  // homepage instead would give each one the homepage's title and canonical and
+  // flash the landing page at app users. The shell keeps its own file.
+  await writeFile(path.join(distDir, APP_SHELL_FILE), template, 'utf-8')
+  console.log(`[prerender] SPA shell -> dist/${APP_SHELL_FILE}`)
 
   // Build the SSR bundle. `ssr: true` keeps React external and targets Node.
   await build({

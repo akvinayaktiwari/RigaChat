@@ -59,7 +59,9 @@ function handler(event) {
 
     var uri = request.uri;
 
-    // The S3 website origin serves '/' and directory indexes itself.
+    // The S3 website origin serves '/' and directory indexes itself. '/' is the
+    // prerendered homepage (dist/index.html), so it must NOT fall through to
+    // the shell rewrite below.
     if (uri === '/' || uri.charAt(uri.length - 1) === '/') {
         return request;
     }
@@ -82,6 +84,11 @@ function handler(event) {
         }
     }
 
-    request.uri = '/index.html';
+    // Client-rendered routes get the empty SPA shell. Not /index.html: that is
+    // the prerendered homepage, and serving it here would hand /login,
+    // /dashboard and /features the homepage's title and canonical, and flash
+    // the landing page at app users before the bundle boots. scripts/prerender.mjs
+    // writes dist/app-shell.html; it must be in the bucket before this ships.
+    request.uri = '/app-shell.html';
     return request;
 }
