@@ -91,7 +91,9 @@ export async function renderRoute(url: string): Promise<{ html: string; head: st
 
   const helmet = helmetContext.helmet
   const head = helmet
-    ? [helmet.title.toString(), helmet.meta.toString(), helmet.link.toString()].filter(Boolean).join('\n    ')
+    ? [helmet.title.toString(), helmet.meta.toString(), helmet.link.toString(), helmet.script.toString()]
+        .filter(Boolean)
+        .join('\n    ')
     : ''
 
   return { html, head }

@@ -9,6 +9,8 @@ import { getPostBySlug } from '../content/blog/registry'
 import { AttachmentCard, BlogSurface, PostMetaLine, PostTags } from '../components/blog/BlogChrome'
 import { JAKARTA_FONT, ScrollReveal, StatRow, StatTile } from '../components/blog/BlogPrimitives'
 import { absoluteUrl } from '../lib/site'
+import StructuredData from '../components/seo/StructuredData'
+import { blogPostingSchema, jsonLdGraph, organizationSchema } from '../lib/structured-data'
 
 function BackToBlog() {
   return (
@@ -101,6 +103,12 @@ export default function BlogPost() {
         <meta name="twitter:image" content={absoluteUrl('/og-image.png')} />
       </Helmet>
 
+      <StructuredData
+        data={jsonLdGraph([
+          organizationSchema(),
+          blogPostingSchema({ ...meta, path: `/blog/${meta.slug}/` }),
+        ])}
+      />
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 
       <BlogSurface>

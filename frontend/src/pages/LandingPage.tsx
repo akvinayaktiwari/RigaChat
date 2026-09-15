@@ -13,6 +13,9 @@ import PricingSection from '../components/landing/PricingSection'
 import CTASection from '../components/landing/CTASection'
 import Footer from '../components/landing/Footer'
 import PageMeta from '../components/seo/PageMeta'
+import StructuredData from '../components/seo/StructuredData'
+import { PRICING_TIERS } from '../lib/pricingTiers'
+import { jsonLdGraph, organizationSchema, softwareApplicationSchema, websiteSchema } from '../lib/structured-data'
 import DemoModal from '../components/landing/modals/DemoModal'
 import QuickSignupModal from '../components/auth/QuickSignupModal'
 import { useAuth } from '../hooks/useAuth'
@@ -102,6 +105,7 @@ export default function LandingPage() {
         description="Train an AI agent on your website in minutes. It captures leads 24/7 on chat, voice and WhatsApp, drops them into a built-in CRM, and follows up until they book. Plans from ₹1,999/mo."
         path="/"
       />
+      <StructuredData data={jsonLdGraph([organizationSchema(), websiteSchema(), softwareApplicationSchema(PRICING_TIERS)])} />
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
       <HeroSection onOpenDemo={() => setIsDemoOpen(true)} />
       <StatsBar />

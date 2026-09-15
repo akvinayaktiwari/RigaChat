@@ -16,6 +16,8 @@ import {
 import Navbar from '../components/landing/Navbar'
 import Footer from '../components/landing/Footer'
 import PageMeta from '../components/seo/PageMeta'
+import StructuredData from '../components/seo/StructuredData'
+import { faqPageSchema, jsonLdGraph } from '../lib/structured-data'
 import DemoModal from '../components/landing/modals/DemoModal'
 
 interface HelpCategory {
@@ -370,6 +372,8 @@ export default function Help() {
         description="Answers on setting up your Vyostra AI agent: embedding the chat widget, training the knowledge base, WhatsApp notifications, Zoho CRM sync, lead forms, trials and billing."
         path="/help"
       />
+      {/* Every article, not filteredArticles: the answers are all on the page, only collapsed. */}
+      <StructuredData data={jsonLdGraph([faqPageSchema(HELP_ARTICLES)])} />
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 
       <main className="pt-36 pb-24 px-6 lg:px-8">
