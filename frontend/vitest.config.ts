@@ -4,6 +4,14 @@ import { defineConfig } from 'vitest/config'
 // way. The difference is the environment: these tests touch sessionStorage and
 // React state, so they need a DOM rather than bare node.
 export default defineConfig({
+  // crawl-files.test.ts reads the CloudFront function's source to catch a
+  // prerendered route the function would never serve. Vite refuses files
+  // outside the project root unless listed; allow exactly that directory.
+  server: {
+    fs: {
+      allow: ['.', '../deploy/cloudfront'],
+    },
+  },
   test: {
     environment: 'jsdom',
     // jsdom has neither IntersectionObserver nor matchMedia; the landing

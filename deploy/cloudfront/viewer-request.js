@@ -19,7 +19,39 @@
 //
 // /api/* has its own cache behavior, so this function never sees it and API
 // responses keep their real status codes.
-var PRERENDERED_PREFIXES = ['/blog', '/privacy-policy', '/terms-of-service'];
+// Keep in step with PRERENDERED_STATIC_ROUTES in frontend/src/lib/crawl-files.ts;
+// crawl-files.test.ts fails if a prerendered route is missing here.
+var PRERENDERED_PREFIXES = ['/features', '/blog', '/privacy-policy', '/terms-of-service'];
+
+/** Re-serialises the query string, keeping multi-value keys. '' when there is none. */
+function serializeQuerystring(querystring) {
+    var keys = Object.keys(querystring);
+    if (keys.length === 0) {
+        return '';
+    }
+
+    var parts = [];
+    for (var i = 0; i < keys.length; i++) {
+        var key = keys[i];
+        var qsValue = querystring[key];
+        if (qsValue.multiValue) {
+            for (var j = 0; j < qsValue.multiValue.length; j++) {
+                parts.push(encodeURIComponent(key) + '=' + encodeURIComponent(qsValue.multiValue[j].value));
+            }
+        } else if (qsValue.value !== undefined) {
+            parts.push(encodeURIComponent(key) + '=' + encodeURIComponent(qsValue.value));
+        }
+    }
+    return '?' + parts.join('&');
+}
+
+function permanentRedirect(location) {
+    return {
+        statusCode: 301,
+        statusDescription: 'Moved Permanently',
+        headers: { 'location': { value: location } }
+    };
+}
 
 function handler(event) {
     var request = event.request;
@@ -27,34 +59,7 @@ function handler(event) {
     var host = headers.host && headers.host.value;
 
     if (host === 'www.vyostra.com') {
-        var redirectUri = request.uri;
-        var querystring = request.querystring;
-        var qs = '';
-        var keys = Object.keys(querystring);
-
-        if (keys.length > 0) {
-            var parts = [];
-            for (var i = 0; i < keys.length; i++) {
-                var key = keys[i];
-                var qsValue = querystring[key];
-                if (qsValue.multiValue) {
-                    for (var j = 0; j < qsValue.multiValue.length; j++) {
-                        parts.push(encodeURIComponent(key) + '=' + encodeURIComponent(qsValue.multiValue[j].value));
-                    }
-                } else if (qsValue.value !== undefined) {
-                    parts.push(encodeURIComponent(key) + '=' + encodeURIComponent(qsValue.value));
-                }
-            }
-            qs = '?' + parts.join('&');
-        }
-
-        return {
-            statusCode: 301,
-            statusDescription: 'Moved Permanently',
-            headers: {
-                'location': { value: 'https://vyostra.com' + redirectUri + qs }
-            }
-        };
+        return permanentRedirect('https://vyostra.com' + request.uri + serializeQuerystring(request.querystring));
     }
 
     var uri = request.uri;
@@ -76,17 +81,20 @@ function handler(event) {
 
     // Prerendered routes are real directories with their own index.html, and
     // rewriting them would serve the empty SPA shell to crawlers instead of the
-    // rendered article. Keep this list in step with prerender.mjs's getRoutes().
+    // rendered page. A directory is served at its trailing-slash form, which is
+    // what every canonical and sitemap entry names. The bare form is answered
+    // here with a 301 rather than passed to S3, whose website endpoint would
+    // answer it with a 302 -- a temporary redirect on every internal link.
     for (var p = 0; p < PRERENDERED_PREFIXES.length; p++) {
         var prefix = PRERENDERED_PREFIXES[p];
         if (uri === prefix || uri.indexOf(prefix + '/') === 0) {
-            return request;
+            return permanentRedirect(uri + '/' + serializeQuerystring(request.querystring));
         }
     }
 
     // Client-rendered routes get the empty SPA shell. Not /index.html: that is
     // the prerendered homepage, and serving it here would hand /login,
-    // /dashboard and /features the homepage's title and canonical, and flash
+    // /dashboard and /help the homepage's title and canonical, and flash
     // the landing page at app users before the bundle boots. scripts/prerender.mjs
     // writes dist/app-shell.html; it must be in the bucket before this ships.
     request.uri = '/app-shell.html';

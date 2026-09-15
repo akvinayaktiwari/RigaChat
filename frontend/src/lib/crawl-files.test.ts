@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import appSource from '../../App.tsx?raw'
+import viewerRequestSource from '../../../deploy/cloudfront/viewer-request.js?raw'
 import {
   PRERENDERED_STATIC_ROUTES,
   SPA_MARKETING_ROUTES,
@@ -71,6 +72,14 @@ describe('route lists', () => {
   // exactly what a sitemap must never hand a crawler.
   it.each([...SPA_MARKETING_ROUTES, ...PRERENDERED_STATIC_ROUTES])('%s is mounted in App.tsx', (route) => {
     expect(mounted.has(route)).toBe(true)
+  })
+
+  // A prerendered route the CloudFront function does not know about is rewritten
+  // to the empty app shell, so its static HTML is written and never served.
+  it.each(PRERENDERED_STATIC_ROUTES)('%s is a prerendered prefix in the CloudFront function', (route) => {
+    const declaration = viewerRequestSource.match(/var PRERENDERED_PREFIXES = \[([^\]]*)\]/)
+    const prefixes = [...(declaration?.[1] ?? '').matchAll(/'([^']+)'/g)].map((match) => match[1] ?? '')
+    expect(prefixes.some((prefix) => route === prefix || route.startsWith(`${prefix}/`))).toBe(true)
   })
 
   it('servedPath adds exactly one trailing slash', () => {
