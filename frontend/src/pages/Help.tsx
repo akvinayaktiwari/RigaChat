@@ -370,7 +370,7 @@ export default function Help() {
       <PageMeta
         title="Help Center — Vyostra AI"
         description="Answers on setting up your Vyostra AI agent: embedding the chat widget, training the knowledge base, WhatsApp notifications, Zoho CRM sync, lead forms, trials and billing."
-        path="/help"
+        path="/help/"
       />
       {/* Every article, not filteredArticles: the answers are all on the page, only collapsed. */}
       <StructuredData data={jsonLdGraph([faqPageSchema(HELP_ARTICLES)])} />

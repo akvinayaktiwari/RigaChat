@@ -191,7 +191,7 @@ export default function Careers() {
       <PageMeta
         title="Careers at Vyostra AI — Work Remotely"
         description="Join Vyostra AI. Fully remote. Build AI products that help businesses grow. Send your resume to support@vyostra.com"
-        path="/careers"
+        path="/careers/"
       />
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 
