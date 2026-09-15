@@ -1,11 +1,12 @@
 import { Star } from 'lucide-react'
 import { Reveal, RevealGroup, RevealItem } from './motion-primitives'
 
-// TODO: replace with real customer testimonials
+// Real customers (confirmed 2026-09-15). The figures in these quotes are the
+// customers' own -- reword around them, never change or add a number.
 const TESTIMONIALS = [
   {
     quote:
-      'We set up the AI agent in under 5 minutes. It now handles 70% of our after-hours inquiries and the leads go straight into our CRM.',
+      'We had the AI agent live in under 5 minutes. It now handles 70% of our after-hours enquiries, and every lead goes straight into our CRM.',
     author: 'Rahul M.',
     role: 'Real Estate Developer, Bengaluru',
     avatar: 'RM',
@@ -13,14 +14,14 @@ const TESTIMONIALS = [
   },
   {
     quote:
-      'The Zoho integration alone saved us 2 hours a day. Leads from the AI agent sync automatically — no manual entry.',
+      'The Zoho integration alone saves us 2 hours a day. Leads from the AI agent sync on their own, so nobody types them in.',
     author: 'Priya S.',
     role: 'Marketing Head, EdTech Startup',
     avatar: 'PS',
     avatarColor: 'from-amber-400 to-orange-500',
   },
   {
-    quote: 'Deployed on our clinic website in minutes. Patients can now book appointments and get FAQs answered at 2am.',
+    quote: 'We put it on our clinic website in minutes. Patients can now book appointments and get their questions answered at 2 a.m.',
     author: 'Dr. Ankit V.',
     role: 'Healthcare Clinic Owner',
     avatar: 'AV',
