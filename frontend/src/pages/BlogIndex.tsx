@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Helmet } from 'react-helmet-async'
 import { Link } from 'react-router-dom'
 import { ArrowRight, FileText } from 'lucide-react'
 import Navbar from '../components/landing/Navbar'
@@ -9,7 +8,7 @@ import { getAllPosts } from '../content/blog/registry'
 import { BlogSurface, PostMetaLine, PostTags } from '../components/blog/BlogChrome'
 import { JAKARTA_FONT, ScrollReveal, StatTile } from '../components/blog/BlogPrimitives'
 import type { BlogPost } from '../types/blog'
-import { absoluteUrl } from '../lib/site'
+import PageMeta from '../components/seo/PageMeta'
 
 function FeaturedPost({ post }: { post: BlogPost }) {
   const { meta } = post
@@ -97,16 +96,11 @@ export default function BlogIndex() {
 
   return (
     <div className="landing-page bg-background">
-      <Helmet>
-        <title>Blog — Vyostra AI</title>
-        <meta name="description" content="Research, breakdowns and field notes from the Vyostra AI team on AI, lead generation and the markets our customers build in." />
-        <link rel="canonical" href={absoluteUrl('/blog/')} />
-        <meta property="og:type" content="website" />
-        <meta property="og:title" content="Blog — Vyostra AI" />
-        <meta property="og:description" content="Research, breakdowns and field notes from the Vyostra AI team." />
-        <meta property="og:url" content={absoluteUrl('/blog/')} />
-        <meta name="twitter:card" content="summary_large_image" />
-      </Helmet>
+      <PageMeta
+        title="Blog — Vyostra AI"
+        description="Research, breakdowns and field notes from the Vyostra AI team on AI, lead generation and the markets our customers build in."
+        path="/blog/"
+      />
 
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 

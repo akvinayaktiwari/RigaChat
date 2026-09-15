@@ -34,6 +34,13 @@ function composePage(template, { html, head }) {
       page = page.replace(/[ \t]*<title>[\s\S]*?<\/title>\r?\n?/i, '')
     }
 
+    // Same for the shell's default description: two description tags leave the
+    // crawler to pick one.
+    if (/<meta[^>]+name="description"/i.test(head)) {
+      page = page.replace(/[ \t]*<!--(?:(?!-->)[\s\S])*-->\r?\n?(?=\s*<meta\s+name="description")/i, '')
+      page = page.replace(/[ \t]*<meta\s+name="description"[\s\S]*?\/>\r?\n?/i, '')
+    }
+
     page = page.replace('</head>', `  ${head}\n  </head>`)
   }
 

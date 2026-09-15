@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Rocket, Link as LinkIcon, CheckCircle2, MessageCircle, TrendingUp, Zap, Globe, Compass } from 'lucide-react'
 import Navbar from '../components/landing/Navbar'
 import Footer from '../components/landing/Footer'
+import PageMeta from '../components/seo/PageMeta'
 import DemoModal from '../components/landing/modals/DemoModal'
 
 interface StatItem {
@@ -246,6 +247,11 @@ export default function About() {
 
   return (
     <div className="landing-page bg-background">
+      <PageMeta
+        title="About Vyostra AI — AI Lead Generation, Built in Bangalore"
+        description="Vyostra AI is a Bangalore-built platform that helps businesses capture every lead with AI chat and voice agents, WhatsApp follow-up and a built-in lead CRM. Meet the founders."
+        path="/about-us"
+      />
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 
       <main className="pt-36 pb-24 px-6 lg:px-8">

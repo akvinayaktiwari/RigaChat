@@ -1,4 +1,4 @@
-import { Helmet } from 'react-helmet-async'
+import PageMeta from '../../components/seo/PageMeta'
 import { Bot, Filter, RefreshCw, Database, MessageSquare, FileText } from 'lucide-react'
 import UseCaseLayout from '../../components/landing/UseCaseLayout'
 
@@ -46,13 +46,11 @@ function CrmTableMockup() {
 export default function Crm() {
   return (
     <>
-      <Helmet>
-        <title>Built-in Lead CRM — Vyostra AI</title>
-        <meta
-          name="description"
-          content="Every lead captured, stored, and organized automatically. Filter, track, and sync to Zoho CRM in real-time."
-        />
-      </Helmet>
+      <PageMeta
+        title="Built-in Lead CRM — Vyostra AI"
+        description="Every lead captured, stored, and organized automatically. Filter, track, and sync to Zoho CRM in real-time."
+        path="/features/crm"
+      />
       <UseCaseLayout
         badge="LEAD CRM"
         headline="Every lead, organized automatically"

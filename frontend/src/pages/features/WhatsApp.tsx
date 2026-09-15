@@ -1,4 +1,4 @@
-import { Helmet } from 'react-helmet-async'
+import PageMeta from '../../components/seo/PageMeta'
 import { Key, ToggleRight, BarChart2, Bell, Lock, Bot, Users, RefreshCw } from 'lucide-react'
 import UseCaseLayout from '../../components/landing/UseCaseLayout'
 
@@ -29,13 +29,11 @@ function WhatsAppNotificationMockup() {
 export default function WhatsAppFeaturePage() {
   return (
     <>
-      <Helmet>
-        <title>WhatsApp Lead Notifications — Vyostra AI</title>
-        <meta
-          name="description"
-          content="Get instant WhatsApp alerts every time a new lead is captured. Weekly reports every Monday. Powered by Gupshup."
-        />
-      </Helmet>
+      <PageMeta
+        title="WhatsApp Lead Notifications — Vyostra AI"
+        description="Get instant WhatsApp alerts every time a new lead is captured. Weekly reports every Monday. Powered by Gupshup."
+        path="/features/whatsapp"
+      />
       <UseCaseLayout
         badge="WHATSAPP AUTOMATION"
         headline="Never miss a lead — get notified instantly"

@@ -1,4 +1,4 @@
-import { Helmet } from 'react-helmet-async'
+import PageMeta from '../../components/seo/PageMeta'
 import { Bot, Code, Users, Brain, Clock, Zap, MessageSquare, Users as CrmIcon, FileText } from 'lucide-react'
 import UseCaseLayout from '../../components/landing/UseCaseLayout'
 
@@ -42,13 +42,11 @@ function ChatWidgetMockup() {
 export default function Chatbot() {
   return (
     <>
-      <Helmet>
-        <title>AI Agent for Lead Generation — Vyostra AI</title>
-        <meta
-          name="description"
-          content="Capture leads 24/7 with an AI agent trained on your business data. No code required. Set up in under 5 minutes."
-        />
-      </Helmet>
+      <PageMeta
+        title="AI Agent for Lead Generation — Vyostra AI"
+        description="Capture leads 24/7 with an AI agent trained on your business data. No code required. Set up in under 5 minutes."
+        path="/features/chatbot"
+      />
       <UseCaseLayout
         badge="AI AGENT"
         headline="Your 24/7 AI sales assistant"

@@ -1,4 +1,4 @@
-import { Helmet } from 'react-helmet-async'
+import PageMeta from '../../components/seo/PageMeta'
 import { FileText, Code, Bell, Palette, Globe, Bot, MessageSquare, Users } from 'lucide-react'
 import UseCaseLayout from '../../components/landing/UseCaseLayout'
 
@@ -20,13 +20,11 @@ function FormMockup() {
 export default function Forms() {
   return (
     <>
-      <Helmet>
-        <title>Smart Form Builder — Vyostra AI</title>
-        <meta
-          name="description"
-          content="Build beautiful lead capture forms in minutes. Embed anywhere. Every submission captured and notified instantly via WhatsApp."
-        />
-      </Helmet>
+      <PageMeta
+        title="Smart Form Builder — Vyostra AI"
+        description="Build beautiful lead capture forms in minutes. Embed anywhere. Every submission captured and notified instantly via WhatsApp."
+        path="/features/forms"
+      />
       <UseCaseLayout
         badge="FORM BUILDER"
         headline="Beautiful forms that capture leads"

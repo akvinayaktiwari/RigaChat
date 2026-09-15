@@ -85,6 +85,7 @@ export default function BlogPost() {
         <title>{`${meta.title} — Vyostra AI`}</title>
         <meta name="description" content={meta.excerpt} />
         <link rel="canonical" href={canonical} />
+        <meta property="og:site_name" content="Vyostra AI" />
         <meta property="og:type" content="article" />
         <meta property="og:title" content={meta.title} />
         <meta property="og:description" content={meta.excerpt} />
@@ -96,6 +97,8 @@ export default function BlogPost() {
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={meta.title} />
         <meta name="twitter:description" content={meta.excerpt} />
+        <meta property="og:image" content={absoluteUrl('/og-image.png')} />
+        <meta name="twitter:image" content={absoluteUrl('/og-image.png')} />
       </Helmet>
 
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />

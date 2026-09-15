@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import Navbar from '../components/landing/Navbar'
 import Footer from '../components/landing/Footer'
+import PageMeta from '../components/seo/PageMeta'
 import DemoModal from '../components/landing/modals/DemoModal'
 
 interface HelpCategory {
@@ -364,6 +365,11 @@ export default function Help() {
 
   return (
     <div className="landing-page bg-background">
+      <PageMeta
+        title="Help Center — Vyostra AI"
+        description="Answers on setting up your Vyostra AI agent: embedding the chat widget, training the knowledge base, WhatsApp notifications, Zoho CRM sync, lead forms, trials and billing."
+        path="/help"
+      />
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 
       <main className="pt-36 pb-24 px-6 lg:px-8">
