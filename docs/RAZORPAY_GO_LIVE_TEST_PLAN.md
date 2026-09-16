@@ -177,8 +177,12 @@ the 9 listed above and nothing else.
 
 Then run `./scripts/razorpay-go-live.sh` (Step 3) — dry run first.
 
-> The script did not exist when this doc first described it (checked against the
-> full git history on 2026-09-16 — it had never been committed). It exists now.
+> Two scripts existed briefly. The original, `backend/scripts/razorpay-go-live.sh`
+> (added 2026-08-24), created INR plans at the OLD prices — ₹1,999 / ₹5,499 /
+> ₹14,999 — and wrote those ids to the Lambdas. Running it after the move to
+> global USD pricing would have repointed production at wrong-priced plans, so it
+> was deleted on 2026-09-16. The live script is `scripts/razorpay-go-live.sh` at
+> the repo root: six plans, two currencies, and it creates nothing.
 
 ### Step 3 — Set the live env vars on ALL THREE Lambdas
 
