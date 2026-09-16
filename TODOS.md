@@ -320,7 +320,7 @@ Gupshup is explicitly out of scope (being deprecated).
 
 ## Content and SEO
 
-### Move blog posts to MDX before the next article
+### [RESOLVED 2026-09-16] Move blog posts to MDX before the next article
 
 **What:** a post is a hand-written TSX component (`src/content/blog/posts/<slug>/content.tsx`).
 The WhatsApp article proved the repeated shape — numbered sections, comparison tables,
@@ -337,8 +337,14 @@ prose, the existing BlogPrimitives components imported for the structured blocks
 none of that changes. Existing TSX posts keep working; convert them only if convenient.
 Verify a prerendered MDX post still emits its body with no `opacity:0` and its FAQ schema.
 
-**Effort:** S-M (~half a day)
-**Priority:** P2 — do it BEFORE writing articles 2 and 3, not after.
+**Done:** `@mdx-js/rollup` + `remark-gfm` in the Vite and vitest configs, the registry
+takes `content.mdx` or `content.tsx`, `MdxComponents.tsx` maps prose elements to the blog's
+look and puts every primitive in scope without imports, and the WhatsApp article is
+converted as proof (output diffed against the TSX build). Authoring guide:
+docs/BLOG_AUTHORING.md.
+
+**Effort:** S-M (done)
+**Priority:** P2
 **Depends on:** None
 
 ### Voice-agent articles: the ON-PAGE agent, India and UAE

@@ -1,6 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { defineConfig, loadEnv, type Plugin } from 'vite'
+import mdx from '@mdx-js/rollup'
+import remarkGfm from 'remark-gfm'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
@@ -33,6 +35,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [
+      // Before react(): the JSX that MDX compiles to still has to go through
+      // the React plugin, and `enforce: 'pre'` is what puts it there first.
+      { enforce: 'pre', ...mdx({ providerImportSource: '@mdx-js/react', remarkPlugins: [remarkGfm] }) },
       react(),
       tailwindcss(),
       serveLocalWidget(env.VITE_API_URL || '', env.VITE_VOICE_WS_URL || ''),
