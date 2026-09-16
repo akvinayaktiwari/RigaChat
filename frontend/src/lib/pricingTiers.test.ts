@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PRICING_TIERS, formatPrice, inrDisplayPrice, isUpgradeFrom, nextTierUp } from './pricingTiers'
+import { PRICING_TIERS, currencyForRegion, formatPrice, inrDisplayPrice, isUpgradeFrom, nextTierUp } from './pricingTiers'
 
 describe('isUpgradeFrom', () => {
   it('treats a higher tier as an upgrade', () => {
@@ -33,11 +33,16 @@ describe('nextTierUp', () => {
     expect(formatPrice(49, 'intl')).toBe('$49')
   })
 
-  // The rupee figure is a conversion of the USD price, and the card is charged
-  // in USD — so it is marked approximate wherever it appears.
-  it('shows rupees as an approximation, never as the price charged', () => {
-    expect(formatPrice(49, 'in')).toBe('≈ ₹4,299')
-    expect(inrDisplayPrice(49)).toBe(4299)
+  // Exact, not approximate: the Razorpay INR plan holds this number, so the
+  // page and the charge are the same figure. Create the plans at these amounts.
+  it('shows the rupee price the INR plans charge', () => {
+    expect(formatPrice(49, 'in')).toBe('₹4,299')
+    expect(PRICING_TIERS.map((t) => inrDisplayPrice(t.priceUsd))).toEqual([4299, 11399, 30699])
+  })
+
+  it('maps a region to the plan currency its checkout uses', () => {
+    expect(currencyForRegion('in')).toBe('INR')
+    expect(currencyForRegion('intl')).toBe('USD')
   })
 
   it('relies on PRICING_TIERS staying in ascending price order', () => {

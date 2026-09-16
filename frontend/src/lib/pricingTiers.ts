@@ -90,19 +90,25 @@ export function nextTierUp(current: PlanTier): BillableTier | undefined {
 }
 
 /**
- * The price as shown for a region.
+ * The price as shown for a region — and, since the INR plans charge exactly
+ * this, the amount an Indian customer is billed. No "≈": the rupee plan holds
+ * this number, so showing an approximation would understate what we know.
  *
- * 'in' renders the converted rupee figure with a "≈" because that is what it
- * is: the card is charged in USD, and the bank's rate on the day decides the
- * exact rupee amount. Dropping the "≈" would be a promise we do not control.
+ * The Razorpay INR plans MUST be created at exactly inrDisplayPrice(usd) for
+ * each tier, or the page and the charge disagree.
  */
 export function formatPrice(priceUsd: number, region: Region): string {
-  if (region === 'in') return `≈ ₹${inrDisplayPrice(priceUsd).toLocaleString('en-IN')}`
+  if (region === 'in') return `₹${inrDisplayPrice(priceUsd).toLocaleString('en-IN')}`
   return `$${priceUsd.toLocaleString('en-US')}`
 }
 
-/** Shown wherever a converted price is: the currency actually charged. */
-export const BILLING_CURRENCY_NOTE = 'Billed in USD'
+/** Which Razorpay plan a region's checkout is created against. */
+export function currencyForRegion(region: Region): 'INR' | 'USD' {
+  return region === 'in' ? 'INR' : 'USD'
+}
+
+/** Why the rupee list exists at all — the methods a USD plan cannot accept. */
+export const INR_METHODS_NOTE = 'Pay by UPI, netbanking, RuPay or card'
 
 // Timezone heuristic, zero network calls / new dependencies. Manual toggle
 // always overrides this — it's only the initial guess.

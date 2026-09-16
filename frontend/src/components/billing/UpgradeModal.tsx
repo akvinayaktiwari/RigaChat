@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Check, CheckCircle2, Loader2, X } from 'lucide-react'
-import { BILLING_CURRENCY_NOTE, PRICING_TIERS, detectRegion, formatPrice, isUpgradeFrom, nextTierUp } from '../../lib/pricingTiers'
+import { INR_METHODS_NOTE, PRICING_TIERS, currencyForRegion, detectRegion, formatPrice, isUpgradeFrom, nextTierUp } from '../../lib/pricingTiers'
 import type { Region } from '../../lib/pricingTiers'
 import type { PlanTier } from '../../types/index'
 import { useTierCheckout } from '../../hooks/useTierCheckout'
@@ -8,7 +8,6 @@ import { useTierCheckout } from '../../hooks/useTierCheckout'
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
 // Same address PricingSection.tsx uses for its international CTA.
-const INTL_CONTACT_EMAIL = 'support@vyostra.com'
 
 const FOCUSABLE_SELECTOR = 'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
 
@@ -25,10 +24,10 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }: UpgradeMo
   const { stage, submittingTier, errorMessage, pendingCheckout, selectTier, reset } = useTierCheckout(() => {
     setTimeout(() => onClose(), 1500)
   })
-  // Region decides both the price shown and whether there is a checkout at all:
-  // Razorpay is India-only, so international visitors get the same mailto CTA
-  // the landing page gives them. Before this the modal hardcoded 'in' and
-  // pushed every user into a payment flow that cannot serve them.
+  // Region decides the currency the subscription is created in: rupees through
+  // the INR plans (UPI, netbanking, RuPay, cards) or dollars through the USD
+  // ones (international cards). Both are real checkouts — the international
+  // mailto this modal used to show existed only because no USD plan existed.
   const [region, setRegion] = useState<Region>(detectRegion)
   const dialogRef = useRef<HTMLDivElement>(null)
 
@@ -114,7 +113,7 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }: UpgradeMo
                 </h2>
                 <p className="text-sm text-gray-500">
                   All plans include a 14-day free trial. Cancel anytime.
-                  {region === 'in' ? ` ${BILLING_CURRENCY_NOTE}.` : ''}
+                  {region === 'in' ? ` ${INR_METHODS_NOTE}.` : ' Billed in USD.'}
                 </p>
               </div>
 
@@ -208,17 +207,10 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }: UpgradeMo
                       <button type="button" disabled className={ctaClasses}>
                         {isCurrent ? 'Your current plan' : 'Included in your plan'}
                       </button>
-                    ) : region === 'intl' ? (
-                      <a
-                        href={`mailto:${INTL_CONTACT_EMAIL}?subject=International ${plan.name} plan enquiry`}
-                        className={ctaClasses}
-                      >
-                        Contact us
-                      </a>
                     ) : (
                       <button
                         type="button"
-                        onClick={() => selectTier(plan.tier)}
+                        onClick={() => selectTier(plan.tier, currencyForRegion(region))}
                         disabled={submittingTier !== null}
                         className={ctaClasses}
                       >

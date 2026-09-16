@@ -4,6 +4,9 @@ import type { BillingErrorCode } from '../services/api'
 import { loadRazorpayScript } from '../lib/razorpay-checkout'
 import { PRICING_TIERS } from '../lib/pricingTiers'
 import type { BillableTier } from '../lib/pricingTiers'
+
+/** Which Razorpay plan the subscription is created against; see api.ts. */
+export type BillingCurrency = 'INR' | 'USD'
 import { useSubscription } from './useSubscription'
 
 const POLL_INTERVAL_MS = 3000
@@ -58,7 +61,7 @@ export interface UseTierCheckoutResult {
   submittingTier: BillableTier | null
   errorMessage: string | null
   pendingCheckout: PendingTierCheckout | null
-  selectTier: (tier: BillableTier) => Promise<void>
+  selectTier: (tier: BillableTier, currency?: BillingCurrency) => Promise<void>
   reset: () => void
 }
 
@@ -166,7 +169,7 @@ export function useTierCheckout(onConfirmed?: () => void): UseTierCheckoutResult
     checkout.open()
   }
 
-  async function selectTier(tier: BillableTier) {
+  async function selectTier(tier: BillableTier, currency: BillingCurrency = 'USD') {
     setErrorMessage(null)
 
     // Resume applies both when we know this pending checkout is for the
@@ -189,7 +192,7 @@ export function useTierCheckout(onConfirmed?: () => void): UseTierCheckoutResult
 
     setSubmittingTier(tier)
     try {
-      const res = await subscribeToTier(tier)
+      const res = await subscribeToTier(tier, currency)
       if (!res.success || !res.data) {
         // Fresh ALREADY_SUBSCRIBED with no local pendingCheckout (e.g. after
         // a page refresh) but the server handed back enough to resume

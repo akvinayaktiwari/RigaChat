@@ -21,7 +21,7 @@ import QuickSignupModal from '../components/auth/QuickSignupModal'
 import { useAuth } from '../hooks/useAuth'
 import type { AuthUser } from '../hooks/useAuth'
 import { useTierCheckout } from '../hooks/useTierCheckout'
-import { detectRegion } from '../lib/pricingTiers'
+import { currencyForRegion, detectRegion } from '../lib/pricingTiers'
 import type { BillableTier, Region } from '../lib/pricingTiers'
 
 const VOICE_AGENT_ID = 'b5b88f4b-3a4d-41cc-b590-9324655c341f'
@@ -58,7 +58,7 @@ export default function LandingPage() {
     // the billing call — the modal is only for turning an anonymous visitor
     // into an authenticated one.
     if (isAuthenticated) {
-      tierCheckout.selectTier(tier)
+      tierCheckout.selectTier(tier, currencyForRegion(region))
       return
     }
     setSignupModal({ mode: 'checkout', tier })
@@ -70,7 +70,7 @@ export default function LandingPage() {
     setSignupModal(null)
 
     if (pending?.mode === 'checkout') {
-      tierCheckout.selectTier(pending.tier)
+      tierCheckout.selectTier(pending.tier, currencyForRegion(region))
     } else {
       window.location.href = '/dashboard'
     }
