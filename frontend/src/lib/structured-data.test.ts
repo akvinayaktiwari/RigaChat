@@ -24,9 +24,9 @@ function asArray(value: JsonValue | undefined): JsonValue[] {
 describe('softwareApplicationSchema', () => {
   const offers = asArray(softwareApplicationSchema(PRICING_TIERS).offers).map(asRecord)
 
-  it('offers every plan at its India price in INR, straight from PRICING_TIERS', () => {
+  it('offers every plan at its global USD price, straight from PRICING_TIERS', () => {
     expect(offers.map((offer) => [offer.name, offer.price, offer.priceCurrency])).toEqual(
-      PRICING_TIERS.map((tier) => [tier.name, String(tier.pricing.in), 'INR']),
+      PRICING_TIERS.map((tier) => [tier.name, String(tier.priceUsd), 'USD']),
     )
   })
 

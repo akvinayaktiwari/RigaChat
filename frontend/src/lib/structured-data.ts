@@ -60,18 +60,18 @@ export function websiteSchema(): JsonLd {
   }
 }
 
-/** India pricing only: it is the one region with a real checkout behind it. */
+/** USD: one global price list, and the currency every card is charged in. */
 function planOffer(tier: PricingTier): JsonLd {
   return {
     '@type': 'Offer',
     name: tier.name,
     description: tier.description,
-    price: String(tier.pricing.in),
-    priceCurrency: 'INR',
+    price: String(tier.priceUsd),
+    priceCurrency: 'USD',
     priceSpecification: {
       '@type': 'UnitPriceSpecification',
-      price: String(tier.pricing.in),
-      priceCurrency: 'INR',
+      price: String(tier.priceUsd),
+      priceCurrency: 'USD',
       unitCode: 'MON',
       referenceQuantity: { '@type': 'QuantitativeValue', value: 1, unitCode: 'MON' },
     },

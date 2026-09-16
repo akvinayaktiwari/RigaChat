@@ -318,6 +318,38 @@ Gupshup is explicitly out of scope (being deprecated).
 **Priority:** P1
 **Depends on:** None.
 
+## Billing
+
+### P0 GATE: the site shows USD prices; Razorpay still charges the old INR plans
+
+**What:** pricing moved to one global list in USD ($49 / $129 / $349) and the separate,
+cheaper India tier (₹1,999 / ₹5,499 / ₹14,999) is gone from the site. The amounts actually
+charged are NOT in this repo: they live in Razorpay Plan objects, referenced by
+`RAZORPAY_PLAN_ID_STARTER` / `_GROWTH` / `_AGENCY`. Those plans are still the old INR ones.
+
+**Why it is a gate:** until the plans are replaced, the page says $49 and the checkout
+charges ₹1,999. Do NOT deploy the pricing change to production before this is done.
+
+**Fix, in order:**
+1. Confirm international payments are enabled on the Razorpay account (settlement stays
+   INR; charging USD needs it switched on, and it is an account-level approval, not a
+   code change).
+2. Create three new USD plans at 49 / 129 / 349 per month. Razorpay plans are immutable —
+   new prices mean new plan objects, never an edit.
+3. Update the three `RAZORPAY_PLAN_ID_*` values wherever the Lambda reads them.
+4. Existing subscribers stay on their old plan until they change tier. Decide deliberately
+   whether to migrate them, and tell them before you do.
+5. Then remove the international mailto gate: `PricingSection.tsx` and `UpgradeModal.tsx`
+   route non-India visitors to a mailto because "Razorpay is India-only". Once USD plans
+   exist that is no longer true, and international visitors should reach the real checkout.
+
+**Also:** prod Razorpay is still in TEST mode (see the memory note), so no real payment can
+be taken on any plan yet.
+
+**Effort:** S in code; the account approval is the unknown
+**Priority:** P0 — blocks deploying the pricing change
+**Depends on:** Razorpay account settings
+
 ## Content and SEO
 
 ### [RESOLVED 2026-09-16] Move blog posts to MDX before the next article

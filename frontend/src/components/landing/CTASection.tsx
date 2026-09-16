@@ -61,7 +61,7 @@ export default function CTASection({ onStartTrial, region }: CTASectionProps) {
             </div>
 
             <p className="mt-6 text-white/50 text-xs">
-              Plans from {formatPrice(LOWEST_TIER.pricing[region], region)}/mo · Cancel anytime
+              Plans from {formatPrice(LOWEST_TIER.priceUsd, region)}/mo · Cancel anytime
             </p>
           </div>
         </Reveal>

@@ -1,6 +1,6 @@
 import { Check } from 'lucide-react'
 import { Reveal, RevealGroup, RevealItem } from './motion-primitives'
-import { PRICING_TIERS, formatPrice } from '../../lib/pricingTiers'
+import { BILLING_CURRENCY_NOTE, PRICING_TIERS, formatPrice } from '../../lib/pricingTiers'
 import type { BillableTier, Region } from '../../lib/pricingTiers'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -59,6 +59,10 @@ export default function PricingSection({
               🌍 International ($)
             </button>
           </div>
+
+          {/* The rupee figure is a conversion, and the card is charged in USD.
+              Saying so next to the toggle is cheaper than a support ticket. */}
+          {region === 'in' ? <p className="mt-3 text-xs text-gray-400">{BILLING_CURRENCY_NOTE} · rupee figures are approximate</p> : null}
         </Reveal>
 
         <RevealGroup className="grid grid-cols-1 md:grid-cols-3 gap-5" stagger={0.09}>
@@ -92,7 +96,7 @@ export default function PricingSection({
 
                 <div className="flex items-baseline gap-1 mb-5">
                   <span className="text-3xl font-extrabold text-gray-900" style={JAKARTA_FONT}>
-                    {formatPrice(plan.pricing[region], region)}
+                    {formatPrice(plan.priceUsd, region)}
                   </span>
                   <span className="text-sm text-gray-400">/mo</span>
                 </div>

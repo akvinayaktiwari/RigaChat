@@ -17,7 +17,9 @@ authority than vyostra.com has today.
 
 Everything is already built for it and every claim is safe to make.
 
-- Currency is **₹**, and Razorpay is the only real checkout. Quote INR.
+- Pricing is **one global list in USD** ($49 / $129 / $349). India is no longer
+  priced separately or lower. Quote USD; a converted rupee figure is fine
+  alongside it, marked approximate, because the card is charged in USD.
 - WhatsApp is the channel that matters. Gupshup is the provider behind it.
 - Real estate is the strongest vertical; clinics and edtech are secondary.
 - Compliance worth naming where relevant: **RERA** for property advertising, and
@@ -33,10 +35,10 @@ with "india" or a Gulf market in it. Dubai real estate is the obvious wedge.
 
 Three things are true today, and a UAE page must respect all three:
 
-1. **No self-serve checkout.** `pricingTiers.ts`: India/Razorpay is the only
-   region with a real payment flow. International pricing is display-only and
-   routes to a mailto. So a UAE page ends in **"talk to us"**, not "start free
-   trial" — until that changes.
+1. **No self-serve checkout yet.** Pricing is global USD now, but the checkout
+   still runs on Razorpay's India plans: international CTAs route to a mailto
+   until USD plans exist (TODOS.md). So a UAE page ends in **"talk to us"**, not
+   "start free trial" — until that changes.
 2. **English, not Arabic.** Multi-language is Phase 2. English is defensible for
    Dubai real estate; implying Arabic support is not.
 3. **The on-page voice agent needs a network test.** It is browser audio to our
@@ -45,7 +47,9 @@ Three things are true today, and a UAE page must respect all three:
    widget from a UAE network. Verify before a page promises it works there.
    (Tracked in TODOS.md.)
 
-Do not write "AED 99/month" or any UAE price until someone can actually pay it.
+Quote the global USD price for the UAE too. Do not invent an AED figure: the
+card is charged in USD, and a local-currency number nobody is charged is just
+wrong.
 
 ## Two audiences, one page
 

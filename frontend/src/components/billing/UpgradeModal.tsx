@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Check, CheckCircle2, Loader2, X } from 'lucide-react'
-import { PRICING_TIERS, detectRegion, formatPrice, isUpgradeFrom, nextTierUp } from '../../lib/pricingTiers'
+import { BILLING_CURRENCY_NOTE, PRICING_TIERS, detectRegion, formatPrice, isUpgradeFrom, nextTierUp } from '../../lib/pricingTiers'
 import type { Region } from '../../lib/pricingTiers'
 import type { PlanTier } from '../../types/index'
 import { useTierCheckout } from '../../hooks/useTierCheckout'
@@ -112,7 +112,10 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }: UpgradeMo
                 <h2 className="font-bold text-2xl text-gray-900 mb-1" style={JAKARTA_FONT}>
                   Choose your plan
                 </h2>
-                <p className="text-sm text-gray-500">All plans include a 14-day free trial. Cancel anytime.</p>
+                <p className="text-sm text-gray-500">
+                  All plans include a 14-day free trial. Cancel anytime.
+                  {region === 'in' ? ` ${BILLING_CURRENCY_NOTE}.` : ''}
+                </p>
               </div>
 
               <div className="inline-flex bg-gray-100 rounded-xl p-1 shrink-0">
@@ -187,7 +190,7 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }: UpgradeMo
 
                     <div className="flex items-baseline gap-1 mb-5">
                       <span className="text-3xl font-extrabold text-gray-900" style={JAKARTA_FONT}>
-                        {formatPrice(plan.pricing[region], region)}
+                        {formatPrice(plan.priceUsd, region)}
                       </span>
                       <span className="text-sm text-gray-400">/mo</span>
                     </div>

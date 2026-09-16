@@ -16,30 +16,54 @@ export type Region = 'in' | 'intl'
 export interface PricingTier {
   tier: BillableTier
   name: string
-  pricing: { in: number; intl: number }
+  /** The price, in USD. The only price there is — see PRICING_TIERS below. */
+  priceUsd: number
   description: string
   features: string[]
 }
 
+/**
+ * Rupee figures shown next to the USD price are a conversion of it, nothing
+ * more. Billing is in USD everywhere, so this rate only has to be close enough
+ * to set expectations; it is a display constant, deliberately not a live rate
+ * (a price that moves with the currency market is a support ticket, not a
+ * feature). Set 2026-09-16 — update it when it drifts far enough to mislead.
+ */
+export const USD_TO_INR_DISPLAY = 88
+
+/** Converted, then rounded to a price-shaped number rather than an exact one. */
+export function inrDisplayPrice(usd: number): number {
+  return Math.round((usd * USD_TO_INR_DISPLAY) / 100) * 100 - 1
+}
+
+/**
+ * One global price list, in USD.
+ *
+ * India used to be priced separately and lower (₹1,999/₹5,499/₹14,999). That
+ * split is gone: the product sells globally, and a cheaper local tier priced
+ * the work below what it is worth. Everyone sees the same number, and Indian
+ * visitors can view it converted (see formatPrice) while still being billed in
+ * USD.
+ */
 export const PRICING_TIERS: PricingTier[] = [
   {
     tier: 'starter',
     name: 'Starter',
-    pricing: { in: 1999, intl: 49 },
+    priceUsd: 49,
     description: 'For a single site getting started with AI chat.',
     features: ['1 agent', '500 conversations/month', '50 CRM leads', 'Website knowledge base training'],
   },
   {
     tier: 'growth',
     name: 'Growth',
-    pricing: { in: 5499, intl: 129 },
+    priceUsd: 129,
     description: 'For growing teams running multiple bots.',
     features: ['3 agents', '2,000 conversations/month', 'Unlimited CRM leads', 'Website knowledge base training'],
   },
   {
     tier: 'agency',
     name: 'Agency',
-    pricing: { in: 14999, intl: 349 },
+    priceUsd: 349,
     description: 'For agencies managing agents at scale.',
     features: ['Unlimited agents', 'Unlimited conversations', 'Unlimited CRM leads', 'Website knowledge base training'],
   },
@@ -65,12 +89,20 @@ export function nextTierUp(current: PlanTier): BillableTier | undefined {
   return PRICING_TIERS.find((t) => isUpgradeFrom(current, t.tier))?.tier
 }
 
-// Same formatting the old duplicated formatPrice() functions used for India
-// (₹ + en-IN grouping) — behavior-identical for region 'in', see the
-// verification report's regression check.
-export function formatPrice(amount: number, region: Region): string {
-  return region === 'in' ? `₹${amount.toLocaleString('en-IN')}` : `$${amount.toLocaleString('en-US')}`
+/**
+ * The price as shown for a region.
+ *
+ * 'in' renders the converted rupee figure with a "≈" because that is what it
+ * is: the card is charged in USD, and the bank's rate on the day decides the
+ * exact rupee amount. Dropping the "≈" would be a promise we do not control.
+ */
+export function formatPrice(priceUsd: number, region: Region): string {
+  if (region === 'in') return `≈ ₹${inrDisplayPrice(priceUsd).toLocaleString('en-IN')}`
+  return `$${priceUsd.toLocaleString('en-US')}`
 }
+
+/** Shown wherever a converted price is: the currency actually charged. */
+export const BILLING_CURRENCY_NOTE = 'Billed in USD'
 
 // Timezone heuristic, zero network calls / new dependencies. Manual toggle
 // always overrides this — it's only the initial guess.
@@ -82,10 +114,13 @@ const INDIA_TIMEZONES = ['Asia/Kolkata', 'Asia/Calcutta']
 
 export function detectRegion(): Region {
   // The build-time prerender has no visitor to detect, only the build machine's
-  // timezone -- UTC in CI, which would bake dollar prices into the static HTML
-  // that crawlers index. India is the market and the only region with a real
-  // checkout, so a server render always shows rupees.
-  if (typeof window === 'undefined') return 'in'
+  // timezone. It renders the USD list: that is the real, global price, it is the
+  // currency cards are charged in, and it is what the SoftwareApplication schema
+  // on the same page publishes -- a static page showing a converted rupee figure
+  // while its own schema says USD is a contradiction crawlers get to see.
+  // An Indian visitor still lands on 'in' once the bundle boots and the
+  // timezone check below runs.
+  if (typeof window === 'undefined') return 'intl'
 
   try {
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
