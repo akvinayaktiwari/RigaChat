@@ -42,14 +42,42 @@ wrong until checked — three of them almost certainly are (see §2).
 Do these in order. Steps 1–4 are all-or-nothing: a partial cutover leaves
 checkout broken in a way that looks like a code bug.
 
+### Step 0 — Enable international payments (NEW, blocking)
+
+The site now prices in **USD worldwide** ($49 / $129 / $349 — merged
+2026-09-16). Charging USD needs international payments enabled on the account;
+it is an account-level approval by Razorpay, not a setting you can flip, and
+settlement still arrives in INR.
+
+Dashboard → Account & Settings → Payment Methods / International. If it is not
+enabled, request it and **stop here** — every step below assumes USD plans.
+
+If Razorpay declines or the approval drags, the fallback is INR plans at the
+converted amounts (₹4,299 / ₹11,399 / ₹30,699, matching what the site shows
+Indian visitors) and a decision about what non-India customers are charged.
+That is a product decision, not a deploy step.
+
 ### Step 1 — Create live-mode Plans
 
 Live and test mode hold **separate Plan objects**. The current
 `RAZORPAY_PLAN_ID_*` values (`plan_TFl5GSmRUtfMdr`, `plan_TFl6Ni0ElGMJ53`,
-`plan_TFl7V2GGsEeYPV`) are **test-mode plans and do not exist in live mode**.
+`plan_TFl7V2GGsEeYPV`) are **test-mode plans, in INR, and do not exist in live
+mode**.
 
-Create Starter / Growth / Agency in live mode at the same prices
-(₹1,999 / ₹5,499 / ₹14,999, monthly) and record the new `plan_...` ids.
+Create Starter / Growth / Agency in live mode, monthly, in **USD**:
+
+| Tier | Amount | Currency |
+|---|---|---|
+| Starter | 49 | USD |
+| Growth | 129 | USD |
+| Agency | 349 | USD |
+
+Razorpay amounts are in the currency's smallest unit, so 49 USD is `4900`.
+Plans are immutable: a price change is always a new plan, never an edit.
+
+**Until these exist and the env ids are swapped, the site says $49 and the card
+is charged ₹1,999.** That gap is live right now — the pricing change is
+deployed, the plans are not.
 
 Verify each resolves before going further:
 
@@ -113,6 +141,9 @@ the 9 listed above and nothing else.
 
 Then run `./scripts/razorpay-go-live.sh` (Step 3) — dry run first.
 
+> The script did not exist when this doc first described it (checked against the
+> full git history on 2026-09-16 — it had never been committed). It exists now.
+
 ### Step 3 — Set the live env vars on ALL THREE Lambdas
 
 `rigachat-api`, `rigachat-api-streaming`, `rigachat-crawler`.
@@ -122,7 +153,7 @@ Then run `./scripts/razorpay-go-live.sh` (Step 3) — dry run first.
 | `RAZORPAY_KEY_ID` | `rzp_live_...` |
 | `RAZORPAY_KEY_SECRET` | live secret |
 | `RAZORPAY_WEBHOOK_SECRET` | the **live** webhook's secret from Step 2 |
-| `RAZORPAY_PLAN_ID_STARTER/GROWTH/AGENCY` | the **live** plan ids from Step 1 |
+| `RAZORPAY_PLAN_ID_STARTER/GROWTH/AGENCY` | the **live, USD** plan ids from Step 1 |
 
 **All three Lambdas, without exception.** `lib/razorpay.ts` reads the key at
 **module load** and throws if absent, and all three run the same bundle with
@@ -138,18 +169,25 @@ Use the script. `aws lambda update-function-configuration --environment`
 export RAZORPAY_LIVE_KEY_ID=rzp_live_xxx
 export RAZORPAY_LIVE_KEY_SECRET=xxx
 export RAZORPAY_LIVE_WEBHOOK_SECRET=xxx        # the LIVE webhook's secret, from Step 2
+export RAZORPAY_LIVE_PLAN_ID_STARTER=plan_xxx  # the three USD plans from Step 1
+export RAZORPAY_LIVE_PLAN_ID_GROWTH=plan_xxx
+export RAZORPAY_LIVE_PLAN_ID_AGENCY=plan_xxx
 
-./scripts/razorpay-go-live.sh                  # dry run: finds/echoes plans, changes nothing
-./scripts/razorpay-go-live.sh --apply          # creates live plans + writes all three Lambdas
+./scripts/razorpay-go-live.sh                  # dry run: checks everything, changes nothing
+./scripts/razorpay-go-live.sh --apply          # writes all three Lambdas
 ```
 
-`razorpay-go-live.sh` does Step 1 and Step 3 together: it read-modify-writes all
-six vars on all three functions, re-reads to confirm the key landed as
-`rzp_live_`, and fails if the variable count changed (a replaced map that lost
-`OPENAI_API_KEY` shows up as a count drop, not a silent success). It refuses a
-`rzp_test_` key, and refuses `--apply` without the live webhook secret — live
-keys plus a test webhook secret is the exact half-migration that rejects every
-delivery.
+`razorpay-go-live.sh` read-modify-writes all six vars on all three functions,
+re-reads to confirm the key landed as `rzp_live_`, and fails if the variable
+count changed (a replaced map that lost `OPENAI_API_KEY` shows up as a count
+drop, not a silent success). It refuses a `rzp_test_` key, refuses `--apply`
+without the live webhook secret — live keys plus a test webhook secret is the
+exact half-migration that rejects every delivery — and verifies each plan id
+resolves in live mode, in USD, before writing anything.
+
+It does NOT create the plans. Creating a plan is a priced, irreversible object
+in a payment account; do it in the dashboard where you can see what you are
+making, then give the script the three ids.
 
 The env budget is tight (~2350 / 4096 bytes). These are replacements, not
 additions, so it does not move — but do not add new vars during cutover.
