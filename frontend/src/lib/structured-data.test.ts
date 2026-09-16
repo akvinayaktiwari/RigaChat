@@ -40,6 +40,12 @@ describe('softwareApplicationSchema', () => {
   })
 })
 
+describe('organizationSchema', () => {
+  it('links the LinkedIn company page, the signal that separates this entity from similarly named ones', () => {
+    expect(organizationSchema().sameAs).toEqual(['https://www.linkedin.com/company/vyostra-ai'])
+  })
+})
+
 describe('faqPageSchema', () => {
   it('maps each question to a Question with an accepted Answer', () => {
     const schema = faqPageSchema([{ question: 'Is there a free trial?', answer: 'Yes.' }])
