@@ -4,6 +4,11 @@ dist/
 .env.local
 *.zip
 
+# Razorpay live credentials. The documented location is ~/.razorpay-live.env,
+# outside the repo — this catches the copy someone makes inside it instead.
+.razorpay-live.env
+*.razorpay-live.env
+
 backend/node_modules/
 backend/dist/
 backend/.env
