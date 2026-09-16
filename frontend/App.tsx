@@ -4,6 +4,7 @@ import { ProtectedRoute } from './src/components/ProtectedRoute/ProtectedRoute'
 import { AdminProtectedRoute } from './src/components/AdminProtectedRoute/AdminProtectedRoute'
 import { DashboardLayout } from './src/components/DashboardLayout/DashboardLayout'
 import { ToastContainer } from './src/components/Toast/Toast'
+import { AnalyticsPageViews } from './src/hooks/useAnalyticsPageViews'
 import LandingPage from './src/pages/LandingPage'
 import NotFound from './src/pages/NotFound'
 import LoginPage from './src/pages/LoginPage'
@@ -66,6 +67,9 @@ import AdminContactMessagesPage from './src/pages/admin/AdminContactMessagesPage
 function App() {
   return (
     <BrowserRouter>
+      {/* Inside the router so it can see navigations; above Routes so page
+          titles are already set when it reads them. */}
+      <AnalyticsPageViews />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/admin/login" element={<AdminLoginPage />} />
