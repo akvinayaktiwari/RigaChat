@@ -119,8 +119,24 @@ for fn in "${FUNCTIONS[@]}"; do
      | .RAZORPAY_PLAN_ID_AGENCY_INR=$agency_inr' \
     <<<"$current")"
 
-  aws lambda update-function-configuration --function-name "$fn" --region "$REGION" \
-    --environment "Variables=$(jq -c . <<<"$updated")" >/dev/null
+  # Via a 0600 temp FILE, never inline. The CLI cannot parse raw JSON in the
+  # --environment shorthand, and when it fails it echoes the whole parameter
+  # back -- printing every secret on the function to the terminal and into
+  # whatever transcript is capturing it. That happened once; this is the fix.
+  payload="$(mktemp)"
+  chmod 600 "$payload"
+  jq -c '{Variables: .}' <<<"$updated" > "$payload"
+
+  # stderr is captured, not streamed, for the same reason: an AWS error can
+  # quote the payload. Only a short, secret-free line is ever shown.
+  if ! err="$(aws lambda update-function-configuration --function-name "$fn" --region "$REGION" \
+      --environment "file://$payload" 2>&1 >/dev/null)"; then
+    rm -f "$payload"
+    echo "  FAIL  $fn: update-function-configuration failed." >&2
+    echo "        ${err%%$'\n'*}" | cut -c1-200 >&2
+    exit 1
+  fi
+  rm -f "$payload"
 
   # Re-read rather than trusting the write: this is the step where a replaced
   # map silently loses variables, and the count is what exposes it.
