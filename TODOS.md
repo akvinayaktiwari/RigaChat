@@ -341,31 +341,31 @@ Verify a prerendered MDX post still emits its body with no `opacity:0` and its F
 **Priority:** P2 — do it BEFORE writing articles 2 and 3, not after.
 **Depends on:** None
 
-### Voice-agent articles: India now, UAE only after three checks
+### Voice-agent articles: the ON-PAGE agent, India and UAE
 
-**What:** the audit's content plan has "AI voice agent for real estate in India"; a UAE
-edition was proposed alongside it.
+**What:** articles for the browser voice agent — the widget a visitor talks to on the site,
+not the Plivo phone number. Two markets: India and UAE (Dubai real estate especially).
 
-**India:** write it. The product does browser voice and real phone numbers, and the
-research found no competitor ranking for the query.
+**Why the on-page agent changes the UAE question:** it is browser audio over the relay
+WebSocket. No DID, no local number, no telecom licensing — the constraints that make UAE
+telephony hard do not apply. Relay latency from ap-south-1 to the Gulf is a short hop.
 
-**UAE is blocked on facts, not writing.** Three things must be answered first, because the
-page would promise them:
-1. **Payment.** `pricingTiers.ts` says India/Razorpay is the only region with a real
-   checkout; international pricing is display-only and routes to a mailto. A Dubai reader
-   cannot buy today.
-2. **Numbers.** UAE restricts VoIP tightly. Confirm with Plivo whether a UAE DID is
-   obtainable at all before a page offers a Dubai number.
-3. **Language and defaults.** Arabic is Phase 2, and `frontend/src/lib/phone.ts` hardcodes
-   `DEFAULT_COUNTRY_CODE = '91'` with a comment saying selling outside India means making
-   it a per-client setting.
+**What is still true before a UAE page ships:**
+1. **Payment.** `pricingTiers.ts`: India/Razorpay is the only region with a real checkout;
+   international pricing is display-only and routes to a mailto. A Dubai reader cannot
+   self-serve. Either accept sales-led onboarding for these leads or fix checkout first.
+2. **Language.** Arabic is Phase 2. English is defensible for Dubai real estate; say so
+   rather than implying Arabic support.
+3. **Untested assumption — test before publishing.** The UAE blocks some VoIP services at
+   the ISP level. Browser audio to our own relay is usually unaffected, but nobody has
+   loaded the widget from a UAE network. Verify (VPN, or someone in Dubai opening
+   /voice-test) before a page promises it works there.
 
-**Fix:** ship the India article. For UAE, either answer the three above, or publish one
-deliberately sales-led page ("talk to us", no self-serve signup) and treat the enquiries as
-manual onboarding. Do not imply self-serve UAE availability while the checkout is
-India-only.
+**Fix:** write the India on-page voice article first — the product does this and the
+research found no competitor ranking for it. Then the UAE edition once (3) is verified,
+with a "talk to us" call to action instead of self-serve signup while (1) stands.
 
-**Effort:** S per article; M for the UAE capability work
+**Effort:** S per article; the UAE network test is minutes
 **Priority:** P2
 **Depends on:** MDX item above, ideally
 
