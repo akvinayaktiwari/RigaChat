@@ -318,6 +318,70 @@ Gupshup is explicitly out of scope (being deprecated).
 **Priority:** P1
 **Depends on:** None.
 
+## Content and SEO
+
+### Move blog posts to MDX before the next article
+
+**What:** a post is a hand-written TSX component (`src/content/blog/posts/<slug>/content.tsx`).
+The WhatsApp article proved the repeated shape — numbered sections, comparison tables,
+callouts, a fact grid, a closing FAQ — so the structure no longer needs discovering.
+
+**Why it matters:** the current setup costs nothing at runtime (post bodies are separate
+lazy chunks; the main bundle is untouched) but it means only a developer can publish, and
+every article is hand-assembled JSX. docs/seo/SEO-GEO-AUDIT.md lists nine more articles.
+Writing those in TSX and converting afterwards is the same work twice.
+
+**Fix:** add `@mdx-js/rollup` to the Vite config so a post is `content.mdx` — markdown for
+prose, the existing BlogPrimitives components imported for the structured blocks. Keep
+`meta.ts` as it is: the registry, prerender, sitemap and FAQ schema all read from it and
+none of that changes. Existing TSX posts keep working; convert them only if convenient.
+Verify a prerendered MDX post still emits its body with no `opacity:0` and its FAQ schema.
+
+**Effort:** S-M (~half a day)
+**Priority:** P2 — do it BEFORE writing articles 2 and 3, not after.
+**Depends on:** None
+
+### Voice-agent articles: India now, UAE only after three checks
+
+**What:** the audit's content plan has "AI voice agent for real estate in India"; a UAE
+edition was proposed alongside it.
+
+**India:** write it. The product does browser voice and real phone numbers, and the
+research found no competitor ranking for the query.
+
+**UAE is blocked on facts, not writing.** Three things must be answered first, because the
+page would promise them:
+1. **Payment.** `pricingTiers.ts` says India/Razorpay is the only region with a real
+   checkout; international pricing is display-only and routes to a mailto. A Dubai reader
+   cannot buy today.
+2. **Numbers.** UAE restricts VoIP tightly. Confirm with Plivo whether a UAE DID is
+   obtainable at all before a page offers a Dubai number.
+3. **Language and defaults.** Arabic is Phase 2, and `frontend/src/lib/phone.ts` hardcodes
+   `DEFAULT_COUNTRY_CODE = '91'` with a comment saying selling outside India means making
+   it a per-client setting.
+
+**Fix:** ship the India article. For UAE, either answer the three above, or publish one
+deliberately sales-led page ("talk to us", no self-serve signup) and treat the enquiries as
+manual onboarding. Do not imply self-serve UAE availability while the checkout is
+India-only.
+
+**Effort:** S per article; M for the UAE capability work
+**Priority:** P2
+**Depends on:** MDX item above, ideally
+
+### Blog index will grow the blog chunk linearly
+
+**What:** `registry.ts` eagerly imports every post's `meta.ts`. Measured at two posts: all
+metadata sits in a 15KB chunk loaded only on blog routes, and the main bundle carries none
+of it. At ~50 posts that chunk is meaningfully larger for every blog reader.
+
+**Fix:** emit a `posts.json` index at build time (same place the sitemap is generated) and
+have BlogIndex read that instead of importing every module.
+
+**Effort:** S
+**Priority:** P3 — not worth doing before ~50 posts. Recorded so it is not rediscovered.
+**Depends on:** None
+
 ## Frontend
 
 ### The frontend talks to two different API hosts, and OAuth state cookies fall through the gap
