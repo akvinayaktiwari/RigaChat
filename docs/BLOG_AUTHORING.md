@@ -1,5 +1,10 @@
 # Writing a blog post
 
+**Read [`seo/CONTENT-STRATEGY.md`](seo/CONTENT-STRATEGY.md) first.** It is the standing
+brief: global product, focus on **India and the UAE**, written to rank on Google and to be
+quoted by ChatGPT, Perplexity and AI Overviews. This file is only the mechanics.
+
+
 A post is two files in one directory. Nothing else has to be registered: the
 registry globs the directory, and the route, sitemap entry, blog-index card and
 prerendered HTML all follow from it.
@@ -63,6 +68,12 @@ Hero stat tiles come from `meta.highlights`, not the body.
 
 ## Rules that are not style preferences
 
+These are the short form. The reasoning is in `seo/CONTENT-STRATEGY.md`.
+
+0. **Write for India or the UAE, and open with the answer.** A page aimed at
+   nobody ranks for nobody, and the first paragraph is the one an AI engine
+   quotes. UAE pages end in "talk to us": there is no self-serve checkout there
+   yet.
 1. **No invented numbers.** No response times, conversion rates or market sizes
    unless they are sourced and cited. An uncited figure is worth less than the
    sentence around it, and both Google and AI engines are getting better at
