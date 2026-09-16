@@ -318,6 +318,40 @@ Gupshup is explicitly out of scope (being deprecated).
 **Priority:** P1
 **Depends on:** None.
 
+## Security
+
+### Secrets live in the Lambda environment, so any env dump exposes all of them
+
+**What:** all three Lambdas carry ~44 environment variables, and the sensitive ones hold
+raw values: OpenAI, Pinecone, Razorpay key + webhook secret, Meta app secret, Upstash
+token, Zoho secret, voice auth secret. Anyone who can read the function configuration —
+or any command that errors while handling it — has every credential at once.
+
+**Why it is being written down now:** that is not hypothetical. On 2026-09-16 the AWS CLI
+rejected an inline `--environment` argument and quoted it back in full, printing nine live
+secrets to a terminal. The script is fixed and `scripts/rotate-lambda-secrets.sh` now makes
+rotation safe, but both are mitigations. The blast radius is the design.
+
+**Fix:** move the sensitive values to SSM Parameter Store (SecureString) and keep only
+parameter NAMES in the environment. A small cached loader in `backend/src/lib/` resolves
+them at cold start; the relay needs the same. Then:
+- an env dump prints pointers, not credentials;
+- rotation is a parameter update — no `update-function-configuration`, so no way to wipe
+  the env map by accident, which is the other recurring hazard here;
+- every read is auditable in CloudTrail, where today there is no trace at all;
+- it reclaims most of the 4KB env budget (see the lambda-env-ceiling work of 2026-08-16).
+
+Standard SSM parameters are free; Secrets Manager would be ~$0.40/secret/month for a
+rotation feature this does not need.
+
+**Watch out for:** `lib/razorpay.ts` and friends read `process.env` at MODULE LOAD and
+throw when absent, so the loader has to resolve before those imports or they have to
+become lazy. Do this deliberately — it is on the startup path of every function.
+
+**Effort:** M (~half a day, plus the relay)
+**Priority:** P1 — after the current credential rotation, not instead of it
+**Depends on:** None
+
 ## Billing
 
 ### P0 GATE: the site shows USD prices; Razorpay still charges the old INR plans
