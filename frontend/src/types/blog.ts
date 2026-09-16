@@ -31,9 +31,25 @@ export interface BlogPostMeta {
   tags: string[]
   /** Estimated read time in minutes, shown in the post meta bar. */
   readingMinutes: number
+  /**
+   * Questions answered in the post body, in the post's own words.
+   *
+   * Rendered as the closing FAQ section AND emitted as FAQPage schema. The two
+   * read from this one array on purpose: structured data that answers something
+   * the page does not is a Google spam-policy violation, and AI answer engines
+   * quote the schema as if it were the page.
+   */
+  faq?: BlogFaqItem[]
   attachment?: BlogAttachment
   /** Headline figures rendered as stat tiles in the post hero. */
   highlights?: BlogHighlight[]
+}
+
+/** One question and its answer, shown on the page and published as schema. */
+export interface BlogFaqItem {
+  question: string
+  /** Plain text: it is both rendered and serialised into JSON-LD. */
+  answer: string
 }
 
 /** A single hero stat tile: a big value with a small label beneath it. */

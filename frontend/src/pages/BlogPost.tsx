@@ -10,7 +10,7 @@ import { AttachmentCard, BlogSurface, PostMetaLine, PostTags } from '../componen
 import { JAKARTA_FONT, ScrollReveal, StatRow, StatTile } from '../components/blog/BlogPrimitives'
 import { absoluteUrl } from '../lib/site'
 import StructuredData from '../components/seo/StructuredData'
-import { blogPostingSchema, jsonLdGraph, organizationSchema } from '../lib/structured-data'
+import { blogPostingSchema, faqPageSchema, jsonLdGraph, organizationSchema } from '../lib/structured-data'
 
 function BackToBlog() {
   return (
@@ -107,6 +107,7 @@ export default function BlogPost() {
         data={jsonLdGraph([
           organizationSchema(),
           blogPostingSchema({ ...meta, path: `/blog/${meta.slug}/` }),
+          ...(meta.faq?.length ? [faqPageSchema(meta.faq)] : []),
         ])}
       />
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
@@ -155,6 +156,24 @@ export default function BlogPost() {
               <Content />
             </Suspense>
           </div>
+
+          {meta.faq?.length ? (
+            <section className="mt-20" aria-labelledby="post-faq">
+              <h2 id="post-faq" className="text-2xl font-bold text-white md:text-3xl" style={JAKARTA_FONT}>
+                Common questions
+              </h2>
+              <dl className="mt-6 space-y-4">
+                {meta.faq.map((item) => (
+                  <div key={item.question} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                    <dt className="text-base font-bold text-white" style={JAKARTA_FONT}>
+                      {item.question}
+                    </dt>
+                    <dd className="mt-2 text-sm leading-relaxed text-white/65">{item.answer}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          ) : null}
 
           {meta.attachment ? (
             <div className="mt-20">
