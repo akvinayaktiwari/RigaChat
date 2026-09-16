@@ -112,6 +112,33 @@ describe('the currency a subscription is charged in', () => {
 
   // Falling back to the USD plan here would charge a customer who chose UPI in
   // dollars, on a card, which is not a payment method they picked.
+  // The bug this covers: a visitor abandons an INR checkout, switches the
+  // toggle to International, clicks again, and Razorpay opens the OLD
+  // subscription — ₹4,299 under a page reading $49. Razorpay charges what the
+  // subscription says, so the hold has to be released, not resumed.
+  it('releases a pending hold created for a different currency and starts a new one', async () => {
+    ensureTrialSubscription.mockResolvedValue({ ...pendingRow(2), pendingPlanId: 'plan_growth_inr' })
+    fetchSubscription.mockResolvedValue({ id: SUB_ID, status: 'created', paid_count: 0 })
+
+    const result = await subscribeToTier(CLIENT, 'growth', 'USD')
+
+    expect(cancelSubscription).toHaveBeenCalledWith(SUB_ID)
+    expect(createSubscription).toHaveBeenCalledWith('plan_growth', expect.objectContaining({ currency: 'USD' }))
+    expect(result.subscriptionId).toBe('sub_new')
+  })
+
+  it('resumes rather than replaces a pending hold for the SAME plan', async () => {
+    ensureTrialSubscription.mockResolvedValue({ ...pendingRow(2), pendingPlanId: 'plan_growth' })
+
+    const error = (await subscribeToTier(CLIENT, 'growth', 'USD').catch((e: unknown) => e)) as InstanceType<
+      typeof BillingError
+    >
+
+    expect(error.code).toBe('ALREADY_SUBSCRIBED')
+    expect(cancelSubscription).not.toHaveBeenCalled()
+    expect(createSubscription).not.toHaveBeenCalled()
+  })
+
   it('fails loudly when the INR plan for that tier is not configured', async () => {
     delete process.env.RAZORPAY_PLAN_ID_GROWTH_INR
 

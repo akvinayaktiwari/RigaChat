@@ -194,6 +194,26 @@ export async function subscribeToTier(
     }
   }
 
+  // A hold created for a DIFFERENT plan must not be resumed. Razorpay charges
+  // what the subscription says, not what our page shows, so a visitor who
+  // abandoned an INR checkout and then switched the toggle to International
+  // would be handed ₹4,299 under a page reading $49.
+  //
+  // Compared against the plan id recorded at creation rather than by asking
+  // Razorpay: a checkout still in progress must not cost an API call on every
+  // duplicate click. A row from before that field existed has nothing to
+  // compare, so it resumes as it always did.
+  if (subscription.status === 'pending_activation' && subscription.pendingPlanId) {
+    if (subscription.pendingPlanId !== resolvePlanId(tier, currency)) {
+      const released = await releaseStaleHold(clientId, subscription)
+      if (released) {
+        subscription.status = 'trialing'
+        subscription.providerSubscriptionId = null
+        subscription.paymentProvider = null
+      }
+    }
+  }
+
   if (subscription.status === 'active' || subscription.status === 'pending_activation') {
     // pending_activation is resumable — the caller can reopen Razorpay
     // checkout against the existing providerSubscriptionId instead of
@@ -235,6 +255,9 @@ export async function subscribeToTier(
   await updatePartial(clientId, {
     paymentProvider: 'razorpay',
     providerSubscriptionId: created.id,
+    // Recorded so a later click can tell whether this hold is still for the
+    // plan being asked for; see the mismatch check above.
+    pendingPlanId: planId,
     status: 'pending_activation',
   })
 

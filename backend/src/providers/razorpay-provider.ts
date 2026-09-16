@@ -67,6 +67,11 @@ export interface RazorpaySubscription {
   status: string
   paid_count: number
   current_end: number | null
+  // The plan the subscription was created against. It fixes the amount AND the
+  // currency Razorpay will charge, whatever our page is displaying — so it is
+  // the authority on whether a pending hold still matches what the visitor
+  // asked for.
+  plan_id?: string
   notes?: Record<string, string>
 }
 

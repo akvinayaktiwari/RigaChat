@@ -957,6 +957,12 @@ export interface Subscription {
   currentPeriodEnd: string | null
   paymentProvider: 'razorpay' | null
   providerSubscriptionId: string | null
+  // The Razorpay plan the pending subscription was created against, held only
+  // while status is pending_activation. It is what lets a repeat checkout tell
+  // "same thing, resume it" from "different tier or currency, that hold is no
+  // longer what the visitor asked for" — without calling Razorpay on every
+  // click. Absent on rows written before 2026-09-16.
+  pendingPlanId?: string | null
   providerCustomerId: string | null
   createdAt: string
   updatedAt: string
