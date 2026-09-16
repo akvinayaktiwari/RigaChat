@@ -6,6 +6,16 @@ import type { PaymentRecord, Subscription } from '../types/index.js'
 
 export type BillableTier = 'starter' | 'growth' | 'agency'
 
+/**
+ * The currency a subscription is charged in.
+ *
+ * INR exists for the payment methods, not for a lower price: UPI, netbanking
+ * and RuPay settle in rupees only, and they are how most Indian customers pay.
+ * The amounts are equivalent (₹4,299 = $49), so this is a rails choice, never a
+ * discount.
+ */
+export type BillingCurrency = 'INR' | 'USD'
+
 export type BillingErrorCode =
   | 'INTERNAL_ACCOUNT_NO_BILLING'
   | 'ALREADY_SUBSCRIBED'
@@ -38,14 +48,25 @@ const PENDING_ACTIVATION_GRACE_MS = 30 * 60 * 1000
 // else on an expired hold is safe to abandon.
 const PAID_REMOTE_STATUSES: ReadonlySet<string> = new Set(['active', 'completed'])
 
-const TIER_PLAN_ENV_VAR: Record<BillableTier, string> = {
-  starter: 'RAZORPAY_PLAN_ID_STARTER',
-  growth: 'RAZORPAY_PLAN_ID_GROWTH',
-  agency: 'RAZORPAY_PLAN_ID_AGENCY',
+// A Razorpay plan is fixed to ONE currency, so a price in two currencies is two
+// plans. This is not a second price list -- INR and USD hold the same amount
+// (₹4,299 is $49) -- it is the payment rails: UPI, netbanking and RuPay are
+// INR-only, and an Indian customer on a USD plan cannot use any of them.
+const TIER_PLAN_ENV_VAR: Record<BillingCurrency, Record<BillableTier, string>> = {
+  USD: {
+    starter: 'RAZORPAY_PLAN_ID_STARTER',
+    growth: 'RAZORPAY_PLAN_ID_GROWTH',
+    agency: 'RAZORPAY_PLAN_ID_AGENCY',
+  },
+  INR: {
+    starter: 'RAZORPAY_PLAN_ID_STARTER_INR',
+    growth: 'RAZORPAY_PLAN_ID_GROWTH_INR',
+    agency: 'RAZORPAY_PLAN_ID_AGENCY_INR',
+  },
 }
 
-function resolvePlanId(tier: BillableTier): string {
-  const envVar = TIER_PLAN_ENV_VAR[tier]
+function resolvePlanId(tier: BillableTier, currency: BillingCurrency): string {
+  const envVar = TIER_PLAN_ENV_VAR[currency][tier]
   const planId = process.env[envVar]
 
   if (!planId) {
@@ -126,7 +147,13 @@ async function releaseStaleHold(clientId: string, subscription: Subscription): P
   return true
 }
 
-export async function subscribeToTier(clientId: string, tier: BillableTier): Promise<SubscribeResult> {
+export async function subscribeToTier(
+  clientId: string,
+  tier: BillableTier,
+  // Defaults to USD: it is the global list price, and a caller that does not
+  // say is not an Indian customer who chose rupees.
+  currency: BillingCurrency = 'USD'
+): Promise<SubscribeResult> {
   // ensureTrialSubscription rather than a plain read: a signup whose trial-row
   // write failed used to 500 here on every checkout attempt, permanently, and
   // only a manual script could clear it. It now repairs itself on this path.
@@ -185,7 +212,7 @@ export async function subscribeToTier(clientId: string, tier: BillableTier): Pro
     )
   }
 
-  const planId = resolvePlanId(tier)
+  const planId = resolvePlanId(tier, currency)
 
   const razorpayKeyId = process.env.RAZORPAY_KEY_ID
   if (!razorpayKeyId) {
@@ -197,7 +224,7 @@ export async function subscribeToTier(clientId: string, tier: BillableTier): Pro
 
   let created: { id: string; status: string }
   try {
-    created = await razorpayProvider.createSubscription(planId, { clientId, tier })
+    created = await razorpayProvider.createSubscription(planId, { clientId, tier, currency })
   } catch (error) {
     throw new BillingError(
       'PROVIDER_ERROR',

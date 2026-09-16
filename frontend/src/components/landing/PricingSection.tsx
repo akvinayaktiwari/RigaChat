@@ -1,15 +1,12 @@
 import { Check } from 'lucide-react'
 import { Reveal, RevealGroup, RevealItem } from './motion-primitives'
-import { BILLING_CURRENCY_NOTE, PRICING_TIERS, formatPrice } from '../../lib/pricingTiers'
+import { INR_METHODS_NOTE, PRICING_TIERS, formatPrice } from '../../lib/pricingTiers'
 import type { BillableTier, Region } from '../../lib/pricingTiers'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
 const MOST_POPULAR_TIER: BillableTier = 'growth'
 
-// International tiers are display-only — no international payment provider
-// exists yet, so their CTA routes to this mailto instead of useTierCheckout.
-const INTL_CONTACT_EMAIL = 'support@vyostra.com'
 
 interface PricingSectionProps {
   // Not wired up yet — checkout/signup wiring is a later module. Defaults to
@@ -62,7 +59,9 @@ export default function PricingSection({
 
           {/* The rupee figure is a conversion, and the card is charged in USD.
               Saying so next to the toggle is cheaper than a support ticket. */}
-          {region === 'in' ? <p className="mt-3 text-xs text-gray-400">{BILLING_CURRENCY_NOTE} · rupee figures are approximate</p> : null}
+          <p className="mt-3 text-xs text-gray-400">
+            {region === 'in' ? INR_METHODS_NOTE : 'Billed in USD · card'}
+          </p>
         </Reveal>
 
         <RevealGroup className="grid grid-cols-1 md:grid-cols-3 gap-5" stagger={0.09}>
@@ -110,18 +109,12 @@ export default function PricingSection({
                   ))}
                 </ul>
 
-                {region === 'in' ? (
-                  <button type="button" onClick={() => onSelectTier(plan.tier)} className={ctaClasses}>
-                    Get Started
-                  </button>
-                ) : (
-                  <a
-                    href={`mailto:${INTL_CONTACT_EMAIL}?subject=International ${plan.name} plan enquiry`}
-                    className={ctaClasses}
-                  >
-                    Contact us
-                  </a>
-                )}
+                {/* Both regions check out for real now: the INR plans take UPI and
+                    cards, the USD plans take international cards. The mailto that
+                    used to stand in for international payments is gone. */}
+                <button type="button" onClick={() => onSelectTier(plan.tier)} className={ctaClasses}>
+                  Get Started
+                </button>
               </RevealItem>
             )
           })}
