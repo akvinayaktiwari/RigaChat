@@ -94,11 +94,11 @@ them, and they are how most Indian customers pay. A Razorpay plan holds one
 currency, so the rupee price is three more plan objects — at the SAME price, not
 a cheaper India tier.
 
-| Tier | Amount | Smallest unit | Currency |
+| Tier | Amount | Smallest unit | Live plan id (created 2026-09-16) |
 |---|---|---|---|
-| Starter | ₹4,299 | `429900` | INR |
-| Growth | ₹11,399 | `1139900` | INR |
-| Agency | ₹30,699 | `3069900` | INR |
+| Starter | ₹4,299 | `429900` | `plan_TcdsSpb0dNbizA` |
+| Growth | ₹11,399 | `1139900` | `plan_TcdsrRWaS0yBkI` |
+| Agency | ₹30,699 | `3069900` | `plan_TcdtSHcrxvzkoH` |
 
 These must match `inrDisplayPrice()` in `frontend/src/lib/pricingTiers.ts`
 exactly — it is what the pricing page renders. The script fails if a plan's
