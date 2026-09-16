@@ -23,11 +23,15 @@ export interface PricingTier {
 }
 
 /**
- * Rupee figures shown next to the USD price are a conversion of it, nothing
- * more. Billing is in USD everywhere, so this rate only has to be close enough
- * to set expectations; it is a display constant, deliberately not a live rate
- * (a price that moves with the currency market is a support ticket, not a
- * feature). Set 2026-09-16 — update it when it drifts far enough to mislead.
+ * The rate that DERIVED the rupee price list — not a live conversion applied at
+ * checkout. Indian customers are charged in rupees, against Razorpay INR plans
+ * created at exactly inrDisplayPrice() for each tier, so the number on the page
+ * is the number on the card.
+ *
+ * Changing this constant therefore changes what the page claims and nothing
+ * else: the plans are immutable, so a new rate means creating new Razorpay
+ * plans and swapping RAZORPAY_PLAN_ID_*_INR. Leave it alone unless doing both.
+ * Set 2026-09-16.
  */
 export const USD_TO_INR_DISPLAY = 88
 

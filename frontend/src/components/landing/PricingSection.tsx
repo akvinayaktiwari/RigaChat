@@ -57,8 +57,8 @@ export default function PricingSection({
             </button>
           </div>
 
-          {/* The rupee figure is a conversion, and the card is charged in USD.
-              Saying so next to the toggle is cheaper than a support ticket. */}
+          {/* Naming the methods is the point of the rupee list: a USD plan cannot
+              accept UPI, netbanking or RuPay, and those are why the INR plans exist. */}
           <p className="mt-3 text-xs text-gray-400">
             {region === 'in' ? INR_METHODS_NOTE : 'Billed in USD · card'}
           </p>
