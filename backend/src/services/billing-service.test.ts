@@ -42,6 +42,19 @@ function pendingRow(heldMinutesAgo: number) {
   }
 }
 
+/** A fresh account on its trial: the state a first checkout starts from. */
+function trialRow() {
+  return {
+    accountId: CLIENT,
+    status: 'trialing',
+    plan: 'free',
+    isInternal: false,
+    paymentProvider: null,
+    providerSubscriptionId: null,
+    updatedAt: new Date().toISOString(),
+  }
+}
+
 // Sync throw rather than a rejected promise: the code awaits inside try/catch
 // so both behave identically, and Vitest's tracking of a mock's returned
 // promise otherwise strands a derived rejection as a phantom failure.
@@ -70,6 +83,44 @@ beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
   process.env.RAZORPAY_KEY_ID = 'rzp_test_key'
   process.env.RAZORPAY_PLAN_ID_GROWTH = 'plan_growth'
+  process.env.RAZORPAY_PLAN_ID_GROWTH_INR = 'plan_growth_inr'
+})
+
+describe('the currency a subscription is charged in', () => {
+  beforeEach(() => {
+    ensureTrialSubscription.mockResolvedValue(trialRow())
+  })
+
+  // One Razorpay plan holds one currency, so INR and USD are different plan
+  // objects at the same price. Picking the wrong one charges the right number
+  // in the wrong currency, which nothing downstream would flag.
+  it('uses the INR plan when the caller asks for rupees', async () => {
+    await subscribeToTier(CLIENT, 'growth', 'INR')
+
+    expect(createSubscription).toHaveBeenCalledWith('plan_growth_inr', {
+      clientId: CLIENT,
+      tier: 'growth',
+      currency: 'INR',
+    })
+  })
+
+  it('defaults to the USD plan when no currency is given', async () => {
+    await subscribeToTier(CLIENT, 'growth')
+
+    expect(createSubscription).toHaveBeenCalledWith('plan_growth', expect.objectContaining({ currency: 'USD' }))
+  })
+
+  // Falling back to the USD plan here would charge a customer who chose UPI in
+  // dollars, on a card, which is not a payment method they picked.
+  it('fails loudly when the INR plan for that tier is not configured', async () => {
+    delete process.env.RAZORPAY_PLAN_ID_GROWTH_INR
+
+    const error = await subscribeToTier(CLIENT, 'growth', 'INR').catch((e: unknown) => e)
+
+    expect((error as InstanceType<typeof BillingError>).code).toBe('CONFIG_ERROR')
+    expect((error as Error).message).toContain('RAZORPAY_PLAN_ID_GROWTH_INR')
+    expect(createSubscription).not.toHaveBeenCalled()
+  })
 })
 
 describe('a checkout still in progress', () => {
@@ -130,7 +181,11 @@ describe('an abandoned checkout, past the grace window', () => {
   it('honours the newly requested tier rather than resuming the old one', async () => {
     await subscribeToTier(CLIENT, 'growth')
 
-    expect(createSubscription).toHaveBeenCalledWith('plan_growth', { clientId: CLIENT, tier: 'growth' })
+    expect(createSubscription).toHaveBeenCalledWith('plan_growth', {
+      clientId: CLIENT,
+      tier: 'growth',
+      currency: 'USD',
+    })
   })
 
   it('skips the cancel call when Razorpay already cancelled it', async () => {
