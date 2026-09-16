@@ -42,8 +42,9 @@ describe('landing components in a server render', () => {
     expect(html).toContain('500+')
   })
 
-  // CI builds in UTC; timezone detection there would bake dollar prices in.
-  it('prices in rupees regardless of the build machine timezone', () => {
-    expect(detectRegion()).toBe('in')
+  // The static page and the JSON-LD on it must name the same currency, and the
+  // schema publishes the global USD list.
+  it('prices in USD regardless of the build machine timezone', () => {
+    expect(detectRegion()).toBe('intl')
   })
 })
