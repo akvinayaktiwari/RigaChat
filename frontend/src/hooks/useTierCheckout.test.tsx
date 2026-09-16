@@ -103,6 +103,46 @@ describe('a payment Razorpay rejects', () => {
   })
 })
 
+describe('a pending checkout the browser remembers', () => {
+  // The production failure this prevents: a tab held a pending subscription
+  // that had since been cancelled, resumed it without asking the server, and
+  // Razorpay threw its own "Payment Failed" alert at a dead subscription_id.
+  it('is re-checked with the server rather than reopened from memory', async () => {
+    const { result } = renderHook(() => useTierCheckout())
+
+    await act(async () => {
+      await result.current.selectTier('starter', 'INR')
+    })
+    act(() => {
+      lastCheckout.options.modal?.ondismiss?.()
+    })
+    await waitFor(() => expect(result.current.pendingCheckout).not.toBeNull())
+
+    subscribeToTier.mockClear()
+    await act(async () => {
+      await result.current.selectTier('starter', 'INR')
+    })
+
+    expect(subscribeToTier).toHaveBeenCalledWith('starter', 'INR')
+  })
+
+  it('reopens the subscription the server says is still pending', async () => {
+    subscribeToTier.mockResolvedValue({
+      success: false,
+      code: 'ALREADY_SUBSCRIBED',
+      details: { status: 'pending_activation', providerSubscriptionId: 'sub_held', razorpayKeyId: 'rzp_live_x' },
+    })
+    const { result } = renderHook(() => useTierCheckout())
+
+    await act(async () => {
+      await result.current.selectTier('growth', 'USD')
+    })
+
+    expect(lastCheckout.options.subscription_id).toBe('sub_held')
+    expect(result.current.errorMessage).toBeNull()
+  })
+})
+
 describe('the checkout request itself failing', () => {
   it('says the service was unreachable rather than blaming the payment', async () => {
     subscribeToTier.mockRejectedValue(new Error('network down'))
