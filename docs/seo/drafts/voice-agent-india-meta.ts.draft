@@ -1,0 +1,46 @@
+import type { BlogPostMeta } from '../../../../types/blog'
+
+const meta: BlogPostMeta = {
+  slug: 'ai-voice-agent-on-your-website-india',
+  title: 'AI Voice Agents on Your Website: A Practical Guide for Indian Businesses',
+  excerpt:
+    'A visitor talks, your site answers — no phone number, no app, no call charges. What actually decides whether that works: microphone permission, browser support, the latency budget, how Indian callers really speak, and where a voice agent should stop and fetch a human.',
+  publishedAt: '2026-09-16',
+  category: 'Lead Generation Playbook',
+  tags: ['Voice AI', 'India', 'Lead Generation', 'Real Estate'],
+  readingMinutes: 10,
+  faq: [
+    {
+      question: 'What is an on-page AI voice agent?',
+      answer:
+        'It is a voice conversation that happens inside the web page. The visitor taps a button, speaks into their device microphone, and an AI agent answers out loud using your website content and knowledge base. There is no phone number, no dialler and no call charge on either side, because the audio travels over the internet connection the browser already has.',
+    },
+    {
+      question: 'Does an on-page voice agent need a phone number?',
+      answer:
+        'No. That is the main practical difference from a phone-based agent. An on-page agent needs only a browser with microphone access, which means no number to buy, no telecom paperwork per market, and nothing to configure before a visitor can speak to it. A phone number is a separate product decision, useful when you want people to reach you without opening the site at all.',
+    },
+    {
+      question: 'Does it work on mobile browsers in India?',
+      answer:
+        'On modern Android and iOS browsers, yes, with two conditions that apply everywhere: the page must be served over HTTPS, and the visitor has to grant microphone permission in response to a tap. Older iOS versions lack the recording APIs some widgets rely on, so a good widget checks for support and stays hidden rather than showing a button that cannot work.',
+    },
+    {
+      question: 'What happens if the visitor speaks Hinglish or switches languages?',
+      answer:
+        'Code-switching mid-sentence is normal in India, not an edge case, and it is worth testing explicitly before launch rather than assuming. Test with the accents and the mix of languages your actual customers use, using recordings or live people, and check two things in particular: whether the agent still captures a phone number correctly, and whether it degrades gracefully to a human handoff when it does not understand.',
+    },
+    {
+      question: 'Should a voice agent record the call, and does it need to say so?',
+      answer:
+        'Recording is useful for quality review and for writing the lead into a CRM, but what you must disclose, and how, is a legal question rather than a product one. Get advice for the jurisdictions you operate in before switching recording on, and if you disclose, say it as the first thing spoken rather than burying it in a privacy policy nobody opens.',
+    },
+    {
+      question: 'When should a voice agent hand over to a person?',
+      answer:
+        'On any real buying signal, on any request it cannot answer from its knowledge base, and the moment the visitor asks for a human. Two rules matter: never invent an answer about price, availability or possession dates, and never promise a callback nobody is staffed to make. A handoff into an unattended inbox is worse than telling the visitor when the team is actually available.',
+    },
+  ],
+}
+
+export default meta
