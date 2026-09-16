@@ -318,6 +318,70 @@ Gupshup is explicitly out of scope (being deprecated).
 **Priority:** P1
 **Depends on:** None.
 
+## Content and SEO
+
+### Move blog posts to MDX before the next article
+
+**What:** a post is a hand-written TSX component (`src/content/blog/posts/<slug>/content.tsx`).
+The WhatsApp article proved the repeated shape — numbered sections, comparison tables,
+callouts, a fact grid, a closing FAQ — so the structure no longer needs discovering.
+
+**Why it matters:** the current setup costs nothing at runtime (post bodies are separate
+lazy chunks; the main bundle is untouched) but it means only a developer can publish, and
+every article is hand-assembled JSX. docs/seo/SEO-GEO-AUDIT.md lists nine more articles.
+Writing those in TSX and converting afterwards is the same work twice.
+
+**Fix:** add `@mdx-js/rollup` to the Vite config so a post is `content.mdx` — markdown for
+prose, the existing BlogPrimitives components imported for the structured blocks. Keep
+`meta.ts` as it is: the registry, prerender, sitemap and FAQ schema all read from it and
+none of that changes. Existing TSX posts keep working; convert them only if convenient.
+Verify a prerendered MDX post still emits its body with no `opacity:0` and its FAQ schema.
+
+**Effort:** S-M (~half a day)
+**Priority:** P2 — do it BEFORE writing articles 2 and 3, not after.
+**Depends on:** None
+
+### Voice-agent articles: the ON-PAGE agent, India and UAE
+
+**What:** articles for the browser voice agent — the widget a visitor talks to on the site,
+not the Plivo phone number. Two markets: India and UAE (Dubai real estate especially).
+
+**Why the on-page agent changes the UAE question:** it is browser audio over the relay
+WebSocket. No DID, no local number, no telecom licensing — the constraints that make UAE
+telephony hard do not apply. Relay latency from ap-south-1 to the Gulf is a short hop.
+
+**What is still true before a UAE page ships:**
+1. **Payment.** `pricingTiers.ts`: India/Razorpay is the only region with a real checkout;
+   international pricing is display-only and routes to a mailto. A Dubai reader cannot
+   self-serve. Either accept sales-led onboarding for these leads or fix checkout first.
+2. **Language.** Arabic is Phase 2. English is defensible for Dubai real estate; say so
+   rather than implying Arabic support.
+3. **Untested assumption — test before publishing.** The UAE blocks some VoIP services at
+   the ISP level. Browser audio to our own relay is usually unaffected, but nobody has
+   loaded the widget from a UAE network. Verify (VPN, or someone in Dubai opening
+   /voice-test) before a page promises it works there.
+
+**Fix:** write the India on-page voice article first — the product does this and the
+research found no competitor ranking for it. Then the UAE edition once (3) is verified,
+with a "talk to us" call to action instead of self-serve signup while (1) stands.
+
+**Effort:** S per article; the UAE network test is minutes
+**Priority:** P2
+**Depends on:** MDX item above, ideally
+
+### Blog index will grow the blog chunk linearly
+
+**What:** `registry.ts` eagerly imports every post's `meta.ts`. Measured at two posts: all
+metadata sits in a 15KB chunk loaded only on blog routes, and the main bundle carries none
+of it. At ~50 posts that chunk is meaningfully larger for every blog reader.
+
+**Fix:** emit a `posts.json` index at build time (same place the sitemap is generated) and
+have BlogIndex read that instead of importing every module.
+
+**Effort:** S
+**Priority:** P3 — not worth doing before ~50 posts. Recorded so it is not rediscovered.
+**Depends on:** None
+
 ## Frontend
 
 ### The frontend talks to two different API hosts, and OAuth state cookies fall through the gap
