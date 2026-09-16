@@ -43,6 +43,9 @@ require RAZORPAY_LIVE_WEBHOOK_SECRET
 require RAZORPAY_LIVE_PLAN_ID_STARTER
 require RAZORPAY_LIVE_PLAN_ID_GROWTH
 require RAZORPAY_LIVE_PLAN_ID_AGENCY
+require RAZORPAY_LIVE_PLAN_ID_STARTER_INR
+require RAZORPAY_LIVE_PLAN_ID_GROWTH_INR
+require RAZORPAY_LIVE_PLAN_ID_AGENCY_INR
 
 # A test key here is the single most likely mistake, and it would take the site
 # live pointing at plans that cannot charge anyone.
@@ -51,10 +54,18 @@ if [[ "$RAZORPAY_LIVE_KEY_ID" != rzp_live_* ]]; then
   exit 1
 fi
 
-echo "==> Checking the three plans resolve in live mode, in USD"
-EXPECTED_AMOUNTS=(4900 12900 34900)   # smallest unit: $49 / $129 / $349
-PLAN_IDS=("$RAZORPAY_LIVE_PLAN_ID_STARTER" "$RAZORPAY_LIVE_PLAN_ID_GROWTH" "$RAZORPAY_LIVE_PLAN_ID_AGENCY")
-PLAN_NAMES=(Starter Growth Agency)
+echo "==> Checking all six plans resolve in live mode at the right price"
+# Six plans: the same three prices in two currencies. Rupee amounts mirror
+# inrDisplayPrice() in frontend/src/lib/pricingTiers.ts — if they disagree, the
+# page and the charge disagree, which is the one failure nobody notices until a
+# customer does.
+EXPECTED_AMOUNTS=(4900 12900 34900 429900 1139900 3069900)
+EXPECTED_CURRENCIES=(USD USD USD INR INR INR)
+PLAN_IDS=(
+  "$RAZORPAY_LIVE_PLAN_ID_STARTER" "$RAZORPAY_LIVE_PLAN_ID_GROWTH" "$RAZORPAY_LIVE_PLAN_ID_AGENCY"
+  "$RAZORPAY_LIVE_PLAN_ID_STARTER_INR" "$RAZORPAY_LIVE_PLAN_ID_GROWTH_INR" "$RAZORPAY_LIVE_PLAN_ID_AGENCY_INR"
+)
+PLAN_NAMES=("Starter USD" "Growth USD" "Agency USD" "Starter INR" "Growth INR" "Agency INR")
 
 for i in "${!PLAN_IDS[@]}"; do
   plan="$(curl -sf -u "$RAZORPAY_LIVE_KEY_ID:$RAZORPAY_LIVE_KEY_SECRET" \
@@ -67,8 +78,8 @@ for i in "${!PLAN_IDS[@]}"; do
   currency="$(jq -r '.item.currency' <<<"$plan")"
   period="$(jq -r '.period' <<<"$plan")"
   echo "  ${PLAN_NAMES[$i]}: $amount $currency / $period"
-  if [[ "$currency" != "USD" || "$amount" != "${EXPECTED_AMOUNTS[$i]}" ]]; then
-    echo "  FAIL  expected ${EXPECTED_AMOUNTS[$i]} USD — the site shows \$$((${EXPECTED_AMOUNTS[$i]} / 100))." >&2
+  if [[ "$currency" != "${EXPECTED_CURRENCIES[$i]}" || "$amount" != "${EXPECTED_AMOUNTS[$i]}" ]]; then
+    echo "  FAIL  expected ${EXPECTED_AMOUNTS[$i]} ${EXPECTED_CURRENCIES[$i]} (the site shows $((${EXPECTED_AMOUNTS[$i]} / 100)))." >&2
     echo "        Fix the plan (they are immutable: make a new one) or the price on the site." >&2
     exit 1
   fi
@@ -80,7 +91,7 @@ if ! $APPLY; then
   echo "==> Dry run. Nothing written. Would set on ${FUNCTIONS[*]}:"
   echo "      RAZORPAY_KEY_ID=$RAZORPAY_LIVE_KEY_ID"
   echo "      RAZORPAY_KEY_SECRET=***  RAZORPAY_WEBHOOK_SECRET=***"
-  echo "      RAZORPAY_PLAN_ID_STARTER/GROWTH/AGENCY=${PLAN_IDS[*]}"
+  echo "      RAZORPAY_PLAN_ID_{STARTER,GROWTH,AGENCY}[_INR] = ${PLAN_IDS[*]}"
   echo "    Re-run with --apply to write."
   exit 0
 fi
@@ -99,8 +110,13 @@ for fn in "${FUNCTIONS[@]}"; do
     --arg starter "$RAZORPAY_LIVE_PLAN_ID_STARTER" \
     --arg growth "$RAZORPAY_LIVE_PLAN_ID_GROWTH" \
     --arg agency "$RAZORPAY_LIVE_PLAN_ID_AGENCY" \
+    --arg starter_inr "$RAZORPAY_LIVE_PLAN_ID_STARTER_INR" \
+    --arg growth_inr "$RAZORPAY_LIVE_PLAN_ID_GROWTH_INR" \
+    --arg agency_inr "$RAZORPAY_LIVE_PLAN_ID_AGENCY_INR" \
     '.RAZORPAY_KEY_ID=$key | .RAZORPAY_KEY_SECRET=$secret | .RAZORPAY_WEBHOOK_SECRET=$hook
-     | .RAZORPAY_PLAN_ID_STARTER=$starter | .RAZORPAY_PLAN_ID_GROWTH=$growth | .RAZORPAY_PLAN_ID_AGENCY=$agency' \
+     | .RAZORPAY_PLAN_ID_STARTER=$starter | .RAZORPAY_PLAN_ID_GROWTH=$growth | .RAZORPAY_PLAN_ID_AGENCY=$agency
+     | .RAZORPAY_PLAN_ID_STARTER_INR=$starter_inr | .RAZORPAY_PLAN_ID_GROWTH_INR=$growth_inr
+     | .RAZORPAY_PLAN_ID_AGENCY_INR=$agency_inr' \
     <<<"$current")"
 
   aws lambda update-function-configuration --function-name "$fn" --region "$REGION" \
@@ -114,8 +130,14 @@ for fn in "${FUNCTIONS[@]}"; do
   after="$(jq 'length' <<<"$after_env")"
   landed_key="$(jq -r '.RAZORPAY_KEY_ID' <<<"$after_env")"
 
-  if [[ "$after" -ne "$before" ]]; then
-    echo "  FAIL  $fn: variable count went $before -> $after. Something was dropped." >&2
+  # Three INR vars are NEW, so the count is expected to grow by exactly three
+  # on a function that did not have them. Anything else means something was lost.
+  new_vars=0
+  for v in RAZORPAY_PLAN_ID_STARTER_INR RAZORPAY_PLAN_ID_GROWTH_INR RAZORPAY_PLAN_ID_AGENCY_INR; do
+    jq -e --arg v "$v" 'has($v)' <<<"$current" >/dev/null || new_vars=$((new_vars + 1))
+  done
+  if [[ "$after" -ne $((before + new_vars)) ]]; then
+    echo "  FAIL  $fn: variable count went $before -> $after, expected $((before + new_vars))." >&2
     exit 1
   fi
   [[ "$landed_key" == rzp_live_* ]] || { echo "  FAIL  $fn: key is '$landed_key'" >&2; exit 1; }
