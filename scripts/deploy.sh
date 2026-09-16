@@ -138,6 +138,10 @@ VITE_STAFF_COGNITO_REGION="$(resolve_var VITE_STAFF_COGNITO_REGION)"
 # existed. A missing stream URL should cost word-by-word rendering, never a
 # deploy.
 VITE_STREAM_URL="$(resolve_var VITE_STREAM_URL)"
+# GA4 Measurement ID for the marketing site. Also deliberately NOT in the
+# required list: an unset value makes src/lib/analytics.ts a no-op, and losing a
+# week of traffic numbers is never worth blocking a production deploy over.
+VITE_GA_MEASUREMENT_ID="$(resolve_var VITE_GA_MEASUREMENT_ID)"
 
 MISSING_VARS=()
 for VAR in VITE_API_URL VITE_COGNITO_DOMAIN VITE_COGNITO_CLIENT_ID \
@@ -319,6 +323,7 @@ VITE_CDN_URL=${VITE_CDN_URL}
 VITE_STAFF_COGNITO_CLIENT_ID=${VITE_STAFF_COGNITO_CLIENT_ID}
 VITE_STAFF_COGNITO_REGION=${VITE_STAFF_COGNITO_REGION}
 VITE_STREAM_URL=${VITE_STREAM_URL}
+VITE_GA_MEASUREMENT_ID=${VITE_GA_MEASUREMENT_ID}
 EOF
 
 npm run build

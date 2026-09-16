@@ -279,6 +279,9 @@ jobs:
           VITE_STREAM_URL: ${{ vars.VITE_STREAM_URL }}
           VITE_META_APP_ID: ${{ vars.VITE_META_APP_ID }}
           VITE_META_WHATSAPP_CONFIG_ID: ${{ vars.VITE_META_WHATSAPP_CONFIG_ID }}
+          # GA4, marketing site only. Unset is safe: src/lib/analytics.ts loads
+          # no tag at all, which is exactly how the site behaved before this.
+          VITE_GA_MEASUREMENT_ID: ${{ vars.VITE_GA_MEASUREMENT_ID }}
         run: npm run build
 
       - uses: aws-actions/configure-aws-credentials@v4
