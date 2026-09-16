@@ -75,6 +75,18 @@ Create Starter / Growth / Agency in live mode, monthly, in **USD**:
 Razorpay amounts are in the currency's smallest unit, so 49 USD is `4900`.
 Plans are immutable: a price change is always a new plan, never an edit.
 
+**Done 2026-09-16.** International payments show Enabled, live mode opened with
+no KYC prompt, and the three live USD plans exist:
+
+| Tier | Live plan id | Price |
+|---|---|---|
+| Starter | `plan_Tccv2e0TkiLvlw` | $49 |
+| Growth | `plan_Tccw84vSLL97Ym` | $129 |
+| Agency | `plan_Tccwhhgjrdb8zT` | $349 |
+
+Not yet verified against the API — that needs the live key, which is Step 2.
+`razorpay-go-live.sh` checks all three before it writes anything.
+
 **Until these exist and the env ids are swapped, the site says $49 and the card
 is charged ₹1,999.** That gap is live right now — the pricing change is
 deployed, the plans are not.
