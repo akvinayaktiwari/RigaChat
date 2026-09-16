@@ -1,9 +1,15 @@
 import { defineConfig } from 'vitest/config'
+import mdx from '@mdx-js/rollup'
+import remarkGfm from 'remark-gfm'
+import react from '@vitejs/plugin-react'
 
 // Mirrors backend/vitest.config.ts so both halves of the repo are run the same
 // way. The difference is the environment: these tests touch sessionStorage and
 // React state, so they need a DOM rather than bare node.
 export default defineConfig({
+  // The blog registry globs .mdx post bodies, so any test that touches it needs
+  // the same compilation step the app build uses.
+  plugins: [{ enforce: 'pre', ...mdx({ providerImportSource: '@mdx-js/react', remarkPlugins: [remarkGfm] }) }, react()],
   // crawl-files.test.ts reads the CloudFront function's source to catch a
   // prerendered route the function would never serve. Vite refuses files
   // outside the project root unless listed; allow exactly that directory.

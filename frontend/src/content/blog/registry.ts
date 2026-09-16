@@ -6,7 +6,8 @@ import type { BlogPost, BlogPostMeta } from '../../types/blog'
  *
  * Each post is a directory under ./posts/<slug>/ containing:
  *   meta.ts     — default-exports BlogPostMeta (eagerly bundled, tiny)
- *   content.tsx — default-exports the body component (lazily bundled)
+ *   content.mdx — the post body in markdown (preferred), or
+ *   content.tsx — the body as a component, for posts that are mostly custom JSX
  *
  * Splitting metadata from body is what keeps /blog cheap: the index page
  * renders from `meta.ts` alone, and a post body is only fetched once its
@@ -15,7 +16,7 @@ import type { BlogPost, BlogPostMeta } from '../../types/blog'
  */
 const metaModules = import.meta.glob<{ default: BlogPostMeta }>('./posts/*/meta.ts', { eager: true })
 
-const contentModules = import.meta.glob<{ default: ComponentType }>('./posts/*/content.tsx')
+const contentModules = import.meta.glob<{ default: ComponentType }>('./posts/*/content.{mdx,tsx}')
 
 /** Pulls "my-post" out of "./posts/my-post/meta.ts". */
 function slugFromPath(path: string): string {
@@ -34,11 +35,10 @@ function buildPosts(): BlogPost[] {
       throw new Error(`Blog post slug mismatch: ${path} declares slug "${meta.slug}" but lives in directory "${slug}". They must match or the post URL will 404.`)
     }
 
-    const contentPath = `./posts/${slug}/content.tsx`
-    const loadContent = contentModules[contentPath]
+    const loadContent = contentModules[`./posts/${slug}/content.mdx`] ?? contentModules[`./posts/${slug}/content.tsx`]
 
     if (!loadContent) {
-      throw new Error(`Blog post "${slug}" has a meta.ts but no content.tsx at ${contentPath}.`)
+      throw new Error(`Blog post "${slug}" has a meta.ts but no content.mdx or content.tsx beside it.`)
     }
 
     posts.push({ meta, loadContent })

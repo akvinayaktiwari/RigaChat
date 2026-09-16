@@ -1,4 +1,5 @@
 import { Suspense, lazy, useMemo, useState, type ComponentType } from 'react'
+import { MDXProvider } from '@mdx-js/react'
 import { Helmet } from 'react-helmet-async'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
@@ -7,6 +8,7 @@ import Footer from '../components/landing/Footer'
 import DemoModal from '../components/landing/modals/DemoModal'
 import { getPostBySlug } from '../content/blog/registry'
 import { AttachmentCard, BlogSurface, PostMetaLine, PostTags } from '../components/blog/BlogChrome'
+import { mdxComponents } from '../components/blog/MdxComponents'
 import { JAKARTA_FONT, ScrollReveal, StatRow, StatTile } from '../components/blog/BlogPrimitives'
 import { absoluteUrl } from '../lib/site'
 import StructuredData from '../components/seo/StructuredData'
@@ -153,7 +155,11 @@ export default function BlogPost() {
 
           <div className="blog-body">
             <Suspense fallback={<PostBodyFallback />}>
-              <Content />
+              {/* Styles the markdown a content.mdx body compiles to. A TSX body
+                  ignores it and styles itself. */}
+              <MDXProvider components={mdxComponents}>
+                <Content />
+              </MDXProvider>
             </Suspense>
           </div>
 
