@@ -36,9 +36,13 @@ function quickSignupErrorMessage(code: QuickSignupErrorCode | undefined, message
       return 'Too many attempts. Please wait a minute and try again.'
     case 'INVALID_PASSWORD':
       return message ?? 'Password does not meet requirements.'
+    // Separated because the customer's next move differs: a provider failure is
+    // worth retrying, an unknown one is worth reporting. "Something went wrong"
+    // for both told them neither.
     case 'PROVIDER_ERROR':
+      return 'We could not create your account just now. Please try again in a moment.'
     default:
-      return 'Something went wrong. Please try again.'
+      return message ?? 'We could not complete signup. Please try again, or contact us if it keeps happening.'
   }
 }
 
@@ -78,8 +82,11 @@ export default function QuickSignupModal({ isOpen, onClose, onSuccess, mode, sug
       }
       onSuccess(res.data.token, res.data.user)
       onClose()
-    } catch {
-      setErrorMessage('Something went wrong. Please try again.')
+    } catch (error) {
+      // The request never completed — offline, or the API unreachable. Say so,
+      // rather than implying the account might have been created.
+      console.error('[signup] quick signup request failed', error)
+      setErrorMessage('We could not reach the server, so no account was created. Check your connection and try again.')
     } finally {
       setLoading(false)
     }

@@ -9,6 +9,26 @@ export interface RazorpayCheckoutResponse {
   razorpay_signature: string
 }
 
+/**
+ * What Razorpay reports on a FAILED payment — a declined card, a rejected UPI
+ * mandate, an abandoned bank page. Without subscribing to `payment.failed` the
+ * modal simply closes and the reason is lost, which reads to the customer as
+ * "something went wrong" with nothing to act on.
+ *
+ * Fields are optional because this is a third-party payload: treat every one as
+ * possibly missing rather than trusting the shape.
+ */
+export interface RazorpayPaymentFailure {
+  error?: {
+    code?: string
+    description?: string
+    reason?: string
+    step?: string
+    source?: string
+    metadata?: { payment_id?: string; order_id?: string }
+  }
+}
+
 export interface RazorpayCheckoutOptions {
   key: string
   subscription_id: string
@@ -21,6 +41,8 @@ export interface RazorpayCheckoutOptions {
 
 export interface RazorpayCheckoutInstance {
   open: () => void
+  /** checkout.js's event subscription. Only 'payment.failed' is used here. */
+  on?: (event: 'payment.failed', handler: (failure: RazorpayPaymentFailure) => void) => void
 }
 
 declare global {

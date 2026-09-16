@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { subscribeToTier, getMySubscription } from '../services/api'
 import type { BillingErrorCode } from '../services/api'
 import { loadRazorpayScript } from '../lib/razorpay-checkout'
+import type { RazorpayPaymentFailure } from '../lib/razorpay-checkout'
 import { PRICING_TIERS } from '../lib/pricingTiers'
 import type { BillableTier } from '../lib/pricingTiers'
 
@@ -51,10 +52,18 @@ function resolveBillingErrorMessage(
       return `You have a pending payment for the ${tierName} plan — finish that checkout below, or wait for it to expire before choosing a different plan.`
     }
 
-    case 'NO_SUBSCRIPTION_RECORD':
+    // Distinct copy per code, because these fail for genuinely different
+    // reasons and the customer's next move differs. One shared sentence sent
+    // everyone to "try again", including the cases where trying again cannot
+    // possibly work.
     case 'CONFIG_ERROR':
+      return 'Checkout is not set up for this currency yet. Switch the currency, or contact us and we will take the payment directly.'
+
     case 'PROVIDER_ERROR':
-      return 'Something went wrong on our end. Please try again shortly, or contact us if it persists.'
+      return 'Our payment provider rejected the request. Nothing has been charged. Please try again in a moment.'
+
+    case 'NO_SUBSCRIPTION_RECORD':
+      return 'We could not find your account record. Please sign out, sign back in, and try again — contact us if it persists.'
 
     default:
       return message ?? 'Something went wrong. Please try again.'
@@ -190,6 +199,28 @@ export function useTierCheckout(onConfirmed?: () => void): UseTierCheckoutResult
         },
       },
     })
+
+    // Razorpay reports a declined card or a rejected mandate here and then
+    // closes the modal. Unhandled, the customer sees the page as it was and no
+    // reason at all. The hold is kept so the same subscription can be retried.
+    checkout.on?.('payment.failed', (failure: RazorpayPaymentFailure) => {
+      const reason = failure?.error?.description?.trim()
+      const step = failure?.error?.step
+      console.error('[billing] Razorpay payment failed', {
+        code: failure?.error?.code,
+        step,
+        reason,
+        paymentId: failure?.error?.metadata?.payment_id,
+      })
+      setPendingCheckout({ tier, currency, subscriptionId, razorpayKeyId })
+      setStage('idle')
+      setErrorMessage(
+        reason
+          ? `Payment failed: ${reason} Nothing was charged — you can try again, or use a different method.`
+          : 'The payment did not go through, and nothing was charged. Try again, or use a different method.'
+      )
+    })
+
     checkout.open()
   }
 
@@ -245,8 +276,14 @@ export function useTierCheckout(onConfirmed?: () => void): UseTierCheckoutResult
         return
       }
       await openRazorpayCheckout(tier, currency, res.data.subscriptionId, res.data.razorpayKeyId)
-    } catch {
-      setErrorMessage('Something went wrong starting checkout. Please try again.')
+    } catch (error) {
+      // Reaching here means the request never completed — offline, a blocked
+      // request, or the API being unreachable. Distinguish it from a payment
+      // failure: nothing was attempted, so "nothing was charged" is certain.
+      console.error('[billing] could not start checkout', error)
+      setErrorMessage(
+        'We could not reach the payment service, so nothing was charged. Check your connection and try again.'
+      )
     } finally {
       setSubmittingTier(null)
     }
