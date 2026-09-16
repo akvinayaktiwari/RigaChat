@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react'
-import { motion, useReducedMotion } from 'motion/react'
+import { motion } from 'motion/react'
+import { useStaticMotion } from '../landing/motion-primitives'
 
 /**
  * Shared building blocks for blog post bodies.
@@ -13,12 +14,14 @@ import { motion, useReducedMotion } from 'motion/react'
 export const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
 /**
- * Fades content up as it scrolls into view. Falls back to a plain div when
- * the user has prefers-reduced-motion set, matching index.css's existing
- * treatment of the roadmap animations.
+ * Fades content up as it scrolls into view. Falls back to a plain div under
+ * prefers-reduced-motion, matching index.css's treatment of the roadmap
+ * animations -- and during the build-time prerender, where the entrance would
+ * otherwise freeze the post's own body at opacity 0 in the static HTML every
+ * non-JS crawler reads.
  */
 export function ScrollReveal({ children, delay = 0, className = '' }: { children: ReactNode; delay?: number; className?: string }) {
-  const reduceMotion = useReducedMotion()
+  const reduceMotion = useStaticMotion()
 
   if (reduceMotion) {
     return <div className={className}>{children}</div>

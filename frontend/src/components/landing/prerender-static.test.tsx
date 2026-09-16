@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { detectRegion } from '../../lib/pricingTiers'
 import { bootedFromPrerender, isServerRender } from '../../lib/prerender-boot'
 import { Reveal, RevealGroup, RevealItem } from './motion-primitives'
+import { ScrollReveal } from '../blog/BlogPrimitives'
 import StatsBar from './StatsBar'
 
 /**
@@ -27,9 +28,11 @@ describe('landing components in a server render', () => {
         <RevealGroup>
           <RevealItem>card</RevealItem>
         </RevealGroup>
+        <ScrollReveal>blog body</ScrollReveal>
       </>,
     )
     expect(html).toContain('headline')
+    expect(html).toContain('blog body')
     expect(html).not.toMatch(/opacity:\s*0/)
   })
 
