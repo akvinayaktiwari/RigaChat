@@ -79,7 +79,7 @@ export default function Contact() {
       <PageMeta
         title="Contact Vyostra AI — Sales and Support"
         description="Talk to the Vyostra AI team about AI chat and voice agents, WhatsApp follow-up, pricing or an existing account. We respond within 24 hours."
-        path="/contact"
+        path="/contact/"
       />
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 

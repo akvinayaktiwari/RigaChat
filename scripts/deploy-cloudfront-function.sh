@@ -72,7 +72,7 @@ echo "==> Testing routing against the CloudFront runtime"
 expect www.vyostra.com /pricing '.response.statusCode'                         '301'
 expect www.vyostra.com /pricing '.response.headers.location.value'             'https://vyostra.com/pricing'
 expect vyostra.com     /        '.request.uri'                                 '/'
-expect vyostra.com     /help    '.request.uri'                                 '/app-shell.html'
+expect vyostra.com     /signup  '.request.uri'                                 '/app-shell.html'
 expect vyostra.com     /dashboard/leads '.request.uri'                         '/app-shell.html'
 expect vyostra.com     /robots.txt '.request.uri'                              '/robots.txt'
 expect vyostra.com     /assets/index-abc.js '.request.uri'                     '/assets/index-abc.js'
@@ -83,9 +83,14 @@ expect vyostra.com     /features '.response.statusCode'                        '
 expect vyostra.com     /features/crm '.response.headers.location.value'        '/features/crm/'
 expect vyostra.com     /blog    '.response.headers.location.value'             '/blog/'
 expect vyostra.com     /privacy-policy '.response.statusCode'                  '301'
+expect vyostra.com     /help/   '.request.uri'                                 '/help/'
+expect vyostra.com     /about-us '.response.headers.location.value'            '/about-us/'
+expect vyostra.com     /contact '.response.statusCode'                         '301'
+expect vyostra.com     /careers '.response.statusCode'                         '301'
 # A path that merely STARTS with a prerendered prefix is not one.
 expect vyostra.com     /blogging '.request.uri'                                '/app-shell.html'
 expect vyostra.com     /featuresx '.request.uri'                               '/app-shell.html'
+expect vyostra.com     /helpdesk '.request.uri'                                '/app-shell.html'
 
 if (( FAILURES > 0 )); then
   echo "==> $FAILURES case(s) failed. LIVE is unchanged; DEVELOPMENT holds the failing code." >&2

@@ -9,10 +9,6 @@
 /** Marketing routes rendered client-side. Served at the bare path, no trailing slash. */
 export const SPA_MARKETING_ROUTES: readonly string[] = [
   '/',
-  '/about-us',
-  '/help',
-  '/contact',
-  '/careers',
 ]
 
 /**
@@ -26,6 +22,10 @@ export const PRERENDERED_STATIC_ROUTES: readonly string[] = [
   '/features/whatsapp',
   '/features/crm',
   '/features/forms',
+  '/about-us',
+  '/help',
+  '/contact',
+  '/careers',
   '/blog',
   '/privacy-policy',
   '/terms-of-service',

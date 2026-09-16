@@ -10,6 +10,10 @@ import Chatbot from './src/pages/features/Chatbot'
 import WhatsAppFeature from './src/pages/features/WhatsApp'
 import Crm from './src/pages/features/Crm'
 import Forms from './src/pages/features/Forms'
+import About from './src/pages/About'
+import Help from './src/pages/Help'
+import Contact from './src/pages/Contact'
+import Careers from './src/pages/Careers'
 import { AuthProvider } from './src/hooks/useAuth'
 import { SubscriptionProvider } from './src/hooks/useSubscription'
 import BlogPost from './src/pages/BlogPost'
@@ -28,7 +32,8 @@ export { SITE_URL }
  * land in dist/ as real static HTML, which is what search crawlers and
  * link-preview scrapers (which never run JS) actually read.
  *
- * The homepage, the feature pages, blog routes and the two legal pages are mounted. The homepage is
+ * The homepage, the feature and company pages, blog routes and the two legal
+ * pages are mounted. The homepage is
  * the page most likely to rank and the one AI crawlers most often fetch. The legal pages matter for a
  * different reader than crawlers: Meta App Review fetches the Privacy Policy and
  * Terms URLs declared in App Settings, and a client-rendered page answers that
@@ -65,6 +70,10 @@ export async function renderRoute(url: string): Promise<{ html: string; head: st
               <Route path="/features/whatsapp" element={<WhatsAppFeature />} />
               <Route path="/features/crm" element={<Crm />} />
               <Route path="/features/forms" element={<Forms />} />
+              <Route path="/about-us" element={<About />} />
+              <Route path="/help" element={<Help />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/careers" element={<Careers />} />
               <Route path="/blog" element={<BlogIndex />} />
               <Route path="/blog/:slug" element={<BlogPost />} />
               <Route path="/privacy-policy" element={<Privacy />} />

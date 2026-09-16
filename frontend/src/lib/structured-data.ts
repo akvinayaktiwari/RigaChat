@@ -17,6 +17,14 @@ export const ORGANIZATION_NAME = 'Vyostra AI'
 export const LEGAL_ENTITY = 'Aashirwad Trading Enterprises'
 const SUPPORT_EMAIL = 'support@vyostra.com'
 
+/**
+ * Profiles that are provably the same entity, which is how a search engine tells
+ * "Vyostra AI" apart from Vyomastra Technologies and Vystra. Add a URL here only
+ * once the profile is claimed and confirmed to be ours -- a wrong sameAs points
+ * the entity graph at someone else's company.
+ */
+const SAME_AS: readonly string[] = ['https://www.linkedin.com/company/vyostra-ai']
+
 const ORGANIZATION_ID = '#organization'
 
 export function organizationSchema(): JsonLd {
@@ -28,6 +36,7 @@ export function organizationSchema(): JsonLd {
     url: absoluteUrl('/'),
     logo: absoluteUrl('/logo-mark.png'),
     email: SUPPORT_EMAIL,
+    sameAs: [...SAME_AS],
     address: {
       '@type': 'PostalAddress',
       addressLocality: 'Bangalore',
