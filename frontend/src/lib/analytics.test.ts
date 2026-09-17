@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { isTrackedPath } from './analytics'
 
 describe('isTrackedPath', () => {
@@ -31,5 +31,75 @@ describe('isTrackedPath', () => {
     expect(isTrackedPath('/administration')).toBe(true)
     expect(isTrackedPath('/dashboards-for-agencies')).toBe(true)
     expect(isTrackedPath('/lead-generation')).toBe(true)
+  })
+})
+
+/**
+ * MEASUREMENT_ID is read from import.meta.env at module load, and
+ * isAnalyticsEnabled() is false under DEV, so the tag is only reachable from a
+ * freshly imported copy of the module with both stubbed.
+ */
+async function loadAnalyticsAsProduction(): Promise<typeof import('./analytics')> {
+  vi.stubEnv('VITE_GA_MEASUREMENT_ID', 'G-TESTID0000')
+  vi.stubEnv('DEV', false)
+  vi.resetModules()
+  return import('./analytics')
+}
+
+interface TaggedWindow extends Window {
+  dataLayer?: unknown[]
+  gtag?: unknown
+}
+
+describe('initAnalytics', () => {
+  beforeEach(() => {
+    const w = window as TaggedWindow
+    delete w.dataLayer
+    delete w.gtag
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  })
+
+  // The bug that made GA4 report nothing while every other signal said the tag
+  // was live: the queue held plain arrays. gtag.js only treats a dataLayer
+  // entry as a command when it is an `arguments` object, and drops anything
+  // else without a word, so config, consent and every page_view went nowhere.
+  it('queues commands as arguments objects, the only shape gtag.js executes', async () => {
+    const { initAnalytics, trackPageView } = await loadAnalyticsAsProduction()
+
+    initAnalytics()
+    trackPageView('/pricing', 'Pricing')
+
+    const queue = (window as TaggedWindow).dataLayer ?? []
+    expect(queue.length).toBeGreaterThan(0)
+    for (const entry of queue) {
+      expect(Object.prototype.toString.call(entry)).toBe('[object Arguments]')
+    }
+  })
+
+  it('sends consent, js, config and the page view in that order', async () => {
+    const { initAnalytics, trackPageView } = await loadAnalyticsAsProduction()
+
+    initAnalytics()
+    trackPageView('/pricing', 'Pricing')
+
+    const queue = (window as TaggedWindow).dataLayer ?? []
+    const commands = queue.map((entry) => (entry as IArguments)[0] as string)
+    expect(commands).toEqual(['consent', 'js', 'config', 'event'])
+  })
+
+  // An untracked route must not reach the queue at all -- not merely be
+  // filtered inside GA, where the path would already have been transmitted.
+  it('queues nothing for the signed-in app', async () => {
+    const { initAnalytics, trackPageView } = await loadAnalyticsAsProduction()
+
+    initAnalytics()
+    const queuedAfterInit = ((window as TaggedWindow).dataLayer ?? []).length
+    trackPageView('/dashboard/leads/lead-1', 'Leads')
+
+    expect(((window as TaggedWindow).dataLayer ?? []).length).toBe(queuedAfterInit)
   })
 })

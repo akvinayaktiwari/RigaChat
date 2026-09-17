@@ -27,7 +27,12 @@ type GtagCommand =
   | ['consent', 'default' | 'update', Record<string, string>]
 
 interface GtagWindow extends Window {
-  dataLayer?: GtagCommand[]
+  /**
+   * Entries are `arguments` objects, NOT arrays -- see the note in
+   * initAnalytics. GtagCommand still types every call, through gtag's
+   * signature below; it is the queued shape that cannot be a plain array.
+   */
+  dataLayer?: IArguments[]
   gtag?: (...args: GtagCommand) => void
 }
 
@@ -86,8 +91,16 @@ export function initAnalytics(): void {
   if (w.gtag) return
 
   w.dataLayer = w.dataLayer ?? []
-  const gtag = (...args: GtagCommand): void => {
-    w.dataLayer?.push(args)
+  // Google's own snippet is `function gtag(){dataLayer.push(arguments)}`, and
+  // the `arguments` object is not incidental. gtag.js reads a dataLayer entry
+  // as a command only when it is one -- it tests Object.prototype.toString for
+  // "[object Arguments]", or an own `callee`. A plain array, which is all a
+  // rest parameter ever is, falls into gtag's legacy "method.path" branch
+  // instead and is discarded in silence: no config, no page views, no error in
+  // the console. Hence a function expression reading `arguments`, and not the
+  // arrow function that shipped first and measured nothing.
+  const gtag: (...args: GtagCommand) => void = function (): void {
+    w.dataLayer?.push(arguments)
   }
   w.gtag = gtag
 
