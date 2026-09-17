@@ -69,6 +69,8 @@ does not backfill it for the period before registration. Register these in
 
 Content grouping needs nothing: `content_group` is a GA4 built-in.
 
+The copy-paste sheet for that screen is `GA4_CUSTOM_DEFINITIONS.md`.
+
 GA4 allows 50 event-scoped custom dimensions and 50 custom metrics per
 property. This uses 6 and 3.
 
