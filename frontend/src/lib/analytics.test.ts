@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { isTrackedPath } from './analytics'
+import { contentGroupFor, isTrackedPath } from './analytics'
 
 describe('isTrackedPath', () => {
   it('tracks the marketing pages', () => {
@@ -99,6 +99,66 @@ describe('initAnalytics', () => {
     initAnalytics()
     const queuedAfterInit = ((window as TaggedWindow).dataLayer ?? []).length
     trackPageView('/dashboard/leads/lead-1', 'Leads')
+
+    expect(((window as TaggedWindow).dataLayer ?? []).length).toBe(queuedAfterInit)
+  })
+})
+
+describe('contentGroupFor', () => {
+  it('groups the sections a content report is read by', () => {
+    expect(contentGroupFor('/')).toBe('Home')
+    expect(contentGroupFor('/blog')).toBe('Blog')
+    expect(contentGroupFor('/blog/whatsapp-chatbot-for-real-estate-india')).toBe('Blog')
+    expect(contentGroupFor('/features')).toBe('Features')
+    expect(contentGroupFor('/features/whatsapp')).toBe('Features')
+    expect(contentGroupFor('/about-us')).toBe('Company')
+    expect(contentGroupFor('/privacy-policy')).toBe('Legal')
+    expect(contentGroupFor('/login')).toBe('Account')
+  })
+
+  // Same segment-boundary rule as isTrackedPath, for the same reason: a new
+  // page whose slug starts with a section name must not be filed under it.
+  it('matches whole segments, and files the unknown under Other', () => {
+    expect(contentGroupFor('/blogging-tips')).toBe('Other')
+    expect(contentGroupFor('/contact-sales')).toBe('Other')
+    expect(contentGroupFor('/some-new-page')).toBe('Other')
+  })
+})
+
+describe('trackEvent', () => {
+  beforeEach(() => {
+    const w = window as TaggedWindow
+    delete w.dataLayer
+    delete w.gtag
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  })
+
+  it('sends the event with its parameters', async () => {
+    const { initAnalytics, trackEvent } = await loadAnalyticsAsProduction()
+    initAnalytics()
+
+    trackEvent('blog_read_progress', { post_slug: 'a-post', percent: 50 })
+
+    const queue = (window as TaggedWindow).dataLayer ?? []
+    const last = queue[queue.length - 1] as IArguments
+    expect([last[0], last[1]]).toEqual(['event', 'blog_read_progress'])
+    expect(last[2]).toEqual({ post_slug: 'a-post', percent: 50 })
+  })
+
+  // An event fired from a component that also renders in the dashboard must be
+  // dropped there, or signed-in usage leaks into the marketing property.
+  it('drops events fired from an untracked path', async () => {
+    const { initAnalytics, trackEvent } = await loadAnalyticsAsProduction()
+    initAnalytics()
+    const queuedAfterInit = ((window as TaggedWindow).dataLayer ?? []).length
+
+    window.history.pushState({}, '', '/dashboard/leads')
+    trackEvent('blog_read_progress', { post_slug: 'a-post', percent: 50 })
+    window.history.pushState({}, '', '/')
 
     expect(((window as TaggedWindow).dataLayer ?? []).length).toBe(queuedAfterInit)
   })

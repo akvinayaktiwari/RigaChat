@@ -125,6 +125,42 @@ export function initAnalytics(): void {
 }
 
 /**
+ * GA4 event parameter values. gtag flattens anything it is handed, so nesting
+ * an object or array here produces a parameter nobody can report on; the type
+ * keeps that from compiling.
+ */
+export type EventParams = Record<string, string | number | boolean>
+
+/**
+ * Content grouping for a path.
+ *
+ * GA4's `content_group` is what turns a flat list of page paths into the row
+ * "Blog: 3,104 views" without anyone maintaining a regex in the GA UI, where
+ * it would silently stop matching the first time a route is renamed. Derived
+ * from the path alone on purpose -- no page has to remember to declare it, and
+ * a page that forgets still lands in a real group rather than "(not set)".
+ */
+export function contentGroupFor(pathname: string): string {
+  const sections: ReadonlyArray<readonly [string, readonly string[]]> = [
+    ['Blog', ['/blog']],
+    ['Features', ['/features']],
+    ['Company', ['/about-us', '/contact', '/careers', '/help', '/system-status']],
+    ['Legal', ['/privacy-policy', '/terms-of-service', '/data-deletion-status']],
+    ['Account', ['/login', '/signup', '/forgot-password', '/reset-password', '/verify-email', '/auth']],
+  ]
+
+  if (pathname === '/') return 'Home'
+
+  for (const [group, prefixes] of sections) {
+    if (prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
+      return group
+    }
+  }
+
+  return 'Other'
+}
+
+/**
  * Reports one page view for a marketing route.
  *
  * page_location is built from the origin and path rather than href on purpose:
@@ -139,5 +175,21 @@ export function trackPageView(pathname: string, title: string): void {
     page_path: pathname,
     page_location: `${window.location.origin}${pathname}`,
     page_title: title,
+    content_group: contentGroupFor(pathname),
   })
+}
+
+/**
+ * Reports a custom event for the page currently on screen.
+ *
+ * The path is re-checked here rather than trusted from the caller: an event
+ * fired from a component that also renders inside the dashboard would
+ * otherwise carry dashboard usage into the marketing property, which is the
+ * one thing isTrackedPath exists to prevent.
+ */
+export function trackEvent(name: string, params: EventParams = {}): void {
+  if (!isAnalyticsEnabled() || !isTrackedPath(window.location.pathname)) return
+
+  const w = window as GtagWindow
+  w.gtag?.('event', name, params)
 }
