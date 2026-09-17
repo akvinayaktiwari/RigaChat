@@ -7,10 +7,12 @@ import Navbar from '../components/landing/Navbar'
 import Footer from '../components/landing/Footer'
 import DemoModal from '../components/landing/modals/DemoModal'
 import { getPostBySlug } from '../content/blog/registry'
+import { useBlogPostAnalytics } from '../hooks/useBlogPostAnalytics'
 import { AttachmentCard, BlogSurface, PostMetaLine, PostTags } from '../components/blog/BlogChrome'
 import { mdxComponents } from '../components/blog/MdxComponents'
 import { JAKARTA_FONT, ScrollReveal, StatRow, StatTile } from '../components/blog/BlogPrimitives'
 import { absoluteUrl } from '../lib/site'
+import type { BlogPost } from '../types/blog'
 import StructuredData from '../components/seo/StructuredData'
 import { blogPostingSchema, faqPageSchema, jsonLdGraph, organizationSchema } from '../lib/structured-data'
 
@@ -65,21 +67,23 @@ function PostNotFound() {
 
 export default function BlogPost() {
   const { slug } = useParams<{ slug: string }>()
-  const [isDemoOpen, setIsDemoOpen] = useState(false)
   const post = slug ? getPostBySlug(slug) : undefined
+
+  // The analytics hook lives in PostArticle rather than here because hooks
+  // cannot run behind the not-found early return, and a missing post must not
+  // report a read of a post that does not exist.
+  return post ? <PostArticle post={post} /> : <PostNotFound />
+}
+
+function PostArticle({ post }: { post: BlogPost }) {
+  const [isDemoOpen, setIsDemoOpen] = useState(false)
+  const { meta } = post
+  const trackCta = useBlogPostAnalytics(meta)
 
   // Keyed on slug so navigating between posts swaps the lazy component
   // instead of reusing the previously resolved one.
-  const Content = useMemo<ComponentType | null>(() => {
-    if (!post) return null
-    return lazy(post.loadContent)
-  }, [post])
+  const Content = useMemo<ComponentType>(() => lazy(post.loadContent), [post])
 
-  if (!post || !Content) {
-    return <PostNotFound />
-  }
-
-  const { meta } = post
   // Trailing slash: the prerendered post is served from blog/<slug>/index.html.
   const canonical = absoluteUrl(`/blog/${meta.slug}/`)
 
@@ -112,7 +116,12 @@ export default function BlogPost() {
           ...(meta.faq?.length ? [faqPageSchema(meta.faq)] : []),
         ])}
       />
-      <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
+      <Navbar
+        onOpenDemo={() => {
+          trackCta('open_demo')
+          setIsDemoOpen(true)
+        }}
+      />
 
       <BlogSurface>
         <article className="mx-auto max-w-4xl px-6 pb-24 pt-36 lg:px-8">
