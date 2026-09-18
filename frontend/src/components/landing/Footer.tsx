@@ -8,7 +8,6 @@ const LINK_COLUMNS = [
       { label: 'Features', href: '/features' },
       { label: 'Integrations', href: '/#integrations' },
       { label: 'Pricing', href: '/#pricing' },
-      { label: 'Changelog', href: '#' },
     ],
   },
   {
@@ -16,6 +15,7 @@ const LINK_COLUMNS = [
     links: [
       { label: 'About Us', href: '/about-us' },
       { label: 'Blog', href: '/blog' },
+      { label: 'Help Center', href: '/help' },
       { label: 'Careers', href: '/careers' },
       { label: 'Contact Us', href: '/contact' },
     ],
@@ -25,7 +25,6 @@ const LINK_COLUMNS = [
     links: [
       { label: 'Privacy Policy', href: '/privacy-policy' },
       { label: 'Terms of Service', href: '/terms-of-service' },
-      { label: 'Security', href: '#' },
     ],
   },
 ]

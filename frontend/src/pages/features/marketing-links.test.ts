@@ -42,4 +42,10 @@ describe('marketing page links', () => {
     const broken = internalHrefs(source).filter((href) => !routes.has(href))
     expect(broken).toEqual([])
   })
+
+  // A bare "#" is a crawl dead end and reads as unfinished. The footer shipped
+  // Changelog and Security that way while /help, a real page, had no link at all.
+  it.each(files)('%s has no placeholder "#" links', (_file, source) => {
+    expect(source).not.toMatch(/href(?:=|:\s*)["']#["']/)
+  })
 })
