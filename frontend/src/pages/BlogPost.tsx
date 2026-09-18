@@ -6,15 +6,43 @@ import { ArrowLeft } from 'lucide-react'
 import Navbar from '../components/landing/Navbar'
 import Footer from '../components/landing/Footer'
 import DemoModal from '../components/landing/modals/DemoModal'
-import { getPostBySlug } from '../content/blog/registry'
+import { getPostBySlug, relatedPosts } from '../content/blog/registry'
 import { useBlogPostAnalytics } from '../hooks/useBlogPostAnalytics'
 import { AttachmentCard, BlogSurface, PostMetaLine, PostTags } from '../components/blog/BlogChrome'
 import { mdxComponents } from '../components/blog/MdxComponents'
 import { JAKARTA_FONT, ScrollReveal, StatRow, StatTile } from '../components/blog/BlogPrimitives'
 import { absoluteUrl } from '../lib/site'
-import type { BlogPost } from '../types/blog'
+import type { BlogPost, BlogPostMeta } from '../types/blog'
 import StructuredData from '../components/seo/StructuredData'
 import { blogPostingSchema, faqPageSchema, jsonLdGraph, organizationSchema } from '../lib/structured-data'
+
+/** Links onward to posts on the same topics, so no post is reachable only from /blog. */
+function RelatedReading({ posts }: { posts: readonly BlogPostMeta[] }) {
+  if (posts.length === 0) return null
+
+  return (
+    <nav className="mt-20" aria-labelledby="related-reading">
+      <h2 id="related-reading" className="mb-4 text-[11px] font-bold uppercase tracking-[0.2em] text-white/40">
+        Related reading
+      </h2>
+      <ul className="space-y-3">
+        {posts.map((related) => (
+          <li key={related.slug}>
+            <Link
+              to={`/blog/${related.slug}/`}
+              className="block rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition-colors hover:border-violet-300/60"
+            >
+              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-violet-300">{related.category}</span>
+              <span className="mt-2 block text-base font-bold text-white" style={JAKARTA_FONT}>
+                {related.title}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )
+}
 
 function BackToBlog() {
   return (
@@ -196,6 +224,8 @@ function PostArticle({ post }: { post: BlogPost }) {
               <AttachmentCard attachment={meta.attachment} variant="compact" />
             </div>
           ) : null}
+
+          <RelatedReading posts={relatedPosts(meta.slug)} />
 
           <div className="mt-16 border-t border-white/10 pt-8">
             <BackToBlog />
