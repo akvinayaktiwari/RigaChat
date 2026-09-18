@@ -35,6 +35,7 @@ export default function WhatsAppFeaturePage() {
         path="/features/whatsapp/"
       />
       <UseCaseLayout
+        featurePath="/features/whatsapp"
         badge="WHATSAPP AUTOMATION"
         headline="Never miss a lead — get notified instantly"
         subheadline="Vyostra AI sends a WhatsApp message to your number the moment a lead is captured — from your agent or your forms. No app switching. No delays."

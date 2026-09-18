@@ -52,6 +52,7 @@ export default function Crm() {
         path="/features/crm/"
       />
       <UseCaseLayout
+        featurePath="/features/crm"
         badge="LEAD CRM"
         headline="Every lead, organized automatically"
         subheadline="Vyostra AI stores every lead captured by your agents and forms in a built-in CRM dashboard. Filter, track status, and sync to Zoho CRM in one click."

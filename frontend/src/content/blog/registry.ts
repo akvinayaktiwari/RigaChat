@@ -65,3 +65,8 @@ export function getPostBySlug(slug: string): BlogPost | undefined {
 export function getAllSlugs(): string[] {
   return posts.map((post) => post.meta.slug)
 }
+
+/** Posts that declare the given feature page in `relatedFeatures`, newest first. */
+export function postsForFeature(featurePath: string, metas: readonly BlogPostMeta[] = posts.map((post) => post.meta)): BlogPostMeta[] {
+  return metas.filter((meta) => meta.relatedFeatures?.includes(featurePath) ?? false)
+}

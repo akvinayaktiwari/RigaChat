@@ -41,6 +41,12 @@ export interface BlogPostMeta {
    */
   faq?: BlogFaqItem[]
   attachment?: BlogAttachment
+  /**
+   * Feature pages this post explains, as routed paths without the trailing
+   * slash (e.g. "/features/whatsapp"). Those pages link back to the post, which
+   * is how a post earns inbound links beyond the /blog index.
+   */
+  relatedFeatures?: string[]
   /** Headline figures rendered as stat tiles in the post hero. */
   highlights?: BlogHighlight[]
 }

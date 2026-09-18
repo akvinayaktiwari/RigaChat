@@ -9,6 +9,7 @@ const meta: BlogPostMeta = {
   category: 'Lead Generation Playbook',
   tags: ['WhatsApp', 'Real Estate', 'India', 'Lead Generation'],
   readingMinutes: 9,
+  relatedFeatures: ['/features/whatsapp', '/features/crm'],
   faq: [
     {
       question: 'What is a WhatsApp chatbot for real estate?',

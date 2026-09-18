@@ -26,6 +26,7 @@ export default function Forms() {
         path="/features/forms/"
       />
       <UseCaseLayout
+        featurePath="/features/forms"
         badge="FORM BUILDER"
         headline="Beautiful forms that capture leads"
         subheadline="Build custom lead capture forms in minutes. Embed on any website. Every submission is captured in your CRM and triggers an instant WhatsApp notification."

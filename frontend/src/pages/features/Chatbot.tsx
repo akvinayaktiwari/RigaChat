@@ -48,6 +48,7 @@ export default function Chatbot() {
         path="/features/chatbot/"
       />
       <UseCaseLayout
+        featurePath="/features/chatbot"
         badge="AI AGENT"
         headline="Your 24/7 AI sales assistant"
         subheadline="Vyostra AI's AI agent engages every visitor, answers their questions, and captures their contact details automatically — even when you are not there."

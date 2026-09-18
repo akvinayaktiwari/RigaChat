@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import Navbar from './Navbar'
 import Footer from './Footer'
 import DemoModal from './modals/DemoModal'
+import RelatedPosts from './RelatedPosts'
+import { postsForFeature } from '../../content/blog/registry'
 
 interface HowItWorksStep {
   number: string
@@ -33,6 +35,8 @@ interface UseCaseLayoutProps {
   integrations: Integration[]
   ctaHeadline: string
   ctaBody: string
+  /** This page's routed path, e.g. "/features/whatsapp"; lists the posts that declare it. */
+  featurePath: string
 }
 
 function HeroSection({ badge, headline, subheadline, heroVisual }: Pick<UseCaseLayoutProps, 'badge' | 'headline' | 'subheadline' | 'heroVisual'>) {
@@ -170,6 +174,7 @@ export default function UseCaseLayout(props: UseCaseLayoutProps) {
         <HowItWorksSection steps={props.howItWorksSteps} />
         <BenefitsSection benefits={props.benefits} />
         <IntegrationsSection integrations={props.integrations} />
+        <RelatedPosts posts={postsForFeature(props.featurePath)} heading="Go deeper" />
         <CtaSection ctaHeadline={props.ctaHeadline} ctaBody={props.ctaBody} />
       </main>
 
