@@ -12,6 +12,8 @@ import TestimonialsSection from '../components/landing/TestimonialsSection'
 import PricingSection from '../components/landing/PricingSection'
 import CTASection from '../components/landing/CTASection'
 import Footer from '../components/landing/Footer'
+import RelatedPosts from '../components/landing/RelatedPosts'
+import { getAllPosts } from '../content/blog/registry'
 import PageMeta from '../components/seo/PageMeta'
 import StructuredData from '../components/seo/StructuredData'
 import { PRICING_TIERS } from '../lib/pricingTiers'
@@ -23,6 +25,9 @@ import type { AuthUser } from '../hooks/useAuth'
 import { useTierCheckout } from '../hooks/useTierCheckout'
 import { currencyForRegion, detectRegion } from '../lib/pricingTiers'
 import type { BillableTier, Region } from '../lib/pricingTiers'
+
+/** Newest posts linked from the homepage, the site's most-linked page. */
+const HOMEPAGE_POST_COUNT = 3
 
 const VOICE_AGENT_ID = 'b5b88f4b-3a4d-41cc-b590-9324655c341f'
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -117,6 +122,9 @@ export default function LandingPage() {
       <TestimonialsSection />
       <PricingSection onSelectTier={handleSelectTier} region={region} onRegionChange={setRegion} />
       <CTASection onStartTrial={handleStartTrial} region={region} />
+      <div className="px-6 lg:px-8 pt-20">
+        <RelatedPosts posts={getAllPosts().slice(0, HOMEPAGE_POST_COUNT).map((post) => post.meta)} heading="From the blog" />
+      </div>
       <Footer />
       <DemoModal isOpen={isDemoOpen} onClose={() => setIsDemoOpen(false)} />
       <QuickSignupModal
