@@ -25,6 +25,8 @@ interface HelpCategory {
   label: string
   icon: 'Rocket' | 'MessageSquare' | 'Cpu' | 'Users' | 'Receipt'
   description: string
+  /** Section heading over this category's answers, phrased the way people ask it. */
+  heading: string
 }
 
 interface HelpArticle {
@@ -34,40 +36,45 @@ interface HelpArticle {
   answer: string
 }
 
-const HELP_CATEGORIES: HelpCategory[] = [
+export const HELP_CATEGORIES: HelpCategory[] = [
   {
     id: 'getting-started',
+    heading: 'How do I get started with Vyostra AI?',
     label: 'Getting Started',
     icon: 'Rocket',
     description: 'Set up your agent and start capturing leads in under 5 minutes.',
   },
   {
     id: 'whatsapp',
+    heading: 'How do WhatsApp notifications work?',
     label: 'WhatsApp',
     icon: 'MessageSquare',
     description: 'Configure lead notifications and weekly reports via WhatsApp.',
   },
   {
     id: 'integrations',
+    heading: 'Which tools does Vyostra AI connect to?',
     label: 'Integrations',
     icon: 'Cpu',
     description: 'Connect Zoho CRM and other tools to sync leads automatically.',
   },
   {
     id: 'leads',
+    heading: 'How do I capture and manage leads?',
     label: 'Leads and Forms',
     icon: 'Users',
     description: 'Manage lead capture, form builder, and lead dashboard.',
   },
   {
     id: 'billing',
+    heading: 'How do plans and billing work?',
     label: 'Billing and Plans',
     icon: 'Receipt',
     description: 'Plans, pricing, and subscription management.',
   },
 ]
 
-const HELP_ARTICLES: HelpArticle[] = [
+export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: 'art-1',
     categoryId: 'getting-started',
@@ -257,28 +264,27 @@ function CategoryGrid({
 }
 
 function ArticleAccordion({ article, isExpanded, onToggle }: { article: HelpArticle; isExpanded: boolean; onToggle: () => void }) {
-  const categoryLabel = HELP_CATEGORIES.find((cat) => cat.id === article.categoryId)?.label ?? article.categoryId
   return (
     <div
       className="bg-white border border-outline-variant/30 rounded-2xl overflow-hidden shadow-xs hover:shadow-sm transition-all duration-200"
       id={`article-accordion-${article.id}`}
     >
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between p-6 text-left font-bold text-on-surface hover:text-primary transition-colors cursor-pointer"
-      >
-        <div className="flex items-start gap-3.5 pr-4">
-          <span className="text-xs px-2.5 py-1 bg-surface-container-high rounded-lg text-outline font-semibold uppercase tracking-wider shrink-0 mt-0.5">
-            {categoryLabel}
-          </span>
-          <span className="text-base font-bold leading-snug">{article.question}</span>
-        </div>
-        {isExpanded ? (
-          <ChevronUp className="w-5 h-5 text-primary shrink-0" />
-        ) : (
-          <ChevronDown className="w-5 h-5 text-outline shrink-0" />
-        )}
-      </button>
+      {/* The heading wraps the button, not the other way round: a heading inside
+          a <button> is invalid HTML and is dropped from the outline crawlers read. */}
+      <h3>
+        <button
+          onClick={onToggle}
+          aria-expanded={isExpanded}
+          className="w-full flex items-center justify-between p-6 text-left font-bold text-on-surface hover:text-primary transition-colors cursor-pointer"
+        >
+          <span className="text-base font-bold leading-snug pr-4">{article.question}</span>
+          {isExpanded ? (
+            <ChevronUp className="w-5 h-5 text-primary shrink-0" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-outline shrink-0" />
+          )}
+        </button>
+      </h3>
       <div className={`transition-all duration-300 overflow-hidden ${isExpanded ? 'max-h-96 border-t border-outline-variant/20' : 'max-h-0'}`}>
         <div className="p-6 bg-surface-container-low/40 text-on-surface-variant text-sm md:text-base leading-relaxed">
           {article.answer}
@@ -301,11 +307,42 @@ function ArticlesList({ articles, expandedId, onToggle }: { articles: HelpArticl
     )
   }
   return (
-    <div className="space-y-4">
-      {articles.map((article) => (
-        <ArticleAccordion key={article.id} article={article} isExpanded={expandedId === article.id} onToggle={() => onToggle(article.id)} />
+    <div className="space-y-12">
+      {HELP_CATEGORIES.map((category) => (
+        <ArticleGroup
+          key={category.id}
+          category={category}
+          articles={articles.filter((article) => article.categoryId === category.id)}
+          expandedId={expandedId}
+          onToggle={onToggle}
+        />
       ))}
     </div>
+  )
+}
+
+interface ArticleGroupProps {
+  category: HelpCategory
+  articles: HelpArticle[]
+  expandedId: string | null
+  onToggle: (id: string) => void
+}
+
+/** One category's answers under a question-phrased heading. Renders nothing when a filter empties it. */
+function ArticleGroup({ category, articles, expandedId, onToggle }: ArticleGroupProps) {
+  if (articles.length === 0) return null
+
+  return (
+    <section aria-labelledby={`help-group-${category.id}`}>
+      <h2 id={`help-group-${category.id}`} className="text-xl md:text-2xl font-extrabold text-on-surface mb-4">
+        {category.heading}
+      </h2>
+      <div className="space-y-4">
+        {articles.map((article) => (
+          <ArticleAccordion key={article.id} article={article} isExpanded={expandedId === article.id} onToggle={() => onToggle(article.id)} />
+        ))}
+      </div>
+    </section>
   )
 }
 
