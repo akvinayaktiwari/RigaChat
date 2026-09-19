@@ -9,6 +9,9 @@ const meta: BlogPostMeta = {
   category: 'Lead Generation Playbook',
   tags: ['WhatsApp', 'Real Estate', 'India', 'Lead Generation'],
   readingMinutes: 9,
+  seoTitle: 'WhatsApp Chatbot for Real Estate in India',
+  seoDescription:
+    'A WhatsApp chatbot for real estate replies to property enquiries instantly and qualifies them. How the 24-hour window, templates and opt-in shape the flow.',
   relatedFeatures: ['/features/whatsapp', '/features/crm'],
   faq: [
     {

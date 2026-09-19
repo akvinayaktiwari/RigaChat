@@ -369,7 +369,7 @@ export default function Help() {
     <div className="landing-page bg-background">
       <PageMeta
         title="Help Center — Vyostra AI"
-        description="Answers on setting up your Vyostra AI agent: embedding the chat widget, training the knowledge base, WhatsApp notifications, Zoho CRM sync, lead forms, trials and billing."
+        description="Set up your Vyostra AI agent: embed the chat widget, train the knowledge base, WhatsApp alerts, Zoho CRM sync, lead forms, trials and billing."
         path="/help/"
       />
       {/* Every article, not filteredArticles: the answers are all on the page, only collapsed. */}

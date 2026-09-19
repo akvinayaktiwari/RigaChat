@@ -9,6 +9,8 @@ const meta: BlogPostMeta = {
   category: 'Hospitality Investment Research',
   tags: ['Hospitality', 'Real Estate', 'India', 'Feasibility Study'],
   readingMinutes: 14,
+  seoDescription:
+    "A feasibility breakdown for a no-frills ₹2,000–2,500/night branded stay in India's pilgrimage towns, between the dharamshala and the full-service hotel.",
   highlights: [
     { value: '7', label: 'Towns screened' },
     { value: '2', label: 'Operating models sized' },

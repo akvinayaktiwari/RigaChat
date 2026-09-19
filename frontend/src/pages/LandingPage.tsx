@@ -106,8 +106,8 @@ export default function LandingPage() {
   return (
     <div className="landing-page bg-white overflow-x-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
       <PageMeta
-        title="Vyostra AI — AI Chatbot with Built-in Lead CRM and WhatsApp Follow-up"
-        description="Train an AI agent on your website in minutes. It captures leads 24/7 on chat, voice and WhatsApp, drops them into a built-in CRM, and follows up until they book. Plans from $49/mo."
+        title="Vyostra AI — AI Chatbot with Lead CRM and WhatsApp Follow-up"
+        description="Train an AI agent on your website in minutes. It captures leads 24/7 on chat, voice and WhatsApp, fills a built-in CRM and follows up. Plans from $49/mo."
         path="/"
       />
       <StructuredData data={jsonLdGraph([organizationSchema(), websiteSchema(), softwareApplicationSchema(PRICING_TIERS)])} />

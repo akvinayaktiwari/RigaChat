@@ -12,6 +12,7 @@ import { AttachmentCard, BlogSurface, PostMetaLine, PostTags } from '../componen
 import { mdxComponents } from '../components/blog/MdxComponents'
 import { JAKARTA_FONT, ScrollReveal, StatRow, StatTile } from '../components/blog/BlogPrimitives'
 import { absoluteUrl } from '../lib/site'
+import { postDescription, postDocumentTitle } from '../lib/search-snippet'
 import type { BlogPost, BlogPostMeta } from '../types/blog'
 import StructuredData from '../components/seo/StructuredData'
 import { blogPostingSchema, faqPageSchema, jsonLdGraph, organizationSchema } from '../lib/structured-data'
@@ -118,8 +119,8 @@ function PostArticle({ post }: { post: BlogPost }) {
   return (
     <div className="landing-page bg-background">
       <Helmet>
-        <title>{`${meta.title} — Vyostra AI`}</title>
-        <meta name="description" content={meta.excerpt} />
+        <title>{postDocumentTitle(meta)}</title>
+        <meta name="description" content={postDescription(meta)} />
         <link rel="canonical" href={canonical} />
         <meta property="og:site_name" content="Vyostra AI" />
         <meta property="og:type" content="article" />

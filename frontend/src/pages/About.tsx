@@ -249,7 +249,7 @@ export default function About() {
     <div className="landing-page bg-background">
       <PageMeta
         title="About Vyostra AI — AI Lead Generation, Built in Bangalore"
-        description="Vyostra AI is a Bangalore-built platform that helps businesses capture every lead with AI chat and voice agents, WhatsApp follow-up and a built-in lead CRM. Meet the founders."
+        description="Vyostra AI is a Bangalore-built platform that captures every lead with AI chat and voice agents, WhatsApp follow-up and a built-in CRM. Meet the founders."
         path="/about-us/"
       />
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />

@@ -47,6 +47,16 @@ export interface BlogPostMeta {
    * is how a post earns inbound links beyond the /blog index.
    */
   relatedFeatures?: string[]
+  /**
+   * Search-result title, when `title` is too long to survive truncation. The
+   * brand suffix is added for you. The on-page H1 and og:title keep `title`.
+   */
+  seoTitle?: string
+  /**
+   * Meta description, when `excerpt` runs past what a results page shows. The
+   * excerpt is a deliberate on-page deck, so it is not cut to fit.
+   */
+  seoDescription?: string
   /** Headline figures rendered as stat tiles in the post hero. */
   highlights?: BlogHighlight[]
 }
