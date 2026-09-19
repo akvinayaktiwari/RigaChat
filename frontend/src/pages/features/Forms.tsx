@@ -1,4 +1,6 @@
 import PageMeta from '../../components/seo/PageMeta'
+import StructuredData from '../../components/seo/StructuredData'
+import { featurePageGraph } from '../../lib/structured-data'
 import { FileText, Code, Bell, Palette, Globe, Bot, MessageSquare, Users } from 'lucide-react'
 import UseCaseLayout from '../../components/landing/UseCaseLayout'
 
@@ -25,6 +27,7 @@ export default function Forms() {
         description="Build beautiful lead capture forms in minutes. Embed anywhere. Every submission captured and notified instantly via WhatsApp."
         path="/features/forms/"
       />
+      <StructuredData data={featurePageGraph({ name: 'Form Builder', path: '/features/forms/' })} />
       <UseCaseLayout
         featurePath="/features/forms"
         badge="FORM BUILDER"

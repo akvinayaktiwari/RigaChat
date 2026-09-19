@@ -15,7 +15,7 @@ import { absoluteUrl } from '../lib/site'
 import { postDescription, postDocumentTitle } from '../lib/search-snippet'
 import type { BlogPost, BlogPostMeta } from '../types/blog'
 import StructuredData from '../components/seo/StructuredData'
-import { blogPostingSchema, faqPageSchema, jsonLdGraph, organizationSchema } from '../lib/structured-data'
+import { blogPostingSchema, breadcrumbSchema, faqPageSchema, jsonLdGraph, organizationSchema } from '../lib/structured-data'
 
 /** Links onward to posts on the same topics, so no post is reachable only from /blog. */
 function RelatedReading({ posts }: { posts: readonly BlogPostMeta[] }) {
@@ -142,6 +142,11 @@ function PostArticle({ post }: { post: BlogPost }) {
         data={jsonLdGraph([
           organizationSchema(),
           blogPostingSchema({ ...meta, path: `/blog/${meta.slug}/` }),
+          breadcrumbSchema([
+            { name: 'Home', path: '/' },
+            { name: 'Blog', path: '/blog/' },
+            { name: meta.title, path: `/blog/${meta.slug}/` },
+          ]),
           ...(meta.faq?.length ? [faqPageSchema(meta.faq)] : []),
         ])}
       />

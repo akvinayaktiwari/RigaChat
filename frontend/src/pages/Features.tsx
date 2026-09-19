@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import PageMeta from '../components/seo/PageMeta'
+import StructuredData from '../components/seo/StructuredData'
+import { featurePageGraph } from '../lib/structured-data'
 import { useNavigate } from 'react-router-dom'
 import { Bot, MessageSquare, Users, FileText, Mic, Route, CalendarCheck } from 'lucide-react'
 import Navbar from '../components/landing/Navbar'
@@ -177,6 +179,7 @@ export default function Features() {
         description="AI chat and voice agents, two-way WhatsApp, follow-up journeys, Lead CRM, Form Builder, and Zoho integration. Everything you need to capture and convert leads."
         path="/features/"
       />
+      <StructuredData data={featurePageGraph({ name: 'Features', path: '/features/' })} />
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 
       <main className="pt-36 pb-24 px-6 lg:px-8">

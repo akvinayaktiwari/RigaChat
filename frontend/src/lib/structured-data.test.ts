@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { serializeJsonLd } from '../components/seo/StructuredData'
 import { PRICING_TIERS } from './pricingTiers'
+import { absoluteUrl } from './site'
 import {
   blogPostingSchema,
+  breadcrumbSchema,
+  featurePageGraph,
   faqPageSchema,
   jsonLdGraph,
   organizationSchema,
@@ -72,5 +75,44 @@ describe('serializeJsonLd', () => {
     const serialized = serializeJsonLd({ name: '</script><script>alert(1)</script>' })
     expect(serialized).not.toContain('</script>')
     expect(JSON.parse(serialized)).toEqual({ name: '</script><script>alert(1)</script>' })
+  })
+})
+
+describe('breadcrumbSchema', () => {
+  it('numbers the crumbs from 1 and makes every item an absolute URL', () => {
+    const list = breadcrumbSchema([
+      { name: 'Home', path: '/' },
+      { name: 'Blog', path: '/blog/' },
+    ])
+    expect(list.itemListElement).toEqual([
+      { '@type': 'ListItem', position: 1, name: 'Home', item: absoluteUrl('/') },
+      { '@type': 'ListItem', position: 2, name: 'Blog', item: absoluteUrl('/blog/') },
+    ])
+  })
+})
+
+describe('featurePageGraph', () => {
+  function node(path: string, type: string, name = 'Lead CRM'): JsonLd {
+    const found = asArray(featurePageGraph({ name, path })['@graph']).map(asRecord).find((entry) => entry['@type'] === type)
+    if (!found) throw new Error(`no ${type} node`)
+    return found
+  }
+
+  function crumbNames(path: string, name?: string): JsonValue[] {
+    return asArray(node(path, 'BreadcrumbList', name).itemListElement).map((item) => asRecord(item).name ?? null)
+  }
+
+  it('marks the page as being about the product node the homepage defines', () => {
+    const softwareId = softwareApplicationSchema(PRICING_TIERS)['@id']
+    expect(softwareId).toBeTruthy()
+    expect(node('/features/crm/', 'WebPage').about).toEqual({ '@id': softwareId })
+  })
+
+  it('trails Home > Features > the page', () => {
+    expect(crumbNames('/features/crm/')).toEqual(['Home', 'Features', 'Lead CRM'])
+  })
+
+  it('does not repeat Features on the features index', () => {
+    expect(crumbNames('/features/', 'Features')).toEqual(['Home', 'Features'])
   })
 })

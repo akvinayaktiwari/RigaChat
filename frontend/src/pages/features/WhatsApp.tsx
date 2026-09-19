@@ -1,4 +1,6 @@
 import PageMeta from '../../components/seo/PageMeta'
+import StructuredData from '../../components/seo/StructuredData'
+import { featurePageGraph } from '../../lib/structured-data'
 import { Key, ToggleRight, BarChart2, Bell, Lock, Bot, Users, RefreshCw } from 'lucide-react'
 import UseCaseLayout from '../../components/landing/UseCaseLayout'
 
@@ -34,6 +36,7 @@ export default function WhatsAppFeaturePage() {
         description="Get instant WhatsApp alerts every time a new lead is captured. Weekly reports every Monday. Powered by Gupshup."
         path="/features/whatsapp/"
       />
+      <StructuredData data={featurePageGraph({ name: 'WhatsApp Automation', path: '/features/whatsapp/' })} />
       <UseCaseLayout
         featurePath="/features/whatsapp"
         badge="WHATSAPP AUTOMATION"

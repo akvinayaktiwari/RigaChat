@@ -26,6 +26,9 @@ const SUPPORT_EMAIL = 'support@vyostra.com'
 const SAME_AS: readonly string[] = ['https://www.linkedin.com/company/vyostra-ai']
 
 const ORGANIZATION_ID = '#organization'
+const WEBSITE_ID = '#website'
+/** The product node. Feature pages point `about` at it, so they read as pages about one product. */
+const SOFTWARE_ID = '#software'
 
 export function organizationSchema(): JsonLd {
   return {
@@ -53,6 +56,7 @@ export function organizationSchema(): JsonLd {
 export function websiteSchema(): JsonLd {
   return {
     '@type': 'WebSite',
+    '@id': absoluteUrl(`/${WEBSITE_ID}`),
     name: ORGANIZATION_NAME,
     url: absoluteUrl('/'),
     inLanguage: 'en-IN',
@@ -82,6 +86,7 @@ function planOffer(tier: PricingTier): JsonLd {
 export function softwareApplicationSchema(tiers: readonly PricingTier[]): JsonLd {
   return {
     '@type': 'SoftwareApplication',
+    '@id': absoluteUrl(`/${SOFTWARE_ID}`),
     name: ORGANIZATION_NAME,
     applicationCategory: 'BusinessApplication',
     applicationSubCategory: 'AI chatbot and lead management',
@@ -130,6 +135,54 @@ export function blogPostingSchema(article: ArticleFields): JsonLd {
     author: { '@id': absoluteUrl(`/${ORGANIZATION_ID}`) },
     publisher: { '@id': absoluteUrl(`/${ORGANIZATION_ID}`) },
   }
+}
+
+export interface Crumb {
+  name: string
+  /** Path exactly as served (trailing slash on prerendered routes): a crumb must never point at a 301. */
+  path: string
+}
+
+export function breadcrumbSchema(crumbs: readonly Crumb[]): JsonLd {
+  return {
+    '@type': 'BreadcrumbList',
+    itemListElement: crumbs.map((crumb, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: crumb.name,
+      item: absoluteUrl(crumb.path),
+    })),
+  }
+}
+
+export interface FeaturePageFields {
+  /** Short name, as the Features page labels it ("Lead CRM"). Also the last breadcrumb. */
+  name: string
+  /** Path exactly as served, e.g. "/features/crm/". */
+  path: string
+}
+
+const FEATURES_CRUMBS: readonly Crumb[] = [
+  { name: 'Home', path: '/' },
+  { name: 'Features', path: '/features/' },
+]
+
+/** A feature page: a WebPage about the product, plus its Home > Features trail. */
+export function featurePageGraph(page: FeaturePageFields): JsonLd {
+  const isIndex = page.path === '/features/'
+  const crumbs = isIndex ? FEATURES_CRUMBS : [...FEATURES_CRUMBS, { name: page.name, path: page.path }]
+
+  return jsonLdGraph([
+    {
+      '@type': 'WebPage',
+      '@id': absoluteUrl(page.path),
+      url: absoluteUrl(page.path),
+      name: page.name,
+      isPartOf: { '@id': absoluteUrl(`/${WEBSITE_ID}`) },
+      about: { '@id': absoluteUrl(`/${SOFTWARE_ID}`) },
+    },
+    breadcrumbSchema(crumbs),
+  ])
 }
 
 /** Wraps nodes in one @graph so @id references resolve across them. */

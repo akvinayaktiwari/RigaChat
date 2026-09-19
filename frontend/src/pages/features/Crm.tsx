@@ -1,4 +1,6 @@
 import PageMeta from '../../components/seo/PageMeta'
+import StructuredData from '../../components/seo/StructuredData'
+import { featurePageGraph } from '../../lib/structured-data'
 import { Bot, Filter, RefreshCw, Database, MessageSquare, FileText } from 'lucide-react'
 import UseCaseLayout from '../../components/landing/UseCaseLayout'
 
@@ -51,6 +53,7 @@ export default function Crm() {
         description="Every lead captured, stored, and organized automatically. Filter, track, and sync to Zoho CRM in real-time."
         path="/features/crm/"
       />
+      <StructuredData data={featurePageGraph({ name: 'Lead CRM', path: '/features/crm/' })} />
       <UseCaseLayout
         featurePath="/features/crm"
         badge="LEAD CRM"

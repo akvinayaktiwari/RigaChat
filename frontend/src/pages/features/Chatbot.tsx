@@ -1,4 +1,6 @@
 import PageMeta from '../../components/seo/PageMeta'
+import StructuredData from '../../components/seo/StructuredData'
+import { featurePageGraph } from '../../lib/structured-data'
 import { Bot, Code, Users, Brain, Clock, Zap, MessageSquare, Users as CrmIcon, FileText } from 'lucide-react'
 import UseCaseLayout from '../../components/landing/UseCaseLayout'
 
@@ -47,6 +49,7 @@ export default function Chatbot() {
         description="Capture leads 24/7 with an AI agent trained on your business data. No code required. Set up in under 5 minutes."
         path="/features/chatbot/"
       />
+      <StructuredData data={featurePageGraph({ name: 'AI Agent', path: '/features/chatbot/' })} />
       <UseCaseLayout
         featurePath="/features/chatbot"
         badge="AI AGENT"
