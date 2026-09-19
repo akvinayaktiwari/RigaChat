@@ -1,9 +1,11 @@
 {/*
   Platform behaviour described here (opt-in, the 24-hour customer service window,
   template approval, quality rating) is WhatsApp Business Platform policy, not a
-  claim about any product. Pricing is deliberately not quoted: Meta has changed
-  the model more than once, so this points at the current docs instead of a number
-  that dates badly.
+  claim about any product, and each rule links to the Meta page that states it.
+  Those links were opened and the claims checked against them on 2026-09-19;
+  Meta moves these pages, so re-check them when the post is updated. Pricing is
+  deliberately not quoted: Meta has changed the model more than once, so this
+  points at the current docs instead of a number that dates badly.
 
   No performance figures appear anywhere in this post. Response-time and conversion
   claims are the easiest thing in this category to invent, and an uncited number is
@@ -37,20 +39,20 @@ In India the property enquiry rarely stays where it started. It begins on a port
 
 ## What rules does WhatsApp enforce on business messages?
 
-These are WhatsApp Business Platform rules, not vendor limitations, and no software removes them. Read them as design constraints: every flow further down is shaped by these.
+These are [WhatsApp Business Platform rules](https://whatsappbusiness.com/policy/), not vendor limitations, and no software removes them. Read them as design constraints: every flow further down is shaped by these.
 
 <div className="mt-6 grid gap-4 md:grid-cols-2">
   <FactCard label="Rule 1 — Opt-in first">
-    A business needs permission before it messages someone, taken where the person can see what they are agreeing to. A lead who messages you first has given the cleanest opt-in there is. A purchased list is the fastest way to lose a number.
+    A business needs [permission before it messages someone](https://developers.facebook.com/documentation/business-messaging/whatsapp/getting-opt-in), taken where the person can see what they are agreeing to. A lead who messages you first has given the cleanest opt-in there is. A purchased list is the fastest way to lose a number.
   </FactCard>
   <FactCard label="Rule 2 — The 24-hour window">
-    Free-form replies are allowed only within 24 hours of the customer's last message. Once that window shuts, the only thing you can send is a pre-approved template.
+    Free-form replies are allowed only within [24 hours of the customer's last message](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages). Once that window shuts, the only thing you can send is a pre-approved template.
   </FactCard>
   <FactCard label="Rule 3 — Templates are reviewed">
-    Templates are submitted to Meta and approved, rejected or paused. They are categorised — marketing, utility, authentication — and the category affects both what you may write and what it costs.
+    Templates are submitted to Meta and [approved, rejected or paused](https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/overview). They are categorised — marketing, utility, authentication — and the category affects both what you may write and [what it costs](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing).
   </FactCard>
   <FactCard label="Rule 4 — Quality is scored">
-    Blocks and "report" taps lower your number's quality rating and can cut your messaging limits. Volume is not the lever people think it is; relevance is.
+    Blocks, reports and ignored messages feed each template's [quality rating](https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/overview). A low rating can pause the template, and [messaging limits](https://developers.facebook.com/documentation/business-messaging/whatsapp/messaging-limits) only scale up for businesses sending high-quality messages. Volume is not the lever people think it is; relevance is.
   </FactCard>
 </div>
 
