@@ -61,7 +61,7 @@ Description:      Which CTA was clicked on a post, e.g. open_demo
 
 ## Custom metrics — tab "Custom metrics", Scope: **Event**
 
-Unit of measurement is **Standard** for all three. `reading_minutes` is
+Unit of measurement is **Standard** for all four. `reading_minutes` is
 deliberately not "Minutes": that unit makes GA format it as a duration, which
 reads oddly for an editorial estimate you mostly want to average.
 
@@ -86,6 +86,17 @@ Description:      Scroll depth milestone reached: 25, 50, 75 or 100
 Unit:             Standard
 ```
 
+```
+Metric name:      Demo chat message index
+Event parameter:  message_index
+Description:      How many messages into the landing-page demo chat this event is. 1 is the visitor's first message.
+Unit:             Standard
+```
+
+A parameter GA4 has never received is not offered in the dropdown — type the
+name in. Registering it before the first event is the right order, since GA4
+does not backfill a dimension or metric for the period before it existed.
+
 ## Just the parameter names
 
 ```
@@ -98,12 +109,13 @@ cta_action
 post_age_days
 reading_minutes
 percent
+message_index
 ```
 
 ## Quotas
 
 50 event-scoped custom dimensions and 50 custom metrics per property. This uses
-6 and 3. `content_group` needs no registration — it is a GA4 built-in.
+6 and 4. `content_group` needs no registration — it is a GA4 built-in.
 
 ## Verifying
 
