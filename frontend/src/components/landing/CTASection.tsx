@@ -40,7 +40,7 @@ export default function CTASection({ onStartTrial, region }: CTASectionProps) {
             </h2>
 
             <p className="text-white/70 text-lg max-w-md mx-auto mb-9">
-              Join 500+ businesses automating conversations with Vyostra AI. Start free, upgrade when you scale.
+              Train it on your site, put it on every channel, and let it answer while you sleep. Start free, upgrade when you scale.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center">

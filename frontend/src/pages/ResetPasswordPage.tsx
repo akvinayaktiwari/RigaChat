@@ -133,7 +133,7 @@ export default function ResetPasswordPage() {
         <AuthHeroPanel
           tagline="AI agents with native CRM"
           features={FEATURE_PILLS}
-          footnote="Trusted by 500+ businesses in India"
+          footnote="Chat, voice and WhatsApp, with a built-in lead CRM"
         />
       </div>
 
