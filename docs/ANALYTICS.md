@@ -29,6 +29,8 @@ nothing while every other signal says the tag is live. That shipped once.
 | `blog_read_progress` | 25 / 50 / 75 / 100 % scrolled | once per milestone per post |
 | `blog_cta_click` | the demo modal opens from a post | `cta_action` says which CTA |
 | `generate_lead` | the backend confirms a contact message | `form: 'contact'`. Fired on confirmed success, never on click: the route rejects a rate-limited submission silently, and answers a honeypot hit with the same success shape a person gets, so a click-fired event would count bots and failures as leads. It carries no name, email or message — PII cannot be removed from a GA4 property afterwards. |
+| `sign_up` | the account is created | `method: 'email'`. After the await resolves, so a duplicate email or a password Cognito rejects is not counted. |
+| `demo_chat_message` | the visitor sends a message in the landing-page demo | `message_index` says how deep the conversation got. The demo opens itself on mount, so a mount event would only repeat the homepage view. The message text is never sent: people type their phone number into demo chats. |
 
 `page_location` is built from origin + path, never `href`: the query string on
 this site carries OAuth codes, Meta redirect state and lead references that
@@ -66,16 +68,16 @@ does not backfill it for the period before registration. Register these in
 
 - `post_slug`, `post_title`, `post_category`, `post_tags`, `post_published_at`,
   `cta_action` — custom **dimensions**
-- `post_age_days`, `reading_minutes`, `percent` — custom **metrics**
+- `post_age_days`, `reading_minutes`, `percent`, `message_index` — custom **metrics**
 
 Content grouping needs nothing: `content_group` is a GA4 built-in.
 
 The copy-paste sheet for that screen is `GA4_CUSTOM_DEFINITIONS.md`.
 
 GA4 allows 50 event-scoped custom dimensions and 50 custom metrics per
-property. This uses 6 and 3.
+property. This uses 6 and 4.
 
-**Mark `generate_lead` as a key event** in **Admin → Events → Key events**, the
+**Mark `generate_lead` and `sign_up` as key events** in **Admin → Events → Key events**, the
 same day it ships. An event that is not marked is invisible to every conversion
 report, and marking is not retroactive for reports built before it. The property
 was created with *Generate leads* as its objective, so until this is marked
