@@ -292,8 +292,10 @@ export default function DemoChat() {
       </div>
 
       <div className="absolute -top-3 -right-3 bg-white rounded-xl px-3 py-2 shadow-lg border border-gray-100 flex items-center gap-2 z-10">
-        <span className="text-green-500 text-xs font-semibold">↑ 94%</span>
-        <span className="text-gray-500 text-xs">resolution rate</span>
+        {/* Was "↑ 94% resolution rate" -- a number nothing in the product
+            measures, floating over a live demo. This says what the demo is. */}
+        <span className="text-green-500 text-xs font-semibold">Live</span>
+        <span className="text-gray-500 text-xs">trained on this site</span>
       </div>
     </div>
   )
