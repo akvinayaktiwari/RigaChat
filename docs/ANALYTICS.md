@@ -28,6 +28,7 @@ nothing while every other signal says the tag is live. That shipped once.
 | `blog_post_view` | a post page mounts | |
 | `blog_read_progress` | 25 / 50 / 75 / 100 % scrolled | once per milestone per post |
 | `blog_cta_click` | the demo modal opens from a post | `cta_action` says which CTA |
+| `generate_lead` | the backend confirms a contact message | `form: 'contact'`. Fired on confirmed success, never on click: the route rejects a rate-limited submission silently, and answers a honeypot hit with the same success shape a person gets, so a click-fired event would count bots and failures as leads. It carries no name, email or message — PII cannot be removed from a GA4 property afterwards. |
 
 `page_location` is built from origin + path, never `href`: the query string on
 this site carries OAuth codes, Meta redirect state and lead references that
@@ -73,6 +74,41 @@ The copy-paste sheet for that screen is `GA4_CUSTOM_DEFINITIONS.md`.
 
 GA4 allows 50 event-scoped custom dimensions and 50 custom metrics per
 property. This uses 6 and 3.
+
+**Mark `generate_lead` as a key event** in **Admin → Events → Key events**, the
+same day it ships. An event that is not marked is invisible to every conversion
+report, and marking is not retroactive for reports built before it. The property
+was created with *Generate leads* as its objective, so until this is marked
+those reports stay empty.
+
+## AI crawlers, which GA4 structurally cannot see
+
+GPTBot, OAI-SearchBot, PerplexityBot, ClaudeBot and Googlebot do not execute
+JavaScript, so they never fire a tag and never appear in GA4 — no matter what
+is added to it. If the content strategy is AI-engine citation, GA4 cannot tell
+you whether it is working.
+
+CloudFront standard logging (v2) is the server-side record:
+
+| Piece | Value |
+| --- | --- |
+| Distribution | `E2ZWB77M7V8J9X` (vyostra.com, www.vyostra.com) |
+| Delivery source | `vyostra-cf-access-logs` (us-east-1 — CloudFront is global) |
+| Destination | `s3://vyostra-cf-logs` (ap-south-1, private, 90-day expiry) |
+| Fields | date, time, c-ip, cs-method, cs(Host), cs-uri-stem, sc-status, cs(User-Agent), cs(Referer), x-edge-result-type |
+
+Read it with `./scripts/ai-crawler-hits.sh` — hits per crawler, and which blog
+URLs they fetched. Logs arrive in batches, so the current hour is always
+incomplete and an empty result means nothing has been delivered yet, which is
+not the same as no crawler having come.
+
+Nothing parses these into a dashboard on purpose. If that is ever wanted, an
+Athena table over the bucket is the next step, not a pipeline.
+
+The delivery is configured through the `logs` delivery API, not the
+distribution's own `Logging` block, so `get-distribution-config` still reports
+`Logging.Enabled: false`. That is expected and not a sign it is off. No deploy
+script calls `update-distribution`, so deploying cannot switch it off.
 
 ## Reading the blog matrix
 
