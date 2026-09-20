@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { trackEvent } from '../../lib/analytics'
 import { ArrowRight, Bot, Mail, RotateCcw } from 'lucide-react'
 import VyostraLogo from '../VyostraLogo'
 
@@ -116,6 +117,10 @@ export default function DemoChat() {
   const [showChips, setShowChips] = useState(true)
   const [inputValue, setInputValue] = useState('')
   const messagesRef = useRef<HTMLDivElement>(null)
+  /* Counts the visitor's own messages, so the event says how far a conversation
+     got rather than only that one happened. A ref, not state: it must not
+     re-render the thread, and resetChat starts the count again. */
+  const sentCount = useRef(0)
 
   useEffect(() => {
     messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight, behavior: 'smooth' })
@@ -137,6 +142,7 @@ export default function DemoChat() {
   }
 
   function resetChat() {
+    sentCount.current = 0
     setMessages([])
     setConversationId(null)
     setIsLoading(false)
@@ -150,6 +156,12 @@ export default function DemoChat() {
     if (!text || isLoading || !conversationId) return
 
     setShowChips(false)
+    // The conversation starts itself on mount, so a mount event would only
+    // repeat the homepage view. A sent message is the visitor actually using
+    // the demo, which is the thing nobody can currently see. The text itself
+    // never goes to GA4: people type their phone number into demo chats.
+    sentCount.current += 1
+    trackEvent('demo_chat_message', { message_index: sentCount.current })
     setMessages((prev) => [...prev, { role: 'user', text }])
     setIsLoading(true)
     setStreamingText('')
