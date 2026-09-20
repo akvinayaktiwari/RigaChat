@@ -38,8 +38,8 @@ describe('landing components in a server render', () => {
 
   it('renders the stats at their real values, not the count-up start of 0', () => {
     const html = renderToString(<StatsBar />).replace(/<!-- -->/g, '')
-    expect(html).toContain('50,000+')
-    expect(html).toContain('500+')
+    expect(html).toContain('$49')
+    expect(html).toContain('24/7')
   })
 
   // The static page and the JSON-LD on it must name the same currency, and the

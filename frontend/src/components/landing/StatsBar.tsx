@@ -12,11 +12,26 @@ interface Stat {
   label: string
 }
 
+/**
+ * What the product IS, not how it has performed.
+ *
+ * This bar used to claim "50,000+ leads captured", "94% resolution rate" and
+ * "500+ businesses live". Production held 181 leads across all three lead
+ * tables and 16 client records, and nothing in the product measures a
+ * resolution rate at all -- the figure had no source to be wrong about. A
+ * traction number on a page built to be quoted by answer engines is a number
+ * that gets quoted, so every value here is instead true by construction:
+ * three channels because three are built, $49 because PRICING_TIERS says so,
+ * one inbox because every channel writes to the same CRM.
+ *
+ * Anything added here must be checkable against the product or the price list.
+ * A performance claim needs a measurement behind it first.
+ */
 const STATS: Stat[] = [
-  { value: 50000, suffix: '+', label: 'Leads captured' },
-  { value: 3, suffix: ' min', label: 'Average setup time' },
-  { value: 94, suffix: '%', label: 'Resolution rate' },
-  { value: 500, suffix: '+', label: 'Businesses live' },
+  { value: 3, label: 'Channels: chat, voice, WhatsApp' },
+  { value: 24, suffix: '/7', label: 'Answering, every day' },
+  { value: 49, prefix: '$', label: 'Plans start at, per month' },
+  { value: 1, label: 'Inbox for every lead' },
 ]
 
 const COUNT_DURATION_MS = 1400

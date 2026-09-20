@@ -31,21 +31,24 @@ describe('StatsBar', () => {
     render(<StatsBar />)
 
     // Final values, on the first paint, with no ticking.
-    expect(screen.getByText('50,000+')).toBeTruthy()
-    expect(screen.getByText('3 min')).toBeTruthy()
-    expect(screen.getByText('94%')).toBeTruthy()
-    expect(screen.getByText('500+')).toBeTruthy()
+    expect(screen.getByText('3')).toBeTruthy()
+    expect(screen.getByText('24/7')).toBeTruthy()
+    expect(screen.getByText('$49')).toBeTruthy()
+    expect(screen.getByText('1')).toBeTruthy()
   })
 
-  it('formats with a thousands separator and keeps the suffix attached', () => {
+  it('keeps the prefix and suffix attached to the counted number', () => {
     setReducedMotion(true)
 
     render(<StatsBar />)
 
-    // 50000 -> "50,000+" not "50000+": the counter owns the formatting, which
-    // is why the stats are stored as value/suffix rather than display strings.
-    expect(screen.queryByText('50000+')).toBeNull()
-    expect(screen.getByText('50,000+')).toBeTruthy()
+    // The counter owns the formatting, which is why a stat is stored as
+    // value/prefix/suffix rather than as a display string: "24/7" has no
+    // single correct parse back into a number to animate.
+    expect(screen.getByText('$49')).toBeTruthy()
+    expect(screen.getByText('24/7')).toBeTruthy()
+    // No current stat reaches four digits, so the thousands separator in
+    // StatValue is unexercised here. It stays for the next stat that needs it.
   })
 
   // Deliberately NOT tested here: "out of view, motion allowed, holds at zero".
