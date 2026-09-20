@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { bootedFromPrerender } from '../../lib/prerender-boot'
-import { ArrowRight, ChevronRight, Star } from 'lucide-react'
+import { ArrowRight, ChevronRight } from 'lucide-react'
 import AuroraCanvas from './AuroraCanvas'
 import DemoChat from './DemoChat'
 import { DURATION, EASE_OUT, EASE_BACK, useStaticMotion } from './motion-primitives'
@@ -10,12 +10,8 @@ interface HeroSectionProps {
   onOpenDemo: () => void
 }
 
-const AVATARS = [
-  { gradient: 'from-violet-500 to-purple-600', initial: 'V' },
-  { gradient: 'from-amber-400 to-orange-500', initial: 'A' },
-  { gradient: 'from-emerald-400 to-teal-500', initial: 'S' },
-  { gradient: 'from-sky-400 to-blue-500', initial: 'M' },
-]
+/** The channels an agent answers on, which is a fact about the build. */
+const CHANNEL_CHIPS = ['Website chat', 'Voice', 'WhatsApp', 'Built-in lead CRM']
 
 export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
   const navigate = useNavigate()
@@ -101,30 +97,19 @@ export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
             </button>
           </motion.div>
 
-          <motion.div {...item} className="flex items-center gap-3">
-            <div className="flex -space-x-2">
-              {AVATARS.map((avatar, i) => (
-                <motion.div
-                  key={avatar.initial}
-                  initial={reduced ? false : { opacity: 0, scale: 0.5 }}
-                  animate={reduced ? undefined : { opacity: 1, scale: 1 }}
-                  transition={{ duration: DURATION.fast, delay: 0.55 + i * 0.07, ease: EASE_BACK }}
-                  className={`w-8 h-8 rounded-full bg-linear-to-br ${avatar.gradient} border-2 border-white flex items-center justify-center text-white text-xs font-bold`}
-                >
-                  {avatar.initial}
-                </motion.div>
-              ))}
-            </div>
-            <div>
-              <div className="flex gap-0.5 mb-0.5">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                ))}
-              </div>
-              <p className="text-xs text-gray-500">
-                Loved by <span className="text-gray-800 font-semibold">500+ businesses</span>
-              </p>
-            </div>
+          {/* A row of stars over invented initials claimed reviews and customers
+              that do not exist -- structured-data.ts deliberately publishes no
+              aggregateRating for the same reason. What replaces it is checkable:
+              these are the channels the product answers on. */}
+          <motion.div {...item} className="flex flex-wrap items-center gap-2">
+            {CHANNEL_CHIPS.map((chip) => (
+              <span
+                key={chip}
+                className="inline-flex items-center rounded-full border border-gray-200 bg-white/70 px-3 py-1 text-xs font-semibold text-gray-600"
+              >
+                {chip}
+              </span>
+            ))}
           </motion.div>
         </motion.div>
 
