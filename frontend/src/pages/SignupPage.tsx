@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { trackEvent } from '../lib/analytics'
 import { AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import AuthHeroPanel from '../components/auth/AuthHeroPanel'
@@ -107,6 +108,10 @@ export default function SignupPage() {
     setLoading(true)
     try {
       await signUp(name.trim(), email.trim(), password)
+      // After the account exists, not on submit: a rejected signup (duplicate
+      // email, weak password) must not count as one. No email or name in the
+      // event.
+      trackEvent('sign_up', { method: 'email' })
       navigate(`/verify-email?email=${encodeURIComponent(email.trim())}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign up failed. Please try again.')
