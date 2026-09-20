@@ -5,6 +5,7 @@ import Footer from '../components/landing/Footer'
 import PageMeta from '../components/seo/PageMeta'
 import DemoModal from '../components/landing/modals/DemoModal'
 import { submitContactMessage } from '../services/api'
+import { trackEvent } from '../lib/analytics'
 
 interface ContactFormState {
   name: string
@@ -20,6 +21,9 @@ interface ContactFormState {
 type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error'
 
 const EMPTY_FORM: ContactFormState = { name: '', email: '', subject: '', message: '', company: '' }
+
+/** Mirrors HONEYPOT_DROPPED_MESSAGE_ID in backend/src/services/contact-service.ts. */
+const HONEYPOT_DROPPED_MESSAGE_ID = 'dropped'
 
 const GENERIC_ERROR = 'Could not send your message. Please try again, or email us directly.'
 
@@ -52,6 +56,17 @@ export default function Contact() {
         setErrorMessage(response.error ?? GENERIC_ERROR)
         setStatus('error')
         return
+      }
+
+      // Fired here, not on click: the route rejects silently on its honeypot
+      // and its rate limit, and a click-fired conversion would count both as
+      // leads. The honeypot answers with this messageId (see
+      // backend/src/services/contact-service.ts) so a bot cannot tell it was
+      // caught -- which means the bot inflates the conversion count unless we
+      // check for it. No name, email or message goes into the event: PII
+      // cannot be deleted from a GA4 property afterwards.
+      if (response.data?.messageId !== HONEYPOT_DROPPED_MESSAGE_ID) {
+        trackEvent('generate_lead', { form: 'contact' })
       }
 
       setForm(EMPTY_FORM)

@@ -125,6 +125,15 @@ async function notify(record: ContactMessage): Promise<boolean> {
   }
 }
 
+/**
+ * messageId returned for a submission the honeypot dropped.
+ *
+ * A bot must not be able to tell it was caught, so the response is otherwise
+ * identical to a real one. The frontend reads this to avoid counting a bot as
+ * a converted lead; frontend/src/pages/Contact.tsx pins the same string.
+ */
+export const HONEYPOT_DROPPED_MESSAGE_ID = 'dropped'
+
 export async function submitContactMessage(
   input: SubmitContactMessageInput,
   sourceIp: string
@@ -134,7 +143,7 @@ export async function submitContactMessage(
   // record written and no email sent.
   if (input.company && input.company.trim()) {
     console.warn(`Contact submission dropped (honeypot filled) from ip ${sourceIp}`)
-    return { messageId: 'dropped', createdAt: new Date().toISOString() }
+    return { messageId: HONEYPOT_DROPPED_MESSAGE_ID, createdAt: new Date().toISOString() }
   }
 
   const fields = validate(input)
