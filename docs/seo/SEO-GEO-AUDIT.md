@@ -1,6 +1,12 @@
 # Vyostra AI — SEO + GEO Audit
 
 **Site:** https://vyostra.com · **Audited:** 2026-09-15 · **Mode:** audit only, no code changed
+
+> **Superseded.** This was audited before the site was prerendered, which is why
+> the GEO score below is 6/100. Prerendering, sitemap, robots and schema all
+> landed afterwards. For the current picture read
+> [`GEO-AUDIT-2026-09-19.md`](./GEO-AUDIT-2026-09-19.md) and its Status section;
+> this file is kept as the record of where the site started.
 **Supporting research:** [`research/keyword-clusters.md`](research/keyword-clusters.md) · [`research/brand-and-competitors.md`](research/brand-and-competitors.md)
 
 **How the evidence was gathered**
