@@ -22,6 +22,9 @@ Generated: 2026-07-20, at commit `c0fe817` on `main`.
 | [SECURITY.md](./SECURITY.md) | Dual-Cognito-pool isolation, CORS anti-leakage design, KMS use, and one unverified cold-start risk |
 | [INFRASTRUCTURE.md](./INFRASTRUCTURE.md) | Real AWS resource identifiers found in-repo; EC2 voice-relay ops config marked TODO (not in-repo) |
 | [CHALLENGES.md](./CHALLENGES.md) | Root cause + fix + commit hash, mined from `git log` and code comments |
+| [seo/GEO-AUDIT-2026-09-19.md](./seo/GEO-AUDIT-2026-09-19.md) | The current SEO/GEO audit, plus a Status section listing what shipped and the measured before/after |
+| [seo/GEO-FIX-PLAN.md](./seo/GEO-FIX-PLAN.md) | The remaining work from that audit, and what each item is blocked on |
+| [ANALYTICS.md](./ANALYTICS.md) | What the marketing site measures: page views, the three conversion events, and the CloudFront logs GA4 cannot replace |
 | [STATUS.md](./STATUS.md) | Real branch state as of generation time — 31 branches, 1 unmerged |
 
 ## How to keep this from rotting

@@ -126,6 +126,19 @@ these as columns:
 - `post_age_days` — a post still earning views at 90+ days is search traffic;
   one that spiked and died was a launch, not an asset.
 
+## Still open
+
+Known gaps, in the order they are worth closing. None is a bug; each is a
+decision or a piece of work nobody has done yet.
+
+| Gap | Why it matters |
+| --- | --- |
+| No `purchase` event | The property reports in USD, the site advertises $49, and Razorpay charges INR for UPI plans. Sending a raw amount with the wrong `currency` makes GA4 convert it and misreport revenue by roughly 85x. Send the real charged amount with its real currency code, or do not send `purchase` at all. |
+| No consent banner | `initAnalytics()` denies all three ad signals but grants `analytics_storage`. Better than stock GA4, still not EEA-compliant. Content targets India and the UAE, so EEA traffic is incidental: a real risk, not an emergency. The fix is to default it denied, update on accept, persist the choice, and keep the banner out of the dashboard shell. |
+| Search Console link unconfirmed | Verification and the GA4 link may be done; the **Reports → Library → Search Console → Publish** step almost certainly is not, and that is the one that makes people think the link failed. This is the only source of query-level data, which is the whole point of the India/UAE content push. |
+| No UTM convention | Campaign and blog traffic is unattributed. |
+| Dashboard product analytics | `/dashboard` is excluded on purpose and should stay that way. When product usage needs measuring it is PostHog or a second property, and it is its own piece of work. Do not solve it by deleting a line from `UNTRACKED_PREFIXES`. |
+
 ## Verifying a change
 
 Realtime, not the standard reports: those lag 24–48 hours, which has already
