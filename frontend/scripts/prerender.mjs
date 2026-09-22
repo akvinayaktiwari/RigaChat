@@ -8,6 +8,7 @@
  *
  * Emits:
  *   dist/index.html (the homepage) and dist/app-shell.html (the empty SPA shell)
+ *   dist/404.html (the S3 website ErrorDocument)
  *   dist/blog/index.html
  *   dist/blog/<slug>/index.html
  *   dist/privacy-policy/index.html, dist/terms-of-service/index.html
@@ -24,6 +25,9 @@ const ssrOutDir = path.join(root, '.prerender-ssr')
 
 /** Served by the CloudFront function for client-rendered routes. Keep in step with deploy/cloudfront/viewer-request.js. */
 const APP_SHELL_FILE = 'app-shell.html'
+
+/** Served by S3 as the bucket's website ErrorDocument. Set it with scripts/set-s3-error-document.sh. */
+const NOT_FOUND_FILE = '404.html'
 
 /** Injects rendered markup and head tags into the built index.html shell. */
 function composePage(template, { html, head }) {
@@ -98,8 +102,18 @@ async function main() {
   })
 
   const entryPath = path.join(ssrOutDir, 'prerender-entry.mjs')
-  const { renderRoute, getRoutes, getCrawlFiles, SITE_URL } = await import(pathToFileURL(entryPath).href)
+  const { renderRoute, getRoutes, getCrawlFiles, SITE_URL, NOT_FOUND_RENDER_PATH } = await import(
+    pathToFileURL(entryPath).href
+  )
   assertPublicOrigin(SITE_URL)
+
+  // The S3 website ErrorDocument. A flat file, not a directory index: S3 names
+  // one key and serves it verbatim, keeping the real 404 status. Without it the
+  // ErrorDocument is dist/index.html, so a missing asset answers with the whole
+  // homepage -- a 404 that looks like a working page to anyone reading the body.
+  const notFound = await renderRoute(NOT_FOUND_RENDER_PATH)
+  await writeFile(path.join(distDir, NOT_FOUND_FILE), composePage(template, notFound), 'utf-8')
+  console.log(`[prerender] not-found -> dist/${NOT_FOUND_FILE}`)
 
   for (const [fileName, contents] of Object.entries(getCrawlFiles())) {
     await writeFile(path.join(distDir, fileName), contents, 'utf-8')

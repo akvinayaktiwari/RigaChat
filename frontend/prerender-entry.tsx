@@ -19,11 +19,20 @@ import { SubscriptionProvider } from './src/hooks/useSubscription'
 import BlogPost from './src/pages/BlogPost'
 import Privacy from './src/pages/Privacy'
 import Terms from './src/pages/Terms'
+import NotFound from './src/pages/NotFound'
 import { getAllPosts, getAllSlugs } from './src/content/blog/registry'
 import { PRERENDERED_STATIC_ROUTES, buildRobotsTxt, buildSitemapXml, sitemapEntries } from './src/lib/crawl-files'
 import { SITE_URL } from './src/lib/site'
 
 export { SITE_URL }
+
+/**
+ * The URL rendered into dist/404.html. It matches no route above, so it falls
+ * through to the catch-all and renders the same NotFound page a visitor gets
+ * client-side. The path itself never appears anywhere -- only the output file
+ * does, and S3 serves that as the website ErrorDocument.
+ */
+export const NOT_FOUND_RENDER_PATH = '/__not-found__'
 
 /**
  * SSR entry used only at build time by scripts/prerender.mjs.
@@ -78,6 +87,7 @@ export async function renderRoute(url: string): Promise<{ html: string; head: st
               <Route path="/blog/:slug" element={<BlogPost />} />
               <Route path="/privacy-policy" element={<Privacy />} />
               <Route path="/terms-of-service" element={<Terms />} />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </StaticRouter>
         </SubscriptionProvider>
