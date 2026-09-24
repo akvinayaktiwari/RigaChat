@@ -1674,7 +1674,19 @@ End-to-end verified the same day against real infra: a submission wrote a real r
 **Priority:** resolved
 **Depends on:** nothing further
 
-### Editing a knowledge base entry doesn't invalidate the 7-day answer cache
+### [RESOLVED 2026-09-24] Editing a knowledge base entry doesn't invalidate the 7-day answer cache
+
+**Resolved:** answer keys are now `ans:<botId>:<generation>:<hash>`, and every KB create,
+update, delete and file-index completion writes a fresh `kbgen:<botId>`. A random token,
+NOT the `INCR` counter proposed below: `incr()` sets its TTL only on first write, so an
+expired counter restarts at 0 and climbs back into generations whose answers are still
+cached. The token's TTL equals `ANSWER_TTL` and is refreshed on each bump, so lapsing back
+to the default generation can never resurface a live pre-edit answer. Cost is one extra
+Redis GET per cached-answer read. Residuals: (1) a chat that reads the new generation
+before Pinecone has propagated the new chunks (30-60s) caches a stale answer under it;
+(2) the Pinecone semantic answer cache (`saveToCache`) is a second layer this does not
+touch; (3) website re-crawls and a cross-channel Agent's voice-KB edits do not bump the
+bot's generation. Original note:
 
 **What:** `redis-repository.ts` caches chat answers under `ans:<botId>:<hash of exact question text>` with `ANSWER_TTL = 7 days` (line 11). Nothing in the KB write path clears it. So after a client corrects a knowledge base entry, every question already asked keeps returning the **pre-edit answer for up to a week**, even though Pinecone now holds the corrected text. `runSuggestionPrewarm()` masks this for the ~10 questions it regenerates, which is why it isn't obvious.
 
