@@ -3,6 +3,7 @@ import { crawlPagesParallel, chunkWithContext, chunkFacts, extractSupportEmail }
 import { extractPageFacts, generateEmbeddingsBatch } from './openai-service.js'
 import { indexKnowledgeBaseEntry } from './rag-service.js'
 import { upsertChunks } from '../repositories/vector-repository.js'
+import { invalidateCachedAnswers } from './kb-service.js'
 import {
   claimCrawlerJob,
   getPublicBotConfig,
@@ -298,6 +299,7 @@ async function processKBFileJob(job: KBFileCrawlerJobMessage): Promise<void> {
     } catch (error) {
       throw new Error(`embed/upsert stage failed: ${error instanceof Error ? error.message : String(error)}`)
     }
+    await invalidateCachedAnswers(job.botId)
 
     await updateKBIndexingStatus(job.botId, job.entryId, {
       indexingStatus: 'complete',

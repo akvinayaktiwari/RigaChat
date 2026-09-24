@@ -2,9 +2,8 @@
  * One-off: drop a single cached chat answer for a bot.
  *
  * The answer cache is keyed by a hash of the exact question text with a 7-day
- * TTL, and editing a knowledge base entry does not invalidate it. After
- * correcting a bot's KB, any question already asked keeps returning the
- * pre-edit answer until it expires. This clears a known one by its exact text.
+ * TTL. KB writes now invalidate a bot's whole cache (bumpAnswerCacheGeneration),
+ * so this is only for dropping one known-bad answer without touching the KB.
  */
 import 'dotenv/config'
 import { deleteCachedAnswer } from '../src/repositories/redis-repository.js'

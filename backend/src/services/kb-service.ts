@@ -9,6 +9,7 @@ import {
 } from '../repositories/kb-repository.js'
 import { indexKnowledgeBaseEntry } from './rag-service.js'
 import { deleteChunksByEntryId } from '../repositories/vector-repository.js'
+import { bumpAnswerCacheGeneration } from '../repositories/redis-repository.js'
 import { checkEntitlement } from './entitlement-service.js'
 import { getBotConfig } from './bot-service.js'
 import { deleteObject, generatePresignedUploadUrl } from '../lib/s3.js'
@@ -127,6 +128,21 @@ export async function confirmKBUpload(input: ConfirmKBUploadInput): Promise<Know
   return entry
 }
 
+// Every KB write changes what the bot should answer, so the bot's cached
+// answers must stop being served -- otherwise a question already asked keeps
+// its pre-edit answer for up to ANSWER_TTL (7 days), and editing an entry is
+// exactly what a client does when the bot said something wrong.
+//
+// Log-don't-fail: by the time this runs the entry and its vectors are already
+// written, so throwing would report a failed edit that actually landed.
+export async function invalidateCachedAnswers(botId: string): Promise<void> {
+  try {
+    await bumpAnswerCacheGeneration(botId)
+  } catch (error) {
+    console.error(`Failed to invalidate cached answers for bot ${botId}:`, error)
+  }
+}
+
 export async function addKBEntry(input: CreateKBEntryInput): Promise<KnowledgeBaseEntry> {
   // Called before the try block below on purpose — that block rewraps every
   // error into a generic Error, which would strip EntitlementError's type
@@ -142,6 +158,7 @@ export async function addKBEntry(input: CreateKBEntryInput): Promise<KnowledgeBa
     })
 
     await indexKnowledgeBaseEntry(input.botId, entry.entryId, entry.title, entry.content)
+    await invalidateCachedAnswers(input.botId)
 
     return entry
   } catch (error) {
@@ -191,6 +208,7 @@ export async function updateKBEntry(
     // sourceUrl, so other entries in the namespace are untouched.
     await deleteChunksByEntryId(botId, entryId)
     await indexKnowledgeBaseEntry(botId, entryId, entry.title, entry.content)
+    await invalidateCachedAnswers(botId)
     return entry
   } catch (error) {
     throw new Error(
@@ -229,6 +247,9 @@ export async function removeKBEntry(botId: string, entryId: string, clientId: st
   // would keep surfacing in RAG results for a bot whose KB entry no longer
   // exists -- a correctness problem, unlike the S3 cleanup above.
   await deleteChunksByEntryId(botId, entryId)
+  // Right after the vectors go, not after the row: the vectors are what the bot
+  // answers from, so even if the row delete below fails the answers changed.
+  await invalidateCachedAnswers(botId)
 
   try {
     await deleteKBEntry(botId, entryId)

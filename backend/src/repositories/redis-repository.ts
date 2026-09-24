@@ -1,4 +1,4 @@
-import { createHash } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 import { getRedisProvider } from '../providers/redis/redis-provider.factory.js'
 import {
   CONTACT_RATE_LIMIT_SECONDS,
@@ -47,19 +47,44 @@ export async function setCachedEmbedding(
   }
 }
 
+// A bot's answer cache is addressed through a generation token, so a KB write
+// can invalidate every cached answer for that bot with one SET instead of a
+// pattern delete (RedisProvider has no scan). Old keys are orphaned and age out
+// on ANSWER_TTL.
+//
+// A random token, not an INCR counter: incr() only sets its TTL on the first
+// write, so a counter that expired would restart at 0 and count back up into
+// generations whose answers are still cached -- serving pre-edit answers again.
+// A token never repeats. Its TTL matches ANSWER_TTL and is refreshed on every
+// bump, so by the time it lapses back to the default, every answer written
+// under that default before the bump has expired too.
+const DEFAULT_ANSWER_GENERATION = '0'
+
+async function getAnswerCacheGeneration(botId: string): Promise<string> {
+  const redis = getRedisProvider()
+  return (await redis.get(`kbgen:${botId}`)) ?? DEFAULT_ANSWER_GENERATION
+}
+
+async function answerKey(text: string, botId: string): Promise<string> {
+  const generation = await getAnswerCacheGeneration(botId)
+  return `ans:${botId}:${generation}:${hashText(text)}`
+}
+
 export async function getCachedAnswer(
   text: string,
   botId: string
 ): Promise<string | null> {
   try {
     const redis = getRedisProvider()
-    const key = `ans:${botId}:${hashText(text)}`
-    return await redis.get(key)
+    return await redis.get(await answerKey(text, botId))
   } catch {
     return null
   }
 }
 
+// If the generation read fails, the whole write is skipped rather than falling
+// back to the default generation -- an answer cached under the wrong generation
+// is exactly the stale read this scheme exists to prevent.
 export async function setCachedAnswer(
   text: string,
   botId: string,
@@ -67,7 +92,7 @@ export async function setCachedAnswer(
 ): Promise<void> {
   try {
     const redis = getRedisProvider()
-    const key = `ans:${botId}:${hashText(text)}`
+    const key = await answerKey(text, botId)
     await redis.set(key, answer, ANSWER_TTL)
     console.log(`Redis answer cached: ${key}`)
   } catch (err) {
@@ -81,11 +106,17 @@ export async function deleteCachedAnswer(
 ): Promise<void> {
   try {
     const redis = getRedisProvider()
-    const key = `ans:${botId}:${hashText(text)}`
-    await redis.delete(key)
+    await redis.delete(await answerKey(text, botId))
   } catch (err) {
     console.error('Failed to delete cached answer:', err)
   }
+}
+
+// Throws on a Redis error: the caller decides whether a KB write should fail
+// because its cached answers could not be invalidated.
+export async function bumpAnswerCacheGeneration(botId: string): Promise<void> {
+  const redis = getRedisProvider()
+  await redis.set(`kbgen:${botId}`, randomUUID(), ANSWER_TTL)
 }
 
 export async function getCachedEntitlements(accountId: string): Promise<Entitlements | null> {
