@@ -126,6 +126,7 @@ const publishedBundle = {
   journey: { ...journey, botId: 'bot-1', clientId: 'client-1' },
   agent,
   status: 'published' as const,
+  updatedAt: '2026-09-24T10:00:00.000Z',
 }
 
 describe('createJourneyBundle — isPrebuiltTemplate is server-controlled', () => {
@@ -320,9 +321,9 @@ describe('publishJourneyBundle — ordering is what keeps AWS clean', () => {
         compiledStateMachineVersionArn: 'arn:aws:states:ap-south-1:1:stateMachine:sm:1',
         publishedVersion: 1,
       },
-      // The status this call read: the write is conditional on the bundle not
-      // having moved underneath it (see the pause/publish race tests below).
-      'draft'
+      // The status and updatedAt this call read: the write is conditional on
+      // the bundle not having moved underneath it (see the race tests below).
+      { status: 'draft', updatedAt: '2026-09-24T10:00:00.000Z' }
     )
   })
 
@@ -491,7 +492,29 @@ describe('pauseJourneyBundle', () => {
     expect(releaseJourneyTrigger).toHaveBeenCalledWith('agent:agent-1#lead_captured', 'bundle-1')
     // The 4th argument is the guard, not decoration: it makes the write
     // conditional on the bundle still being published.
-    expect(updateJourneyBundleRepo).toHaveBeenCalledWith('bot-1', 'bundle-1', { status: 'paused' }, 'published')
+    expect(updateJourneyBundleRepo).toHaveBeenCalledWith(
+      'bot-1',
+      'bundle-1',
+      { status: 'paused' },
+      { status: 'published', updatedAt: '2026-09-24T10:00:00.000Z' }
+    )
+  })
+
+  // REGRESSION (ABA). A status-only guard let a stale pause land after a
+  // concurrent pause + resume had taken the bundle back to 'published': the
+  // stale pause had already released the OLD claim, so the bundle ended paused
+  // while holding the NEW one, blocking every other journey on that trigger.
+  // Pinning the updatedAt it read is what makes the intervening round trip
+  // visible to the conditional write.
+  it('guards the pause write with the updatedAt it read, not just the status', async () => {
+    getJourneyBundleById.mockResolvedValue({ ...publishedBundle, updatedAt: '2026-09-24T11:30:00.000Z' })
+
+    await pauseJourneyBundle('bot-1', 'bundle-1', 'client-1')
+
+    expect(updateJourneyBundleRepo.mock.calls[0]?.[3]).toEqual({
+      status: 'published',
+      updatedAt: '2026-09-24T11:30:00.000Z',
+    })
   })
 
   // REGRESSION (ship review + Codex, both independently). Pause and publish are
@@ -625,7 +648,7 @@ describe('pauseJourneyBundle', () => {
       'bot-1',
       'bundle-1',
       expect.objectContaining({ status: 'published' }),
-      'paused'
+      { status: 'paused', updatedAt: '2026-09-24T10:00:00.000Z' }
     )
   })
 

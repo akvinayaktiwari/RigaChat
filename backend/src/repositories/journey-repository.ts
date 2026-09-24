@@ -19,6 +19,16 @@ export class JourneyBundleStateConflictError extends Error {
   }
 }
 
+// What a status transition read before deciding to move the bundle. Status
+// alone admits an ABA race: pause A reads published, a concurrent pause and
+// resume take it paused -> published, and A's stale 'published' condition
+// still matches. updatedAt changes on every write, so pinning it too means any
+// intervening write invalidates the stale transition.
+export interface JourneyBundleTransitionGuard {
+  readonly status: JourneyBundleStatus
+  readonly updatedAt: string
+}
+
 export async function createJourneyBundle(
   data: Omit<JourneyBundle, 'bundleId' | 'createdAt' | 'updatedAt'>
 ): Promise<JourneyBundle> {
@@ -92,9 +102,10 @@ export async function updateJourneyBundle(
   // Without it this is an UpdateCommand with no condition, which in DynamoDB is
   // an upsert: a caller racing a delete resurrects a ghost row carrying only the
   // keys it wrote. Callers that are moving a bundle from one state to another
-  // pass the state they read, so losing the race fails loudly instead of
+  // pass the status AND updatedAt they read, so losing the race -- including to
+  // a round trip that ends on the same status -- fails loudly instead of
   // writing a status that contradicts what the rest of the record says.
-  expectedStatus?: JourneyBundleStatus
+  guard?: JourneyBundleTransitionGuard
 ): Promise<JourneyBundle> {
   const now = new Date().toISOString()
   const fields: Record<string, unknown> = { ...updates, updatedAt: now }
@@ -117,16 +128,23 @@ export async function updateJourneyBundle(
         UpdateExpression: `SET ${updateExpressionParts.join(', ')}`,
         ExpressionAttributeNames: expressionAttributeNames,
         ExpressionAttributeValues: expressionAttributeValues,
-        ...(expectedStatus
+        ...(guard
           ? {
               // attribute_exists(bundleId) is what stops the upsert; the status
-              // equality is what stops a stale transition landing on a bundle
-              // someone else already moved.
-              ConditionExpression: 'attribute_exists(bundleId) AND #expectedStatusAttr = :expectedStatus',
-              ExpressionAttributeNames: { ...expressionAttributeNames, '#expectedStatusAttr': 'status' },
+              // and updatedAt equalities are what stop a stale transition
+              // landing on a bundle someone else already moved, even one they
+              // moved back.
+              ConditionExpression:
+                'attribute_exists(bundleId) AND #expectedStatusAttr = :expectedStatus AND #expectedUpdatedAtAttr = :expectedUpdatedAt',
+              ExpressionAttributeNames: {
+                ...expressionAttributeNames,
+                '#expectedStatusAttr': 'status',
+                '#expectedUpdatedAtAttr': 'updatedAt',
+              },
               ExpressionAttributeValues: {
                 ...expressionAttributeValues,
-                ':expectedStatus': expectedStatus,
+                ':expectedStatus': guard.status,
+                ':expectedUpdatedAt': guard.updatedAt,
               },
             }
           : {}),
@@ -136,7 +154,7 @@ export async function updateJourneyBundle(
     return result.Attributes as JourneyBundle
   } catch (error) {
     if (error instanceof Error && error.name === 'ConditionalCheckFailedException') {
-      throw new JourneyBundleStateConflictError(bundleId, expectedStatus as JourneyBundleStatus)
+      throw new JourneyBundleStateConflictError(bundleId, guard?.status as JourneyBundleStatus)
     }
     throw new Error(`Failed to update Journey bundle ${bundleId}: ${error instanceof Error ? error.message : String(error)}`)
   }

@@ -757,7 +757,12 @@ now conditional on the status the caller read, and a lost publish no longer dele
 a concurrent publish's shared claim). These two survive, and both need a design
 change rather than another conditional.
 
-**Guard the pause transition with a revision, not just a status.** A status-only
+**[RESOLVED 2026-09-24] Guard the pause transition with a revision, not just a status.**
+**Resolved:** both transition writes now pass `{ status, updatedAt }` as read, and
+`updateJourneyBundle` conditions on both, so an intervening pause + resume fails the
+stale write as a conflict. `updatedAt` rather than a new revision counter because every
+existing row already carries it -- no backfill. Residual: two writes stamped in the same
+millisecond would still collide. Original note: A status-only
 condition admits an ABA race: pause A reads `published` and releases the claim,
 pause B writes `paused`, a resume re-claims the trigger and writes `published`, then
 pause A's stale condition still matches and succeeds. Pause A already released the

@@ -343,7 +343,17 @@ export async function pauseJourneyBundle(botId: string, bundleId: string, client
   const claimKey = triggerClaimKey({ agentId: existing.agentId, botId }, existing.journey.triggerType)
 
   try {
-    return await updateJourneyBundleRepo(botId, bundleId, { status: 'paused' }, 'published')
+    // Pinned to the updatedAt this call read, not just the status: a concurrent
+    // pause + resume can take the bundle round to 'published' again, and a
+    // status-only guard would then let this stale pause land -- after it had
+    // already released the OLD claim, leaving a paused bundle holding the NEW
+    // one and blocking every other journey on that trigger.
+    return await updateJourneyBundleRepo(
+      botId,
+      bundleId,
+      { status: 'paused' },
+      { status: 'published', updatedAt: existing.updatedAt }
+    )
   } catch (error) {
     if (error instanceof JourneyBundleStateConflictError) {
       // Someone else moved this bundle first (a republish, an edit, a delete).
@@ -461,7 +471,7 @@ export async function publishJourneyBundle(botId: string, bundleId: string, clie
         // editing -- verified live on 2026-08-06 (record said 2, arn said :1).
         publishedVersion: published.version,
       },
-      existing.status
+      { status: existing.status, updatedAt: existing.updatedAt }
     )
   } catch (error) {
     if (error instanceof JourneyBundleStateConflictError) {
