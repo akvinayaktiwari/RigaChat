@@ -776,7 +776,13 @@ transition sites in `backend/src/services/journey-service.ts`.
 **Priority:** P1
 **Effort:** S (~half a day)
 
-**Don't re-claim on an ambiguous write failure.** `pauseJourneyBundle` restores the
+**[RESOLVED 2026-09-24] Don't re-claim on an ambiguous write failure.**
+**Resolved:** `restoreClaimIfPauseDidNotLand` reads the bundle back and restores the claim
+only if it is still `published` with the `updatedAt` the pause read. A paused or deleted
+bundle keeps no claim. If the read-back fails too it restores anyway: a stuck claim is
+visible and undone by resuming, a published bundle with no claim drops leads silently.
+Not a `TransactWriteItems` -- the claim table's own condition logic would have to move
+into the transaction. Original note: `pauseJourneyBundle` restores the
 trigger claim when the status write throws a non-conflict error, so a failed pause is
 a no-op rather than a silent outage. But a DynamoDB timeout is ambiguous: the write
 may have committed `paused` and only the response was lost. In that case the

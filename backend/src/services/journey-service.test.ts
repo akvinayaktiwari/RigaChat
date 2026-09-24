@@ -666,6 +666,39 @@ describe('pauseJourneyBundle', () => {
     })
   })
 
+  // REGRESSION. A timeout is ambiguous: the paused write may have committed
+  // and only the response was lost. Restoring then handed the trigger to a
+  // bundle ignition refuses to run, blocking every other journey on it.
+  it('does NOT restore the claim when the failed write actually landed paused', async () => {
+    getJourneyBundleById
+      .mockResolvedValueOnce(publishedBundle)
+      .mockResolvedValueOnce({ ...publishedBundle, status: 'paused', updatedAt: '2026-09-24T10:00:05.000Z' })
+    updateJourneyBundleRepo.mockRejectedValue(new Error('socket timeout'))
+
+    await expect(pauseJourneyBundle('bot-1', 'bundle-1', 'client-1')).rejects.toThrow('socket timeout')
+    expect(claimJourneyTrigger).not.toHaveBeenCalled()
+  })
+
+  it('does NOT restore the claim when the bundle was deleted meanwhile', async () => {
+    getJourneyBundleById.mockResolvedValueOnce(publishedBundle).mockResolvedValueOnce(null)
+    updateJourneyBundleRepo.mockRejectedValue(new Error('socket timeout'))
+
+    await expect(pauseJourneyBundle('bot-1', 'bundle-1', 'client-1')).rejects.toThrow('socket timeout')
+    expect(claimJourneyTrigger).not.toHaveBeenCalled()
+  })
+
+  // Unknown state: a stuck claim is visible and undone by resuming, a
+  // published bundle with no claim drops leads silently, so lean to restoring.
+  it('restores the claim when the read-back fails too', async () => {
+    getJourneyBundleById
+      .mockResolvedValueOnce(publishedBundle)
+      .mockRejectedValueOnce(new Error('DynamoDB unavailable'))
+    updateJourneyBundleRepo.mockRejectedValue(new Error('DynamoDB unavailable'))
+
+    await expect(pauseJourneyBundle('bot-1', 'bundle-1', 'client-1')).rejects.toThrow('DynamoDB unavailable')
+    expect(claimJourneyTrigger).toHaveBeenCalledTimes(1)
+  })
+
   // A conflict means someone else legitimately owns the trigger now; putting
   // the claim back would steal it, or resurrect it for a deleted bundle.
   it('does NOT restore the claim when the write lost to another writer', async () => {
