@@ -1,5 +1,36 @@
 # TODOS
 
+## Form-lead alerts say "Not provided" for name and phone on every form lead
+
+**What:** `captureFormLead` (`backend/src/services/form-lead-service.ts`) picks the lead's name
+and phone for `sendLeadNotification` by searching the **keys** of `customFields` for `name` /
+`phone`. But form leads are keyed by `fieldId` UUIDs — `frontend/public/form-widget.js` sends
+`customFields[field.fieldId]`, and so does the Aspire Uru site integration — so the search never
+matches. Every website-form lead therefore produces:
+
+- a WhatsApp lead alert with `Name: Not provided` and `Phone: Not provided`, and an interest
+  line that reads `3f1c…-uuid: Asha · 9b2e…-uuid: +91 98450 12345`;
+- a mobile push titled just "New lead", with the same UUID soup as its body.
+
+The lead itself is stored correctly, and the dashboard shows it with labels. Only the alert is
+unreadable, and the alert is the part a client acts on in the moment.
+
+**Found:** 2026-09-25 while wiring the Aspire Uru site-visit form to Forms (AspireURU
+`docs/vyostra-lead-contract.md`). Affects every client using a website form, not just Aspire Uru.
+
+**Fix:** the first line of `captureFormLead` already fetches the form
+(`await getPublicConfig(input.formId)`) and discards it. Keep it, then:
+1. Build `fieldId -> field` from `form.fields`, and turn `customFields` into
+   `[{ label, type, value }]`.
+2. Pick **phone** by `field.type === 'phone'` (fall back to a label containing phone/mobile),
+   **name** by a label containing `name`.
+3. Build the summary line from labels: `Name: Asha · Phone: +91… · Interested in: Type A`,
+   ideally leaving out the name and phone already shown on their own rows.
+4. Keep the old key-based pick as the fallback for hand-crafted bodies keyed by label.
+Test: a form lead keyed by UUID fieldIds yields a notification with the real name and phone.
+
+**Depends on:** None. Small, contained to `form-lead-service.ts` plus a test.
+
 ## Identity join reads every lead a client owns, on every inbound message
 
 **What:** `findLeadByPhone` calls `getLeadsForClient(clientId)`, an unpaginated
