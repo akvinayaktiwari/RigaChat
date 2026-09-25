@@ -1,6 +1,10 @@
 # TODOS
 
-## Form-lead alerts say "Not provided" for name and phone on every form lead
+## [RESOLVED 2026-09-25] Form-lead alerts said "Not provided" for name and phone on every form lead
+
+**Resolved:** `captureFormLead` now keeps the form config and `summariseFormLead` resolves
+fieldIds to labels before picking name (label) and phone (field type, then label). Regression
+test: `backend/src/services/form-lead-service.test.ts` (fails on the old code).
 
 **What:** `captureFormLead` (`backend/src/services/form-lead-service.ts`) picks the lead's name
 and phone for `sendLeadNotification` by searching the **keys** of `customFields` for `name` /
