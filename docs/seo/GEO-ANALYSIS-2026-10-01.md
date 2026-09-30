@@ -2,7 +2,9 @@
 
 Method: live `curl` of robots.txt, llms.txt, sitemap and the homepage fetched as `OAI-SearchBot` (no JS executed). Baseline: `GEO-AUDIT-2026-09-19.md` (63/100). Not measured: rankings, actual AI citations, Wikipedia/Reddit/YouTube presence (no DataForSEO/Ahrefs access this run).
 
-## GEO Readiness Score: ~68 / 100 (estimate)
+## GEO Readiness Score: ~70 / 100 (estimate)
+
+Corrected: this headline first read 68, which did not match the criteria table below (17+17+8+12+16 = 70). After the three voice agent posts went live the same day, the estimate is ~73 (citability 19, authority 13).
 
 The 09-19 audit was never formally re-scored. This estimate credits the shipped fixes (question H2s, "What is Vyostra AI?" block, breadcrumb/WebPage schema, internal links, Person schema). It is held down by the same constraint as before: only **2 blog posts** and no off-site entity presence.
 
@@ -51,7 +53,7 @@ Pass. Fetched without JS, the homepage returns 106 KB of HTML with the H1, 10 H2
 2. **Founder entity links.** The two `Person` nodes have no `sameAs`; the Organization has only company LinkedIn. Add founder LinkedIn URLs plus a credential line on `/about-us/`. Blocked on founder inputs.
 3. **Off-site mentions.** YouTube (strongest correlate, ~0.74) and Reddit are absent. A short product walkthrough on YouTube and genuine answers in r/realestateindia-type threads beat any on-page tweak.
 4. **`dateModified` + refresh cadence.** Content under 3 months old is cited far more; set a 60-90 day refresh on both posts and the feature pages, and expose `dateModified` in schema.
-5. **Measure real citations.** No baseline exists. Run a fixed set of 20 novel prompts monthly across ChatGPT, Perplexity and AI Mode and log whether vyostra.com is cited. Without it, the 68 is a guess.
+5. **Measure real citations.** No baseline exists. Run a fixed set of 20 novel prompts monthly across ChatGPT, Perplexity and AI Mode and log whether vyostra.com is cited. Without it, the score is a guess.
 
 ## Schema recommendations
 - Add `sameAs` to both `Person` nodes and a `jobTitle`.
