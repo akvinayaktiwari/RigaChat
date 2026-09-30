@@ -58,7 +58,13 @@ half-measure; it bounds cost and leaves the correctness hole.
 
 **Depends on:** None. Do it before a client's lead count makes the truncation reachable.
 
-## Two copies of the voice token validator, now with different capabilities
+## [RESOLVED 2026-09-30] Two copies of the voice token validator, now with different capabilities
+
+**Resolved:** `voice-relay/auth.ts` moved to `backend/src/lib/voice-token.ts` and the Lambda's
+`validateVoiceToken` copy is deleted; the RAG route, the relay and the session all import the
+one module. The "separate bundle" reason for the copy never held -- `voice-routes.ts` already
+imported `generateToken` from the relay's file, and esbuild follows imports across folders.
+`npm run build:relay` still bundles with no AWS SDK. Original note:
 
 **What:** `validateVoiceToken` in `backend/src/routes/voice-routes.ts` is a duplicate of
 `validateToken` in `backend/src/voice-relay/auth.ts`, deliberately — voice-relay builds as
