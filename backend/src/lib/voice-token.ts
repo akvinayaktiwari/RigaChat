@@ -1,5 +1,12 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
+// Voice session tokens, shared by the Lambda (voice-routes.ts mints widget
+// tokens and validates them on the RAG route) and the EC2 voice relay. One
+// module, so a change to the token format cannot land on one side only -- the
+// Lambda used to carry its own copy of validateToken, which silently lacked the
+// scope parameter below. Keep this file dependency-free beyond node:crypto:
+// the relay bundle imports it, and must not grow the AWS SDK or services.
+
 const TOKEN_MAX_AGE_MS = 5 * 60 * 1000
 
 // Extra context folded into the signature but NOT into the payload, so the

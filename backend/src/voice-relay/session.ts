@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import WebSocket from 'ws'
 import type { VoiceAgentVoice, VoiceCallLog } from '../types/index.js'
-import { generateToken } from './auth.js'
+import { generateToken } from '../lib/voice-token.js'
 import { writeVoiceCallLog } from '../repositories/voice-repository.js'
 import {
   recordCallHandoff,

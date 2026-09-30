@@ -55,7 +55,7 @@ import {
   type RelayContext,
   type TelephonyConfig,
 } from './relay.js'
-import { generateToken, validateToken } from './auth.js'
+import { generateToken, validateToken } from '../lib/voice-token.js'
 import { getVoiceAgentById } from '../repositories/voice-repository.js'
 import { getAgentForPhoneNumber } from '../repositories/voice-phone-lookup-repository.js'
 import { transferCall } from '../providers/plivo-call-provider.js'
