@@ -343,7 +343,17 @@ export async function pauseJourneyBundle(botId: string, bundleId: string, client
   const claimKey = triggerClaimKey({ agentId: existing.agentId, botId }, existing.journey.triggerType)
 
   try {
-    return await updateJourneyBundleRepo(botId, bundleId, { status: 'paused' }, 'published')
+    // Pinned to the updatedAt this call read, not just the status: a concurrent
+    // pause + resume can take the bundle round to 'published' again, and a
+    // status-only guard would then let this stale pause land -- after it had
+    // already released the OLD claim, leaving a paused bundle holding the NEW
+    // one and blocking every other journey on that trigger.
+    return await updateJourneyBundleRepo(
+      botId,
+      bundleId,
+      { status: 'paused' },
+      { status: 'published', updatedAt: existing.updatedAt }
+    )
   } catch (error) {
     if (error instanceof JourneyBundleStateConflictError) {
       // Someone else moved this bundle first (a republish, an edit, a delete).
@@ -352,20 +362,44 @@ export async function pauseJourneyBundle(botId: string, bundleId: string, client
       // claim for a bundle that no longer exists.
       throw new JourneyValidationError('Only a published journey can be paused')
     }
-    // A real infrastructure failure. The bundle is still 'published' but its
-    // claim is gone, which is the one combination that lies: the dashboard
-    // shows Live while ignition finds nothing. Put the claim back so the
-    // failed pause is a no-op rather than a silent outage, then surface the
-    // original error -- best-effort, because if Dynamo is down this fails too.
-    await claimJourneyTrigger(claimKey, { bundleId, botId, clientId }).catch((restoreError) => {
-      console.error(
-        `[journey] pause failed for bundle ${bundleId} AND its trigger claim could not be restored; ` +
-          `the bundle reads as published but no lead will ignite into it:`,
-        restoreError
-      )
-    })
+    await restoreClaimIfPauseDidNotLand(existing, claimKey)
     throw error
   }
+}
+
+// The status write in pauseJourneyBundle failed with something other than a
+// conflict, after the trigger claim was already released. If the bundle is
+// still 'published' that is the one combination that lies -- the dashboard
+// shows Live while ignition finds nothing -- so the claim goes back and the
+// failed pause is a no-op rather than a silent outage.
+//
+// But a timeout is ambiguous: the write may have committed 'paused' and only
+// the response was lost. Restoring then would hand the trigger to a journey
+// ignition refuses to run, blocking every other journey on it. So read the
+// bundle back and restore only if it is exactly as this pause found it. If the
+// read fails too, restore anyway: a stuck claim is visible and fixed by
+// resuming, whereas a published bundle with no claim drops leads silently.
+async function restoreClaimIfPauseDidNotLand(existing: JourneyBundle, claimKey: string): Promise<void> {
+  const { botId, bundleId, clientId } = existing
+  const current = await getJourneyBundleById(botId, bundleId).then(
+    (bundle) => ({ readOk: true as const, bundle }),
+    (readError: unknown) => {
+      console.error(`[journey] could not read bundle ${bundleId} back after a failed pause:`, readError)
+      return { readOk: false as const, bundle: null }
+    }
+  )
+
+  const untouched =
+    current.bundle?.status === 'published' && current.bundle.updatedAt === existing.updatedAt
+  if (current.readOk && !untouched) return
+
+  await claimJourneyTrigger(claimKey, { bundleId, botId, clientId }).catch((restoreError) => {
+    console.error(
+      `[journey] pause failed for bundle ${bundleId} AND its trigger claim could not be restored; ` +
+        `the bundle reads as published but no lead will ignite into it:`,
+      restoreError
+    )
+  })
 }
 
 // Compiles, claims the trigger, provisions a real Step Functions state machine,
@@ -461,7 +495,7 @@ export async function publishJourneyBundle(botId: string, bundleId: string, clie
         // editing -- verified live on 2026-08-06 (record said 2, arn said :1).
         publishedVersion: published.version,
       },
-      existing.status
+      { status: existing.status, updatedAt: existing.updatedAt }
     )
   } catch (error) {
     if (error instanceof JourneyBundleStateConflictError) {

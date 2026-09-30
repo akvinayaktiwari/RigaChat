@@ -757,7 +757,12 @@ now conditional on the status the caller read, and a lost publish no longer dele
 a concurrent publish's shared claim). These two survive, and both need a design
 change rather than another conditional.
 
-**Guard the pause transition with a revision, not just a status.** A status-only
+**[RESOLVED 2026-09-24] Guard the pause transition with a revision, not just a status.**
+**Resolved:** both transition writes now pass `{ status, updatedAt }` as read, and
+`updateJourneyBundle` conditions on both, so an intervening pause + resume fails the
+stale write as a conflict. `updatedAt` rather than a new revision counter because every
+existing row already carries it -- no backfill. Residual: two writes stamped in the same
+millisecond would still collide. Original note: A status-only
 condition admits an ABA race: pause A reads `published` and releases the claim,
 pause B writes `paused`, a resume re-claims the trigger and writes `published`, then
 pause A's stale condition still matches and succeeds. Pause A already released the
@@ -771,7 +776,13 @@ transition sites in `backend/src/services/journey-service.ts`.
 **Priority:** P1
 **Effort:** S (~half a day)
 
-**Don't re-claim on an ambiguous write failure.** `pauseJourneyBundle` restores the
+**[RESOLVED 2026-09-24] Don't re-claim on an ambiguous write failure.**
+**Resolved:** `restoreClaimIfPauseDidNotLand` reads the bundle back and restores the claim
+only if it is still `published` with the `updatedAt` the pause read. A paused or deleted
+bundle keeps no claim. If the read-back fails too it restores anyway: a stuck claim is
+visible and undone by resuming, a published bundle with no claim drops leads silently.
+Not a `TransactWriteItems` -- the claim table's own condition logic would have to move
+into the transaction. Original note: `pauseJourneyBundle` restores the
 trigger claim when the status write throws a non-conflict error, so a failed pause is
 a no-op rather than a silent outage. But a DynamoDB timeout is ambiguous: the write
 may have committed `paused` and only the response was lost. In that case the
