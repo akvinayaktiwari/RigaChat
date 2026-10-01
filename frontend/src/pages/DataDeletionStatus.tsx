@@ -46,7 +46,7 @@ function Step({
         <Icon className="w-5 h-5" />
       </div>
       <div className="min-w-0 pt-1">
-        <h3 className="font-bold text-on-surface text-base">{title}</h3>
+        <h2 className="font-bold text-on-surface text-base">{title}</h2>
         <p className="text-sm text-on-surface-variant leading-relaxed mt-1">{body}</p>
       </div>
     </div>
@@ -247,9 +247,9 @@ export default function DataDeletionStatus() {
               <Mail className="w-6 h-6" />
             </div>
             <div className="min-w-0">
-              <h4 className="font-bold text-xs text-on-surface-variant uppercase tracking-wider">
+              <h2 className="font-bold text-xs text-on-surface-variant uppercase tracking-wider">
                 Questions about this request
-              </h4>
+              </h2>
               <a
                 href={`mailto:${SUPPORT_EMAIL}`}
                 className="text-base font-bold text-on-surface hover:text-primary transition-colors break-all"

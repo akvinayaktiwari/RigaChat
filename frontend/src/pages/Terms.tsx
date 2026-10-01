@@ -152,7 +152,7 @@ function TocSidebar({ activeSection, onNavigate }: { activeSection: string; onNa
       </div>
 
       <div className="hidden lg:block glass-card p-6 rounded-2xl shadow-xs border border-outline-variant/30 bg-white/70">
-        <h3 className="text-lg font-extrabold text-on-surface mb-6 border-b border-outline-variant/20 pb-3">Table of Contents</h3>
+        <h2 className="text-lg font-extrabold text-on-surface mb-6 border-b border-outline-variant/20 pb-3">Table of Contents</h2>
         <ul className="space-y-3.5">
           {TOC_ITEMS.map((item) => {
             const isActive = activeSection === item.id
@@ -217,7 +217,7 @@ function ContactSection() {
             <Mail className="w-6 h-6" />
           </div>
           <div>
-            <h4 className="font-bold text-xs text-on-surface-variant uppercase tracking-wider">Email Inquiries</h4>
+            <h3 className="font-bold text-xs text-on-surface-variant uppercase tracking-wider">Email Inquiries</h3>
             <a href="mailto:support@vyostra.com" className="text-base font-bold text-on-surface hover:text-primary transition-colors">
               support@vyostra.com
             </a>
@@ -228,7 +228,7 @@ function ContactSection() {
             <MapPin className="w-6 h-6" />
           </div>
           <div>
-            <h4 className="font-bold text-xs text-on-surface-variant uppercase tracking-wider">Company Headquarters</h4>
+            <h3 className="font-bold text-xs text-on-surface-variant uppercase tracking-wider">Company Headquarters</h3>
             <p className="text-base font-bold text-on-surface">Bangalore, Karnataka, India</p>
           </div>
         </div>
