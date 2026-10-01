@@ -235,18 +235,20 @@ function FounderCard({ founder }: { founder: FounderInfo }) {
       >
         {founder.name.split(' ').map((n) => n[0]).join('')}
       </div>
-      <h3 className="font-bold text-base text-on-surface leading-tight">{founder.name}</h3>
+      <div className="relative inline-flex items-center">
+        <h3 className="font-bold text-base text-on-surface leading-tight">{founder.name}</h3>
+        <a
+          href={founder.linkedinUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`${founder.name} on LinkedIn`}
+          className="absolute left-full top-1/2 -translate-y-1/2 p-3 rounded-full text-on-surface-variant hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 transition-colors"
+        >
+          <LinkedInIcon />
+        </a>
+      </div>
       <p className="text-xs text-primary font-semibold tracking-wider uppercase mt-1.5">{founder.role}</p>
       <p className="text-xs md:text-sm text-on-surface-variant mt-3 leading-relaxed flex-1">{founder.description}</p>
-      <a
-        href={founder.linkedinUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label={`${founder.name} on LinkedIn`}
-        className="mt-5 inline-flex items-center justify-center w-9 h-9 rounded-full border border-outline-variant/40 text-on-surface-variant hover:text-primary hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 transition-colors"
-      >
-        <LinkedInIcon />
-      </a>
     </div>
   )
 }
