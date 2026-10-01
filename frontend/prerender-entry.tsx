@@ -70,6 +70,20 @@ export const NOT_FOUND_RENDER_PATH = '/__not-found__'
 // flag; without it the head tags never reach the server state object.
 HelmetProvider.canUseDOM = false
 
+/**
+ * Removes the NUL bytes react-dom's stream writer leaves in its output.
+ *
+ * It encodes into a fixed 2048-byte view, and when a multi-byte character does
+ * not fit in what is left, it flushes the WHOLE view -- unfilled tail included
+ * -- before starting the next one (writeStringChunk, react-dom 18.3.1). So a
+ * curly quote or a rupee sign that happens to land on a boundary ships one or
+ * two zero bytes in front of it. Which page is hit changes with every edit to
+ * the markup above it. HTML never contains a NUL, so dropping them is lossless.
+ */
+function stripStreamPadding(html: string): string {
+  return html.replaceAll('\0', '')
+}
+
 /** Renders one route to fully-resolved HTML plus its <head> tags. */
 export async function renderRoute(url: string): Promise<{ html: string; head: string }> {
   const helmetContext: { helmet?: HelmetServerState | null } = {}
@@ -115,7 +129,7 @@ export async function renderRoute(url: string): Promise<{ html: string; head: st
       },
     })
 
-    sink.on('finish', () => resolve(Buffer.concat(chunks).toString('utf8')))
+    sink.on('finish', () => resolve(stripStreamPadding(Buffer.concat(chunks).toString('utf8'))))
     sink.on('error', reject)
 
     // onAllReady (not onShellReady) so lazy post bodies inside <Suspense>

@@ -52,6 +52,13 @@ function composePage(template, { html, head }) {
     page = page.replace('</head>', `  ${head}\n  </head>`)
   }
 
+  // renderRoute strips the NUL padding react-dom's stream writer can emit. If
+  // one still gets here the strip has stopped working, and shipping it would
+  // put a byte no HTML parser expects into a page meant for crawlers.
+  if (html.includes('\0')) {
+    throw new Error('Prerendered markup contains a NUL byte; see stripStreamPadding in prerender-entry.tsx.')
+  }
+
   const rootDiv = '<div id="root"></div>'
   if (!page.includes(rootDiv)) {
     throw new Error('Could not find <div id="root"></div> in dist/index.html — the prerender injection point changed.')
