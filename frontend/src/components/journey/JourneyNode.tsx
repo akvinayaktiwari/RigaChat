@@ -26,7 +26,7 @@ interface JourneyNodeProps {
 function KindRow({ step }: { step: JourneyStep }) {
   const kind = NODE_KIND[step.type]
   return (
-    <div className="flex items-center gap-2 text-[10.5px] font-bold tracking-[0.11em] uppercase text-gray-400">
+    <div className="flex items-center gap-2 text-[10.5px] font-bold tracking-[0.11em] uppercase text-gray-500">
       <span
         className={`w-[15px] h-[15px] rounded-[5px] grid place-items-center text-[9px] text-white ${kind.chip}`}
         aria-hidden="true"
@@ -70,7 +70,7 @@ function Detail({ step }: { step: JourneyStep }) {
       return step.messageHint ? (
         <p className="text-[12.5px] text-gray-500 leading-snug line-clamp-2">“{step.messageHint}”</p>
       ) : (
-        <p className="text-[12.5px] text-gray-400 leading-snug italic line-clamp-2">The agent writes this itself</p>
+        <p className="text-[12.5px] text-gray-500 leading-snug italic line-clamp-2">The agent writes this itself</p>
       )
     case 'wait':
       return (

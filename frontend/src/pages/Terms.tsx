@@ -163,7 +163,7 @@ function TocSidebar({ activeSection, onNavigate }: { activeSection: string; onNa
                     isActive ? 'bg-primary text-white shadow-xs font-semibold' : 'text-on-surface-variant hover:text-primary hover:bg-primary/5'
                   }`}
                 >
-                  <span className={`text-xs font-bold ${isActive ? 'text-white/80' : 'text-outline group-hover:text-primary'}`}>{item.order}</span>
+                  <span className={`text-xs font-bold ${isActive ? 'text-white/80' : 'text-on-surface-variant group-hover:text-primary'}`}>{item.order}</span>
                   <span className="text-sm font-medium leading-tight">{item.label}</span>
                 </button>
               </li>
@@ -216,7 +216,7 @@ function ContactSection() {
             <Mail className="w-6 h-6" />
           </div>
           <div>
-            <h4 className="font-bold text-xs text-outline uppercase tracking-wider">Email Inquiries</h4>
+            <h4 className="font-bold text-xs text-on-surface-variant uppercase tracking-wider">Email Inquiries</h4>
             <a href="mailto:support@vyostra.com" className="text-base font-bold text-on-surface hover:text-primary transition-colors">
               support@vyostra.com
             </a>
@@ -227,7 +227,7 @@ function ContactSection() {
             <MapPin className="w-6 h-6" />
           </div>
           <div>
-            <h4 className="font-bold text-xs text-outline uppercase tracking-wider">Company Headquarters</h4>
+            <h4 className="font-bold text-xs text-on-surface-variant uppercase tracking-wider">Company Headquarters</h4>
             <p className="text-base font-bold text-on-surface">Bangalore, Karnataka, India</p>
           </div>
         </div>

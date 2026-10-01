@@ -469,7 +469,7 @@ export default function BotDetailPage() {
                   placeholder="https://yourwebsite.com"
                   className={inputClasses}
                 />
-                <p className="mt-1.5 text-xs text-gray-400">
+                <p className="mt-1.5 text-xs text-gray-500">
                   (Optional — leave empty to use Knowledge Base only)
                 </p>
               </div>
@@ -493,7 +493,7 @@ export default function BotDetailPage() {
                   placeholder="Auto-detected from your website"
                   className={inputClasses}
                 />
-                <p className="mt-1.5 text-xs text-gray-400">
+                <p className="mt-1.5 text-xs text-gray-500">
                   Detected automatically during setup. Visitors can contact this address directly from the agent.
                 </p>
                 {bot.supportEmail && !isValidEmail(bot.supportEmail.trim()) && (

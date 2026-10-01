@@ -85,7 +85,7 @@ const INITIAL_FORM_DATA: FormData = {
 const inputClasses =
   'w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 bg-white outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors'
 const labelClasses = 'block text-sm font-medium text-gray-700 mb-1.5'
-const hintClasses = 'text-xs text-gray-400 mt-1'
+const hintClasses = 'text-xs text-gray-500 mt-1'
 
 const primaryButtonClasses =
   'bg-linear-to-r from-violet-600 to-purple-500 text-white font-semibold rounded-xl shadow-md shadow-violet-200/50 hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed'
@@ -107,14 +107,14 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
                 className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold ${
                   isDone || isActive
                     ? 'bg-violet-600 text-white'
-                    : 'border-2 border-gray-200 text-gray-400 bg-white'
+                    : 'border-2 border-gray-200 text-gray-500 bg-white'
                 }`}
               >
                 {isDone ? <Check size={16} /> : stepNum}
               </div>
               <span
                 className={`text-xs mt-2 ${
-                  isActive ? 'text-violet-700 font-medium' : isDone ? 'text-violet-600' : 'text-gray-400'
+                  isActive ? 'text-violet-700 font-medium' : isDone ? 'text-violet-600' : 'text-gray-500'
                 }`}
               >
                 {label}

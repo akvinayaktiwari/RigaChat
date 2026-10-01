@@ -121,7 +121,7 @@ export default function MobileAppSection() {
       {error ? <p className="mt-4 text-xs text-red-600">{error}</p> : null}
 
       {devices !== null && devices.length > 0 ? (
-        <p className="mt-4 text-xs text-gray-400 leading-relaxed">
+        <p className="mt-4 text-xs text-gray-500 leading-relaxed">
           Removing a device stops lead alerts reaching it. Do this if you lose a phone — the person
           holding it stays signed out of alerts even if the app is still installed.
         </p>

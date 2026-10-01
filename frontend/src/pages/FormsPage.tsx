@@ -149,7 +149,7 @@ export default function FormsPage() {
                   type="button"
                   onClick={() => setFormToDelete(form)}
                   title="Delete form"
-                  className="text-gray-400 hover:text-red-500 transition-colors shrink-0"
+                  className="text-gray-500 hover:text-red-500 transition-colors shrink-0"
                 >
                   <Trash2 size={16} />
                 </button>
@@ -161,7 +161,7 @@ export default function FormsPage() {
               <p className="text-sm text-gray-500">
                 {form.fields.length} {form.fields.length === 1 ? 'field' : 'fields'}
               </p>
-              <p className="text-xs text-gray-400 mt-1">Submits as: {form.submitButtonText}</p>
+              <p className="text-xs text-gray-500 mt-1">Submits as: {form.submitButtonText}</p>
 
               <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-50">
                 <button
@@ -199,7 +199,7 @@ export default function FormsPage() {
             <button
               type="button"
               onClick={() => setSelectedFormForEmbed(null)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-600 transition-colors"
               title="Close"
             >
               <X size={20} />

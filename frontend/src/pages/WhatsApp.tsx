@@ -483,19 +483,19 @@ export default function WhatsApp() {
           ) : isConnected && status ? (
             <div className="space-y-4">
               {isConnected && !isActive && (
-                <p className="text-xs text-gray-400">Switching your active provider is coming soon</p>
+                <p className="text-xs text-gray-500">Switching your active provider is coming soon</p>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                 <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">App Name</p>
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">App Name</p>
                   <p className="text-gray-900 font-medium mt-1">{status.appName}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Sender Number</p>
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Sender Number</p>
                   <p className="text-gray-900 font-medium mt-1">{status.sourceNumber}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Notification Number</p>
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Notification Number</p>
                   <p className="text-gray-900 font-medium mt-1">{status.notificationNumber}</p>
                 </div>
               </div>
@@ -613,7 +613,7 @@ export default function WhatsApp() {
                   {isMetaConnected ? (isMetaActive ? 'Connected · Active' : 'Connected') : 'Not Connected'}
                 </span>
                 {isMetaConnected && !isMetaActive && (
-                  <p className="text-[11px] text-gray-400 mt-1 max-w-40">
+                  <p className="text-[11px] text-gray-500 mt-1 max-w-40">
                     Switching your active provider is coming soon
                   </p>
                 )}
@@ -626,14 +626,14 @@ export default function WhatsApp() {
           ) : isMetaConnected && metaStatus ? (
             <div className="space-y-4">
               <div>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Phone Number</p>
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Phone Number</p>
                 <p className="text-gray-900 font-medium mt-1" data-testid="meta-wa-display-number">
                   {metaStatus.displayPhoneNumber}
                 </p>
               </div>
               {metaStatus.verifiedName && (
                 <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Verified Name</p>
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Verified Name</p>
                   <p className="text-gray-900 font-medium mt-1" data-testid="meta-wa-verified-name">
                     {metaStatus.verifiedName}
                   </p>
@@ -780,7 +780,7 @@ export default function WhatsApp() {
                 your notification number right away, so you never miss a lead.
               </p>
               <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 border border-gray-100">
-                <p className="font-mono text-xs text-gray-400 mb-1">Example message</p>
+                <p className="font-mono text-xs text-gray-500 mb-1">Example message</p>
                 New lead captured!
                 <br />
                 Name: Adarsh
@@ -807,7 +807,7 @@ export default function WhatsApp() {
                 and forms — to your notification number.
               </p>
               <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 border border-gray-100">
-                <p className="font-mono text-xs text-gray-400 mb-1">Example message</p>
+                <p className="font-mono text-xs text-gray-500 mb-1">Example message</p>
                 Your weekly Vyostra AI report
                 <br />
                 New leads this week: 12
@@ -820,7 +820,7 @@ export default function WhatsApp() {
 
           {activeTab === 'agent' && (
             <div className="flex flex-col items-center justify-center text-center py-10 gap-3">
-              <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+              <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
                 <Lock className="w-5 h-5" />
               </div>
               <h4 className="text-sm font-bold text-gray-900">WhatsApp Agent</h4>

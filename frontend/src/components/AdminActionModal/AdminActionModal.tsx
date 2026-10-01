@@ -195,7 +195,7 @@ export function AdminActionModal({ account, action, token, currentOverrides, onC
           onClick={onClose}
           disabled={submitting}
           title="Close"
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+          className="absolute top-4 right-4 text-gray-500 hover:text-gray-600 transition-colors disabled:opacity-50"
         >
           <X size={20} />
         </button>

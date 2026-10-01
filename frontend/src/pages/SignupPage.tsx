@@ -147,7 +147,7 @@ export default function SignupPage() {
 
           <div className="flex items-center gap-3 mb-5">
             <hr className="flex-1 h-px bg-gray-100 border-0" />
-            <span className="text-xs text-gray-400">or</span>
+            <span className="text-xs text-gray-500">or</span>
             <hr className="flex-1 h-px bg-gray-100 border-0" />
           </div>
 
@@ -192,7 +192,7 @@ export default function SignupPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600 transition-colors"
                   title={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -210,7 +210,7 @@ export default function SignupPage() {
                       />
                     ))}
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">{strength.label}</p>
+                  <p className="text-xs text-gray-500 mt-1">{strength.label}</p>
                 </div>
               )}
             </div>
@@ -229,7 +229,7 @@ export default function SignupPage() {
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600 transition-colors"
                   title={showConfirmPassword ? 'Hide password' : 'Show password'}
                 >
                   {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -245,7 +245,7 @@ export default function SignupPage() {
               </div>
             )}
 
-            <p className="text-xs text-gray-400 text-center mt-4">
+            <p className="text-xs text-gray-500 text-center mt-4">
               By creating an account you agree to our Terms of Service and Privacy Policy
             </p>
 

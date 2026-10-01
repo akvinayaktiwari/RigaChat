@@ -30,7 +30,7 @@ export function Toggle({ checked, onChange, onLabel, offLabel, title, disabled =
         />
       </button>
       {label && (
-        <span className={`text-sm font-medium ${checked ? 'text-indigo-600' : 'text-slate-400'}`}>{label}</span>
+        <span className={`text-sm font-medium ${checked ? 'text-indigo-600' : 'text-slate-500'}`}>{label}</span>
       )}
     </div>
   )

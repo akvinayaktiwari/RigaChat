@@ -239,7 +239,7 @@ function StepEditor({
           <span className="w-6 h-6 rounded-full bg-violet-50 text-violet-600 text-xs font-bold flex items-center justify-center shrink-0">
             {index + 1}
           </span>
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
             {STEP_TYPE_LABELS[step.type]}
           </span>
         </div>
@@ -249,7 +249,7 @@ function StepEditor({
             onClick={onMoveUp}
             disabled={!canMoveUp}
             title="Move up"
-            className="p-1.5 text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors"
+            className="p-1.5 text-gray-500 hover:text-gray-700 disabled:opacity-30 transition-colors"
           >
             <ChevronUp size={14} />
           </button>
@@ -258,7 +258,7 @@ function StepEditor({
             onClick={onMoveDown}
             disabled={!canMoveDown}
             title="Move down"
-            className="p-1.5 text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors"
+            className="p-1.5 text-gray-500 hover:text-gray-700 disabled:opacity-30 transition-colors"
           >
             <ChevronDown size={14} />
           </button>
@@ -266,7 +266,7 @@ function StepEditor({
             type="button"
             onClick={onRemove}
             title="Remove step"
-            className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+            className="p-1.5 text-gray-500 hover:text-red-500 transition-colors"
           >
             <Trash2 size={14} />
           </button>
@@ -550,7 +550,7 @@ function StepEditor({
               className={inputClasses}
               placeholder="Why hand off to a human here"
             />
-            <p className="text-xs text-gray-400 mt-1.5">This ends the journey — a human takes over from here.</p>
+            <p className="text-xs text-gray-500 mt-1.5">This ends the journey — a human takes over from here.</p>
           </div>
         )}
       </div>

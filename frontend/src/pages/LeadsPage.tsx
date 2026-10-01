@@ -104,18 +104,18 @@ function matchesStatus(lead: UnifiedLead, filter: StatusFilter): boolean {
 }
 
 function ContactLines({ lead }: { lead: UnifiedLead }) {
-  if (!lead.phone && !lead.email) return <span className="text-gray-300">No contact</span>
+  if (!lead.phone && !lead.email) return <span className="text-gray-500">No contact</span>
   return (
     <>
       {lead.phone && (
         <div className="flex items-center gap-1.5">
-          <Phone size={12} className="text-gray-400 shrink-0" />
+          <Phone size={12} className="text-gray-500 shrink-0" />
           <span className="truncate">{lead.phone}</span>
         </div>
       )}
       {lead.email && (
         <div className="flex items-center gap-1.5 mt-0.5">
-          <Mail size={12} className="text-gray-400 shrink-0" />
+          <Mail size={12} className="text-gray-500 shrink-0" />
           <span className="truncate">{lead.email}</span>
         </div>
       )}
@@ -548,7 +548,7 @@ export default function LeadsPage() {
                             aria-label={`Archive ${lead.name ?? 'lead'}`}
                             disabled={savingLeadId === lead.leadId}
                             onClick={() => handleArchive(lead)}
-                            className="shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-40"
+                            className="shrink-0 p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-40"
                           >
                             <Archive size={15} />
                           </button>

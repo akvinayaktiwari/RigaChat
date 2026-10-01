@@ -40,7 +40,7 @@ function Step({
     <div className="flex gap-4">
       <div
         className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-          done ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400'
+          done ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-500'
         }`}
       >
         <Icon className="w-5 h-5" />
@@ -171,7 +171,7 @@ export default function DataDeletionStatus() {
               </p>
 
               <div className="mt-8 p-6 bg-white border border-outline-variant/30 rounded-2xl shadow-xs">
-                <p className="text-[10px] font-bold text-outline uppercase tracking-wider">
+                <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
                   Confirmation code
                 </p>
                 {/* break-all so a long code stays inside the card on a phone */}
@@ -247,7 +247,7 @@ export default function DataDeletionStatus() {
               <Mail className="w-6 h-6" />
             </div>
             <div className="min-w-0">
-              <h4 className="font-bold text-xs text-outline uppercase tracking-wider">
+              <h4 className="font-bold text-xs text-on-surface-variant uppercase tracking-wider">
                 Questions about this request
               </h4>
               <a

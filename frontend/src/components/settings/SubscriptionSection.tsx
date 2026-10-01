@@ -131,7 +131,7 @@ export default function SubscriptionSection({ subscription, onUpgradeClick }: Su
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
         <div>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Limits</p>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Limits</p>
           <LimitRow label="Chat" value={limits.chat} />
           <LimitRow label="CRM" value={limits.crm} />
           <LimitRow label="Agents" value={limits.agents} />
@@ -140,7 +140,7 @@ export default function SubscriptionSection({ subscription, onUpgradeClick }: Su
 
         {features.chat.enabled && (
           <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Usage this period</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Usage this period</p>
             <LimitRow label="Conversations" value={usageLabel} />
           </div>
         )}

@@ -249,7 +249,7 @@ export default function SchedulerPage() {
                     ) : (
                       // Unresolved: the lead is older than the inbox window, or
                       // the inbox call failed. A short id beats a full uuid.
-                      <p className="text-xs text-gray-400 mt-0.5">Lead {action.leadId.slice(0, 8)}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Lead {action.leadId.slice(0, 8)}</p>
                     ))}
                 </div>
               </div>
@@ -265,7 +265,7 @@ export default function SchedulerPage() {
                   type="button"
                   onClick={() => setActionToDelete(action)}
                   title="Delete schedule"
-                  className="text-gray-400 hover:text-red-500 transition-colors p-2"
+                  className="text-gray-500 hover:text-red-500 transition-colors p-2"
                 >
                   <Trash2 size={16} />
                 </button>
@@ -282,7 +282,7 @@ export default function SchedulerPage() {
             <button
               type="button"
               onClick={() => setModalAction(null)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-600 transition-colors"
               title="Close"
             >
               <X size={20} />

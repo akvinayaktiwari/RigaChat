@@ -126,7 +126,7 @@ function EntryModal({ title, form, onChange, onCancel, onSave, saving, saveLabel
           type="button"
           onClick={onCancel}
           title="Close"
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+          className="absolute top-4 right-4 text-gray-500 hover:text-gray-600 transition-colors"
         >
           <X size={20} />
         </button>
@@ -539,7 +539,7 @@ export default function VoiceKnowledgeBasePage() {
                 style={{ width: `${uploadStage === 'confirming' ? 100 : uploadProgress}%` }}
               />
             </div>
-            <p className="text-xs text-gray-400 mt-2">
+            <p className="text-xs text-gray-500 mt-2">
               {uploadStage === 'confirming' ? 'Finishing up...' : `Uploading... ${uploadProgress}%`}
             </p>
           </div>
@@ -577,7 +577,7 @@ export default function VoiceKnowledgeBasePage() {
               dragActive ? 'border-violet-400 bg-violet-50' : 'border-gray-200'
             } ${subscriptionLoading ? 'opacity-50 pointer-events-none' : ''}`}
           >
-            <Upload className={`w-8 h-8 mb-2 ${dragActive ? 'text-violet-500' : 'text-gray-400'}`} />
+            <Upload className={`w-8 h-8 mb-2 ${dragActive ? 'text-violet-500' : 'text-gray-500'}`} />
             <p className="text-sm text-gray-600">
               Drag and drop a file here, or{' '}
               <button
@@ -588,7 +588,7 @@ export default function VoiceKnowledgeBasePage() {
                 browse
               </button>
             </p>
-            <p className="text-xs text-gray-400 mt-1">PDF, DOCX, or TXT</p>
+            <p className="text-xs text-gray-500 mt-1">PDF, DOCX, or TXT</p>
             <input
               ref={fileInputRef}
               type="file"
@@ -600,7 +600,7 @@ export default function VoiceKnowledgeBasePage() {
         )}
 
         {pollPaused && (
-          <p className="text-xs text-gray-400 mt-3">
+          <p className="text-xs text-gray-500 mt-3">
             Still indexing one or more files — this can take longer for larger documents.{' '}
             <button
               type="button"
@@ -668,7 +668,7 @@ export default function VoiceKnowledgeBasePage() {
                     </div>
 
                     {isFileEntry && (
-                      <p className="text-xs text-gray-400 mb-1">
+                      <p className="text-xs text-gray-500 mb-1">
                         {entry.fileType?.toUpperCase()}
                         {entry.fileSizeBytes !== undefined && ` · ${formatFileSize(entry.fileSizeBytes)}`}
                       </p>
@@ -684,7 +684,7 @@ export default function VoiceKnowledgeBasePage() {
                       </p>
                     ) : null}
 
-                    <div className="flex items-center gap-1 mt-2 text-gray-400 text-xs">
+                    <div className="flex items-center gap-1 mt-2 text-gray-500 text-xs">
                       <Calendar size={12} />
                       Added {formatRelativeDate(new Date(entry.createdAt))}
                     </div>
@@ -696,7 +696,7 @@ export default function VoiceKnowledgeBasePage() {
                     type="button"
                     onClick={() => openEdit(entry)}
                     title="Edit entry"
-                    className="text-gray-400 hover:text-violet-600 transition-colors p-2 rounded-lg hover:bg-gray-50"
+                    className="text-gray-500 hover:text-violet-600 transition-colors p-2 rounded-lg hover:bg-gray-50"
                   >
                     <Pencil size={16} />
                   </button>
@@ -707,7 +707,7 @@ export default function VoiceKnowledgeBasePage() {
                       setShowDeleteModal(true)
                     }}
                     title="Delete entry"
-                    className="text-gray-400 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-gray-50"
+                    className="text-gray-500 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-gray-50"
                   >
                     <Trash2 size={16} />
                   </button>

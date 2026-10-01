@@ -28,7 +28,7 @@ function FeatureCard({ label, feature }: { label: string; feature: AdminFeatureS
   return (
     <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</p>
-      <p className={`text-sm mt-1 ${feature.enabled ? 'text-gray-900' : 'text-gray-400'}`}>{formatFeatureDetail(feature)}</p>
+      <p className={`text-sm mt-1 ${feature.enabled ? 'text-gray-900' : 'text-gray-500'}`}>{formatFeatureDetail(feature)}</p>
     </div>
   )
 }
@@ -46,7 +46,7 @@ function AuditEntryRow({ entry }: { entry: AuditEntry }) {
     <div className="border border-gray-100 rounded-xl px-4 py-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <span className="text-sm font-semibold text-gray-900">{ACTION_LABELS[entry.action]}</span>
-        <span className="text-xs text-gray-400">{new Date(entry.timestamp).toLocaleString()}</span>
+        <span className="text-xs text-gray-500">{new Date(entry.timestamp).toLocaleString()}</span>
       </div>
       <p className="text-xs text-gray-500 mt-1">
         by {entry.actorEmail} — {entry.reason}
@@ -124,7 +124,7 @@ export function AccountDetailPanel({ account, token, onClose, onRefresh }: Accou
               {account.name ?? '—'} · {account.plan} · {account.status}
             </p>
           </div>
-          <button type="button" onClick={onClose} title="Close" className="text-gray-400 hover:text-gray-600 transition-colors">
+          <button type="button" onClick={onClose} title="Close" className="text-gray-500 hover:text-gray-600 transition-colors">
             <X size={20} />
           </button>
         </div>

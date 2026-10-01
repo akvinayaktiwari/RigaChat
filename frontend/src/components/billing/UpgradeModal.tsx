@@ -96,7 +96,7 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }: UpgradeMo
           <button
             type="button"
             onClick={onClose}
-            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+            className="absolute top-4 right-4 text-gray-500 hover:text-gray-600 transition-colors"
             aria-label="Close"
             title="Close"
           >
@@ -191,7 +191,7 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }: UpgradeMo
                       <span className="text-3xl font-extrabold text-gray-900" style={JAKARTA_FONT}>
                         {formatPrice(plan.priceUsd, region)}
                       </span>
-                      <span className="text-sm text-gray-400">/mo</span>
+                      <span className="text-sm text-gray-500">/mo</span>
                     </div>
 
                     <ul className="space-y-2.5 mb-6">

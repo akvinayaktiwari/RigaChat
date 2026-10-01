@@ -48,7 +48,7 @@ function TemplateRow({ template, creating, onCreate }: TemplateRowProps) {
     <li data-testid={`template-row-${template.name}`} className="flex items-start justify-between gap-4 py-4">
       <div className="min-w-0">
         <p className="font-mono text-sm font-semibold text-gray-900">{template.name}</p>
-        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mt-0.5">
+        <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mt-0.5">
           {template.category} · {template.language}
         </p>
         <p className="text-sm text-gray-500 mt-1.5 whitespace-pre-line line-clamp-2">{template.body}</p>

@@ -168,7 +168,7 @@ export default function JourneyExecutions({ botId, bundleId }: { botId: string; 
                 }
                 className="w-full px-6 py-3.5 flex items-start gap-4 text-left hover:bg-gray-50/60 transition-colors"
               >
-                <span className="text-gray-300 mt-0.5 shrink-0">
+                <span className="text-gray-500 mt-0.5 shrink-0">
                   {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 </span>
 
@@ -183,7 +183,7 @@ export default function JourneyExecutions({ botId, bundleId }: { botId: string; 
                   <span className="block text-sm font-medium text-gray-900 truncate">
                     {execution.lastStepId ? `Step: ${execution.lastStepId}` : execution.lastEventType}
                   </span>
-                  <span className="block text-xs text-gray-400 truncate">
+                  <span className="block text-xs text-gray-500 truncate">
                     lead {execution.leadId.slice(0, 8)} · {execution.eventCount}{' '}
                     {execution.eventCount === 1 ? 'event' : 'events'} · started {relativeTime(execution.startedAt)}
                   </span>
@@ -194,14 +194,14 @@ export default function JourneyExecutions({ botId, bundleId }: { botId: string; 
                   )}
                 </span>
 
-                <span className="text-xs text-gray-400 shrink-0">{relativeTime(execution.lastEventAt)}</span>
+                <span className="text-xs text-gray-500 shrink-0">{relativeTime(execution.lastEventAt)}</span>
               </button>
 
               {isOpen && (
                 <ol className="px-6 pb-4 pl-16 space-y-2 border-l-2 border-gray-100 ml-8">
                   {execution.events.map((event, i) => (
                     <li key={`${event.ts}-${i}`} className="flex items-baseline gap-3 text-xs">
-                      <span className="text-gray-400 tabular-nums shrink-0 w-28">{clockTime(event.ts)}</span>
+                      <span className="text-gray-500 tabular-nums shrink-0 w-28">{clockTime(event.ts)}</span>
                       <span className={event.type === 'journey_ended' && event.outcome === 'failed' ? 'text-red-600' : 'text-gray-700'}>
                         {describeEvent(event)}
                       </span>
@@ -222,7 +222,7 @@ export default function JourneyExecutions({ botId, bundleId }: { botId: string; 
           flight" forever. Presenting that as proof it is alive would recreate
           the exact ambiguity this feature exists to remove. */}
       {executions.some((execution) => execution.status === 'running') && (
-        <p className="px-6 py-3 text-xs text-gray-400 border-t border-black/5">
+        <p className="px-6 py-3 text-xs text-gray-500 border-t border-black/5">
           "In flight" means no ending was recorded and none can be inferred. A run that reached a handoff is shown as
           handed off even without a terminal event, but one sitting on a message could be mid-journey or could have
           stopped — open it to see how long it has been there.

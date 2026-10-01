@@ -97,7 +97,7 @@ function TemplateGrid({
             </h3>
           </div>
           <p className="text-sm text-gray-500 grow">{template.description}</p>
-          <p className="text-xs text-gray-400 mt-3 mb-4">
+          <p className="text-xs text-gray-500 mt-3 mb-4">
             {template.journey.steps.length} steps · {template.agent.mcpToolbox.length} tools
           </p>
           <button
@@ -353,7 +353,7 @@ export default function JourneysPage() {
             <h2 className="text-sm font-bold text-gray-900" style={JAKARTA_FONT}>
               Active across all bots
             </h2>
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-gray-500">
               {activeJourneys.length} of {bots.length} {bots.length === 1 ? 'bot' : 'bots'}
             </span>
           </div>
@@ -377,7 +377,7 @@ export default function JourneysPage() {
                   {STATUS_LABELS[bundle.status]}
                 </span>
                 <span className="font-semibold text-sm text-gray-900 truncate">{bundle.name}</span>
-                <span className="text-xs text-gray-400 truncate ml-auto shrink-0">
+                <span className="text-xs text-gray-500 truncate ml-auto shrink-0">
                   {botNameById.get(bundle.botId) ?? bundle.botId} · {TRIGGER_LABELS[bundle.journey.triggerType] ?? 'trigger'}
                 </span>
               </button>
@@ -473,7 +473,7 @@ export default function JourneysPage() {
                     </span>
                   </div>
                   <p className="text-sm text-gray-500 truncate">{statusLine(bundle)}</p>
-                  <p className="text-xs text-gray-400 truncate mt-0.5">
+                  <p className="text-xs text-gray-500 truncate mt-0.5">
                     {bundle.description ||
                       `${bundle.journey.steps.length} step${bundle.journey.steps.length === 1 ? '' : 's'}`}
                   </p>

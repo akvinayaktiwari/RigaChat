@@ -481,7 +481,7 @@ export default function MetaAds() {
         ) : pages.length > 0 || legacyOnlyConnection ? (
           <div className="space-y-4">
             <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">
                 Connected Pages ({pages.length})
               </p>
               {pages.length === 0 && (
@@ -688,13 +688,13 @@ export default function MetaAds() {
                       </p>
                     )}
                     {extraFields.length > 0 && (
-                      <p className="text-xs text-gray-400 mt-0.5">
+                      <p className="text-xs text-gray-500 mt-0.5">
                         {extraFields.map(([key, value]) => `${key}: ${value}`).join(', ')}
                       </p>
                     )}
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-xs text-gray-400">{new Date(lead.createdAt).toLocaleDateString()}</p>
+                    <p className="text-xs text-gray-500">{new Date(lead.createdAt).toLocaleDateString()}</p>
                     {lead.crmSynced ? (
                       <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full mt-1">
                         <Check className="w-2.5 h-2.5" /> Synced

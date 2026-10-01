@@ -98,9 +98,9 @@ export default function IntegrationsSection({
                 </div>
 
                 {isLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-gray-400 shrink-0" />
+                  <Loader2 className="w-4 h-4 animate-spin text-gray-500 shrink-0" />
                 ) : isComingSoon ? (
-                  <span className="text-xs text-gray-400 shrink-0">Coming Soon</span>
+                  <span className="text-xs text-gray-500 shrink-0">Coming Soon</span>
                 ) : isConnected ? (
                   <button
                     type="button"
@@ -142,7 +142,7 @@ export default function IntegrationsSection({
                       }))}
                     />
                   )}
-                  <p className="text-xs text-gray-400 mt-2">
+                  <p className="text-xs text-gray-500 mt-2">
                     Your booking agent creates real, confirmed slots against this event type.
                   </p>
                 </div>

@@ -40,9 +40,9 @@ function DeliveryTicks({ status }: { status?: MessageDeliveryStatus }) {
     return <CheckCheck size={14} className="text-sky-500" aria-label="read" />
   }
   if (status === 'delivered') {
-    return <CheckCheck size={14} className="text-gray-400" aria-label="delivered" />
+    return <CheckCheck size={14} className="text-gray-500" aria-label="delivered" />
   }
-  return <Check size={14} className="text-gray-400" aria-label="sent" />
+  return <Check size={14} className="text-gray-500" aria-label="sent" />
 }
 
 // A message the agent sent, or the lead sent. Bubbles, because these are the
@@ -61,7 +61,7 @@ function MessageRow({ event, status }: { event: LeadEvent; status?: MessageDeliv
           {event.body || <span className="opacity-60">(no text)</span>}
         </div>
         <div
-          className={`mt-1 flex items-center gap-2 text-[11px] text-gray-400 ${
+          className={`mt-1 flex items-center gap-2 text-[11px] text-gray-500 ${
             outbound ? 'justify-end' : 'justify-start'
           }`}
         >
@@ -92,9 +92,9 @@ function SystemRow({ event }: { event: LeadEvent }) {
 
   return (
     <div className="flex items-center gap-2 text-[12px] text-gray-500">
-      <span className="shrink-0 text-gray-400">{icon}</span>
+      <span className="shrink-0 text-gray-500">{icon}</span>
       <span className="min-w-0 truncate">{label}</span>
-      <span className="ml-auto shrink-0 text-gray-400 text-[11px]">{formatTime(event.ts)}</span>
+      <span className="ml-auto shrink-0 text-gray-500 text-[11px]">{formatTime(event.ts)}</span>
     </div>
   )
 }
@@ -221,7 +221,7 @@ export default function LeadTimeline({ events, loading, error }: LeadTimelinePro
         )
       })}
 
-      <p className="pt-2 text-[11px] text-gray-400" style={JAKARTA_FONT}>
+      <p className="pt-2 text-[11px] text-gray-500" style={JAKARTA_FONT}>
         {visible.length} event{visible.length === 1 ? '' : 's'}
       </p>
     </div>
