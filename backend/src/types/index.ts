@@ -503,6 +503,10 @@ export interface MetaDirectWhatsAppConnection {
   businessAccountId: string
   accessTokenEncrypted: string
   displayPhoneNumber: string
+  // The business name Meta approved for the number, as read at connect time.
+  // Optional because connections made before it was read, and every connection
+  // made through the redirect path, have none.
+  verifiedName?: string
   notificationNumber: string
   connectedAt: string
   // Whether POST /{wabaId}/subscribed_apps succeeded for this connection.

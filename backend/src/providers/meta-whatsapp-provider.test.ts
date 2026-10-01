@@ -367,5 +367,30 @@ describe('MetaWhatsAppProvider.exchangeCodeForCredentials', () => {
 
     await expect(metaWhatsAppProvider.exchangeCodeForCredentials('code-1', 'phone-1')).rejects.toThrow(/Code expired/)
   })
+
+  it('returns the verified name Meta approved for the number', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: 'tok' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ display_phone_number: '+91 70070 28001' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ verified_name: 'Vyostra AI' }), { status: 200 }))
+
+    const result = await metaWhatsAppProvider.exchangeCodeForCredentials('code-1', 'phone-1')
+
+    expect(result.verifiedName).toBe('Vyostra AI')
+  })
+
+  // The name is only ever displayed. A connection that works must not be thrown
+  // away because the one cosmetic lookup failed.
+  it('still connects when the verified name lookup fails', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: 'tok' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ display_phone_number: '+91 70070 28001' }), { status: 200 }))
+      .mockRejectedValueOnce(new Error('network down'))
+
+    const result = await metaWhatsAppProvider.exchangeCodeForCredentials('code-1', 'phone-1')
+
+    expect(result.displayPhoneNumber).toBe('+91 70070 28001')
+    expect(result.verifiedName).toBeUndefined()
+  })
 })
 

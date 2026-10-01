@@ -244,4 +244,23 @@ describe('storeMetaWhatsAppConnection webhook subscription', () => {
     }
     expect(stored.metaDirectWhatsAppConnection).not.toHaveProperty('tokenExpiresAt')
   })
+
+  it('records the verified name when the exchange read one', async () => {
+    await storeMetaWhatsAppConnection('client-1', { ...input, verifiedName: 'Vyostra AI' })
+
+    expect(vi.mocked(updateClient).mock.calls[0]?.[1]).toMatchObject({
+      metaDirectWhatsAppConnection: { verifiedName: 'Vyostra AI' },
+    })
+  })
+
+  // Same reason as tokenExpiresAt above: the redirect path never reads one, and
+  // DynamoDB rejects an explicit undefined.
+  it('omits verifiedName entirely when none was read', async () => {
+    await storeMetaWhatsAppConnection('client-1', input)
+
+    const stored = vi.mocked(updateClient).mock.calls[0]?.[1] as {
+      metaDirectWhatsAppConnection?: Record<string, unknown>
+    }
+    expect(stored.metaDirectWhatsAppConnection).not.toHaveProperty('verifiedName')
+  })
 })

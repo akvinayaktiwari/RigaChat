@@ -392,6 +392,9 @@ export interface MetaDirectWhatsAppConnection {
   phoneNumberId: string
   businessAccountId: string
   displayPhoneNumber: string
+  // The business name Meta approved for the number. Absent on connections made
+  // before it was read.
+  verifiedName?: string
   notificationNumber: string
   connectedAt: string
   active: boolean

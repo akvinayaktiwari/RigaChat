@@ -165,6 +165,7 @@ export interface StoreMetaWhatsAppConnectionInput {
   notificationNumber: string
   accessToken: string
   displayPhoneNumber: string
+  verifiedName?: string
   // From the Embedded Signup FINISH payload. Absent on the seed script and the
   // redirect path, which is why the stored record still falls back to wabaId.
   businessId?: string
@@ -288,6 +289,7 @@ export async function storeMetaWhatsAppConnection(
       businessAccountId: input.businessId ?? input.wabaId,
       accessTokenEncrypted,
       displayPhoneNumber: input.displayPhoneNumber,
+      ...(input.verifiedName ? { verifiedName: input.verifiedName } : {}),
       notificationNumber: input.notificationNumber,
       connectedAt: new Date().toISOString(),
       webhookSubscribed,
@@ -300,10 +302,8 @@ export async function storeMetaWhatsAppConnection(
 }
 
 export async function connectMetaWhatsApp(clientId: string, input: ConnectMetaWhatsAppInput): Promise<void> {
-  const { accessToken, displayPhoneNumber, tokenExpiresAt } = await metaWhatsAppProvider.exchangeCodeForCredentials(
-    input.code,
-    input.phoneNumberId
-  )
+  const { accessToken, displayPhoneNumber, verifiedName, tokenExpiresAt } =
+    await metaWhatsAppProvider.exchangeCodeForCredentials(input.code, input.phoneNumberId)
 
   await storeMetaWhatsAppConnection(clientId, {
     wabaId: input.wabaId,
@@ -311,6 +311,7 @@ export async function connectMetaWhatsApp(clientId: string, input: ConnectMetaWh
     notificationNumber: input.notificationNumber,
     accessToken,
     displayPhoneNumber,
+    verifiedName,
     businessId: input.businessId,
     tokenExpiresAt,
   })

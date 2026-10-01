@@ -28,6 +28,7 @@ interface MetaTokenResponse {
 
 interface MetaPhoneNumberResponse {
   display_phone_number?: string
+  verified_name?: string
   error?: { message?: string }
 }
 
@@ -189,6 +190,9 @@ interface MetaPhoneListResponse {
 export interface MetaWhatsAppCredentialsExchange {
   accessToken: string
   displayPhoneNumber: string
+  // The business name Meta approved for this number. Absent when the lookup
+  // failed -- it is shown on the dashboard, never needed to send.
+  verifiedName?: string
   // ISO timestamp, absent when Meta did not report expires_in. Stored on the
   // connection so a token approaching death can be found BEFORE it takes a
   // client's inbound and outbound with it.
@@ -252,13 +256,32 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
       throw new Error(`Meta phone number lookup failed: ${phoneData.error?.message ?? 'Unknown error'}`)
     }
 
+    const verifiedName = await this.lookupVerifiedName(phoneNumberId, tokenData.access_token)
+
     return {
       accessToken: tokenData.access_token,
       displayPhoneNumber: phoneData.display_phone_number,
+      ...(verifiedName ? { verifiedName } : {}),
       tokenExpiresAt:
         tokenData.expires_in === undefined
           ? undefined
           : new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
+    }
+  }
+
+  // Asked for on its own rather than added to the display_phone_number lookup
+  // above, and allowed to fail. Meta rejects a WHOLE request when any single
+  // field is unavailable to the token, so sharing a request would let a name
+  // that is only ever displayed take the connection down with it.
+  private async lookupVerifiedName(phoneNumberId: string, accessToken: string): Promise<string | undefined> {
+    try {
+      const params = new URLSearchParams({ access_token: accessToken, fields: 'verified_name' })
+      const response = await fetch(`${GRAPH_API_BASE}/${phoneNumberId}?${params.toString()}`)
+      const data = (await response.json()) as MetaPhoneNumberResponse
+      return data.verified_name?.trim() || undefined
+    } catch (error) {
+      console.error(`[whatsapp] verified name lookup failed for phone number ${phoneNumberId}:`, error)
+      return undefined
     }
   }
 
