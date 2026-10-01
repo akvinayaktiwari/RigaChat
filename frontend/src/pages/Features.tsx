@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react'
 import PageMeta from '../components/seo/PageMeta'
 import StructuredData from '../components/seo/StructuredData'
 import { featurePageGraph } from '../lib/structured-data'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Bot, MessageSquare, Users, FileText, Mic, Route, CalendarCheck } from 'lucide-react'
 import Navbar from '../components/landing/Navbar'
 import Footer from '../components/landing/Footer'
@@ -13,7 +13,7 @@ interface FeatureCardData {
   title: string
   body: string
   // Absent for features that are live but don't have a marketing deep-dive page
-  // yet. Only /features/chatbot, /whatsapp, /crm and /forms exist as routes --
+  // yet. Only /features/chatbot, /whatsapp, /crm, /forms and /voice-agent exist as routes --
   // giving a card an href that has no route would 404, so the card renders
   // static instead of guessing at a URL.
   href?: string
@@ -43,6 +43,7 @@ const FEATURE_CARDS: FeatureCardData[] = [
     icon: <Mic className="w-6 h-6" />,
     title: 'AI Voice Agent',
     body: 'Visitors talk to your agent on the page — no app, no phone call. Same knowledge base, same CRM.',
+    href: '/features/voice-agent',
   },
   {
     icon: <CalendarCheck className="w-6 h-6" />,
@@ -99,8 +100,6 @@ function FeatureCardBody({ card }: { card: FeatureCardData }) {
 const CARD_SHELL = 'text-left bg-white border border-outline-variant/30 rounded-2xl p-6 shadow-xs'
 
 function FeatureCard({ card }: { card: FeatureCardData }) {
-  const navigate = useNavigate()
-
   // No deep-dive page for this feature yet, so it renders as a plain panel --
   // no hover lift and no pointer cursor, which would promise a click that
   // goes nowhere.
@@ -112,14 +111,13 @@ function FeatureCard({ card }: { card: FeatureCardData }) {
     )
   }
 
-  const href = card.href
+  // A real link, not a button that navigates: a crawler follows an href and
+  // nothing else, so as buttons these cards left every feature page unlinked
+  // from the page that lists them.
   return (
-    <button
-      onClick={() => navigate(href)}
-      className={`${CARD_SHELL} hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer`}
-    >
+    <Link to={card.href} className={`block ${CARD_SHELL} hover:shadow-md hover:-translate-y-1 transition-all`}>
       <FeatureCardBody card={card} />
-    </button>
+    </Link>
   )
 }
 

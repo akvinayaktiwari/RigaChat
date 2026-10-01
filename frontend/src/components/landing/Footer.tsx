@@ -7,7 +7,8 @@ const LINK_COLUMNS = [
     links: [
       { label: 'Features', href: '/features' },
       { label: 'Integrations', href: '/#integrations' },
-      { label: 'Pricing', href: '/#pricing' },
+      { label: 'Pricing', href: '/pricing' },
+      { label: 'FAQ', href: '/faq' },
     ],
   },
   {

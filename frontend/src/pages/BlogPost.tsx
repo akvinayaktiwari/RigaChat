@@ -12,6 +12,7 @@ import { AttachmentCard, BlogSurface, PostMetaLine, PostTags } from '../componen
 import { mdxComponents } from '../components/blog/MdxComponents'
 import { JAKARTA_FONT, ScrollReveal, StatRow, StatTile } from '../components/blog/BlogPrimitives'
 import { absoluteUrl } from '../lib/site'
+import { PEOPLE } from '../lib/people'
 import { postDescription, postDocumentTitle } from '../lib/search-snippet'
 import type { BlogPost, BlogPostMeta } from '../types/blog'
 import StructuredData from '../components/seo/StructuredData'
@@ -128,6 +129,8 @@ function PostArticle({ post }: { post: BlogPost }) {
         <meta property="og:description" content={meta.excerpt} />
         <meta property="og:url" content={canonical} />
         <meta property="article:published_time" content={meta.publishedAt} />
+        <meta property="article:modified_time" content={meta.updatedAt ?? meta.publishedAt} />
+        <meta name="author" content={PEOPLE[meta.authorId].name} />
         {meta.tags.map((tag) => (
           <meta property="article:tag" content={tag} key={tag} />
         ))}
@@ -141,7 +144,7 @@ function PostArticle({ post }: { post: BlogPost }) {
       <StructuredData
         data={jsonLdGraph([
           organizationSchema(),
-          blogPostingSchema({ ...meta, path: `/blog/${meta.slug}/` }),
+          blogPostingSchema({ ...meta, path: `/blog/${meta.slug}/`, author: PEOPLE[meta.authorId] }),
           breadcrumbSchema([
             { name: 'Home', path: '/' },
             { name: 'Blog', path: '/blog/' },
@@ -168,7 +171,7 @@ function PostArticle({ post }: { post: BlogPost }) {
               </h1>
               <p className="mt-6 max-w-3xl text-base leading-relaxed text-white/60 md:text-lg">{meta.excerpt}</p>
               <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
-                <PostMetaLine meta={meta} />
+                <PostMetaLine meta={meta} linkAuthor />
                 <PostTags tags={meta.tags} />
               </div>
             </ScrollReveal>

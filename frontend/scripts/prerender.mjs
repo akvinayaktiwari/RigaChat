@@ -1,5 +1,5 @@
 /**
- * Build-time prerender for blog and legal routes, plus robots.txt and sitemap.xml.
+ * Build-time prerender for blog and legal routes, plus robots.txt, sitemap.xml and llms.txt.
  *
  * Runs after `vite build`. Builds an SSR bundle of prerender-entry.tsx, renders
  * each blog route to HTML, and writes it into dist/ as a real static file so
@@ -12,7 +12,7 @@
  *   dist/blog/index.html
  *   dist/blog/<slug>/index.html
  *   dist/privacy-policy/index.html, dist/terms-of-service/index.html
- *   dist/robots.txt, dist/sitemap.xml
+ *   dist/robots.txt, dist/sitemap.xml, dist/llms.txt
  */
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'

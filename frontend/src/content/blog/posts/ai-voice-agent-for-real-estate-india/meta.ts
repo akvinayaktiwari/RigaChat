@@ -6,13 +6,14 @@ const meta: BlogPostMeta = {
   excerpt:
     'A property buyer on your project page has questions that are simple to ask and costly to get wrong: is it available, what is the price, when is possession. A voice agent can answer some of them well. The skill is in deciding which, and in making the handoff to your sales team clean.',
   publishedAt: '2026-10-01',
-  category: 'Lead Generation Playbook',
+  authorId: 'vinayak-tiwari',
+  category: 'Voice AI',
   tags: ['Voice AI', 'Real Estate', 'India', 'Lead Generation'],
   readingMinutes: 7,
   seoTitle: 'AI Voice Agent for Real Estate in India',
   seoDescription:
     'What a real estate AI voice agent should answer from your knowledge base, what it must hand to sales, and why availability and price are the risky questions.',
-  relatedFeatures: ['/features/chatbot'],
+  relatedFeatures: ['/features/voice-agent', '/features/chatbot'],
   faq: [
     {
       question: 'What can an AI voice agent do for a real estate business?',

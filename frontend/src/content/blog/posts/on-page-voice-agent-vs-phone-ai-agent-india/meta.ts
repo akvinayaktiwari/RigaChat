@@ -6,13 +6,14 @@ const meta: BlogPostMeta = {
   excerpt:
     'Two products share the name "AI voice agent". One lives inside your web page and needs only a browser. The other answers a phone number and needs telephony. They solve different problems for different callers, and picking the wrong one is the most common way voice AI disappoints.',
   publishedAt: '2026-10-01',
-  category: 'Lead Generation Playbook',
+  authorId: 'vinayak-tiwari',
+  category: 'Comparison',
   tags: ['Voice AI', 'India', 'Comparison'],
   readingMinutes: 6,
   seoTitle: 'On-Page Voice Agent vs Phone AI Agent (India)',
   seoDescription:
     'An on-page voice agent runs in the browser with no phone number; a phone AI agent answers calls. How they differ in setup and reach, and when to use which.',
-  relatedFeatures: ['/features/chatbot'],
+  relatedFeatures: ['/features/voice-agent', '/features/chatbot'],
   faq: [
     {
       question: 'What is the difference between an on-page voice agent and a phone AI agent?',

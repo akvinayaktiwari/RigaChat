@@ -6,7 +6,8 @@ const meta: BlogPostMeta = {
   excerpt:
     'Most property enquiries in India end up on WhatsApp, and most of them go cold waiting for a reply. Here is how the WhatsApp Business Platform actually behaves — the 24-hour window, templates, opt-in — and how to design a qualification and site-visit flow around those rules rather than against them.',
   publishedAt: '2026-09-16',
-  category: 'Lead Generation Playbook',
+  authorId: 'vinayak-tiwari',
+  category: 'WhatsApp',
   tags: ['WhatsApp', 'Real Estate', 'India', 'Lead Generation'],
   readingMinutes: 9,
   seoTitle: 'WhatsApp Chatbot for Real Estate in India',

@@ -32,11 +32,27 @@ leads and 16 clients against claims of 50,000+ and 500+) and 5.1, the bundle spl
 chunk went 1,077 kB / 286 kB gzip to 558 kB / 168 kB gzip, and a load of / fetches that chunk
 alone. `src/pages/app-bundle-split.test.ts` pins both directions of the eager/lazy line.
 
+**Done on 2026-10-02 (branch `seo/aeo-handoff`, unmerged; from `docs/SEO_AEO_HANDOFF.md`):**
+- 6.1 `llms.txt`, generated from `STATIC_PAGES` in `crawl-files.ts` and uploaded with the
+  one-hour cache beside robots.txt.
+- 3.1 person authors: `lib/people.ts`, a visible byline, `Person` author, `dateModified`,
+  optional `updatedAt`. Every post is attributed to Vinayak Tiwari (the handoff's default).
+- 3.2 in part: both founders are `Person` nodes with `jobTitle` and their LinkedIn `sameAs`,
+  taken from `/about-us`. Input B turned out to be in the repo already. Company profiles
+  (input C) are still LinkedIn only.
+- New pages `/pricing/`, `/faq/`, `/features/voice-agent/`, each prerendered, in the sitemap
+  and in `llms.txt`. The feature cards on `/features/` became real links.
+- `lastmod` on every static page; blog categories fixed to four clusters.
+- NOT done from that handoff, on purpose: the homepage title was already 60 characters, and
+  homepage JSON-LD already existed (the handoff was written from a fetch that missed both).
+  The three `/compare/*` pages are a draft only, `docs/seo/drafts/compare-pages.md`.
+- **After merging:** run `scripts/deploy-cloudfront-function.sh` so `/pricing` and `/faq`
+  (no trailing slash) 301 to the slash form instead of getting the app shell.
+
 **Not started:**
-- 2.2, 3.1, 3.2, 3.4 are blocked on inputs A–E.
+- 2.2 and 3.4 are blocked on inputs D and E; the rest of 3.2 on input C.
 - 3.5 and 3.6 need design assets.
 - 4.2's `purchase` event, blocked on the INR figures (the currency trap).
-- 6.1 is `llms.txt`.
 - The consent banner (prompt-analytics §2).
 
 **Found while working, not in the original audit:** `StatsBar.tsx` asserts

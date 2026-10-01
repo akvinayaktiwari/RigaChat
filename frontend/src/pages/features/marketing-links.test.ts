@@ -12,7 +12,7 @@ import appSource from '../../../App.tsx?raw'
  */
 
 const marketingSources: Record<string, string> = {
-  ...import.meta.glob<string>('../Features.tsx', { query: '?raw', import: 'default', eager: true }),
+  ...import.meta.glob<string>(['../Features.tsx', '../Pricing.tsx', '../Faq.tsx'], { query: '?raw', import: 'default', eager: true }),
   ...import.meta.glob<string>(['./*.tsx', '!./*.test.tsx'], { query: '?raw', import: 'default', eager: true }),
   ...import.meta.glob<string>(['../../components/landing/**/*.tsx', '!../../components/landing/**/*.test.tsx'], { query: '?raw', import: 'default', eager: true }),
 }
@@ -41,6 +41,14 @@ describe('marketing page links', () => {
   it.each(files)('%s links only to mounted routes', (_file, source) => {
     const broken = internalHrefs(source).filter((href) => !routes.has(href))
     expect(broken).toEqual([])
+  })
+
+  // The features index is where a crawler discovers the feature pages, and it
+  // can only follow an href. Cards that navigate from onClick link nothing.
+  it('links the feature cards with real anchors', () => {
+    const features = files.find(([file]) => file.endsWith('/Features.tsx'))?.[1] ?? ''
+    expect(features).toContain('<Link to={card.href}')
+    expect(features).not.toMatch(/onClick=\{\(\) => navigate\(href\)\}/)
   })
 
   // A bare "#" is a crawl dead end and reads as unfinished. The footer shipped

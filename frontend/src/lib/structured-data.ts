@@ -6,6 +6,7 @@
  * violation, and AI answer engines quote it as fact. So there is deliberately no
  * AggregateRating: there are no third-party reviews to aggregate yet.
  */
+import { FOUNDERS, type Person } from './people'
 import type { PricingTier } from './pricingTiers'
 import { absoluteUrl } from './site'
 
@@ -15,7 +16,7 @@ export type JsonLd = { [key: string]: JsonValue }
 export const ORGANIZATION_NAME = 'Vyostra AI'
 /** Must match Privacy.tsx's LEGAL_ENTITY, which Meta Business Verification checks. */
 export const LEGAL_ENTITY = 'Aashirwad Trading Enterprises'
-const SUPPORT_EMAIL = 'support@vyostra.com'
+export const SUPPORT_EMAIL = 'support@vyostra.com'
 
 /**
  * Profiles that are provably the same entity, which is how a search engine tells
@@ -29,6 +30,23 @@ const ORGANIZATION_ID = '#organization'
 const WEBSITE_ID = '#website'
 /** The product node. Feature pages point `about` at it, so they read as pages about one product. */
 const SOFTWARE_ID = '#software'
+
+/**
+ * A person, identified by @id so the same human is one node whether they appear
+ * as a founder or as a post's author. The LinkedIn profile is what tells an
+ * engine which "Vinayak Tiwari" this is.
+ */
+export function personSchema(person: Person): JsonLd {
+  return {
+    '@type': 'Person',
+    '@id': absoluteUrl(`/#${person.id}`),
+    name: person.name,
+    jobTitle: person.role,
+    worksFor: { '@id': absoluteUrl(`/${ORGANIZATION_ID}`) },
+    url: absoluteUrl('/about-us/'),
+    sameAs: [person.linkedinUrl],
+  }
+}
 
 export function organizationSchema(): JsonLd {
   return {
@@ -46,10 +64,7 @@ export function organizationSchema(): JsonLd {
       addressRegion: 'Karnataka',
       addressCountry: 'IN',
     },
-    founder: [
-      { '@type': 'Person', name: 'Vinayak Tiwari' },
-      { '@type': 'Person', name: 'Adarsh Jee Pandey' },
-    ],
+    founder: FOUNDERS.map(personSchema),
   }
 }
 
@@ -79,7 +94,7 @@ function planOffer(tier: PricingTier): JsonLd {
       unitCode: 'MON',
       referenceQuantity: { '@type': 'QuantitativeValue', value: 1, unitCode: 'MON' },
     },
-    url: absoluteUrl('/#pricing'),
+    url: absoluteUrl('/pricing/'),
   }
 }
 
@@ -119,8 +134,12 @@ export interface ArticleFields {
   title: string
   excerpt: string
   publishedAt: string
+  /** When the post was last substantially revised. Absent on a post never revised. */
+  updatedAt?: string
   path: string
   tags: readonly string[]
+  /** The person the page's byline names. */
+  author: Person
 }
 
 export function blogPostingSchema(article: ArticleFields): JsonLd {
@@ -129,10 +148,11 @@ export function blogPostingSchema(article: ArticleFields): JsonLd {
     headline: article.title,
     description: article.excerpt,
     datePublished: article.publishedAt,
+    dateModified: article.updatedAt ?? article.publishedAt,
     mainEntityOfPage: absoluteUrl(article.path),
     image: absoluteUrl('/og-image.png'),
     keywords: article.tags.join(', '),
-    author: { '@id': absoluteUrl(`/${ORGANIZATION_ID}`) },
+    author: personSchema(article.author),
     publisher: { '@id': absoluteUrl(`/${ORGANIZATION_ID}`) },
   }
 }
@@ -156,7 +176,7 @@ export function breadcrumbSchema(crumbs: readonly Crumb[]): JsonLd {
 }
 
 export interface FeaturePageFields {
-  /** Short name, as the Features page labels it ("Lead CRM"). Also the last breadcrumb. */
+  /** Short name, as the site labels the page ("Lead CRM", "Pricing"). Also the last breadcrumb. */
   name: string
   /** Path exactly as served, e.g. "/features/crm/". */
   path: string
@@ -167,22 +187,33 @@ const FEATURES_CRUMBS: readonly Crumb[] = [
   { name: 'Features', path: '/features/' },
 ]
 
+/** A page of the site that is about the product. */
+function webPageSchema(page: FeaturePageFields): JsonLd {
+  return {
+    '@type': 'WebPage',
+    '@id': absoluteUrl(page.path),
+    url: absoluteUrl(page.path),
+    name: page.name,
+    isPartOf: { '@id': absoluteUrl(`/${WEBSITE_ID}`) },
+    about: { '@id': absoluteUrl(`/${SOFTWARE_ID}`) },
+  }
+}
+
 /** A feature page: a WebPage about the product, plus its Home > Features trail. */
 export function featurePageGraph(page: FeaturePageFields): JsonLd {
+  return jsonLdGraph(featurePageNodes(page))
+}
+
+/** featurePageGraph's nodes, for a feature page that adds its own (an FAQPage) to the graph. */
+export function featurePageNodes(page: FeaturePageFields): JsonLd[] {
   const isIndex = page.path === '/features/'
   const crumbs = isIndex ? FEATURES_CRUMBS : [...FEATURES_CRUMBS, { name: page.name, path: page.path }]
+  return [webPageSchema(page), breadcrumbSchema(crumbs)]
+}
 
-  return jsonLdGraph([
-    {
-      '@type': 'WebPage',
-      '@id': absoluteUrl(page.path),
-      url: absoluteUrl(page.path),
-      name: page.name,
-      isPartOf: { '@id': absoluteUrl(`/${WEBSITE_ID}`) },
-      about: { '@id': absoluteUrl(`/${SOFTWARE_ID}`) },
-    },
-    breadcrumbSchema(crumbs),
-  ])
+/** A top-level page (/pricing/, /faq/): a WebPage about the product, one crumb below Home. */
+export function pageGraphNodes(page: FeaturePageFields): JsonLd[] {
+  return [webPageSchema(page), breadcrumbSchema([{ name: 'Home', path: '/' }, { name: page.name, path: page.path }])]
 }
 
 /** Wraps nodes in one @graph so @id references resolve across them. */

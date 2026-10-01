@@ -4,6 +4,8 @@ import viewerRequestSource from '../../../deploy/cloudfront/viewer-request.js?ra
 import {
   PRERENDERED_STATIC_ROUTES,
   SPA_MARKETING_ROUTES,
+  STATIC_PAGES,
+  buildLlmsTxt,
   buildRobotsTxt,
   buildSitemapXml,
   servedPath,
@@ -60,8 +62,41 @@ describe('sitemapEntries', () => {
     expect(entries.find((entry) => entry.path === '/')?.lastModified).toBeUndefined()
   })
 
+  // lastmod is the crawler's cue to refetch; a revised post left at its
+  // publication date is a revision nobody is told about.
+  it('dates a revised post from its revision', () => {
+    const revised = sitemapEntries([{ slug: 'a-post', publishedAt: '2026-08-01', updatedAt: '2026-09-20' }])
+    expect(revised.find((entry) => entry.path === '/blog/a-post/')?.lastModified).toBe('2026-09-20')
+  })
+
+  it('dates every static page from its own record', () => {
+    const features = STATIC_PAGES.find((page) => page.route === '/features/crm')
+    expect(entries.find((entry) => entry.path === '/features/crm/')?.lastModified).toBe(features?.lastModified)
+  })
+
+  // A new post changes the index page; the index must say so without anyone
+  // remembering to bump its date.
+  it('dates the blog index from its newest post', () => {
+    const withNewPost = sitemapEntries([{ slug: 'a-post', publishedAt: '2099-01-01' }])
+    expect(withNewPost.find((entry) => entry.path === '/blog/')?.lastModified).toBe('2099-01-01')
+  })
+
   it('has no duplicate URLs', () => {
     expect(new Set(paths).size).toBe(paths.length)
+  })
+})
+
+describe('static page dates', () => {
+  // One day of slack: a date written in India is already "tomorrow" in UTC
+  // for the first five and a half hours of the day.
+  const latestAllowed = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
+
+  // A lastmod in the future, or one that is not a date, is one a crawler
+  // learns to disregard along with every other date in the file.
+  it.each(STATIC_PAGES.map((page) => [page.route, page.lastModified] as const))('%s has a real date that is not in the future', (_route, date) => {
+    expect(date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10)).toBe(date)
+    expect(date <= latestAllowed).toBe(true)
   })
 })
 
@@ -94,5 +129,35 @@ describe('buildSitemapXml', () => {
     expect(xml).toContain('<loc>https://vyostra.com/a&amp;b</loc>')
     expect(xml).toContain('<lastmod>2026-08-01</lastmod>')
     expect(xml.startsWith('<?xml version="1.0" encoding="UTF-8"?>')).toBe(true)
+  })
+})
+
+describe('buildLlmsTxt', () => {
+  const posts = [{ slug: 'a-post', title: 'A post', description: 'What the post answers.' }]
+  const tiers = [{ tier: 'starter' as const, name: 'Starter', priceUsd: 49, description: 'For one site.', features: ['1 agent', '50 CRM leads'] }]
+  const llms = buildLlmsTxt(ORIGIN, {
+    definition: ['Vyostra AI is a lead-capture platform.', 'It writes leads into a CRM.'],
+    tiers,
+    posts,
+    supportEmail: 'support@vyostra.com',
+  })
+
+  it('opens with the name and the definition as the summary blockquote', () => {
+    expect(llms.startsWith('# Vyostra AI\n\n> Vyostra AI is a lead-capture platform.\n\nIt writes leads into a CRM.\n')).toBe(true)
+  })
+
+  // A page in the sitemap and missing here is a page the two files disagree
+  // about, which is the drift generating both from one list exists to prevent.
+  it('links every URL the sitemap lists', () => {
+    const sitemapPaths = sitemapEntries([{ slug: 'a-post', publishedAt: '2026-08-01' }]).map((entry) => entry.path)
+    expect(sitemapPaths.filter((path) => !llms.includes(`](${ORIGIN}${path})`))).toEqual([])
+  })
+
+  it('states each plan at its price', () => {
+    expect(llms).toContain('- Starter: $49 per month. For one site. Includes 1 agent, 50 CRM leads.')
+  })
+
+  it('describes a post in its own words', () => {
+    expect(llms).toContain('- [A post](https://vyostra.com/blog/a-post/): What the post answers.')
   })
 })

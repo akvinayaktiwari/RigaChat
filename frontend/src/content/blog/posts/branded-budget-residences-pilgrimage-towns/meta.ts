@@ -6,7 +6,8 @@ const meta: BlogPostMeta = {
   excerpt:
     'The white space between the unbranded dharamshala and the full-service hotel — a data-backed feasibility breakdown for a clean, no-frills, ₹2,000–2,500/night branded stay format.',
   publishedAt: '2026-08-01',
-  category: 'Hospitality Investment Research',
+  authorId: 'vinayak-tiwari',
+  category: 'Real Estate',
   tags: ['Hospitality', 'Real Estate', 'India', 'Feasibility Study'],
   readingMinutes: 14,
   seoDescription:
