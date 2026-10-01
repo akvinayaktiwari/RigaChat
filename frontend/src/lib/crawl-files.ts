@@ -14,7 +14,7 @@ export const SPA_MARKETING_ROUTES: readonly string[] = [
 ]
 
 /** The llms.txt heading a page is listed under. "Optional" is the spec's name for skippable links. */
-export type LlmsSection = 'Product' | 'Blog' | 'Company' | 'Optional'
+export type LlmsSection = 'Product' | 'Pricing' | 'Blog' | 'Company' | 'Optional'
 
 export interface StaticPage {
   /**
@@ -59,6 +59,12 @@ export const STATIC_PAGES: readonly StaticPage[] = [
     label: 'Form Builder',
     summary: 'Embeddable lead capture forms whose submissions land in the same CRM.',
     section: 'Product',
+  },
+  {
+    route: '/pricing',
+    label: 'Pricing',
+    summary: 'The three plans, what each includes, billing in USD or INR, and the 14-day free trial.',
+    section: 'Pricing',
   },
   { route: '/about-us', label: 'About Vyostra AI', summary: 'Who builds Vyostra AI and where: the founders, in Bangalore.', section: 'Company' },
   { route: '/help', label: 'Help Center', summary: 'Setup answers: embedding the widget, the knowledge base, WhatsApp, Zoho CRM, forms, billing.', section: 'Company' },
@@ -206,7 +212,7 @@ export function buildLlmsTxt(origin: string, input: LlmsTxtInput): string {
     `> ${summary}`,
     ...detail,
     llmsSection('Product', product),
-    llmsSection('Pricing', input.tiers.map(llmsPlanLine)),
+    llmsSection('Pricing', [...llmsPageLinks(origin, 'Pricing'), ...input.tiers.map(llmsPlanLine)]),
     llmsSection('Blog', [...llmsPageLinks(origin, 'Blog'), ...posts]),
     llmsSection('Company', [...llmsPageLinks(origin, 'Company'), `- Support: ${input.supportEmail}`]),
     llmsSection('Optional', llmsPageLinks(origin, 'Optional')),

@@ -17,6 +17,7 @@ import WhatsAppFeature from './src/pages/features/WhatsApp'
 import Crm from './src/pages/features/Crm'
 import Forms from './src/pages/features/Forms'
 import Careers from './src/pages/Careers'
+import Pricing from './src/pages/Pricing'
 // Blog routes are lazy so post bodies (and the blog's motion/table components)
 // stay out of the main bundle every other page pays for.
 const BlogIndex = lazy(() => import('./src/pages/BlogIndex'))
@@ -140,6 +141,7 @@ function App() {
           <Route path="/features/crm" element={<Crm />} />
           <Route path="/features/forms" element={<Forms />} />
           <Route path="/careers" element={<Careers />} />
+          <Route path="/pricing" element={<Pricing />} />
           <Route
             path="/blog"
             element={

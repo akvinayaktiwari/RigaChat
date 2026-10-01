@@ -10,6 +10,7 @@ import {
   faqPageSchema,
   jsonLdGraph,
   organizationSchema,
+  pageGraphNodes,
   personSchema,
   softwareApplicationSchema,
   type JsonLd,
@@ -33,6 +34,10 @@ describe('softwareApplicationSchema', () => {
     expect(offers.map((offer) => [offer.name, offer.price, offer.priceCurrency])).toEqual(
       PRICING_TIERS.map((tier) => [tier.name, String(tier.priceUsd), 'USD']),
     )
+  })
+
+  it('points each offer at the pricing page, where the plan is described', () => {
+    expect(offers.map((offer) => offer.url)).toEqual(PRICING_TIERS.map(() => absoluteUrl('/pricing/')))
   })
 
   it('prices per month, which is what the page says', () => {
@@ -122,6 +127,15 @@ describe('breadcrumbSchema', () => {
       { '@type': 'ListItem', position: 1, name: 'Home', item: absoluteUrl('/') },
       { '@type': 'ListItem', position: 2, name: 'Blog', item: absoluteUrl('/blog/') },
     ])
+  })
+})
+
+describe('pageGraphNodes', () => {
+  const [page, crumbs] = pageGraphNodes({ name: 'Pricing', path: '/pricing/' })
+
+  it('describes a page about the product, one crumb below Home', () => {
+    expect(page?.about).toEqual({ '@id': softwareApplicationSchema(PRICING_TIERS)['@id'] })
+    expect(asArray(crumbs?.itemListElement).map((item) => asRecord(item).item)).toEqual([absoluteUrl('/'), absoluteUrl('/pricing/')])
   })
 })
 

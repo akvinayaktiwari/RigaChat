@@ -94,7 +94,7 @@ function planOffer(tier: PricingTier): JsonLd {
       unitCode: 'MON',
       referenceQuantity: { '@type': 'QuantitativeValue', value: 1, unitCode: 'MON' },
     },
-    url: absoluteUrl('/#pricing'),
+    url: absoluteUrl('/pricing/'),
   }
 }
 
@@ -176,7 +176,7 @@ export function breadcrumbSchema(crumbs: readonly Crumb[]): JsonLd {
 }
 
 export interface FeaturePageFields {
-  /** Short name, as the Features page labels it ("Lead CRM"). Also the last breadcrumb. */
+  /** Short name, as the site labels the page ("Lead CRM", "Pricing"). Also the last breadcrumb. */
   name: string
   /** Path exactly as served, e.g. "/features/crm/". */
   path: string
@@ -187,22 +187,33 @@ const FEATURES_CRUMBS: readonly Crumb[] = [
   { name: 'Features', path: '/features/' },
 ]
 
+/** A page of the site that is about the product. */
+function webPageSchema(page: FeaturePageFields): JsonLd {
+  return {
+    '@type': 'WebPage',
+    '@id': absoluteUrl(page.path),
+    url: absoluteUrl(page.path),
+    name: page.name,
+    isPartOf: { '@id': absoluteUrl(`/${WEBSITE_ID}`) },
+    about: { '@id': absoluteUrl(`/${SOFTWARE_ID}`) },
+  }
+}
+
 /** A feature page: a WebPage about the product, plus its Home > Features trail. */
 export function featurePageGraph(page: FeaturePageFields): JsonLd {
+  return jsonLdGraph(featurePageNodes(page))
+}
+
+/** featurePageGraph's nodes, for a feature page that adds its own (an FAQPage) to the graph. */
+export function featurePageNodes(page: FeaturePageFields): JsonLd[] {
   const isIndex = page.path === '/features/'
   const crumbs = isIndex ? FEATURES_CRUMBS : [...FEATURES_CRUMBS, { name: page.name, path: page.path }]
+  return [webPageSchema(page), breadcrumbSchema(crumbs)]
+}
 
-  return jsonLdGraph([
-    {
-      '@type': 'WebPage',
-      '@id': absoluteUrl(page.path),
-      url: absoluteUrl(page.path),
-      name: page.name,
-      isPartOf: { '@id': absoluteUrl(`/${WEBSITE_ID}`) },
-      about: { '@id': absoluteUrl(`/${SOFTWARE_ID}`) },
-    },
-    breadcrumbSchema(crumbs),
-  ])
+/** A top-level page (/pricing/, /faq/): a WebPage about the product, one crumb below Home. */
+export function pageGraphNodes(page: FeaturePageFields): JsonLd[] {
+  return [webPageSchema(page), breadcrumbSchema([{ name: 'Home', path: '/' }, { name: page.name, path: page.path }])]
 }
 
 /** Wraps nodes in one @graph so @id references resolve across them. */
