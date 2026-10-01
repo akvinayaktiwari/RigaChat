@@ -7,7 +7,7 @@ const meta: BlogPostMeta = {
     'Two products share the name "AI voice agent". One lives inside your web page and needs only a browser. The other answers a phone number and needs telephony. They solve different problems for different callers, and picking the wrong one is the most common way voice AI disappoints.',
   publishedAt: '2026-10-01',
   authorId: 'vinayak-tiwari',
-  category: 'Lead Generation Playbook',
+  category: 'Comparison',
   tags: ['Voice AI', 'India', 'Comparison'],
   readingMinutes: 6,
   seoTitle: 'On-Page Voice Agent vs Phone AI Agent (India)',

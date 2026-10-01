@@ -12,7 +12,7 @@ const meta: BlogPostMeta = {
   excerpt: 'An excerpt.',
   publishedAt: '2026-09-16',
   authorId: 'vinayak-tiwari',
-  category: 'Lead Generation Playbook',
+  category: 'WhatsApp',
   tags: ['WhatsApp', 'Real Estate', 'India'],
   readingMinutes: 9,
 }
@@ -21,7 +21,7 @@ describe('postDimensions', () => {
   it('carries the axes a content report is sliced by', () => {
     expect(postDimensions(meta)).toMatchObject({
       post_slug: 'whatsapp-chatbot-for-real-estate-india',
-      post_category: 'Lead Generation Playbook',
+      post_category: 'WhatsApp',
       post_published_at: '2026-09-16',
       reading_minutes: 9,
     })

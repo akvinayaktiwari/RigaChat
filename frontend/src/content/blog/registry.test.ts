@@ -4,7 +4,7 @@ import type { BlogPostMeta } from '../../types/blog'
 import { RELATED_POST_LIMIT, getAllPosts, postsForFeature, relatedPosts } from './registry'
 
 function meta(slug: string, relatedFeatures?: string[], tags: string[] = []): BlogPostMeta {
-  return { slug, title: slug, excerpt: '', publishedAt: '2026-09-01', authorId: 'vinayak-tiwari', category: '', tags, readingMinutes: 1, relatedFeatures }
+  return { slug, title: slug, excerpt: '', publishedAt: '2026-09-01', authorId: 'vinayak-tiwari', category: 'WhatsApp', tags, readingMinutes: 1, relatedFeatures }
 }
 
 describe('postsForFeature', () => {

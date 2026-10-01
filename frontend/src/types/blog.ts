@@ -15,6 +15,16 @@ export interface BlogAttachment {
 }
 
 /**
+ * The topic clusters the blog is organised into. A fixed list rather than free
+ * text: a post's category is its eyebrow label AND the GA4 `post_category`
+ * dimension, and "which cluster earns its keep" is only a report if every post
+ * in a cluster spells it the same way. Add a cluster here when a second post
+ * needs it, not for one post.
+ */
+export const BLOG_CATEGORIES = ['WhatsApp', 'Voice AI', 'Real Estate', 'Comparison'] as const
+export type BlogCategory = (typeof BLOG_CATEGORIES)[number]
+
+/**
  * Post metadata. Lives in its own `meta.ts` next to the post body so the
  * index page can eagerly import every post's metadata without pulling any
  * post body into the initial bundle.
@@ -39,8 +49,8 @@ export interface BlogPostMeta {
    * and published as the BlogPosting author, from the one record.
    */
   authorId: PersonId
-  /** Eyebrow label above the title, e.g. "Hospitality Investment Research". */
-  category: string
+  /** The post's cluster. Shown as the eyebrow label above the title. */
+  category: BlogCategory
   tags: string[]
   /** Estimated read time in minutes, shown in the post meta bar. */
   readingMinutes: number

@@ -7,7 +7,7 @@ const meta: BlogPostMeta = {
     'A visitor talks, your site answers — no phone number, no app, no call charges. What actually decides whether that works: microphone permission, browser support, the latency budget, how Indian callers really speak, and where a voice agent should stop and fetch a human.',
   publishedAt: '2026-10-01',
   authorId: 'vinayak-tiwari',
-  category: 'Lead Generation Playbook',
+  category: 'Voice AI',
   tags: ['Voice AI', 'India', 'Lead Generation', 'Real Estate'],
   readingMinutes: 8,
   seoTitle: 'AI Voice Agents on Your Website: India Guide',

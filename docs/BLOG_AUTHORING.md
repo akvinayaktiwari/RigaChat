@@ -29,7 +29,7 @@ const meta: BlogPostMeta = {
   excerpt: 'One or two sentences. Used as the meta description and the index card deck.',
   publishedAt: '2026-09-16',  // YYYY-MM-DD, drives ordering
   authorId: 'vinayak-tiwari', // a key of PEOPLE in src/lib/people.ts
-  category: 'Lead Generation Playbook',
+  category: 'WhatsApp',       // one of BLOG_CATEGORIES in src/types/blog.ts
   tags: ['WhatsApp', 'India'],
   readingMinutes: 9,
   faq: [                      // optional, see below
@@ -39,6 +39,11 @@ const meta: BlogPostMeta = {
 
 export default meta
 ```
+
+`category` is one of four clusters: `WhatsApp`, `Voice AI`, `Real Estate`,
+`Comparison`. It is the eyebrow label and the GA4 `post_category` dimension, so
+it is a fixed list (`BLOG_CATEGORIES`) and not free text. Use `tags` for
+everything finer.
 
 `authorId` is the byline under the title and the `BlogPosting` author, from one
 record. To add an author, add them to `PEOPLE` in `frontend/src/lib/people.ts`;
