@@ -198,7 +198,7 @@ function TocSidebar({ activeSection, onNavigate }: { activeSection: string; onNa
                     isActive ? 'bg-primary text-white shadow-xs font-semibold' : 'text-on-surface-variant hover:text-primary hover:bg-primary/5'
                   }`}
                 >
-                  <span className={`text-xs font-bold ${isActive ? 'text-white/80' : 'text-outline group-hover:text-primary'}`}>{item.order}</span>
+                  <span className={`text-xs font-bold ${isActive ? 'text-white/80' : 'text-on-surface-variant group-hover:text-primary'}`}>{item.order}</span>
                   <span className="text-sm font-medium leading-tight">{item.label}</span>
                 </button>
               </li>
@@ -292,7 +292,7 @@ function StorageSection() {
             </div>
             <div>
               <h4 className="font-bold text-on-surface text-base">AWS Cloud Infrastructure</h4>
-              <p className="text-xs text-outline font-medium">Region: ap-south-1 (Mumbai, India)</p>
+              <p className="text-xs text-on-surface-variant font-medium">Region: ap-south-1 (Mumbai, India)</p>
             </div>
           </div>
           <span className="px-3.5 py-1 bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-full text-xs font-bold tracking-wider uppercase w-fit">
@@ -356,7 +356,7 @@ function PartnersSection() {
               {renderPartnerIcon(partner.icon)}
             </div>
             <h5 className="font-bold text-on-surface text-sm mb-1">{partner.name}</h5>
-            <p className="text-xs text-outline font-medium">{partner.role}</p>
+            <p className="text-xs text-on-surface-variant font-medium">{partner.role}</p>
           </div>
         ))}
       </div>
@@ -395,7 +395,7 @@ function ContactSection() {
             <Mail className="w-6 h-6" />
           </div>
           <div>
-            <h4 className="font-bold text-xs text-outline uppercase tracking-wider">Email Inquiries</h4>
+            <h4 className="font-bold text-xs text-on-surface-variant uppercase tracking-wider">Email Inquiries</h4>
             <a href="mailto:support@vyostra.com" className="text-base font-bold text-on-surface hover:text-primary transition-colors">
               support@vyostra.com
             </a>
@@ -406,7 +406,7 @@ function ContactSection() {
             <MapPin className="w-6 h-6" />
           </div>
           <div>
-            <h4 className="font-bold text-xs text-outline uppercase tracking-wider">Company Headquarters</h4>
+            <h4 className="font-bold text-xs text-on-surface-variant uppercase tracking-wider">Company Headquarters</h4>
             <p className="text-base font-bold text-on-surface">Bangalore, Karnataka, India</p>
           </div>
         </div>

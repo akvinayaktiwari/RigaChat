@@ -171,7 +171,7 @@ export default function DataDeletionStatus() {
               </p>
 
               <div className="mt-8 p-6 bg-white border border-outline-variant/30 rounded-2xl shadow-xs">
-                <p className="text-[10px] font-bold text-outline uppercase tracking-wider">
+                <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
                   Confirmation code
                 </p>
                 {/* break-all so a long code stays inside the card on a phone */}
@@ -247,7 +247,7 @@ export default function DataDeletionStatus() {
               <Mail className="w-6 h-6" />
             </div>
             <div className="min-w-0">
-              <h4 className="font-bold text-xs text-outline uppercase tracking-wider">
+              <h4 className="font-bold text-xs text-on-surface-variant uppercase tracking-wider">
                 Questions about this request
               </h4>
               <a
