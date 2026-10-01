@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { PRERENDERED_STATIC_ROUTES } from '../../lib/crawl-files'
 import type { BlogPostMeta } from '../../types/blog'
-import { RELATED_POST_LIMIT, getAllPosts, postsForFeature, relatedPosts } from './registry'
+import { RELATED_POST_LIMIT, getAllPosts, loadedPostContent, postsForFeature, preloadPostContent, relatedPosts } from './registry'
 
 function meta(slug: string, relatedFeatures?: string[], tags: string[] = []): BlogPostMeta {
   return { slug, title: slug, excerpt: '', publishedAt: '2026-09-01', authorId: 'vinayak-tiwari', category: 'WhatsApp', tags, readingMinutes: 1, relatedFeatures }
@@ -63,5 +63,20 @@ describe('relatedPosts', () => {
 
   it('returns nothing for an unknown slug', () => {
     expect(relatedPosts('missing', [tagged('a', ['x'])])).toEqual([])
+  })
+})
+
+describe('preloadPostContent', () => {
+  const slug = getAllPosts()[0]?.meta.slug ?? ''
+
+  it('makes the post body available without another fetch', async () => {
+    expect(loadedPostContent(slug)).toBeUndefined()
+    await preloadPostContent(slug)
+    expect(loadedPostContent(slug)).toBeTypeOf('function')
+  })
+
+  it('does nothing for a slug that is not a post', async () => {
+    await preloadPostContent('no-such-post')
+    expect(loadedPostContent('no-such-post')).toBeUndefined()
   })
 })
