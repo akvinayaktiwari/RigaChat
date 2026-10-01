@@ -24,7 +24,7 @@ function RelatedReading({ posts }: { posts: readonly BlogPostMeta[] }) {
 
   return (
     <nav className="mt-20" aria-labelledby="related-reading">
-      <h2 id="related-reading" className="mb-4 text-[11px] font-bold uppercase tracking-[0.2em] text-white/40">
+      <h2 id="related-reading" className="mb-4 text-[11px] font-bold uppercase tracking-[0.2em] text-white/55">
         Related reading
       </h2>
       <ul className="space-y-3">
@@ -230,7 +230,7 @@ function PostArticle({ post }: { post: BlogPost }) {
 
           {meta.attachment ? (
             <div className="mt-20">
-              <h2 className="mb-4 text-[11px] font-bold uppercase tracking-[0.2em] text-white/40">Take the full model with you</h2>
+              <h2 className="mb-4 text-[11px] font-bold uppercase tracking-[0.2em] text-white/55">Take the full model with you</h2>
               <AttachmentCard attachment={meta.attachment} variant="compact" />
             </div>
           ) : null}

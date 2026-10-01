@@ -22,7 +22,7 @@ function FeaturedPost({ post }: { post: BlogPost }) {
             <span className="rounded-full border border-violet-400/30 bg-violet-500/15 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-violet-300">
               Latest
             </span>
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/40">{meta.category}</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/55">{meta.category}</span>
           </div>
 
           <h2 className="mt-5 text-2xl font-extrabold leading-tight text-white md:text-4xl" style={JAKARTA_FONT}>
@@ -52,7 +52,7 @@ function FeaturedPost({ post }: { post: BlogPost }) {
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </span>
             {meta.attachment ? (
-              <span className="inline-flex items-center gap-1.5 text-xs text-white/40">
+              <span className="inline-flex items-center gap-1.5 text-xs text-white/55">
                 <FileText className="h-3.5 w-3.5" aria-hidden="true" />
                 Includes the {meta.attachment.pages ? `${meta.attachment.pages}-page ` : ''}source PDF
               </span>
@@ -70,7 +70,7 @@ function PostCard({ post, index }: { post: BlogPost; index: number }) {
   return (
     <ScrollReveal delay={index * 0.05}>
       <article className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition-colors hover:border-violet-400/30">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/40">{meta.category}</span>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/55">{meta.category}</span>
         <h3 className="mt-3 text-lg font-bold leading-snug text-white" style={JAKARTA_FONT}>
           <Link to={`/blog/${meta.slug}`} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-violet-300">
             <span className="absolute inset-0" aria-hidden="true" />
@@ -129,7 +129,7 @@ export default function BlogIndex() {
 
               {rest.length > 0 ? (
                 <>
-                  <h2 className="mt-20 text-[11px] font-bold uppercase tracking-[0.2em] text-white/40">More posts</h2>
+                  <h2 className="mt-20 text-[11px] font-bold uppercase tracking-[0.2em] text-white/55">More posts</h2>
                   <div className="mt-6 grid gap-5 md:grid-cols-2">
                     {rest.map((post, index) => (
                       <PostCard key={post.meta.slug} post={post} index={index} />

@@ -59,7 +59,7 @@ export default function PricingSection({
 
           {/* Naming the methods is the point of the rupee list: a USD plan cannot
               accept UPI, netbanking or RuPay, and those are why the INR plans exist. */}
-          <p className="mt-3 text-xs text-gray-400">
+          <p className="mt-3 text-xs text-gray-500">
             {region === 'in' ? INR_METHODS_NOTE : 'Billed in USD · card'}
           </p>
         </Reveal>

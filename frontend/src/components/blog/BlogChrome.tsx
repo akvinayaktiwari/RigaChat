@@ -58,16 +58,16 @@ export function PostMetaLine({ meta, linkAuthor = false }: { meta: BlogPostMeta;
   const author = PEOPLE[meta.authorId]
 
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/40">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/55">
       <span>
         By{' '}
         {/* Plain text on index cards: the whole card is already one link to the post. */}
         {linkAuthor ? (
-          <a href="/about-us/" rel="author" className="font-medium text-white/60 underline-offset-4 hover:text-white hover:underline">
+          <a href="/about-us/" rel="author" className="font-medium text-white/75 underline-offset-4 hover:text-white hover:underline">
             {author.name}
           </a>
         ) : (
-          <span className="font-medium text-white/60">{author.name}</span>
+          <span className="font-medium text-white/75">{author.name}</span>
         )}
         , {author.role}
       </span>

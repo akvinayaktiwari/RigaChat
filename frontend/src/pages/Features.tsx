@@ -125,10 +125,10 @@ function ComingSoonSection() {
   return (
     <section className="max-w-7xl mx-auto mb-20">
       <h2 className="text-sm font-bold text-on-surface-variant uppercase tracking-widest mb-4">Coming Soon</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 opacity-60">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {COMING_SOON.map((item) => (
           <div key={item.title} className="bg-white border border-outline-variant/30 rounded-2xl p-6 shadow-xs">
-            <span className="bg-orange-50 text-orange-600 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full">
+            <span className="bg-orange-50 text-orange-800 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full">
               COMING SOON
             </span>
             <h3 className="font-bold text-on-surface text-lg mt-3 mb-2">{item.title}</h3>

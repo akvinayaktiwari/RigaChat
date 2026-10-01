@@ -265,7 +265,7 @@ function TimelineNodeCard({ node, state, pinned, onHover, onToggle }: TimelineNo
     >
       <p className={`mb-1.5 text-[11px] font-semibold uppercase tracking-wide ${style.labelColor}`}>{node.label}</p>
       <p className="mb-1 text-sm font-semibold text-white">{node.title}</p>
-      <p className="mt-auto text-xs text-white/40">{node.timing}</p>
+      <p className="mt-auto text-xs text-white/55">{node.timing}</p>
     </button>
   )
 }

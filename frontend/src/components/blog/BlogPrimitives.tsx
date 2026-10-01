@@ -124,7 +124,7 @@ export function DataTable({ headers, rows, caption, columnClasses = [] }: { head
           </tbody>
         </table>
       </div>
-      {caption ? <figcaption className="mt-3 text-xs leading-relaxed text-white/40">{caption}</figcaption> : null}
+      {caption ? <figcaption className="mt-3 text-xs leading-relaxed text-white/55">{caption}</figcaption> : null}
     </figure>
   )
 }
@@ -214,7 +214,7 @@ export function PhaseTimeline({ phases }: { phases: PhaseItem[] }) {
               <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-violet-300" style={JAKARTA_FONT}>
                 Phase {item.phase}
               </span>
-              <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/40">{item.timeline}</span>
+              <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/55">{item.timeline}</span>
             </div>
             <p className="mt-2 text-sm leading-relaxed text-white/65">{item.action}</p>
           </div>
