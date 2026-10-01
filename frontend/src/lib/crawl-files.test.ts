@@ -57,9 +57,20 @@ describe('sitemapEntries', () => {
     expect(paths).not.toContain('/blog')
   })
 
-  it('dates blog posts from publishedAt and nothing else', () => {
+  it('dates blog posts from publishedAt', () => {
     expect(entries.find((entry) => entry.path === '/blog/a-post/')?.lastModified).toBe('2026-08-01')
-    expect(entries.find((entry) => entry.path === '/')?.lastModified).toBeUndefined()
+  })
+
+  // A URL with no lastmod gives a crawler no cue to refetch it.
+  it('dates every URL', () => {
+    expect(entries.filter((entry) => !/^\d{4}-\d{2}-\d{2}$/.test(entry.lastModified ?? ''))).toEqual([])
+  })
+
+  // The homepage lists the latest posts, so a new post changes it too.
+  it('dates the homepage from its newest post once that is later than its own copy', () => {
+    const home = (posts: Parameters<typeof sitemapEntries>[0]) => sitemapEntries(posts).find((entry) => entry.path === '/')?.lastModified
+    expect(home([{ slug: 'a-post', publishedAt: '2099-01-01' }])).toBe('2099-01-01')
+    expect(home([{ slug: 'a-post', publishedAt: '2000-01-01' }])).not.toBe('2000-01-01')
   })
 
   // lastmod is the crawler's cue to refetch; a revised post left at its
