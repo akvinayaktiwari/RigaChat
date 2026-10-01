@@ -1,6 +1,6 @@
 import PageMeta from '../../components/seo/PageMeta'
 import StructuredData from '../../components/seo/StructuredData'
-import { featurePageGraph } from '../../lib/structured-data'
+import { faqPageSchema, featurePageNodes, jsonLdGraph, type FaqItem } from '../../lib/structured-data'
 import { Bot, Filter, RefreshCw, Database, MessageSquare, FileText } from 'lucide-react'
 import UseCaseLayout from '../../components/landing/UseCaseLayout'
 
@@ -10,6 +10,42 @@ interface LeadRow {
   date: string
   status: 'New' | 'Contacted' | 'Qualified'
 }
+
+/**
+ * Rendered on the page and published as FAQPage from this one array.
+ *
+ * Each answer matches the leads page as it is: its three filters and search
+ * box, its four statuses, and the archive and erase actions on a lead.
+ */
+export const LEAD_CRM_FAQ: FaqItem[] = [
+  {
+    question: 'Which leads appear in the Vyostra AI lead CRM?',
+    answer:
+      'Every lead Vyostra AI captures: from your chat agents, your lead forms and your Meta lead ads. They arrive in one list, each with its conversation transcript or the answers the lead submitted.',
+  },
+  {
+    question: 'What statuses can a lead have?',
+    answer:
+      'Four: New, Contacted, Qualified and Closed. You move a lead from one to the next as your team follows up, and you can add notes to it along the way.',
+  },
+  {
+    question: 'How do I find a lead in the CRM?',
+    answer:
+      'Filter the list by source, by status and by date range, or search by name. The date ranges are the last 7, 30 or 90 days, or all time.',
+  },
+  {
+    question: 'Does the lead CRM sync with other CRMs?',
+    answer:
+      'It syncs with Zoho CRM. You connect Zoho once from Settings, and every new lead is then sent to Zoho automatically.',
+  },
+  {
+    question: 'Can I remove a lead from the CRM?',
+    answer:
+      'Yes, in two ways. Archiving hides a lead from the list and can be undone. Erasing deletes the lead and its history permanently and cannot be undone.',
+  },
+]
+
+const PAGE = { name: 'Lead CRM', path: '/features/crm/' }
 
 const LEAD_ROWS: LeadRow[] = [
   { name: 'Rahul Sharma', source: 'Property Bot', date: 'Today', status: 'New' },
@@ -53,12 +89,14 @@ export default function Crm() {
         description="Every lead captured, stored, and organized automatically. Filter, track, and sync to Zoho CRM in real-time."
         path="/features/crm/"
       />
-      <StructuredData data={featurePageGraph({ name: 'Lead CRM', path: '/features/crm/' })} />
+      <StructuredData data={jsonLdGraph([...featurePageNodes(PAGE), faqPageSchema(LEAD_CRM_FAQ)])} />
       <UseCaseLayout
         featurePath="/features/crm"
         badge="LEAD CRM"
-        headline="Every lead, organized automatically"
-        subheadline="Vyostra AI stores every lead captured by your agents and forms in a built-in CRM dashboard. Filter, track status, and sync to Zoho CRM in one click."
+        headline="A built-in lead CRM for every enquiry"
+        subheadline="The Vyostra AI lead CRM is the dashboard where every captured lead lands, from your chat agents, lead forms and Meta lead ads. Each lead keeps its transcript or form answers, a status and your notes, and new leads can sync to Zoho CRM automatically."
+        howItWorksHeading="How does the Vyostra AI lead CRM work?"
+        benefitsHeading="Why keep leads in a built-in CRM?"
         heroVisual={<CrmTableMockup />}
         howItWorksSteps={[
           {
@@ -70,7 +108,7 @@ export default function Crm() {
           {
             number: '2',
             title: 'Filter and Track',
-            body: 'Filter leads by date, source, and status. Update status from New to Contacted to Qualified as your team follows up.',
+            body: 'Filter leads by date, source, and status. Move each lead from New to Contacted, Qualified and Closed as your team follows up.',
             icon: <Filter className="w-6 h-6" />,
           },
           {
@@ -102,6 +140,7 @@ export default function Crm() {
           { icon: <MessageSquare className="w-4 h-4" />, title: 'WhatsApp Alerts', href: '/features/whatsapp' },
           { icon: <FileText className="w-4 h-4" />, title: 'Form Builder', href: '/features/forms' },
         ]}
+        faq={{ heading: 'What do people ask about the Vyostra AI lead CRM?', items: LEAD_CRM_FAQ }}
         ctaHeadline="See every lead in one place"
         ctaBody="Vyostra AI captures and organizes your leads automatically. Connect Zoho CRM in one click."
       />
