@@ -17,6 +17,7 @@ interface FounderInfo {
   role: string
   description: string
   avatarGradient: string
+  linkedinUrl: string
 }
 
 const STATS: StatItem[] = [
@@ -33,6 +34,15 @@ const FOUNDERS: FounderInfo[] = [
     description:
       'Drives growth and customer acquisition for Vyostra AI. Performance marketer at Vyostra AI, Bangalore.',
     avatarGradient: 'from-emerald-600 to-teal-500',
+    linkedinUrl: 'https://www.linkedin.com/in/adarshjeepandey',
+  },
+  {
+    name: 'V. Sai Kavshik',
+    role: 'Head of Sales',
+    description:
+      'Runs the client side of every launch at Vyostra AI. Has managed ₹10L+ a month in ad spend for developers.',
+    avatarGradient: 'from-orange-500 to-amber-400',
+    linkedinUrl: 'https://www.linkedin.com/in/v-s-kavshik',
   },
   {
     name: 'Vinayak Tiwari',
@@ -40,6 +50,7 @@ const FOUNDERS: FounderInfo[] = [
     description:
       'Built Vyostra AI to help businesses capture every lead automatically. Full-stack engineer at Vyostra AI, Bangalore.',
     avatarGradient: 'from-purple-600 to-indigo-500',
+    linkedinUrl: 'https://www.linkedin.com/in/vinayaktiwari-ai',
   },
 ]
 
@@ -219,6 +230,15 @@ function FounderCard({ founder }: { founder: FounderInfo }) {
       <h4 className="font-bold text-base text-on-surface leading-tight">{founder.name}</h4>
       <p className="text-xs text-outline font-semibold tracking-wider uppercase mt-1">{founder.role}</p>
       <p className="text-xs md:text-sm text-on-surface-variant mt-3 leading-relaxed">{founder.description}</p>
+      <a
+        href={founder.linkedinUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={`${founder.name} on LinkedIn`}
+        className="text-xs font-semibold text-primary hover:underline mt-4"
+      >
+        LinkedIn
+      </a>
     </div>
   )
 }
@@ -230,9 +250,9 @@ function TeamSection() {
         <span className="text-xs font-bold uppercase tracking-widest text-primary bg-primary/10 px-3 py-1.5 rounded-full">
           The Builders Behind The AI
         </span>
-        <h2 className="text-3xl md:text-4xl font-extrabold text-on-surface mt-4 tracking-tight">Meet the Founders</h2>
+        <h2 className="text-3xl md:text-4xl font-extrabold text-on-surface mt-4 tracking-tight">Meet the Team</h2>
       </div>
-      <div className="max-w-2xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-6">
+      <div className="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">
         {FOUNDERS.map((founder) => (
           <FounderCard key={founder.name} founder={founder} />
         ))}
