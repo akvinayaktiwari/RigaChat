@@ -33,6 +33,12 @@ e2e/playwright-report/
 # are artifacts to collect from disk, not files to version.
 e2e/screenshots/
 
+# The App Review recorder (e2e/app-review). The profile holds LIVE session
+# cookies for Vyostra AI, Facebook and WhatsApp Web -- never commit it. The
+# recordings can show a real phone number and are rebuilt on every run.
+e2e/.pw-profile/
+e2e/recordings/
+
 .DS_Store
 
 # Agent worktrees — machine-local scratch, never shared

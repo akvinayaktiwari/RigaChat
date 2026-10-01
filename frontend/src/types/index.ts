@@ -392,9 +392,22 @@ export interface MetaDirectWhatsAppConnection {
   phoneNumberId: string
   businessAccountId: string
   displayPhoneNumber: string
+  // The business name Meta approved for the number. Absent on connections made
+  // before it was read.
+  verifiedName?: string
   notificationNumber: string
   connectedAt: string
   active: boolean
+}
+
+// A Vyostra AI template and its review status on this client's own WhatsApp
+// Business Account. `status` is Meta's value verbatim, or 'NOT_CREATED'.
+export interface WhatsAppTemplateOverview {
+  name: string
+  language: string
+  category: string
+  body: string
+  status: string
 }
 
 export interface ConnectMetaWhatsAppInput {

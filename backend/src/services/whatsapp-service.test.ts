@@ -31,8 +31,12 @@ vi.mock('../repositories/gupshup-app-lookup-repository.js', () => ({
 vi.mock('./lead-service.js', () => ({ getLeadsForClient: vi.fn() }))
 vi.mock('./form-lead-service.js', () => ({ getLeadsForClient: vi.fn() }))
 
-const { hasActiveWhatsAppSession, storeMetaWhatsAppConnection } = await import('./whatsapp-service.js')
-const { getClientById, updateClient } = await import('../repositories/client-repository.js')
+const { disconnectMetaWhatsApp, hasActiveWhatsAppSession, storeMetaWhatsAppConnection } = await import(
+  './whatsapp-service.js'
+)
+const { getClientById, removeClientMetaDirectWhatsAppConnection, updateClient } = await import(
+  '../repositories/client-repository.js'
+)
 
 beforeEach(() => {
   getLastInboundMessageAt.mockReset()
@@ -186,6 +190,36 @@ describe('storeMetaWhatsAppConnection webhook subscription', () => {
     })
   })
 
+  // Disconnect then connect again: no connection record, but Meta still holds
+  // the PIN the number was first registered with. A freshly minted one would be
+  // refused, and the retries count toward Meta's two-step lockout.
+  it('reuses the pin kept at disconnect when the same number connects again', async () => {
+    decrypt.mockResolvedValue('424242')
+    vi.mocked(getClientById).mockResolvedValue({
+      clientId: 'client-1',
+      metaWhatsAppNumberPins: { 'phone-1': 'kept-cipher' },
+    } as never)
+
+    await storeMetaWhatsAppConnection('client-1', input)
+
+    expect(decrypt).toHaveBeenCalledWith('kept-cipher')
+    expect(registerPhoneNumber).toHaveBeenCalledWith('phone-1', '424242', 'tok')
+    expect(vi.mocked(updateClient).mock.calls[0]?.[1]).toMatchObject({
+      metaDirectWhatsAppConnection: { twoStepPinEncrypted: 'kept-cipher', registered: true },
+    })
+  })
+
+  it("does not replay a kept pin at a different number", async () => {
+    vi.mocked(getClientById).mockResolvedValue({
+      clientId: 'client-1',
+      metaWhatsAppNumberPins: { 'phone-other': 'kept-cipher' },
+    } as never)
+
+    await storeMetaWhatsAppConnection('client-1', input)
+
+    expect(decrypt).not.toHaveBeenCalled()
+  })
+
   it('mints a pin only when the client has none stored', async () => {
     await storeMetaWhatsAppConnection('client-1', input)
 
@@ -243,5 +277,75 @@ describe('storeMetaWhatsAppConnection webhook subscription', () => {
       metaDirectWhatsAppConnection?: Record<string, unknown>
     }
     expect(stored.metaDirectWhatsAppConnection).not.toHaveProperty('tokenExpiresAt')
+  })
+
+  it('records the verified name when the exchange read one', async () => {
+    await storeMetaWhatsAppConnection('client-1', { ...input, verifiedName: 'Vyostra AI' })
+
+    expect(vi.mocked(updateClient).mock.calls[0]?.[1]).toMatchObject({
+      metaDirectWhatsAppConnection: { verifiedName: 'Vyostra AI' },
+    })
+  })
+
+  // Same reason as tokenExpiresAt above: the redirect path never reads one, and
+  // DynamoDB rejects an explicit undefined.
+  it('omits verifiedName entirely when none was read', async () => {
+    await storeMetaWhatsAppConnection('client-1', input)
+
+    const stored = vi.mocked(updateClient).mock.calls[0]?.[1] as {
+      metaDirectWhatsAppConnection?: Record<string, unknown>
+    }
+    expect(stored.metaDirectWhatsAppConnection).not.toHaveProperty('verifiedName')
+  })
+})
+
+describe('disconnectMetaWhatsApp', () => {
+  beforeEach(() => {
+    vi.mocked(getClientById).mockReset()
+    vi.mocked(updateClient).mockReset().mockResolvedValue(undefined as never)
+    vi.mocked(removeClientMetaDirectWhatsAppConnection).mockReset().mockResolvedValue(undefined)
+  })
+
+  // THE regression test. Disconnect used to REMOVE the whole record, PIN
+  // included, while Meta kept the PIN bound to the number.
+  it("keeps the number's pin, alongside any already kept, before removing the connection", async () => {
+    vi.mocked(getClientById).mockResolvedValue({
+      clientId: 'client-1',
+      metaWhatsAppNumberPins: { 'phone-old': 'old-cipher' },
+      metaDirectWhatsAppConnection: { phoneNumberId: 'phone-1', twoStepPinEncrypted: 'pin-cipher' },
+    } as never)
+
+    await disconnectMetaWhatsApp('client-1')
+
+    expect(updateClient).toHaveBeenCalledWith('client-1', {
+      metaWhatsAppNumberPins: { 'phone-old': 'old-cipher', 'phone-1': 'pin-cipher' },
+    })
+    expect(vi.mocked(updateClient).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(removeClientMetaDirectWhatsAppConnection).mock.invocationCallOrder[0] ?? 0
+    )
+  })
+
+  // If the copy cannot be written, removing the record would destroy the PIN.
+  it('leaves the connection in place when the pin cannot be kept', async () => {
+    vi.mocked(getClientById).mockResolvedValue({
+      clientId: 'client-1',
+      metaDirectWhatsAppConnection: { phoneNumberId: 'phone-1', twoStepPinEncrypted: 'pin-cipher' },
+    } as never)
+    vi.mocked(updateClient).mockRejectedValue(new Error('dynamo down'))
+
+    await expect(disconnectMetaWhatsApp('client-1')).rejects.toThrow(/dynamo down/)
+    expect(removeClientMetaDirectWhatsAppConnection).not.toHaveBeenCalled()
+  })
+
+  it('still disconnects a connection that never had a pin', async () => {
+    vi.mocked(getClientById).mockResolvedValue({
+      clientId: 'client-1',
+      metaDirectWhatsAppConnection: { phoneNumberId: 'phone-1' },
+    } as never)
+
+    await disconnectMetaWhatsApp('client-1')
+
+    expect(updateClient).not.toHaveBeenCalled()
+    expect(removeClientMetaDirectWhatsAppConnection).toHaveBeenCalledWith('client-1')
   })
 })

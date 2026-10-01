@@ -12,6 +12,7 @@ import {
   sendMetaWhatsAppTestMessage,
 } from '../services/api'
 import { MetaIcon, WhatsAppIcon } from '../components/landing/BrandIcons'
+import WhatsAppTemplates from '../components/WhatsAppTemplates'
 import type { ConnectWhatsAppInput, MetaDirectWhatsAppConnection, WhatsAppConnection } from '../types/index'
 
 type TabId = 'lead-notifications' | 'weekly-reports' | 'agent'
@@ -626,8 +627,18 @@ export default function WhatsApp() {
             <div className="space-y-4">
               <div>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Phone Number</p>
-                <p className="text-gray-900 font-medium mt-1">{metaStatus.displayPhoneNumber}</p>
+                <p className="text-gray-900 font-medium mt-1" data-testid="meta-wa-display-number">
+                  {metaStatus.displayPhoneNumber}
+                </p>
               </div>
+              {metaStatus.verifiedName && (
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Verified Name</p>
+                  <p className="text-gray-900 font-medium mt-1" data-testid="meta-wa-verified-name">
+                    {metaStatus.verifiedName}
+                  </p>
+                </div>
+              )}
 
               <div className="pt-4 border-t border-gray-100">
                 <label htmlFor="meta-wa-test-number" className={LABEL_CLASSES}>
@@ -724,6 +735,10 @@ export default function WhatsApp() {
           )}
         </section>
       </div>
+
+      {/* Templates live on the client's own WhatsApp Business Account, so the
+          section only means something once Meta is connected. */}
+      {isMetaConnected && <WhatsAppTemplates />}
 
       {/* Tabs */}
       <section className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">

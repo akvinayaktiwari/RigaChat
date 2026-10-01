@@ -19,6 +19,7 @@ import { mcpRoutes } from './mcp-routes.js'
 import { schedulerRoutes } from './scheduler-routes.js'
 import { voiceRoutes } from './voice-routes.js'
 import { webhookRoutes } from './webhooks.js'
+import { whatsAppTemplateRoutes } from './whatsapp-template-routes.js'
 import { EntitlementError, toEntitlementErrorResponse } from '../services/entitlement-service.js'
 import type { ApiResponse } from '../types/index.js'
 
@@ -166,6 +167,7 @@ app.route('/api/devices', deviceRoutes)
 app.route('/api/contact', contactRoutes)
 app.route('/api/forms', formRoutes)
 app.route('/api/integrations', integrationRoutes)
+app.route('/api/integrations/meta-whatsapp/templates', whatsAppTemplateRoutes)
 app.route('/api/voice-agents', voiceRoutes)
 app.route('/api/webhooks', webhookRoutes)
 

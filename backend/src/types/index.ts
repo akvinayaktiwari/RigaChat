@@ -495,6 +495,24 @@ export interface MetaConnectPagesResult {
   skipped: MetaPageSkipped[]
 }
 
+// One row of the dashboard's WhatsApp templates section: a template from the
+// library in lib/whatsapp-templates.ts, paired with what Meta says about it on
+// THIS client's WABA. Templates are WABA-scoped, so the same library template
+// is approved on one client's account and absent on the next.
+export interface WhatsAppTemplateOverview {
+  name: string
+  language: string
+  // Meta's own category once the template exists, which can differ from the one
+  // requested -- Meta reclassifies UTILITY to MARKETING on its own.
+  category: string
+  body: string
+  // Meta's review status verbatim (APPROVED, PENDING, REJECTED, ...), or
+  // WHATSAPP_TEMPLATE_NOT_CREATED when the WABA does not have it yet.
+  status: string
+}
+
+export const WHATSAPP_TEMPLATE_NOT_CREATED = 'NOT_CREATED'
+
 export interface MetaDirectWhatsAppConnection {
   provider: 'meta_direct'
   connected: boolean
@@ -503,6 +521,10 @@ export interface MetaDirectWhatsAppConnection {
   businessAccountId: string
   accessTokenEncrypted: string
   displayPhoneNumber: string
+  // The business name Meta approved for the number, as read at connect time.
+  // Optional because connections made before it was read, and every connection
+  // made through the redirect path, have none.
+  verifiedName?: string
   notificationNumber: string
   connectedAt: string
   // Whether POST /{wabaId}/subscribed_apps succeeded for this connection.
@@ -586,6 +608,14 @@ export interface ClientRecord {
   crmConnection?: CRMConnection
   whatsappConnection?: WhatsAppConnection
   metaDirectWhatsAppConnection?: MetaDirectWhatsAppConnection
+  /**
+   * Two-step verification PINs that outlive a disconnect, encrypted, keyed by
+   * phoneNumberId. Meta binds a PIN to the number, not to our connection record:
+   * disconnecting here does not deregister the number there, so a reconnect has
+   * to present the SAME PIN or /register is refused. Before this existed,
+   * disconnect deleted the only copy.
+   */
+  metaWhatsAppNumberPins?: Record<string, string>
   activeWhatsappProvider?: WhatsAppActiveProvider
   metaConnection?: MetaConnection
   /**
