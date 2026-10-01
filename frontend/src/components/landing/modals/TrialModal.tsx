@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'motion/react'
+import { AnimatePresence } from 'motion/react'
+import * as m from 'motion/react-m'
 import { X, ArrowRight, Sparkles, Zap, Database } from 'lucide-react'
 
 interface TrialModalProps {
@@ -25,7 +26,7 @@ export default function TrialModal({ isOpen, onClose }: TrialModalProps) {
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <motion.div
+          <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -34,7 +35,7 @@ export default function TrialModal({ isOpen, onClose }: TrialModalProps) {
             id="trial-modal-backdrop"
           />
 
-          <motion.div
+          <m.div
             initial={{ scale: 0.95, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 20 }}
@@ -80,7 +81,7 @@ export default function TrialModal({ isOpen, onClose }: TrialModalProps) {
                 Go to Vyostra AI <ArrowRight className="w-4 h-4" />
               </button>
             </div>
-          </motion.div>
+          </m.div>
         </div>
       )}
     </AnimatePresence>

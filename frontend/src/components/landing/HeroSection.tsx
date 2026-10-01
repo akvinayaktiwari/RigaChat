@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'motion/react'
+import * as m from 'motion/react-m'
 import { bootedFromPrerender } from '../../lib/prerender-boot'
 import { ArrowRight, ChevronRight } from 'lucide-react'
 import AuroraCanvas from './AuroraCanvas'
@@ -51,14 +51,14 @@ export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
       </div>
 
       <div className="relative max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
-        <motion.div {...container}>
-          <motion.div
+        <m.div {...container}>
+          <m.div
             {...item}
             className="inline-flex items-center gap-2 bg-violet-50 border border-violet-100 text-violet-700 text-xs font-semibold px-3.5 py-1.5 rounded-full mb-6">
             <span className="w-1.5 h-1.5 bg-violet-500 rounded-full inline-block" />
             New: self-running follow-up journeys
             <ChevronRight className="w-3.5 h-3.5" />
-          </motion.div>
+          </m.div>
 
           {/* NOT part of the mount stagger. This h1 is the page's LCP element;
               animating it in means the most important thing on the page is
@@ -76,12 +76,12 @@ export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
             </span>
           </h1>
 
-          <motion.p {...item} className="text-lg text-gray-500 leading-relaxed mb-8 max-w-lg">
+          <m.p {...item} className="text-lg text-gray-500 leading-relaxed mb-8 max-w-lg">
             Train on your website content, capture leads automatically, then let your agent follow up on WhatsApp until
             they book — all in one platform.
-          </motion.p>
+          </m.p>
 
-          <motion.div {...item} className="flex flex-col sm:flex-row gap-3 mb-10">
+          <m.div {...item} className="flex flex-col sm:flex-row gap-3 mb-10">
             <button
               onClick={() => navigate('/signup')}
               className="cta-sheen w-full sm:w-auto inline-flex items-center justify-center gap-2 text-white font-semibold bg-linear-to-r from-violet-600 to-purple-500 px-6 py-3.5 rounded-xl hover:opacity-90 transition-opacity shadow-lg shadow-violet-200/70 hover:shadow-xl hover:shadow-violet-300/60 text-sm"
@@ -95,13 +95,13 @@ export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
             >
               See it in action
             </button>
-          </motion.div>
+          </m.div>
 
           {/* A row of stars over invented initials claimed reviews and customers
               that do not exist -- structured-data.ts deliberately publishes no
               aggregateRating for the same reason. What replaces it is checkable:
               these are the channels the product answers on. */}
-          <motion.div {...item} className="flex flex-wrap items-center gap-2">
+          <m.div {...item} className="flex flex-wrap items-center gap-2">
             {CHANNEL_CHIPS.map((chip) => (
               <span
                 key={chip}
@@ -110,13 +110,13 @@ export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
                 {chip}
               </span>
             ))}
-          </motion.div>
-        </motion.div>
+          </m.div>
+        </m.div>
 
         {/* id is the scroll target the walkthrough's "try the live agent" action
             hands off to, since this chat is the real streaming agent and the
             walkthrough is scripted. */}
-        <motion.div
+        <m.div
           id="hero-demo-chat"
           initial={reduced ? false : { opacity: 0, y: 28, scale: 0.97 }}
           animate={reduced ? undefined : { opacity: 1, y: 0, scale: 1 }}
@@ -124,7 +124,7 @@ export default function HeroSection({ onOpenDemo }: HeroSectionProps) {
           className="flex justify-center lg:justify-end mt-8 lg:mt-0 scroll-mt-28"
         >
           <DemoChat />
-        </motion.div>
+        </m.div>
       </div>
     </section>
   )

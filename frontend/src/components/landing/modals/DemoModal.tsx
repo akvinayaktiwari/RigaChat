@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
-import { motion, AnimatePresence } from 'motion/react'
+import { AnimatePresence } from 'motion/react'
+import * as m from 'motion/react-m'
 import { X, Play, Pause, RotateCcw, Check } from 'lucide-react'
 import {
   VERTICALS,
@@ -74,7 +75,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <motion.div
+          <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -83,7 +84,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
             id="demo-backdrop"
           />
 
-          <motion.div
+          <m.div
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
@@ -197,7 +198,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                 </div>
               </div>
             </div>
-          </motion.div>
+          </m.div>
         </div>
       )}
     </AnimatePresence>

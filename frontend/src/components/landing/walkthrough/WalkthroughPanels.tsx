@@ -1,4 +1,4 @@
-import { motion } from 'motion/react'
+import * as m from 'motion/react-m'
 import {
   Bot,
   Database,
@@ -49,7 +49,7 @@ export function SystemPanel({ script }: PanelProps) {
           const Icon = step.icon
           return (
             <div key={step.label} className="flex items-center">
-              <motion.div
+              <m.div
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.14 }}
@@ -59,7 +59,7 @@ export function SystemPanel({ script }: PanelProps) {
                   <Icon className="w-4 h-4" />
                 </span>
                 <span className="text-[10px] font-semibold text-white/80 leading-tight text-center">{step.label}</span>
-              </motion.div>
+              </m.div>
               {/* Hidden while the row wraps -- a connector at a wrap boundary
                   points at nothing and reads as a mistake. */}
               {i < SYSTEM_STEPS.length - 1 && (
@@ -88,7 +88,7 @@ export function QualifyPanel({ script, localTick }: PanelProps) {
 
       <div className="flex-1 p-4 space-y-3 overflow-hidden">
         {script.conversation.slice(0, shown).map((message, i) => (
-          <motion.div
+          <m.div
             key={i}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -103,7 +103,7 @@ export function QualifyPanel({ script, localTick }: PanelProps) {
             >
               {message.text}
             </div>
-          </motion.div>
+          </m.div>
         ))}
       </div>
     </div>
@@ -123,7 +123,7 @@ export function CrmPanel({ script, localTick }: PanelProps) {
         </div>
         <div className="divide-y divide-outline-variant/20">
           {script.fields.slice(0, shown).map((field) => (
-            <motion.div
+            <m.div
               key={field.label}
               initial={{ opacity: 0, x: -6 }}
               animate={{ opacity: 1, x: 0 }}
@@ -133,20 +133,20 @@ export function CrmPanel({ script, localTick }: PanelProps) {
                 {field.label}
               </span>
               <span className="text-xs font-semibold text-on-surface">{field.value}</span>
-            </motion.div>
+            </m.div>
           ))}
         </div>
       </div>
       <div className="mt-3 min-h-[18px]">
         {synced && (
-          <motion.p
+          <m.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1.5"
           >
             <Check className="w-3.5 h-3.5 shrink-0" />
             Saved with the full transcript, and pushed to Zoho if connected
-          </motion.p>
+          </m.p>
         )}
       </div>
     </div>
@@ -177,7 +177,7 @@ export function JourneyPanel({ script, localTick }: PanelProps) {
           const style = BEAT_STYLES[beat.kind]
           const Icon = style.icon
           return (
-            <motion.div
+            <m.div
               key={beat.text}
               initial={{ opacity: 0, x: -8 }}
               animate={{ opacity: 1, x: 0 }}
@@ -186,7 +186,7 @@ export function JourneyPanel({ script, localTick }: PanelProps) {
               <Icon className={`w-3.5 h-3.5 shrink-0 ${style.color}`} />
               <span className="text-xs text-white/90 flex-1 leading-snug">{beat.text}</span>
               <span className="text-[10px] text-white/40 shrink-0">{beat.when}</span>
-            </motion.div>
+            </m.div>
           )
         })}
       </div>
@@ -201,7 +201,7 @@ interface BookedPanelProps extends PanelProps {
 export function BookedPanel({ script, onTryLiveAgent }: BookedPanelProps) {
   return (
     <div className="h-full flex flex-col justify-center items-center text-center px-4">
-      <motion.div
+      <m.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         className="w-full max-w-sm rounded-xl border border-emerald-400/30 bg-emerald-400/5 p-5"
@@ -213,7 +213,7 @@ export function BookedPanel({ script, onTryLiveAgent }: BookedPanelProps) {
           {script.booking.title}
         </p>
         <p className="text-xs text-outline-variant mt-1">{script.booking.detail}</p>
-      </motion.div>
+      </m.div>
 
       <p className="text-[11px] text-outline-variant mt-4 max-w-sm leading-relaxed">
         Booked through your connected Cal.com account and visible in your dashboard. If the lead had gone quiet instead,

@@ -1,4 +1,5 @@
-import { motion, useReducedMotion, type Variants } from 'motion/react'
+import { useReducedMotion, type Variants } from 'motion/react'
+import * as m from 'motion/react-m'
 import type { ReactNode } from 'react'
 import { isServerRender } from '../../lib/prerender-boot'
 
@@ -56,11 +57,11 @@ export function Reveal({ children, className }: RevealProps) {
   const reduced = useStaticMotion()
 
   if (reduced) {
-    return <motion.div className={className}>{children}</motion.div>
+    return <m.div className={className}>{children}</m.div>
   }
 
   return (
-    <motion.div
+    <m.div
       className={className}
       initial={{ opacity: 0, y: TRAVEL }}
       whileInView={{ opacity: 1, y: 0 }}
@@ -68,7 +69,7 @@ export function Reveal({ children, className }: RevealProps) {
       transition={{ duration: DURATION.base, ease: EASE_OUT }}
     >
       {children}
-    </motion.div>
+    </m.div>
   )
 }
 
@@ -93,11 +94,11 @@ export function RevealGroup({ children, className, stagger = 0.06 }: RevealGroup
   const reduced = useStaticMotion()
 
   if (reduced) {
-    return <motion.div className={className}>{children}</motion.div>
+    return <m.div className={className}>{children}</m.div>
   }
 
   return (
-    <motion.div
+    <m.div
       className={className}
       initial="hidden"
       whileInView="visible"
@@ -105,7 +106,7 @@ export function RevealGroup({ children, className, stagger = 0.06 }: RevealGroup
       variants={{ visible: { transition: { staggerChildren: stagger } } }}
     >
       {children}
-    </motion.div>
+    </m.div>
   )
 }
 
@@ -129,12 +130,12 @@ export function RevealItem({ children, className }: RevealItemProps) {
   const reduced = useStaticMotion()
 
   if (reduced) {
-    return <motion.div className={className}>{children}</motion.div>
+    return <m.div className={className}>{children}</m.div>
   }
 
   return (
-    <motion.div className={className} variants={ITEM_VARIANTS}>
+    <m.div className={className} variants={ITEM_VARIANTS}>
       {children}
-    </motion.div>
+    </m.div>
   )
 }
