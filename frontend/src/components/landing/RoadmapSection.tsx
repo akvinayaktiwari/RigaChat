@@ -255,7 +255,9 @@ function TimelineNodeCard({ node, state, pinned, onHover, onToggle }: TimelineNo
     <button
       type="button"
       aria-pressed={pinned}
-      aria-label={`${node.label}: ${node.title}, ${node.timing}`}
+      // No aria-label: the three lines below ARE the name. A hand-written label
+      // that punctuates them differently ("Agent: ..., ...") no longer contains
+      // the visible text, so someone using voice control cannot say what they see.
       onPointerEnter={() => onHover(true)}
       onFocus={() => onHover(true)}
       onClick={onToggle}

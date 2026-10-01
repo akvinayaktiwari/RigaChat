@@ -272,12 +272,14 @@
         var collapsed = document.createElement('button');
         collapsed.id = 'vw-collapsed';
         collapsed.type = 'button';
-        collapsed.setAttribute('aria-label', 'Talk to our AI agent');
         var collapsedLogo = document.createElement('span');
         collapsedLogo.innerHTML = LOGO_SVG;
         var collapsedLabel = document.createElement('span');
         collapsedLabel.id = 'vw-collapsed-label';
         collapsedLabel.textContent = state.config.name || 'Talk to our AI agent';
+        // The accessible name has to contain the text on the button, or someone
+        // using voice control cannot activate it by saying what they see.
+        collapsed.setAttribute('aria-label', state.config.name ? 'Talk to ' + state.config.name : 'Talk to our AI agent');
         collapsed.appendChild(collapsedLogo);
         collapsed.appendChild(collapsedLabel);
 
