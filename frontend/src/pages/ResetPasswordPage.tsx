@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { AlertCircle, CheckCircle, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
 import { confirmForgotPassword } from '../services/api'
 import type { ConfirmForgotPasswordResponse } from '../services/api'
 import { useToast } from '../components/Toast/Toast'
 import AuthHeroPanel from '../components/auth/AuthHeroPanel'
+import PasswordVisibilityToggle from '../components/auth/PasswordVisibilityToggle'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -182,14 +183,7 @@ export default function ResetPasswordPage() {
                   autoComplete="new-password"
                   className={`${inputClasses} pr-11`}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600 transition-colors"
-                  title={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
+                <PasswordVisibilityToggle visible={showPassword} onToggle={() => setShowPassword((v) => !v)} />
               </div>
               {fieldErrors.newPassword && <p className={fieldErrorClasses}>{fieldErrors.newPassword}</p>}
 
@@ -219,14 +213,7 @@ export default function ResetPasswordPage() {
                   autoComplete="new-password"
                   className={`${inputClasses} pr-11`}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600 transition-colors"
-                  title={showConfirmPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
+                <PasswordVisibilityToggle visible={showConfirmPassword} onToggle={() => setShowConfirmPassword((v) => !v)} />
               </div>
               {fieldErrors.confirmNewPassword && <p className={fieldErrorClasses}>{fieldErrors.confirmNewPassword}</p>}
             </div>

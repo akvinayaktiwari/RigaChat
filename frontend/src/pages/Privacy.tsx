@@ -173,6 +173,7 @@ function TocSidebar({ activeSection, onNavigate }: { activeSection: string; onNa
     <aside className="print:hidden lg:col-span-3 lg:sticky lg:top-28">
       <div className="lg:hidden relative w-full mb-6">
         <select
+          aria-label="Jump to a section"
           value={activeSection}
           onChange={(e) => onNavigate(e.target.value)}
           className="w-full p-4 bg-white border border-outline-variant rounded-xl text-sm font-semibold text-on-surface shadow-xs cursor-pointer"
@@ -186,7 +187,7 @@ function TocSidebar({ activeSection, onNavigate }: { activeSection: string; onNa
       </div>
 
       <div className="hidden lg:block glass-card p-6 rounded-2xl shadow-xs border border-outline-variant/30 bg-white/70">
-        <h3 className="text-lg font-extrabold text-on-surface mb-6 border-b border-outline-variant/20 pb-3">Table of Contents</h3>
+        <h2 className="text-lg font-extrabold text-on-surface mb-6 border-b border-outline-variant/20 pb-3">Table of Contents</h2>
         <ul className="space-y-3.5">
           {TOC_ITEMS.map((item) => {
             const isActive = activeSection === item.id
@@ -246,7 +247,7 @@ function CollectSection() {
           <div key={bullet.label} className="flex gap-4 items-start">
             <CheckCircle2 className="w-5.5 h-5.5 text-primary shrink-0 mt-0.5" />
             <div>
-              <h4 className="font-bold text-on-surface text-base mb-1">{bullet.label}</h4>
+              <h3 className="font-bold text-on-surface text-base mb-1">{bullet.label}</h3>
               <p className="text-sm md:text-base text-on-surface-variant leading-relaxed">{bullet.text}</p>
             </div>
           </div>
@@ -271,7 +272,7 @@ function UsageSection() {
             <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-4 ${block.isSpecial ? 'bg-white/20' : 'bg-primary/10'}`}>
               {renderBlockIcon(block.icon)}
             </div>
-            <h4 className={`font-bold text-base mb-1.5 ${block.isSpecial ? 'text-white' : 'text-on-surface'}`}>{block.label}</h4>
+            <h3 className={`font-bold text-base mb-1.5 ${block.isSpecial ? 'text-white' : 'text-on-surface'}`}>{block.label}</h3>
             <p className={`text-sm md:text-base leading-relaxed ${block.isSpecial ? 'text-white/90' : 'text-on-surface-variant'}`}>{block.text}</p>
           </div>
         ))}
@@ -291,7 +292,7 @@ function StorageSection() {
               <Database className="w-6 h-6" />
             </div>
             <div>
-              <h4 className="font-bold text-on-surface text-base">AWS Cloud Infrastructure</h4>
+              <h3 className="font-bold text-on-surface text-base">AWS Cloud Infrastructure</h3>
               <p className="text-xs text-on-surface-variant font-medium">Region: ap-south-1 (Mumbai, India)</p>
             </div>
           </div>
@@ -305,7 +306,7 @@ function StorageSection() {
               <Lock className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h5 className="font-bold text-on-surface text-sm md:text-base mb-1">TLS / AES-256 Encryption</h5>
+              <h4 className="font-bold text-on-surface text-sm md:text-base mb-1">TLS / AES-256 Encryption</h4>
               <p className="text-sm text-on-surface-variant leading-relaxed">
                 All user interaction logs and captured dialogue data are encrypted instantly in transit using TLS 1.3 and stored at-rest using AES-256 protocols.
               </p>
@@ -316,7 +317,7 @@ function StorageSection() {
               <Key className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h5 className="font-bold text-on-surface text-sm md:text-base mb-1">AWS KMS Key Envelope</h5>
+              <h4 className="font-bold text-on-surface text-sm md:text-base mb-1">AWS KMS Key Envelope</h4>
               <p className="text-sm text-on-surface-variant leading-relaxed">
                 Client-specific API credentials, including WhatsApp and Zoho CRM secrets, are fully encrypted with envelope keys managed by AWS KMS.
               </p>
@@ -327,7 +328,7 @@ function StorageSection() {
               <Calendar className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h5 className="font-bold text-on-surface text-sm md:text-base mb-1">Data Retention</h5>
+              <h4 className="font-bold text-on-surface text-sm md:text-base mb-1">Data Retention</h4>
               <p className="text-sm text-on-surface-variant leading-relaxed">
                 Account and lead data, including data sourced via Meta integrations, is retained for the duration of
                 the client's active subscription plus 90 days, or until a deletion request is received. If you
@@ -355,7 +356,7 @@ function PartnersSection() {
             <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 bg-slate-50 border border-outline-variant/10">
               {renderPartnerIcon(partner.icon)}
             </div>
-            <h5 className="font-bold text-on-surface text-sm mb-1">{partner.name}</h5>
+            <h3 className="font-bold text-on-surface text-sm mb-1">{partner.name}</h3>
             <p className="text-xs text-on-surface-variant font-medium">{partner.role}</p>
           </div>
         ))}
@@ -395,7 +396,7 @@ function ContactSection() {
             <Mail className="w-6 h-6" />
           </div>
           <div>
-            <h4 className="font-bold text-xs text-on-surface-variant uppercase tracking-wider">Email Inquiries</h4>
+            <h3 className="font-bold text-xs text-on-surface-variant uppercase tracking-wider">Email Inquiries</h3>
             <a href="mailto:support@vyostra.com" className="text-base font-bold text-on-surface hover:text-primary transition-colors">
               support@vyostra.com
             </a>
@@ -406,7 +407,7 @@ function ContactSection() {
             <MapPin className="w-6 h-6" />
           </div>
           <div>
-            <h4 className="font-bold text-xs text-on-surface-variant uppercase tracking-wider">Company Headquarters</h4>
+            <h3 className="font-bold text-xs text-on-surface-variant uppercase tracking-wider">Company Headquarters</h3>
             <p className="text-base font-bold text-on-surface">Bangalore, Karnataka, India</p>
           </div>
         </div>
