@@ -5,10 +5,14 @@ const meta: BlogPostMeta = {
   title: 'AI Voice Agents on Your Website: A Practical Guide for Indian Businesses',
   excerpt:
     'A visitor talks, your site answers — no phone number, no app, no call charges. What actually decides whether that works: microphone permission, browser support, the latency budget, how Indian callers really speak, and where a voice agent should stop and fetch a human.',
-  publishedAt: '2026-09-16',
+  publishedAt: '2026-10-01',
   category: 'Lead Generation Playbook',
   tags: ['Voice AI', 'India', 'Lead Generation', 'Real Estate'],
-  readingMinutes: 10,
+  readingMinutes: 8,
+  seoTitle: 'AI Voice Agents on Your Website: India Guide',
+  seoDescription:
+    'An on-page AI voice agent lets a visitor talk to your site with no phone number. What decides whether it works: HTTPS, mic permission, latency and Hinglish.',
+  relatedFeatures: ['/features/chatbot'],
   faq: [
     {
       question: 'What is an on-page AI voice agent?',

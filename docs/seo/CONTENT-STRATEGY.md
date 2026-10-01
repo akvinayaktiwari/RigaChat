@@ -113,8 +113,8 @@ site can win.
 
 ## Current state
 
-- **Published:** WhatsApp chatbot for real estate in India.
-- **Next:** on-page voice agent for India, then the UAE edition once the network
-  test is done.
+- **Published:** WhatsApp chatbot for real estate in India; the on-page voice
+  agent cluster (India guide, on-page vs phone, real estate) as of 2026-10-01.
+- **Next:** the UAE edition of the voice guide once the network test is done.
 - **Planned:** the remaining articles in the audit's section 5, prioritised by
   the India/UAE focus above rather than by search volume alone.
