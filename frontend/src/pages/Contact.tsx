@@ -237,7 +237,7 @@ export default function Contact() {
                 <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
                   <Mail className="w-6 h-6" />
                 </div>
-                <h3 className="text-xl font-bold text-on-surface">Email Us</h3>
+                <h2 className="text-xl font-bold text-on-surface">Email Us</h2>
                 <p className="text-sm text-on-surface-variant leading-relaxed">
                   For general questions, demos, and partnerships.
                 </p>
@@ -253,7 +253,7 @@ export default function Contact() {
                 <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
                   <MessageSquare className="w-6 h-6" />
                 </div>
-                <h3 className="text-xl font-bold text-on-surface">Technical Support</h3>
+                <h2 className="text-xl font-bold text-on-surface">Technical Support</h2>
                 <p className="text-sm text-on-surface-variant leading-relaxed">
                   For help with your Vyostra AI account, agents, or integrations.
                 </p>

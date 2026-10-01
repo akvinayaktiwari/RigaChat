@@ -125,10 +125,10 @@ function ComingSoonSection() {
   return (
     <section className="max-w-7xl mx-auto mb-20">
       <h2 className="text-sm font-bold text-on-surface-variant uppercase tracking-widest mb-4">Coming Soon</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 opacity-60">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {COMING_SOON.map((item) => (
           <div key={item.title} className="bg-white border border-outline-variant/30 rounded-2xl p-6 shadow-xs">
-            <span className="bg-orange-50 text-orange-600 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full">
+            <span className="bg-orange-50 text-orange-800 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full">
               COMING SOON
             </span>
             <h3 className="font-bold text-on-surface text-lg mt-3 mb-2">{item.title}</h3>
@@ -182,10 +182,17 @@ export default function Features() {
 
       <main className="pt-36 pb-24 px-6 lg:px-8">
         <FeaturesHero />
-        <section className="max-w-7xl mx-auto mb-20 grid grid-cols-1 md:grid-cols-2 gap-6">
-          {FEATURE_CARDS.map((card) => (
-            <FeatureCard key={card.title} card={card} />
-          ))}
+        <section className="max-w-7xl mx-auto mb-20" aria-labelledby="live-features">
+          {/* Read by screen readers and crawlers only: the cards are h3s, and
+              without a heading above them the outline jumps from h1 to h3. */}
+          <h2 id="live-features" className="sr-only">
+            Live features
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {FEATURE_CARDS.map((card) => (
+              <FeatureCard key={card.title} card={card} />
+            ))}
+          </div>
         </section>
         <ComingSoonSection />
         <FeaturesCta />

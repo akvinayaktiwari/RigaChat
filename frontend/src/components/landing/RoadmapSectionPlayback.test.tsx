@@ -27,7 +27,7 @@ describe('RoadmapSection journey playback', () => {
   it('pins a step when it is clicked, and releases it when clicked again', () => {
     render(<RoadmapSection />)
 
-    const step = screen.getByRole('button', { name: /Checks: Visit booked yet\?/ })
+    const step = screen.getByRole('button', { name: /Checks\s*Visit booked yet\?/ })
     expect(step.getAttribute('aria-pressed')).toBe('false')
 
     fireEvent.click(step)
@@ -45,8 +45,8 @@ describe('RoadmapSection journey playback', () => {
     // The timing line ("up to 24 hours") is what makes each step meaningful,
     // and it is the part a screen reader would otherwise get last or not at all.
     expect(
-      screen.getByRole('button', { name: 'Hands off: Over to your team, instead of nagging' }),
+      screen.getByRole('button', { name: /Hands off\s*Over to your team\s*instead of nagging/ }),
     ).toBeDefined()
-    expect(screen.getAllByRole('button', { name: /Agent:/ })).toHaveLength(3)
+    expect(screen.getAllByRole('button', { name: /^Agent/ })).toHaveLength(3)
   })
 })

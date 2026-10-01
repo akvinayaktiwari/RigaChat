@@ -69,17 +69,17 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-gray-100 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-gray-400">© 2026 Vyostra AI, a product of Aashirwad Trading Enterprises. All rights reserved.</p>
+          <p className="text-xs text-gray-500">© 2026 Vyostra AI, a product of Aashirwad Trading Enterprises. All rights reserved.</p>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1.5 text-xs text-gray-400">
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
               <WhatsAppIcon className="w-3.5 h-3.5 text-green-600" />
               WhatsApp
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-gray-400">
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
               <ZohoIcon className="w-3.5 h-3.5 text-red-600" />
               Zoho
             </div>
-            <span className="text-gray-300 text-xs">+2 more</span>
+            <span className="text-gray-500 text-xs">+2 more</span>
           </div>
         </div>
       </div>
