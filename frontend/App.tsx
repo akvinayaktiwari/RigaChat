@@ -28,12 +28,12 @@ const BlogPost = lazy(() => import('./src/pages/BlogPost'))
 /**
  * Everything behind sign-in, and the test harnesses, load on demand.
  *
- * The marketing pages above stay EAGER on purpose. main.tsx mounts with
- * createRoot().render(), not hydrateRoot(): React replaces the prerendered
- * markup outright, so a lazy marketing page would swap a fully rendered page
- * for the Suspense fallback on first paint -- a blank flash and an LCP
- * regression on exactly the pages that are meant to rank. Anything below is
- * reached only after a navigation, where a fallback costs nothing.
+ * The marketing pages above stay EAGER on purpose. main.tsx hydrates the
+ * prerendered markup, so a lazy page keeps its HTML on screen while its chunk
+ * loads -- but its buttons do nothing until then, and on a client-side
+ * navigation it shows the Suspense fallback first. The blog is the one
+ * exception, lazy to keep the MDX runtime out of every other page. Anything
+ * below is reached only after a navigation, where a fallback costs nothing.
  *
  * Adding a page: if it is prerendered (see PRERENDERED_STATIC_ROUTES in
  * src/lib/crawl-files.ts) import it eagerly; otherwise lazy() it here.
@@ -83,9 +83,15 @@ const AdminLoginPage = lazy(() => import('./src/pages/admin/AdminLoginPage'))
 const AdminAccountsPage = lazy(() => import('./src/pages/admin/AdminAccountsPage'))
 const AdminContactMessagesPage = lazy(() => import('./src/pages/admin/AdminContactMessagesPage'))
 
-function App() {
+/**
+ * Everything inside the router. Exported so the build-time prerender renders
+ * this exact tree under a StaticRouter: main.tsx hydrates the prerendered
+ * markup, and hydration only holds if the server and the browser render the
+ * same components in the same order, Suspense boundary included.
+ */
+export function AppRoutes() {
   return (
-    <BrowserRouter>
+    <>
       {/* Inside the router so it can see navigations; above Routes so page
           titles are already set when it reads them. */}
       <AnalyticsPageViews />
@@ -199,6 +205,14 @@ function App() {
         </Routes>
       </Suspense>
       <ToastContainer />
+    </>
+  )
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AppRoutes />
     </BrowserRouter>
   )
 }

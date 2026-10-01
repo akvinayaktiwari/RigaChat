@@ -11,9 +11,9 @@ import { PRERENDERED_STATIC_ROUTES } from '../lib/crawl-files'
  *
  * Both directions matter, which is why this file tests both:
  *  - an app page imported eagerly quietly puts itself back in the entry chunk
- *  - a PRERENDERED page made lazy is worse: main.tsx uses createRoot, not
- *    hydrateRoot, so React replaces the prerendered markup with the Suspense
- *    fallback on first paint -- a blank flash on the pages meant to rank.
+ *  - a PRERENDERED page made lazy keeps its markup on screen (main.tsx
+ *    hydrates it) but stays inert until its chunk arrives: the hero's buttons
+ *    do nothing on the pages meant to convert.
  */
 
 /** Components imported at the top of App.tsx: these ship in the entry chunk. */

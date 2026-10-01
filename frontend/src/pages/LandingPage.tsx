@@ -21,6 +21,7 @@ import { PRICING_TIERS } from '../lib/pricingTiers'
 import { jsonLdGraph, organizationSchema, softwareApplicationSchema, websiteSchema } from '../lib/structured-data'
 import DemoModal from '../components/landing/modals/DemoModal'
 import QuickSignupModal from '../components/auth/QuickSignupModal'
+import { bootedFromPrerender } from '../lib/prerender-boot'
 import { useAuth } from '../hooks/useAuth'
 import type { AuthUser } from '../hooks/useAuth'
 import { useTierCheckout } from '../hooks/useTierCheckout'
@@ -38,7 +39,10 @@ type SignupModalRequest = { mode: 'trial' } | { mode: 'checkout'; tier: Billable
 export default function LandingPage() {
   const [isDemoOpen, setIsDemoOpen] = useState(false)
   const [signupModal, setSignupModal] = useState<SignupModalRequest | null>(null)
-  const [region, setRegion] = useState<Region>(() => detectRegion())
+  // A prerendered page was rendered with the USD list, and hydration needs the
+  // first client render to say the same thing; the visitor's own region is
+  // applied in the effect below, once React owns the markup.
+  const [region, setRegion] = useState<Region>(() => (bootedFromPrerender() ? 'intl' : detectRegion()))
   const voiceWidgetInjected = useRef(false)
   const { isAuthenticated, setSession } = useAuth()
 
@@ -81,6 +85,10 @@ export default function LandingPage() {
       window.location.href = '/dashboard'
     }
   }
+
+  useEffect(() => {
+    setRegion(detectRegion())
+  }, [])
 
   useEffect(() => {
     if (!window.location.hash) return

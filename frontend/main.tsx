@@ -8,7 +8,7 @@ import { StaffAuthProvider } from './src/hooks/useStaffAuth'
 import { SubscriptionProvider } from './src/hooks/useSubscription'
 import './src/index.css'
 
-ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+const app = (
   <React.StrictMode>
     <HelmetProvider>
       <AuthProvider>
@@ -25,3 +25,16 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     </HelmetProvider>
   </React.StrictMode>
 )
+
+const container = document.getElementById('root') as HTMLElement
+
+// A prerendered page arrives with its markup already in #root, and hydrating
+// attaches React to it in place. createRoot would discard that markup and
+// render it again -- and for a lazy route (a blog post) it would show the empty
+// Suspense fallback until the route's chunk arrived, about a second on a phone.
+// The app shell arrives empty, so there is nothing to hydrate and it renders.
+if (container.hasChildNodes()) {
+  ReactDOM.hydrateRoot(container, app)
+} else {
+  ReactDOM.createRoot(container).render(app)
+}

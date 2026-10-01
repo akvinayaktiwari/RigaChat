@@ -1,28 +1,12 @@
 import { Writable } from 'node:stream'
 import { renderToPipeableStream } from 'react-dom/server'
 import { HelmetProvider, type HelmetServerState } from 'react-helmet-async'
-import { Route, Routes } from 'react-router-dom'
 import { StaticRouter } from 'react-router-dom/server'
-import BlogIndex from './src/pages/BlogIndex'
-import LandingPage from './src/pages/LandingPage'
-import Features from './src/pages/Features'
-import Chatbot from './src/pages/features/Chatbot'
-import WhatsAppFeature from './src/pages/features/WhatsApp'
-import Crm from './src/pages/features/Crm'
-import Forms from './src/pages/features/Forms'
-import VoiceAgent from './src/pages/features/VoiceAgent'
-import About from './src/pages/About'
-import Help from './src/pages/Help'
-import Contact from './src/pages/Contact'
-import Careers from './src/pages/Careers'
-import Pricing from './src/pages/Pricing'
-import Faq from './src/pages/Faq'
+import { AppRoutes } from './App'
+import { MotionProvider } from './src/components/MotionProvider'
 import { AuthProvider } from './src/hooks/useAuth'
+import { StaffAuthProvider } from './src/hooks/useStaffAuth'
 import { SubscriptionProvider } from './src/hooks/useSubscription'
-import BlogPost from './src/pages/BlogPost'
-import Privacy from './src/pages/Privacy'
-import Terms from './src/pages/Terms'
-import NotFound from './src/pages/NotFound'
 import { getAllPosts, getAllSlugs } from './src/content/blog/registry'
 import { PRERENDERED_STATIC_ROUTES, buildLlmsTxt, buildRobotsTxt, buildSitemapXml, sitemapEntries } from './src/lib/crawl-files'
 import { WHAT_IS_VYOSTRA } from './src/components/landing/WhatIsVyostra'
@@ -34,8 +18,8 @@ import { SITE_URL } from './src/lib/site'
 export { SITE_URL }
 
 /**
- * The URL rendered into dist/404.html. It matches no route above, so it falls
- * through to the catch-all and renders the same NotFound page a visitor gets
+ * The URL rendered into dist/404.html. It matches no route in App.tsx, so it
+ * falls through to the catch-all and renders the same NotFound page a visitor gets
  * client-side. The path itself never appears anywhere -- only the output file
  * does, and S3 serves that as the website ErrorDocument.
  */
@@ -44,13 +28,18 @@ export const NOT_FOUND_RENDER_PATH = '/__not-found__'
 /**
  * SSR entry used only at build time by scripts/prerender.mjs.
  *
- * The site ships as a client-rendered SPA; this exists so blog routes also
- * land in dist/ as real static HTML, which is what search crawlers and
+ * The site ships as a client-rendered SPA; this exists so the public pages
+ * also land in dist/ as real static HTML, which is what search crawlers and
  * link-preview scrapers (which never run JS) actually read.
  *
- * The homepage, the feature and company pages, blog routes and the two legal
- * pages are mounted. The homepage is
- * the page most likely to rank and the one AI crawlers most often fetch. The legal pages matter for a
+ * It renders App.tsx's own route tree, under the same providers as main.tsx,
+ * because the browser HYDRATES this markup: a tree that differs from the
+ * client's is a hydration error, and React recovers from one by throwing the
+ * prerendered page away and rendering it again. Which routes are written to
+ * disk is decided by getRoutes() below, not by what is mounted.
+ *
+ * The homepage is the page most likely to rank and the one AI crawlers most
+ * often fetch. The legal pages matter for a
  * different reader than crawlers: Meta App Review fetches the Privacy Policy and
  * Terms URLs declared in App Settings, and a client-rendered page answers that
  * fetch with an empty <div id="root"> -- a documented App Review rejection, even
@@ -62,8 +51,9 @@ export const NOT_FOUND_RENDER_PATH = '/__not-found__'
  * per confirmation code at runtime, so a static render would only ever emit the
  * empty state. Meta is given the callback endpoint, not this page.
  *
- * The authenticated dashboard and auth pages stay out -- prerendering them would
- * be pointless and would drag Cognito/browser-only code into a Node render.
+ * The authenticated dashboard and auth pages are mounted (they are part of the
+ * one tree) but never rendered: they are lazy, and no prerendered URL matches
+ * them, so their code is never loaded in Node.
  */
 
 // react-helmet-async decides between its client and server dispatcher off this
@@ -88,32 +78,19 @@ function stripStreamPadding(html: string): string {
 export async function renderRoute(url: string): Promise<{ html: string; head: string }> {
   const helmetContext: { helmet?: HelmetServerState | null } = {}
 
+  // The same providers, in the same order, as main.tsx: the browser hydrates
+  // this markup, so the two trees have to agree.
   const app = (
     <HelmetProvider context={helmetContext}>
       <AuthProvider>
         <SubscriptionProvider>
-          <StaticRouter location={url}>
-            <Routes>
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/features" element={<Features />} />
-              <Route path="/features/chatbot" element={<Chatbot />} />
-              <Route path="/features/whatsapp" element={<WhatsAppFeature />} />
-              <Route path="/features/crm" element={<Crm />} />
-              <Route path="/features/forms" element={<Forms />} />
-              <Route path="/features/voice-agent" element={<VoiceAgent />} />
-              <Route path="/about-us" element={<About />} />
-              <Route path="/help" element={<Help />} />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/careers" element={<Careers />} />
-              <Route path="/pricing" element={<Pricing />} />
-              <Route path="/faq" element={<Faq />} />
-              <Route path="/blog" element={<BlogIndex />} />
-              <Route path="/blog/:slug" element={<BlogPost />} />
-              <Route path="/privacy-policy" element={<Privacy />} />
-              <Route path="/terms-of-service" element={<Terms />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </StaticRouter>
+          <StaffAuthProvider>
+            <MotionProvider>
+              <StaticRouter location={url}>
+                <AppRoutes />
+              </StaticRouter>
+            </MotionProvider>
+          </StaffAuthProvider>
         </SubscriptionProvider>
       </AuthProvider>
     </HelmetProvider>
@@ -164,12 +141,10 @@ export async function renderRoute(url: string): Promise<{ html: string; head: st
 /**
  * Every route the prerender script should emit.
  *
- * The tree above is wrapped in AuthProvider and SubscriptionProvider because
- * the landing page reaches useSubscription() through useTierCheckout. That is
- * safe in Node only because both providers touch sessionStorage and the API
- * inside effects, which never run during SSR -- a provider that reads storage
- * during render would break this build. StaffAuthProvider is left out: no
- * prerendered route uses it.
+ * The providers above are safe in Node only because each touches
+ * sessionStorage and the API inside effects, which never run during SSR -- a
+ * provider that reads storage during render would break this build, and one
+ * that renders differently from stored state would break hydration.
  *
  * A route rendered here must also render its FINAL state: see useStaticMotion()
  * in components/landing/motion-primitives.tsx for why entrance animations would
