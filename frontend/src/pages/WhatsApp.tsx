@@ -12,6 +12,7 @@ import {
   sendMetaWhatsAppTestMessage,
 } from '../services/api'
 import { MetaIcon, WhatsAppIcon } from '../components/landing/BrandIcons'
+import WhatsAppTemplates from '../components/WhatsAppTemplates'
 import type { ConnectWhatsAppInput, MetaDirectWhatsAppConnection, WhatsAppConnection } from '../types/index'
 
 type TabId = 'lead-notifications' | 'weekly-reports' | 'agent'
@@ -734,6 +735,10 @@ export default function WhatsApp() {
           )}
         </section>
       </div>
+
+      {/* Templates live on the client's own WhatsApp Business Account, so the
+          section only means something once Meta is connected. */}
+      {isMetaConnected && <WhatsAppTemplates />}
 
       {/* Tabs */}
       <section className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">

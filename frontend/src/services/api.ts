@@ -60,6 +60,7 @@ import type {
   VoicePhoneLookup,
   VoiceUsageSummary,
   WhatsAppConnection,
+  WhatsAppTemplateOverview,
   BotWhatsAppStatus,
   LeadEvent,
 } from '../types/index'
@@ -649,6 +650,14 @@ export function connectMetaWhatsAppOAuth(notificationNumber: string): void {
 
 export function sendMetaWhatsAppTestMessage(toNumber: string): Promise<ApiResponse<{ messageId?: string }>> {
   return apiClient<{ messageId?: string }>('/api/integrations/meta-whatsapp/test-message', 'POST', { toNumber })
+}
+
+export function getWhatsAppTemplates(): Promise<ApiResponse<WhatsAppTemplateOverview[]>> {
+  return apiClient<WhatsAppTemplateOverview[]>('/api/integrations/meta-whatsapp/templates')
+}
+
+export function createWhatsAppTemplate(name: string): Promise<ApiResponse<WhatsAppTemplateOverview>> {
+  return apiClient<WhatsAppTemplateOverview>('/api/integrations/meta-whatsapp/templates', 'POST', { name })
 }
 
 export function disconnectMetaWhatsApp(): Promise<ApiResponse<{ success: boolean }>> {

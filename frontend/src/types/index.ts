@@ -400,6 +400,16 @@ export interface MetaDirectWhatsAppConnection {
   active: boolean
 }
 
+// A Vyostra AI template and its review status on this client's own WhatsApp
+// Business Account. `status` is Meta's value verbatim, or 'NOT_CREATED'.
+export interface WhatsAppTemplateOverview {
+  name: string
+  language: string
+  category: string
+  body: string
+  status: string
+}
+
 export interface ConnectMetaWhatsAppInput {
   code: string
   wabaId: string
