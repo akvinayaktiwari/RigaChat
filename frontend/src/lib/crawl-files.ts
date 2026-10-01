@@ -61,6 +61,12 @@ export const STATIC_PAGES: readonly StaticPage[] = [
     section: 'Product',
   },
   {
+    route: '/features/voice-agent',
+    label: 'AI Voice Agent',
+    summary: 'The on-page voice agent: visitors talk to your site in the browser, with no phone number. An add-on.',
+    section: 'Product',
+  },
+  {
     route: '/pricing',
     label: 'Pricing',
     summary: 'The three plans, what each includes, billing in USD or INR, and the 14-day free trial.',

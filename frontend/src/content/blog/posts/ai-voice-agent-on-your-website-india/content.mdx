@@ -21,7 +21,7 @@ A visitor needs a modern browser, a page served over HTTPS, and a tap that grant
 Two consequences follow for how you set it up:
 
 - **Serve every page that carries the widget over HTTPS.** On a plain HTTP page the browser withholds microphone access, and the button can never work. The [MDN documentation for getUserMedia](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia) states the secure-context requirement.
-- **Expect some browsers to be unsupported, and hide the button there.** A widget that shows a microphone button the browser cannot honour trains visitors to ignore it. The Vyostra voice widget checks for the required audio APIs when the page loads and does not appear at all if they are missing.
+- **Expect some browsers to be unsupported, and hide the button there.** A widget that shows a microphone button the browser cannot honour trains visitors to ignore it. The [Vyostra AI voice agent](/features/voice-agent/) widget checks for the required audio APIs when the page loads and does not appear at all if they are missing.
 
 ## Why would a visitor talk instead of type?
 

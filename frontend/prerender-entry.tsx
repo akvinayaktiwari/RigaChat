@@ -10,6 +10,7 @@ import Chatbot from './src/pages/features/Chatbot'
 import WhatsAppFeature from './src/pages/features/WhatsApp'
 import Crm from './src/pages/features/Crm'
 import Forms from './src/pages/features/Forms'
+import VoiceAgent from './src/pages/features/VoiceAgent'
 import About from './src/pages/About'
 import Help from './src/pages/Help'
 import Contact from './src/pages/Contact'
@@ -85,6 +86,7 @@ export async function renderRoute(url: string): Promise<{ html: string; head: st
               <Route path="/features/whatsapp" element={<WhatsAppFeature />} />
               <Route path="/features/crm" element={<Crm />} />
               <Route path="/features/forms" element={<Forms />} />
+              <Route path="/features/voice-agent" element={<VoiceAgent />} />
               <Route path="/about-us" element={<About />} />
               <Route path="/help" element={<Help />} />
               <Route path="/contact" element={<Contact />} />

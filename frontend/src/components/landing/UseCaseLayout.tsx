@@ -4,6 +4,8 @@ import Navbar from './Navbar'
 import Footer from './Footer'
 import DemoModal from './modals/DemoModal'
 import RelatedPosts from './RelatedPosts'
+import FaqList from './FaqList'
+import type { FaqItem } from '../../lib/structured-data'
 import { postsForFeature } from '../../content/blog/registry'
 
 interface HowItWorksStep {
@@ -37,6 +39,11 @@ interface UseCaseLayoutProps {
   ctaBody: string
   /** This page's routed path, e.g. "/features/whatsapp"; lists the posts that declare it. */
   featurePath: string
+  /**
+   * Questions answered on the page, under a question-phrased heading. The page
+   * that passes them publishes FAQPage schema from the same array.
+   */
+  faq?: { heading: string; items: readonly FaqItem[] }
 }
 
 function HeroSection({ badge, headline, subheadline, heroVisual }: Pick<UseCaseLayoutProps, 'badge' | 'headline' | 'subheadline' | 'heroVisual'>) {
@@ -136,6 +143,15 @@ function IntegrationsSection({ integrations }: { integrations: Integration[] }) 
   )
 }
 
+function FaqSection({ heading, items }: { heading: string; items: readonly FaqItem[] }) {
+  return (
+    <section className="max-w-3xl mx-auto mb-20">
+      <h2 className="text-3xl md:text-4xl font-extrabold text-on-surface tracking-tight text-center mb-12">{heading}</h2>
+      <FaqList items={items} />
+    </section>
+  )
+}
+
 function CtaSection({ ctaHeadline, ctaBody }: Pick<UseCaseLayoutProps, 'ctaHeadline' | 'ctaBody'>) {
   const navigate = useNavigate()
   return (
@@ -174,6 +190,7 @@ export default function UseCaseLayout(props: UseCaseLayoutProps) {
         <HowItWorksSection steps={props.howItWorksSteps} />
         <BenefitsSection benefits={props.benefits} />
         <IntegrationsSection integrations={props.integrations} />
+        {props.faq ? <FaqSection heading={props.faq.heading} items={props.faq.items} /> : null}
         <RelatedPosts posts={postsForFeature(props.featurePath)} heading="Go deeper" />
         <CtaSection ctaHeadline={props.ctaHeadline} ctaBody={props.ctaBody} />
       </main>

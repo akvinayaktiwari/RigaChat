@@ -13,7 +13,7 @@ const meta: BlogPostMeta = {
   seoTitle: 'On-Page Voice Agent vs Phone AI Agent (India)',
   seoDescription:
     'An on-page voice agent runs in the browser with no phone number; a phone AI agent answers calls. How they differ in setup and reach, and when to use which.',
-  relatedFeatures: ['/features/chatbot'],
+  relatedFeatures: ['/features/voice-agent', '/features/chatbot'],
   faq: [
     {
       question: 'What is the difference between an on-page voice agent and a phone AI agent?',

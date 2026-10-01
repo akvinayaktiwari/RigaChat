@@ -13,7 +13,7 @@ const meta: BlogPostMeta = {
   seoTitle: 'AI Voice Agents on Your Website: India Guide',
   seoDescription:
     'An on-page AI voice agent lets a visitor talk to your site with no phone number. What decides whether it works: HTTPS, mic permission, latency and Hinglish.',
-  relatedFeatures: ['/features/chatbot'],
+  relatedFeatures: ['/features/voice-agent', '/features/chatbot'],
   faq: [
     {
       question: 'What is an on-page AI voice agent?',

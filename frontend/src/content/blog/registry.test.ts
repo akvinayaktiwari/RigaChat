@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { PRERENDERED_STATIC_ROUTES } from '../../lib/crawl-files'
 import type { BlogPostMeta } from '../../types/blog'
 import { RELATED_POST_LIMIT, getAllPosts, postsForFeature, relatedPosts } from './registry'
 
@@ -24,7 +25,11 @@ describe('postsForFeature', () => {
 
 describe('relatedFeatures on real posts', () => {
   // A typo here ("/features/whatsap") links nothing and fails nowhere else.
-  const featureRoutes = ['/features/chatbot', '/features/whatsapp', '/features/crm', '/features/forms']
+  const featureRoutes = PRERENDERED_STATIC_ROUTES.filter((route) => route.startsWith('/features/'))
+
+  it('finds the feature routes it checks against', () => {
+    expect(featureRoutes).toContain('/features/whatsapp')
+  })
 
   it.each(getAllPosts().map(({ meta: postMeta }) => [postMeta.slug, postMeta.relatedFeatures ?? []] as const))(
     '%s names only real feature routes',

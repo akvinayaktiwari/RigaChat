@@ -13,7 +13,7 @@ interface FeatureCardData {
   title: string
   body: string
   // Absent for features that are live but don't have a marketing deep-dive page
-  // yet. Only /features/chatbot, /whatsapp, /crm and /forms exist as routes --
+  // yet. Only /features/chatbot, /whatsapp, /crm, /forms and /voice-agent exist as routes --
   // giving a card an href that has no route would 404, so the card renders
   // static instead of guessing at a URL.
   href?: string
@@ -43,6 +43,7 @@ const FEATURE_CARDS: FeatureCardData[] = [
     icon: <Mic className="w-6 h-6" />,
     title: 'AI Voice Agent',
     body: 'Visitors talk to your agent on the page — no app, no phone call. Same knowledge base, same CRM.',
+    href: '/features/voice-agent',
   },
   {
     icon: <CalendarCheck className="w-6 h-6" />,

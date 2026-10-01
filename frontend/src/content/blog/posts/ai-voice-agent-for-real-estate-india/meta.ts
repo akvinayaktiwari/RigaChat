@@ -13,7 +13,7 @@ const meta: BlogPostMeta = {
   seoTitle: 'AI Voice Agent for Real Estate in India',
   seoDescription:
     'What a real estate AI voice agent should answer from your knowledge base, what it must hand to sales, and why availability and price are the risky questions.',
-  relatedFeatures: ['/features/chatbot'],
+  relatedFeatures: ['/features/voice-agent', '/features/chatbot'],
   faq: [
     {
       question: 'What can an AI voice agent do for a real estate business?',
