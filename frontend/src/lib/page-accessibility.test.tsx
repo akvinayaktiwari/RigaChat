@@ -1,19 +1,12 @@
 // @vitest-environment node
 import type { ReactElement } from 'react'
-import { renderToString } from 'react-dom/server'
-import { HelmetProvider } from 'react-helmet-async'
-import { StaticRouter } from 'react-router-dom/server'
 import { describe, expect, it } from 'vitest'
-import { AppRoutes, preloadRoute } from '../../App'
-import { MotionProvider } from '../components/MotionProvider'
 import { getAllSlugs } from '../content/blog/registry'
-import { AuthProvider } from '../hooks/useAuth'
-import { StaffAuthProvider } from '../hooks/useStaffAuth'
-import { SubscriptionProvider } from '../hooks/useSubscription'
 import DataDeletionStatus from '../pages/DataDeletionStatus'
 import LoginPage from '../pages/LoginPage'
 import SignupPage from '../pages/SignupPage'
 import Status from '../pages/Status'
+import { renderPublicPage } from '../test-render'
 import { PRERENDERED_STATIC_ROUTES } from './crawl-files'
 
 /**
@@ -38,20 +31,7 @@ const LAZY_PAGES: Record<string, ReactElement> = {
 }
 
 async function renderPage(route: string): Promise<string> {
-  await preloadRoute(route)
-  return renderToString(
-    <HelmetProvider>
-      <AuthProvider>
-        <SubscriptionProvider>
-          <StaffAuthProvider>
-            <MotionProvider>
-              <StaticRouter location={route}>{LAZY_PAGES[route] ?? <AppRoutes />}</StaticRouter>
-            </MotionProvider>
-          </StaffAuthProvider>
-        </SubscriptionProvider>
-      </AuthProvider>
-    </HelmetProvider>,
-  )
+  return (await renderPublicPage(route, LAZY_PAGES[route])).html
 }
 
 function headingLevels(html: string): number[] {
