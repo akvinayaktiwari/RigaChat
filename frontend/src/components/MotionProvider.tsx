@@ -1,10 +1,13 @@
 import type { ReactNode } from 'react'
 import { LazyMotion } from 'motion/react'
+import { createMotionLoader } from '../lib/motion-fallback'
 
-async function loadMotionFeatures() {
+// Wrapped so a chunk that fails or stalls shows the content instead of leaving
+// every reveal at opacity 0. See lib/motion-fallback.ts.
+const loadMotionFeatures = createMotionLoader(async () => {
   const features = await import('../lib/motion-features')
   return features.default
-}
+})
 
 interface MotionProviderProps {
   children: ReactNode

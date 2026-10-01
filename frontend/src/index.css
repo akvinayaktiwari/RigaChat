@@ -441,3 +441,13 @@ body {
     padding-top: 0 !important;
   }
 }
+
+/* The animation chunk failed or stalled (lib/motion-fallback.ts). An m.* element
+   that never got its engine is stuck in its `initial` state, which is always
+   opacity 0 plus an offset or scale; show it where it would have ended up.
+   Both spellings: the browser writes "opacity: 0", serialised markup "opacity:0". */
+.motion-unavailable [style*='opacity: 0'],
+.motion-unavailable [style*='opacity:0'] {
+  opacity: 1 !important;
+  transform: none !important;
+}
