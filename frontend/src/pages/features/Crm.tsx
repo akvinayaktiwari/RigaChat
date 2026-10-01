@@ -70,7 +70,7 @@ export default function Crm() {
           {
             number: '2',
             title: 'Filter and Track',
-            body: 'Filter leads by date, bot, source, and status. Update status from New to Contacted to Qualified as your team follows up.',
+            body: 'Filter leads by date, source, and status. Update status from New to Contacted to Qualified as your team follows up.',
             icon: <Filter className="w-6 h-6" />,
           },
           {
@@ -89,7 +89,7 @@ export default function Crm() {
           {
             icon: <Filter className="w-5 h-5" />,
             title: 'Powerful Filtering',
-            body: 'Filter by bot name, date range, lead source, and status. Find any lead in seconds across your entire pipeline.',
+            body: 'Filter by date range, lead source, and status, or search by name. Find any lead in seconds across your entire pipeline.',
           },
           {
             icon: <RefreshCw className="w-5 h-5" />,

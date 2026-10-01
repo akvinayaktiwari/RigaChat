@@ -134,7 +134,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     id: 'art-9',
     categoryId: 'leads',
     question: 'Where do I see my captured leads?',
-    answer: 'All leads appear in the Leads section of your dashboard. Filter by date, bot, source, and status.',
+    answer: 'All leads appear in the Leads section of your dashboard. Filter by date, source, and status.',
   },
   {
     id: 'art-10',
