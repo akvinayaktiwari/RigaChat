@@ -90,6 +90,25 @@ describe('sendLeadNotification', () => {
     )
   })
 
+  // A client's own WABA may have _1 rejected or still in review while _2 has
+  // cleared. The alert must reach them on whichever one Meta will send.
+  it('falls through to lead_notification_2 when _1 is refused outright', async () => {
+    sendWhatsAppTemplateToClientNumber
+      .mockResolvedValueOnce({ success: false, error: 'Template not approved', retryable: false })
+      .mockResolvedValueOnce({ success: true, messageId: 'wamid.second' })
+
+    const result = await sendLeadNotification(input)
+
+    expect(sendWhatsAppTemplateToClientNumber).toHaveBeenNthCalledWith(
+      2,
+      'client-1',
+      'lead_notification_2',
+      ['Website chat', 'Ravi Kumar', '+919876543210', '3 BHK in Wakad'],
+      expect.any(String)
+    )
+    expect(result).toMatchObject({ notified: true, via: 'whatsapp', wamid: 'wamid.second' })
+  })
+
   it('carries the lead details on the event so a later fallback can rebuild it', async () => {
     await sendLeadNotification(input)
 

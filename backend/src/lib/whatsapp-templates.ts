@@ -115,6 +115,21 @@ export const WHATSAPP_TEMPLATES: WhatsAppTemplateDefinition[] = [
     sentBy: 'lead-notification-service.ts sendLeadNotification',
   },
   {
+    // The spare for lead_notification_1, tried only when _1 is refused outright
+    // -- the same arrangement as lead_handoff_alert_2. Takes the SAME four
+    // parameters in the same order, because the send site fills both from one
+    // list.
+    //
+    // Deliberately the plainest shape Meta reviews: body only, no button. A
+    // client connecting their own WABA starts with zero templates, and this is
+    // the one most likely to clear review first.
+    name: 'lead_notification_2',
+    category: 'UTILITY',
+    body: 'You have a new lead from {{1}}.\n\nName: {{2}}\nPhone: {{3}}\nInterested in: {{4}}\n\nReply to them from your Vyostra AI inbox.',
+    bodyExample: ['Website chat', 'Ravi Kumar', '+91 98765 43210', '3 BHK in Wakad'],
+    sentBy: 'lead-notification-service.ts sendLeadNotification (fallback when lead_notification_1 is refused)',
+  },
+  {
     // Goes to the CLIENT's notificationNumber on a weekly schedule, so it is
     // business-initiated by definition and can never rely on a session window.
     // It shipped for months as a free-text send and therefore never once

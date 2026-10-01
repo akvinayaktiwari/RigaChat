@@ -28,9 +28,10 @@ import type { ClientRecord, LeadRef } from '../types/index.js'
 // Tried in order, first success wins -- the same fall-through
 // notification-service.ts uses for handoff alerts, and for the same reason:
 // a template pending Meta review must not take the notification down with it.
-// Only one entry today; a `lead_notification_2` slots in here with no other
-// change if _1 is ever rejected or recategorised.
-export const LEAD_NOTIFICATION_TEMPLATES = ['lead_notification_1'] as const
+// Both take the same four body parameters in the same order, so one param
+// list serves either. _2 is reached only when _1 is refused outright, which on
+// a WABA where _1 is approved is never.
+export const LEAD_NOTIFICATION_TEMPLATES = ['lead_notification_1', 'lead_notification_2'] as const
 
 // Meta rejects a send whose template parameter is an empty string, which turns
 // "this lead did not fill in their phone" into a hard delivery failure. Every
