@@ -87,10 +87,15 @@ expect vyostra.com     /help/   '.request.uri'                                 '
 expect vyostra.com     /about-us '.response.headers.location.value'            '/about-us/'
 expect vyostra.com     /contact '.response.statusCode'                         '301'
 expect vyostra.com     /careers '.response.statusCode'                         '301'
+expect vyostra.com     /pricing '.response.headers.location.value'             '/pricing/'
+expect vyostra.com     /pricing/ '.request.uri'                                '/pricing/'
+expect vyostra.com     /faq     '.response.headers.location.value'             '/faq/'
+expect vyostra.com     /features/voice-agent '.response.headers.location.value' '/features/voice-agent/'
 # A path that merely STARTS with a prerendered prefix is not one.
 expect vyostra.com     /blogging '.request.uri'                                '/app-shell.html'
 expect vyostra.com     /featuresx '.request.uri'                               '/app-shell.html'
 expect vyostra.com     /helpdesk '.request.uri'                                '/app-shell.html'
+expect vyostra.com     /faqs    '.request.uri'                                 '/app-shell.html'
 
 if (( FAILURES > 0 )); then
   echo "==> $FAILURES case(s) failed. LIVE is unchanged; DEVELOPMENT holds the failing code." >&2
