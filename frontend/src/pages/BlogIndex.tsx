@@ -9,6 +9,8 @@ import { BlogSurface, PostMetaLine, PostTags } from '../components/blog/BlogChro
 import { JAKARTA_FONT, ScrollReveal, StatTile } from '../components/blog/BlogPrimitives'
 import type { BlogPost } from '../types/blog'
 import PageMeta from '../components/seo/PageMeta'
+import StructuredData from '../components/seo/StructuredData'
+import { blogIndexNodes, jsonLdGraph, organizationSchema } from '../lib/structured-data'
 
 function FeaturedPost({ post }: { post: BlogPost }) {
   const { meta } = post
@@ -100,6 +102,12 @@ export default function BlogIndex() {
         title="Blog — Vyostra AI"
         description="Research, breakdowns and field notes from the Vyostra AI team on AI, lead generation and the markets our customers build in."
         path="/blog/"
+      />
+      <StructuredData
+        data={jsonLdGraph([
+          organizationSchema(),
+          ...blogIndexNodes(posts.map(({ meta }) => ({ title: meta.title, path: `/blog/${meta.slug}/` }))),
+        ])}
       />
 
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />

@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
+import { getAllPosts } from '../content/blog/registry'
 import { renderPublicPage } from '../test-render'
 import { FOUNDERS } from './people'
 import { absoluteUrl } from './site'
@@ -8,7 +9,8 @@ import type { JsonLd, JsonValue } from './structured-data'
 /**
  * What the structured data on a page says, checked on the page itself rather
  * than on the builders: a builder nobody calls passes every unit test and
- * leaves the page with no schema at all, which is how /about-us/ shipped.
+ * leaves the page with no schema at all, which is how /about-us/ and /blog/
+ * shipped.
  */
 
 function asRecord(value: JsonValue | undefined): JsonLd {
@@ -52,5 +54,25 @@ describe('/about-us structured data', () => {
   it('trails Home > About', async () => {
     const crumbs = asArray(nodeOfType(await graphNodes('/about-us'), 'BreadcrumbList').itemListElement).map((item) => asRecord(item).item)
     expect(crumbs).toEqual([absoluteUrl('/'), absoluteUrl('/about-us/')])
+  })
+})
+
+describe('/blog structured data', () => {
+  it('lists every post, in the order the page shows them, at the URL each is served from', async () => {
+    const list = asRecord(nodeOfType(await graphNodes('/blog'), 'Blog').mainEntity)
+    const items = asArray(list.itemListElement).map(asRecord)
+    expect(items.map((item) => item.url)).toEqual(getAllPosts().map(({ meta }) => absoluteUrl(`/blog/${meta.slug}/`)))
+    expect(items.map((item) => item.position)).toEqual(items.map((_, index) => index + 1))
+  })
+
+  it('shows every post it lists', async () => {
+    const { html } = await renderPublicPage('/blog')
+    const decoded = html.replace(/&amp;/g, '&').replace(/&#x27;/g, "'").replace(/&quot;/g, '"')
+    expect(getAllPosts().filter(({ meta }) => !decoded.includes(meta.title)).map(({ meta }) => meta.slug)).toEqual([])
+  })
+
+  it('is published by the organization in the same graph', async () => {
+    const nodes = await graphNodes('/blog')
+    expect(nodeOfType(nodes, 'Blog').publisher).toEqual({ '@id': nodeOfType(nodes, 'Organization')['@id'] })
   })
 })

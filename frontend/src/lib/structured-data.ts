@@ -233,6 +233,36 @@ export function aboutPageNodes(page: FeaturePageFields): JsonLd[] {
   return [aboutPage, breadcrumbSchema([{ name: 'Home', path: '/' }, { name: page.name, path: page.path }])]
 }
 
+export interface BlogListing {
+  title: string
+  /** Path exactly as served, e.g. "/blog/a-post/". */
+  path: string
+}
+
+const BLOG_INDEX_PATH = '/blog/'
+
+/** The blog index: a Blog published by the organization, listing its posts in the order the page shows them. */
+export function blogIndexNodes(posts: readonly BlogListing[]): JsonLd[] {
+  const blog: JsonLd = {
+    '@type': 'Blog',
+    '@id': absoluteUrl(BLOG_INDEX_PATH),
+    url: absoluteUrl(BLOG_INDEX_PATH),
+    name: `${ORGANIZATION_NAME} Blog`,
+    isPartOf: { '@id': absoluteUrl(`/${WEBSITE_ID}`) },
+    publisher: { '@id': absoluteUrl(`/${ORGANIZATION_ID}`) },
+    mainEntity: {
+      '@type': 'ItemList',
+      itemListElement: posts.map((post, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        name: post.title,
+        url: absoluteUrl(post.path),
+      })),
+    },
+  }
+  return [blog, breadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'Blog', path: BLOG_INDEX_PATH }])]
+}
+
 /** Wraps nodes in one @graph so @id references resolve across them. */
 export function jsonLdGraph(nodes: readonly JsonLd[]): JsonLd {
   return { '@context': 'https://schema.org', '@graph': [...nodes] }
