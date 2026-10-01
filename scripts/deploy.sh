@@ -442,12 +442,14 @@ aws s3 cp frontend/dist/llms.txt s3://"$S3_BUCKET_FRONTEND"/llms.txt \
 # cp --recursive, not sync: sync skips files whose size and mtime match, which
 # would leave the bad cache-control in place on any page whose content did not
 # change. cp always rewrites the metadata.
+# no-cache without no-store: revalidated on every navigation, but still
+# eligible for the back/forward cache. Mirrors ci.yml.
 aws s3 cp frontend/dist/ s3://"$S3_BUCKET_FRONTEND"/ \
   --recursive \
   --exclude "*" \
   --include "*.html" \
   --content-type "text/html; charset=utf-8" \
-  --cache-control "no-cache, no-store, must-revalidate" \
+  --cache-control "no-cache" \
   --region "$AWS_REGION"
 
 echo "==> Step 9: Invalidating CloudFront distributions..."

@@ -370,6 +370,11 @@ jobs:
       # cp --recursive, not sync: sync skips files whose size and mtime match,
       # which would leave the bad cache-control in place on any page whose
       # content did not change. cp always rewrites the metadata.
+      #
+      # no-cache, deliberately without no-store: the browser must revalidate the
+      # HTML on every navigation (so a deploy is picked up at once), but may keep
+      # the page for the back/forward cache. no-store forbids that, and made
+      # every Back press a full reload.
       - name: Upload every HTML entrypoint with no-cache
         run: |
           aws s3 cp frontend/dist/ \
@@ -378,7 +383,7 @@ jobs:
             --exclude "*" \
             --include "*.html" \
             --content-type "text/html; charset=utf-8" \
-            --cache-control "no-cache, no-store, must-revalidate" \
+            --cache-control "no-cache" \
             --region ${{ secrets.AWS_REGION }}
 
       # Resolve the distribution from the domain users actually log in to,
