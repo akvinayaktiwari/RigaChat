@@ -4,6 +4,8 @@ import { Rocket, Link as LinkIcon, CheckCircle2, MessageCircle, TrendingUp, Zap,
 import Navbar from '../components/landing/Navbar'
 import Footer from '../components/landing/Footer'
 import PageMeta from '../components/seo/PageMeta'
+import StructuredData from '../components/seo/StructuredData'
+import { aboutPageNodes, jsonLdGraph, organizationSchema } from '../lib/structured-data'
 import DemoModal from '../components/landing/modals/DemoModal'
 
 interface StatItem {
@@ -282,6 +284,7 @@ export default function About() {
         description="Vyostra AI is a Bangalore-built platform that captures every lead with AI chat and voice agents, WhatsApp follow-up and a built-in CRM. Meet the founders."
         path="/about-us/"
       />
+      <StructuredData data={jsonLdGraph([organizationSchema(), ...aboutPageNodes({ name: 'About Vyostra AI', path: '/about-us/' })])} />
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 
       <main className="pt-36 pb-24 px-6 lg:px-8">

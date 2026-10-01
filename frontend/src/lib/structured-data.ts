@@ -216,6 +216,23 @@ export function pageGraphNodes(page: FeaturePageFields): JsonLd[] {
   return [webPageSchema(page), breadcrumbSchema([{ name: 'Home', path: '/' }, { name: page.name, path: page.path }])]
 }
 
+/**
+ * The about page: an AboutPage whose subject is the organization, one crumb
+ * below Home. Emit it alongside organizationSchema(), which carries the
+ * founders the page introduces.
+ */
+export function aboutPageNodes(page: FeaturePageFields): JsonLd[] {
+  const aboutPage: JsonLd = {
+    '@type': 'AboutPage',
+    '@id': absoluteUrl(page.path),
+    url: absoluteUrl(page.path),
+    name: page.name,
+    isPartOf: { '@id': absoluteUrl(`/${WEBSITE_ID}`) },
+    mainEntity: { '@id': absoluteUrl(`/${ORGANIZATION_ID}`) },
+  }
+  return [aboutPage, breadcrumbSchema([{ name: 'Home', path: '/' }, { name: page.name, path: page.path }])]
+}
+
 /** Wraps nodes in one @graph so @id references resolve across them. */
 export function jsonLdGraph(nodes: readonly JsonLd[]): JsonLd {
   return { '@context': 'https://schema.org', '@graph': [...nodes] }
