@@ -80,7 +80,7 @@ export default function Chatbot() {
           {
             icon: <Brain className="w-5 h-5" />,
             title: 'Trained on Your Content',
-            body: 'Vyostra AI reads your website, FAQs, and product pages to build a knowledge base automatically. Answers are always accurate and on-brand.',
+            body: 'Vyostra AI reads your website, FAQs, and product pages to build a knowledge base automatically. The agent answers only from that content, and says so when the answer is not there.',
           },
           {
             icon: <Clock className="w-5 h-5" />,
