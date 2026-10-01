@@ -83,6 +83,14 @@ DELETE /api/integrations/meta/disconnect -> disconnect-all: every Page row AND t
                                   Facebook assets (auth required)
 POST /api/kb                -> add knowledge base entry + embed it
 GET  /api/kb                -> fetch all KB entries (auth required)
+GET  /api/integrations/meta-whatsapp/templates -> the WhatsApp template library (lib/whatsapp-templates.ts), each
+                                  with its review status on the caller's OWN WABA. Read live from Meta, never
+                                  cached -- a stored copy would show PENDING long after approval. 409 when the
+                                  client has no Meta Direct connection (auth required)
+POST /api/integrations/meta-whatsapp/templates -> submit ONE library template to Meta on the caller's WABA. The body
+                                  carries a NAME, never template text, so it cannot submit arbitrary copy. 404 for
+                                  a name outside the library, 502 with Meta's own reason when Meta refuses
+                                  (auth required)
 GET  /api/journeys/templates             -> list the prebuilt agent library (auth required; code-defined seeds, identical for every client)
 POST /api/journeys/from-template/:templateId -> clone a prebuilt agent into a client-owned bundle (auth required)
 POST /api/journeys                       -> create a JourneyBundle (auth required; isPrebuiltTemplate/sourceTemplateId are server-controlled, NOT client-settable)

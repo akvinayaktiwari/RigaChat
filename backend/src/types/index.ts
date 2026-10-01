@@ -495,6 +495,24 @@ export interface MetaConnectPagesResult {
   skipped: MetaPageSkipped[]
 }
 
+// One row of the dashboard's WhatsApp templates section: a template from the
+// library in lib/whatsapp-templates.ts, paired with what Meta says about it on
+// THIS client's WABA. Templates are WABA-scoped, so the same library template
+// is approved on one client's account and absent on the next.
+export interface WhatsAppTemplateOverview {
+  name: string
+  language: string
+  // Meta's own category once the template exists, which can differ from the one
+  // requested -- Meta reclassifies UTILITY to MARKETING on its own.
+  category: string
+  body: string
+  // Meta's review status verbatim (APPROVED, PENDING, REJECTED, ...), or
+  // WHATSAPP_TEMPLATE_NOT_CREATED when the WABA does not have it yet.
+  status: string
+}
+
+export const WHATSAPP_TEMPLATE_NOT_CREATED = 'NOT_CREATED'
+
 export interface MetaDirectWhatsAppConnection {
   provider: 'meta_direct'
   connected: boolean
