@@ -1,0 +1,94 @@
+{/*
+  Product claims in this post are limited to what ships today: the voice widget is one
+  script tag with a data-agent-id, it asks for the microphone only after a tap, it does
+  not mount in a browser without the audio APIs, the agent answers from the client's
+  knowledge base, and it can raise a request for a human. Nothing here says the on-page
+  conversation is saved as a CRM lead, because that is not what the browser path does.
+
+  The one external figure is the roughly 200 ms gap between turns in human conversation
+  (Stivers et al., PNAS 2009), linked inline. No performance numbers for the product.
+  Recording and disclosure are described as a legal question on purpose; see TODOS.md.
+*/}
+
+An on-page AI voice agent is a voice conversation that happens inside your web page: the visitor taps a button, speaks into their device microphone, and an AI agent answers out loud from your website content and knowledge base. There is no phone number to dial, no app to install and no call charge, because the audio travels over the internet connection the browser already has.
+
+The idea is simple. Whether it works for a particular Indian business comes down to five practical things: whether the browser will let the page listen, how fast the agent answers, how your customers actually speak, what the agent is allowed to say, and when it hands over to a person. This guide covers each in the order a visitor meets them.
+
+## What does a visitor need for an on-page voice agent to work?
+
+A visitor needs a modern browser, a page served over HTTPS, and a tap that grants microphone permission. Browsers expose the microphone only to secure pages, and only after the visitor allows it, so the agent cannot start listening on its own. That is a feature: the first thing the visitor sees is a button, and nothing is recorded until they press it.
+
+Two consequences follow for how you set it up:
+
+- **Serve every page that carries the widget over HTTPS.** On a plain HTTP page the browser withholds microphone access, and the button can never work. The [MDN documentation for getUserMedia](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia) states the secure-context requirement.
+- **Expect some browsers to be unsupported, and hide the button there.** A widget that shows a microphone button the browser cannot honour trains visitors to ignore it. The Vyostra voice widget checks for the required audio APIs when the page loads and does not appear at all if they are missing.
+
+## Why would a visitor talk instead of type?
+
+Because for some questions, speaking is the lower-effort option. A person on a phone who wants to ask "is the two-bedroom on the higher floors still available, and what is the all-in price" can say it in five seconds and would need a minute to type it. Typing in Hindi, whether in Devanagari or in Roman script, on a phone keyboard is slower still, and many people simply do not bother.
+
+Voice is not a replacement for chat. It suits questions that are long, specific or urgent, and visitors who are walking, driving or holding something. Chat suits people who are in a meeting, on a train without headphones, or who want to paste a link or copy a figure. Offering both on the same knowledge base lets the visitor choose, which is the reason to run [the website chatbot](/features/chatbot) and the voice agent from one source of answers rather than two.
+
+## How fast does a voice agent have to answer?
+
+It has to answer in roughly the gap a person would leave, which is about a fifth of a second. A [cross-language study of turn-taking in conversation](https://www.pnas.org/doi/10.1073/pnas.0903616106) (Stivers et al., PNAS, 2009) found that the typical pause between one speaker finishing and the next starting is around 200 milliseconds across the ten languages studied. Nobody expects a machine to hit that, but the study explains why a slow agent feels broken rather than merely slow: a long silence reads as a dropped call.
+
+You cannot tune the model's speed yourself, but you control the things that add to it:
+
+- **Keep answers short.** A two-to-three sentence reply starts and ends sooner than a paragraph, and it is easier to follow by ear. Vyostra's voice agent is instructed to keep to that length.
+- **Keep the knowledge base lean and specific.** When the agent has to look something up, every lookup is a pause. Answers it can give from its core instructions are faster than answers it has to fetch.
+- **Do not make the agent read lists.** Three bullet points on a screen are a scan; read aloud they are twenty seconds of monologue. Write voice answers as a sentence, then offer the next detail.
+
+## How do Indian callers really speak, and does it matter?
+
+It matters more than any other setting, because mixing languages mid-sentence is normal speech in India, not an edge case. A visitor might ask a question in English, give a locality name in Hindi, and say their budget as "forty-five lakh". Accent, background noise on a phone speaker and the way digits are read aloud ("nine eight seven, double five") all change what the agent hears.
+
+Do not assume it works; test it, with the people who will actually use it:
+
+1. **Record or run live calls with real customers' accents**, not just your own team's. Include the regional accents of your catchment area.
+2. **Say numbers the way people say them**: phone numbers in groups, budgets in lakh and crore, and floor numbers.
+3. **Mix languages deliberately** inside a single sentence, and note whether the agent keeps the thread.
+4. **Check the failure mode, not just the success.** When the agent does not understand, it should ask once to repeat and then offer a person, not guess.
+
+The point of the test is to find the question shapes that fail before a customer does. Vyostra's current voice agent is English-first; if your audience mostly speaks another language, say so to yourself before launch rather than discovering it in the first week.
+
+## What should a voice agent be allowed to say?
+
+It should say only what is in the knowledge base you gave it, and say plainly when it does not know. This is the single most important rule, because a voice agent sounds confident whatever it says. A chat answer with a wrong price can be re-read and doubted; a spoken one is simply heard.
+
+<Callout title="Decide this before launch" tone="warning">
+Never let an agent improvise price, availability, discounts, possession dates or legal status. Put the facts you are willing to stand behind in the knowledge base, and instruct the agent that anything outside it gets "let me connect you with someone who can confirm that" instead of a guess.
+</Callout>
+
+Stale answers are the quieter version of the same problem. A knowledge base that says a unit is available after it has sold produces a confident, wrong sentence on every call that asks. Give one person ownership of the knowledge base and a habit of updating it when stock or pricing changes.
+
+## When should the agent hand over to a person?
+
+On a real buying signal, on anything it cannot answer from the knowledge base, and the moment the visitor asks for a human. The agent should recognise these from meaning rather than keywords, because people ask for a person in unbounded ways, including through plain frustration. Vyostra's voice agent has a handoff action it can take for exactly this, which alerts your team.
+
+Two rules keep a handoff honest:
+
+- **Never promise a callback nobody is staffed to make.** A handoff into an unattended inbox is worse than telling the visitor when your team is actually available.
+- **Pass the context along.** The person who picks up should know what the visitor asked and why they wanted a human, so they do not start with "how can I help you".
+
+## Do you have to tell people the call is recorded?
+
+That is a legal question, not a product setting, and the answer depends on what you record and where you operate. India's [Digital Personal Data Protection Act, 2023](https://www.meity.gov.in/data-protection-framework) governs how personal data is collected and used, and voice is personal data. Whether and how an AI voice agent must disclose itself or any recording is a point to settle with a lawyer who knows your sector.
+
+The practical advice is narrow: do not switch on recording until you have that answer; and if you do disclose, say it as the first thing the agent speaks rather than burying it in a privacy policy nobody opens.
+
+## A pre-launch checklist for an on-page voice agent
+
+| Check | What good looks like |
+| --- | --- |
+| HTTPS on every page with the widget | Microphone prompt appears on tap |
+| Unsupported browsers | Button hidden, no broken state |
+| Knowledge base | Only facts you will stand behind; one named owner |
+| Answer length | Two or three spoken sentences, no read-out lists |
+| Accents and language mix | Tested with real customers, including numbers and names |
+| Handoff | Someone is staffed to act on it, with stated hours |
+| Recording and disclosure | Legal advice taken before anything is recorded |
+
+## Where does an on-page voice agent fit with chat and WhatsApp?
+
+It sits at the moment a visitor is already on your site and wants an answer now. [WhatsApp](/blog/whatsapp-chatbot-for-real-estate-india/) is where the follow-up lives once you have their number, and chat is the quiet option beside it. The three work best as one flow on one set of answers: voice or chat to resolve the question, a captured number, then WhatsApp to bring the lead back. If you are weighing this against a voice agent that answers a phone number, read [on-page voice agent or phone AI agent](/blog/on-page-voice-agent-vs-phone-ai-agent-india/) next, and for property specifically, [what a real-estate voice agent should answer](/blog/ai-voice-agent-for-real-estate-india/).
