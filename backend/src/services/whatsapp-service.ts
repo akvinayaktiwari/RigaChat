@@ -232,7 +232,11 @@ export async function storeMetaWhatsAppConnection(
   // replayed at the new one.
   const existing = client?.metaDirectWhatsAppConnection
   const isSameNumber = existing?.phoneNumberId === input.phoneNumberId
-  const existingPinEncrypted = isSameNumber ? existing?.twoStepPinEncrypted : undefined
+  // A number disconnected and connected again has no `existing` record, but
+  // Meta still holds the PIN it was first registered with. The copy kept by
+  // disconnectMetaWhatsApp is what lets that reconnect register at all.
+  const existingPinEncrypted =
+    (isSameNumber ? existing?.twoStepPinEncrypted : undefined) ?? client?.metaWhatsAppNumberPins?.[input.phoneNumberId]
 
   // Connections made before the PIN was stored are the dangerous case: the
   // number may already be live under a PIN nobody holds. A fresh PIN cannot
@@ -368,6 +372,21 @@ export async function disconnectWhatsApp(clientId: string): Promise<void> {
 
 export async function disconnectMetaWhatsApp(clientId: string): Promise<void> {
   const client = await getClientById(clientId)
+  const connection = client?.metaDirectWhatsAppConnection
+
+  // Kept BEFORE the record is removed, and allowed to abort the disconnect if
+  // it fails. Disconnecting here does not deregister the number at Meta, so the
+  // PIN stays bound there; deleting our only copy would mean this number can
+  // never be registered through us again.
+  if (connection?.twoStepPinEncrypted) {
+    await updateClient(clientId, {
+      metaWhatsAppNumberPins: {
+        ...client?.metaWhatsAppNumberPins,
+        [connection.phoneNumberId]: connection.twoStepPinEncrypted,
+      },
+    })
+  }
+
   await removeClientMetaDirectWhatsAppConnection(clientId)
 
   if (client?.activeWhatsappProvider === 'meta_direct') {

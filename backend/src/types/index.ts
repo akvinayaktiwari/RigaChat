@@ -590,6 +590,14 @@ export interface ClientRecord {
   crmConnection?: CRMConnection
   whatsappConnection?: WhatsAppConnection
   metaDirectWhatsAppConnection?: MetaDirectWhatsAppConnection
+  /**
+   * Two-step verification PINs that outlive a disconnect, encrypted, keyed by
+   * phoneNumberId. Meta binds a PIN to the number, not to our connection record:
+   * disconnecting here does not deregister the number there, so a reconnect has
+   * to present the SAME PIN or /register is refused. Before this existed,
+   * disconnect deleted the only copy.
+   */
+  metaWhatsAppNumberPins?: Record<string, string>
   activeWhatsappProvider?: WhatsAppActiveProvider
   metaConnection?: MetaConnection
   /**
