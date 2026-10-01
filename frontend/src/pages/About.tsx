@@ -219,25 +219,33 @@ function StatsSection() {
   )
 }
 
+function LinkedInIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor" aria-hidden="true">
+      <path d="M20.45 20.45h-3.56v-5.57c0-1.33-.03-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0z" />
+    </svg>
+  )
+}
+
 function FounderCard({ founder }: { founder: FounderInfo }) {
   return (
     <div className="bg-white border border-outline-variant/30 rounded-2xl p-6 shadow-xs hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col items-center text-center">
       <div
-        className={`w-28 h-28 rounded-full bg-gradient-to-tr ${founder.avatarGradient} flex items-center justify-center text-white text-3xl font-black shadow-inner uppercase mb-5`}
+        className={`w-28 h-28 rounded-full bg-gradient-to-tr ${founder.avatarGradient} flex items-center justify-center text-white text-3xl font-black shadow-inner uppercase mb-5 ring-4 ring-white`}
       >
         {founder.name.split(' ').map((n) => n[0]).join('')}
       </div>
-      <h4 className="font-bold text-base text-on-surface leading-tight">{founder.name}</h4>
-      <p className="text-xs text-outline font-semibold tracking-wider uppercase mt-1">{founder.role}</p>
-      <p className="text-xs md:text-sm text-on-surface-variant mt-3 leading-relaxed">{founder.description}</p>
+      <h3 className="font-bold text-base text-on-surface leading-tight">{founder.name}</h3>
+      <p className="text-xs text-primary font-semibold tracking-wider uppercase mt-1.5">{founder.role}</p>
+      <p className="text-xs md:text-sm text-on-surface-variant mt-3 leading-relaxed flex-1">{founder.description}</p>
       <a
         href={founder.linkedinUrl}
         target="_blank"
         rel="noopener noreferrer"
         aria-label={`${founder.name} on LinkedIn`}
-        className="text-xs font-semibold text-primary hover:underline mt-4"
+        className="mt-5 inline-flex items-center justify-center w-9 h-9 rounded-full border border-outline-variant/40 text-on-surface-variant hover:text-primary hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 transition-colors"
       >
-        LinkedIn
+        <LinkedInIcon />
       </a>
     </div>
   )
