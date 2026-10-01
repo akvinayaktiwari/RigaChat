@@ -59,7 +59,7 @@ export default function WhatsAppFeaturePage() {
           {
             number: '3',
             title: 'Get Weekly Reports',
-            body: 'Every Monday at 9am IST, receive a full summary of your week — total leads, conversations, top performing bot — directly on WhatsApp.',
+            body: 'Every Monday at 9am IST, receive a summary of the past week’s new leads, split between chat agents and forms, directly on WhatsApp.',
             icon: <BarChart2 className="w-6 h-6" />,
           },
         ]}
@@ -77,7 +77,7 @@ export default function WhatsAppFeaturePage() {
           {
             icon: <BarChart2 className="w-5 h-5" />,
             title: 'Weekly Performance Reports',
-            body: 'Every Monday morning, a consolidated report arrives on your WhatsApp — leads by bot, total conversations, and your best performing agent of the week.',
+            body: 'Every Monday morning, one report arrives on your WhatsApp with the week’s new leads, counted separately for chat agents and forms.',
           },
         ]}
         integrations={[

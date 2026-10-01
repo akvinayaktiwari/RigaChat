@@ -115,7 +115,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     categoryId: 'whatsapp',
     question: 'How do weekly reports work?',
     answer:
-      'After connecting WhatsApp, enable Weekly Reports. You receive a summary every Monday at 9am IST covering leads, conversations, and top bots.',
+      'After connecting WhatsApp, enable Weekly Reports. You receive a summary every Monday at 9am IST of the past week’s new leads, split between chat agents and forms.',
   },
   {
     id: 'art-7',
