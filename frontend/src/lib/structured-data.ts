@@ -15,7 +15,7 @@ export type JsonLd = { [key: string]: JsonValue }
 export const ORGANIZATION_NAME = 'Vyostra AI'
 /** Must match Privacy.tsx's LEGAL_ENTITY, which Meta Business Verification checks. */
 export const LEGAL_ENTITY = 'Aashirwad Trading Enterprises'
-const SUPPORT_EMAIL = 'support@vyostra.com'
+export const SUPPORT_EMAIL = 'support@vyostra.com'
 
 /**
  * Profiles that are provably the same entity, which is how a search engine tells

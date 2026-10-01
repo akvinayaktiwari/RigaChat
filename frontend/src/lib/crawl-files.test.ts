@@ -4,6 +4,7 @@ import viewerRequestSource from '../../../deploy/cloudfront/viewer-request.js?ra
 import {
   PRERENDERED_STATIC_ROUTES,
   SPA_MARKETING_ROUTES,
+  buildLlmsTxt,
   buildRobotsTxt,
   buildSitemapXml,
   servedPath,
@@ -94,5 +95,35 @@ describe('buildSitemapXml', () => {
     expect(xml).toContain('<loc>https://vyostra.com/a&amp;b</loc>')
     expect(xml).toContain('<lastmod>2026-08-01</lastmod>')
     expect(xml.startsWith('<?xml version="1.0" encoding="UTF-8"?>')).toBe(true)
+  })
+})
+
+describe('buildLlmsTxt', () => {
+  const posts = [{ slug: 'a-post', title: 'A post', description: 'What the post answers.' }]
+  const tiers = [{ tier: 'starter' as const, name: 'Starter', priceUsd: 49, description: 'For one site.', features: ['1 agent', '50 CRM leads'] }]
+  const llms = buildLlmsTxt(ORIGIN, {
+    definition: ['Vyostra AI is a lead-capture platform.', 'It writes leads into a CRM.'],
+    tiers,
+    posts,
+    supportEmail: 'support@vyostra.com',
+  })
+
+  it('opens with the name and the definition as the summary blockquote', () => {
+    expect(llms.startsWith('# Vyostra AI\n\n> Vyostra AI is a lead-capture platform.\n\nIt writes leads into a CRM.\n')).toBe(true)
+  })
+
+  // A page in the sitemap and missing here is a page the two files disagree
+  // about, which is the drift generating both from one list exists to prevent.
+  it('links every URL the sitemap lists', () => {
+    const sitemapPaths = sitemapEntries([{ slug: 'a-post', publishedAt: '2026-08-01' }]).map((entry) => entry.path)
+    expect(sitemapPaths.filter((path) => !llms.includes(`](${ORIGIN}${path})`))).toEqual([])
+  })
+
+  it('states each plan at its price', () => {
+    expect(llms).toContain('- Starter: $49 per month. For one site. Includes 1 agent, 50 CRM leads.')
+  })
+
+  it('describes a post in its own words', () => {
+    expect(llms).toContain('- [A post](https://vyostra.com/blog/a-post/): What the post answers.')
   })
 })

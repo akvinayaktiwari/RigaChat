@@ -21,7 +21,11 @@ import Privacy from './src/pages/Privacy'
 import Terms from './src/pages/Terms'
 import NotFound from './src/pages/NotFound'
 import { getAllPosts, getAllSlugs } from './src/content/blog/registry'
-import { PRERENDERED_STATIC_ROUTES, buildRobotsTxt, buildSitemapXml, sitemapEntries } from './src/lib/crawl-files'
+import { PRERENDERED_STATIC_ROUTES, buildLlmsTxt, buildRobotsTxt, buildSitemapXml, sitemapEntries } from './src/lib/crawl-files'
+import { WHAT_IS_VYOSTRA } from './src/components/landing/WhatIsVyostra'
+import { PRICING_TIERS } from './src/lib/pricingTiers'
+import { postDescription } from './src/lib/search-snippet'
+import { SUPPORT_EMAIL } from './src/lib/structured-data'
 import { SITE_URL } from './src/lib/site'
 
 export { SITE_URL }
@@ -155,11 +159,16 @@ export function getRoutes(): string[] {
   return ['/', ...PRERENDERED_STATIC_ROUTES, ...getAllSlugs().map((slug) => `/blog/${slug}`)]
 }
 
-/** robots.txt and sitemap.xml contents, keyed by the file name to write under dist/. */
+/** robots.txt, sitemap.xml and llms.txt contents, keyed by the file name to write under dist/. */
 export function getCrawlFiles(): Record<string, string> {
-  const posts = getAllPosts().map(({ meta }) => ({ slug: meta.slug, publishedAt: meta.publishedAt }))
+  const metas = getAllPosts().map(({ meta }) => meta)
+  const posts = metas.map((meta) => ({ slug: meta.slug, publishedAt: meta.publishedAt }))
+  const summaries = metas.map((meta) => ({ slug: meta.slug, title: meta.title, description: postDescription(meta) }))
   return {
     'robots.txt': buildRobotsTxt(SITE_URL),
     'sitemap.xml': buildSitemapXml(SITE_URL, sitemapEntries(posts)),
+    // The definition is the homepage's own "What is Vyostra AI?" block, so the
+    // file cannot describe the product differently from the page it points at.
+    'llms.txt': buildLlmsTxt(SITE_URL, { definition: WHAT_IS_VYOSTRA, tiers: PRICING_TIERS, posts: summaries, supportEmail: SUPPORT_EMAIL }),
   }
 }
