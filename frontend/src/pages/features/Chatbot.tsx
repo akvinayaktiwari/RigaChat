@@ -1,8 +1,44 @@
 import PageMeta from '../../components/seo/PageMeta'
 import StructuredData from '../../components/seo/StructuredData'
-import { featurePageGraph } from '../../lib/structured-data'
+import { faqPageSchema, featurePageNodes, jsonLdGraph, type FaqItem } from '../../lib/structured-data'
 import { Bot, Code, Users, Brain, Clock, Zap, MessageSquare, Users as CrmIcon, FileText } from 'lucide-react'
 import UseCaseLayout from '../../components/landing/UseCaseLayout'
+
+/**
+ * Rendered on the page and published as FAQPage from this one array.
+ *
+ * Every answer describes a setting or behaviour that exists in the dashboard
+ * today. An answer engine quotes these as fact, so nothing here is aspirational.
+ */
+export const CHAT_AGENT_FAQ: FaqItem[] = [
+  {
+    question: 'How does the Vyostra AI chat agent learn about my business?',
+    answer:
+      'You enter your website URL and Vyostra AI reads the site and builds a knowledge base from it automatically. You can add your own knowledge base entries by hand for anything the site does not cover.',
+  },
+  {
+    question: 'What does the chat agent do when it does not know the answer?',
+    answer:
+      'It says so. The Vyostra AI chat agent answers only from your website content and knowledge base, and when the answer is not there it tells the visitor instead of guessing.',
+  },
+  {
+    question: 'When does the chat agent ask a visitor for their contact details?',
+    answer:
+      'After a number of messages that you set. The agent then shows a short lead form with the fields you chose, and the visitor’s details are saved as a lead with the conversation transcript.',
+  },
+  {
+    question: 'Can I control when the chat widget appears?',
+    answer:
+      'Yes. You choose one of four triggers: as soon as the page loads, after 5 seconds, after the visitor scrolls halfway down the page, or when they move to leave.',
+  },
+  {
+    question: 'Do I need to write code to add the chat agent to my site?',
+    answer:
+      'No. You copy one script tag and paste it before the closing body tag of your website. It works on WordPress, Webflow and custom HTML sites.',
+  },
+]
+
+const PAGE = { name: 'AI Agent', path: '/features/chatbot/' }
 
 function ChatWidgetMockup() {
   return (
@@ -49,12 +85,14 @@ export default function Chatbot() {
         description="Capture leads 24/7 with an AI agent trained on your business data. No code required. Set up in under 5 minutes."
         path="/features/chatbot/"
       />
-      <StructuredData data={featurePageGraph({ name: 'AI Agent', path: '/features/chatbot/' })} />
+      <StructuredData data={jsonLdGraph([...featurePageNodes(PAGE), faqPageSchema(CHAT_AGENT_FAQ)])} />
       <UseCaseLayout
         featurePath="/features/chatbot"
         badge="AI AGENT"
-        headline="Your 24/7 AI sales assistant"
-        subheadline="Vyostra AI's AI agent engages every visitor, answers their questions, and captures their contact details automatically — even when you are not there."
+        headline="An AI chat agent that answers visitors and captures leads"
+        subheadline="The Vyostra AI chat agent is a chat widget for your website, trained on your own site content and knowledge base. It answers visitors’ questions at any hour, asks for their contact details once they are engaged, and saves each lead with its transcript in the built-in lead CRM."
+        howItWorksHeading="How does the Vyostra AI chat agent work?"
+        benefitsHeading="Why put an AI chat agent on your website?"
         heroVisual={<ChatWidgetMockup />}
         howItWorksSteps={[
           {
@@ -98,6 +136,7 @@ export default function Chatbot() {
           { icon: <CrmIcon className="w-4 h-4" />, title: 'Lead CRM', href: '/features/crm' },
           { icon: <FileText className="w-4 h-4" />, title: 'Form Builder', href: '/features/forms' },
         ]}
+        faq={{ heading: 'What do people ask about the Vyostra AI chat agent?', items: CHAT_AGENT_FAQ }}
         ctaHeadline="Ready to capture leads on autopilot?"
         ctaBody="Set up your AI agent in under 5 minutes. No code required. No credit card needed."
       />
