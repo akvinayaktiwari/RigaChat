@@ -58,7 +58,7 @@ export default function Forms() {
           {
             icon: <Palette className="w-5 h-5" />,
             title: 'No Code Form Builder',
-            body: 'Build professional lead capture forms without writing a single line of code. Drag, drop, and publish in minutes.',
+            body: 'Build professional lead capture forms without writing a single line of code. Add fields, label them, and publish in minutes.',
           },
           {
             icon: <Globe className="w-5 h-5" />,
