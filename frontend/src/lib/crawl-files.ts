@@ -27,6 +27,14 @@ export interface StaticPage {
   /** One line on what the page answers, for llms.txt. Must be true of the page. */
   summary: string
   section: LlmsSection
+  /**
+   * YYYY-MM-DD the page's content last changed; the sitemap's lastmod. Bump it
+   * by hand when you change what the page says. Never derive it from the build
+   * clock: that marks every page modified on every deploy, and a crawler that
+   * sees dates move without content moving stops trusting all of them. A date
+   * left stale only understates.
+   */
+  lastModified: string
 }
 
 /**
@@ -35,56 +43,63 @@ export interface StaticPage {
  * disagree about which pages exist.
  */
 export const STATIC_PAGES: readonly StaticPage[] = [
-  { route: '/features', label: 'Features', summary: 'Every live feature of Vyostra AI on one page.', section: 'Product' },
+  { route: '/features', label: 'Features', summary: 'Every live feature of Vyostra AI on one page.', section: 'Product', lastModified: '2026-10-02' },
   {
     route: '/features/chatbot',
     label: 'AI Agent',
     summary: 'The website chat agent: trained on your site, embedded with one script tag, captures leads at any hour.',
     section: 'Product',
+    lastModified: '2026-09-19',
   },
   {
     route: '/features/whatsapp',
     label: 'WhatsApp',
     summary: 'Instant WhatsApp alerts for each new lead and a weekly report, sent through Gupshup.',
     section: 'Product',
+    lastModified: '2026-09-19',
   },
   {
     route: '/features/crm',
     label: 'Lead CRM',
     summary: 'The built-in lead CRM: every captured lead stored, filterable, and synced to Zoho CRM.',
     section: 'Product',
+    lastModified: '2026-09-19',
   },
   {
     route: '/features/forms',
     label: 'Form Builder',
     summary: 'Embeddable lead capture forms whose submissions land in the same CRM.',
     section: 'Product',
+    lastModified: '2026-09-19',
   },
   {
     route: '/features/voice-agent',
     label: 'AI Voice Agent',
     summary: 'The on-page voice agent: visitors talk to your site in the browser, with no phone number. An add-on.',
     section: 'Product',
+    lastModified: '2026-10-02',
   },
   {
     route: '/pricing',
     label: 'Pricing',
     summary: 'The three plans, what each includes, billing in USD or INR, and the 14-day free trial.',
     section: 'Pricing',
+    lastModified: '2026-10-02',
   },
   {
     route: '/faq',
     label: 'FAQ',
     summary: 'Short answers on what Vyostra AI is, setup, where leads go, WhatsApp follow-up and cost.',
     section: 'Product',
+    lastModified: '2026-10-02',
   },
-  { route: '/about-us', label: 'About Vyostra AI', summary: 'Who builds Vyostra AI and where: the founders, in Bangalore.', section: 'Company' },
-  { route: '/help', label: 'Help Center', summary: 'Setup answers: embedding the widget, the knowledge base, WhatsApp, Zoho CRM, forms, billing.', section: 'Company' },
-  { route: '/contact', label: 'Contact', summary: 'Reach sales or support; the team replies within 24 hours.', section: 'Company' },
-  { route: '/careers', label: 'Careers', summary: 'Working at Vyostra AI, a fully remote team.', section: 'Company' },
-  { route: '/blog', label: 'All articles', summary: 'The blog index, newest first.', section: 'Blog' },
-  { route: '/privacy-policy', label: 'Privacy Policy', summary: 'What data Vyostra AI collects and how it is handled.', section: 'Optional' },
-  { route: '/terms-of-service', label: 'Terms of Service', summary: 'The terms that govern use of Vyostra AI.', section: 'Optional' },
+  { route: '/about-us', label: 'About Vyostra AI', summary: 'Who builds Vyostra AI and where: the founders, in Bangalore.', section: 'Company', lastModified: '2026-10-01' },
+  { route: '/help', label: 'Help Center', summary: 'Setup answers: embedding the widget, the knowledge base, WhatsApp, Zoho CRM, forms, billing.', section: 'Company', lastModified: '2026-09-19' },
+  { route: '/contact', label: 'Contact', summary: 'Reach sales or support; the team replies within 24 hours.', section: 'Company', lastModified: '2026-09-20' },
+  { route: '/careers', label: 'Careers', summary: 'Working at Vyostra AI, a fully remote team.', section: 'Company', lastModified: '2026-09-16' },
+  { route: '/blog', label: 'All articles', summary: 'The blog index, newest first.', section: 'Blog', lastModified: '2026-09-15' },
+  { route: '/privacy-policy', label: 'Privacy Policy', summary: 'What data Vyostra AI collects and how it is handled.', section: 'Optional', lastModified: '2026-09-15' },
+  { route: '/terms-of-service', label: 'Terms of Service', summary: 'The terms that govern use of Vyostra AI.', section: 'Optional', lastModified: '2026-09-15' },
 ]
 
 /** The routes of STATIC_PAGES, for callers that only need to know which pages exist. */
@@ -165,11 +180,24 @@ export interface PostDate {
   updatedAt?: string
 }
 
+const BLOG_INDEX_ROUTE = '/blog'
+
+function postLastModified(post: PostDate): string {
+  return post.updatedAt ?? post.publishedAt
+}
+
+/** The blog index changes whenever a post is published or revised, whatever its own date says. */
+function staticPageLastModified(page: StaticPage, posts: readonly PostDate[]): string {
+  if (page.route !== BLOG_INDEX_ROUTE) return page.lastModified
+  // ISO dates sort as strings.
+  return [page.lastModified, ...posts.map(postLastModified)].sort().at(-1) ?? page.lastModified
+}
+
 /** Every public, indexable URL: SPA marketing pages, prerendered pages, blog posts. */
 export function sitemapEntries(posts: readonly PostDate[]): SitemapEntry[] {
   const spa = SPA_MARKETING_ROUTES.map((path) => ({ path }))
-  const prerendered = PRERENDERED_STATIC_ROUTES.map((route) => ({ path: servedPath(route) }))
-  const blog = posts.map((post) => ({ path: servedPath(`/blog/${post.slug}`), lastModified: post.updatedAt ?? post.publishedAt }))
+  const prerendered = STATIC_PAGES.map((page) => ({ path: servedPath(page.route), lastModified: staticPageLastModified(page, posts) }))
+  const blog = posts.map((post) => ({ path: servedPath(`/blog/${post.slug}`), lastModified: postLastModified(post) }))
   return [...spa, ...prerendered, ...blog]
 }
 

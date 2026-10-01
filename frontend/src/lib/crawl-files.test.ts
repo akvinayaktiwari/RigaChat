@@ -4,6 +4,7 @@ import viewerRequestSource from '../../../deploy/cloudfront/viewer-request.js?ra
 import {
   PRERENDERED_STATIC_ROUTES,
   SPA_MARKETING_ROUTES,
+  STATIC_PAGES,
   buildLlmsTxt,
   buildRobotsTxt,
   buildSitemapXml,
@@ -68,8 +69,34 @@ describe('sitemapEntries', () => {
     expect(revised.find((entry) => entry.path === '/blog/a-post/')?.lastModified).toBe('2026-09-20')
   })
 
+  it('dates every static page from its own record', () => {
+    const features = STATIC_PAGES.find((page) => page.route === '/features/crm')
+    expect(entries.find((entry) => entry.path === '/features/crm/')?.lastModified).toBe(features?.lastModified)
+  })
+
+  // A new post changes the index page; the index must say so without anyone
+  // remembering to bump its date.
+  it('dates the blog index from its newest post', () => {
+    const withNewPost = sitemapEntries([{ slug: 'a-post', publishedAt: '2099-01-01' }])
+    expect(withNewPost.find((entry) => entry.path === '/blog/')?.lastModified).toBe('2099-01-01')
+  })
+
   it('has no duplicate URLs', () => {
     expect(new Set(paths).size).toBe(paths.length)
+  })
+})
+
+describe('static page dates', () => {
+  // One day of slack: a date written in India is already "tomorrow" in UTC
+  // for the first five and a half hours of the day.
+  const latestAllowed = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
+
+  // A lastmod in the future, or one that is not a date, is one a crawler
+  // learns to disregard along with every other date in the file.
+  it.each(STATIC_PAGES.map((page) => [page.route, page.lastModified] as const))('%s has a real date that is not in the future', (_route, date) => {
+    expect(date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10)).toBe(date)
+    expect(date <= latestAllowed).toBe(true)
   })
 })
 
