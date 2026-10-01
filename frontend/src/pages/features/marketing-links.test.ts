@@ -12,7 +12,7 @@ import appSource from '../../../App.tsx?raw'
  */
 
 const marketingSources: Record<string, string> = {
-  ...import.meta.glob<string>(['../Features.tsx', '../Pricing.tsx'], { query: '?raw', import: 'default', eager: true }),
+  ...import.meta.glob<string>(['../Features.tsx', '../Pricing.tsx', '../Faq.tsx'], { query: '?raw', import: 'default', eager: true }),
   ...import.meta.glob<string>(['./*.tsx', '!./*.test.tsx'], { query: '?raw', import: 'default', eager: true }),
   ...import.meta.glob<string>(['../../components/landing/**/*.tsx', '!../../components/landing/**/*.test.tsx'], { query: '?raw', import: 'default', eager: true }),
 }

@@ -15,6 +15,7 @@ import Help from './src/pages/Help'
 import Contact from './src/pages/Contact'
 import Careers from './src/pages/Careers'
 import Pricing from './src/pages/Pricing'
+import Faq from './src/pages/Faq'
 import { AuthProvider } from './src/hooks/useAuth'
 import { SubscriptionProvider } from './src/hooks/useSubscription'
 import BlogPost from './src/pages/BlogPost'
@@ -89,6 +90,7 @@ export async function renderRoute(url: string): Promise<{ html: string; head: st
               <Route path="/contact" element={<Contact />} />
               <Route path="/careers" element={<Careers />} />
               <Route path="/pricing" element={<Pricing />} />
+              <Route path="/faq" element={<Faq />} />
               <Route path="/blog" element={<BlogIndex />} />
               <Route path="/blog/:slug" element={<BlogPost />} />
               <Route path="/privacy-policy" element={<Privacy />} />

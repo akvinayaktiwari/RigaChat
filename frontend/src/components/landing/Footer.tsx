@@ -8,6 +8,7 @@ const LINK_COLUMNS = [
       { label: 'Features', href: '/features' },
       { label: 'Integrations', href: '/#integrations' },
       { label: 'Pricing', href: '/pricing' },
+      { label: 'FAQ', href: '/faq' },
     ],
   },
   {

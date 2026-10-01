@@ -66,6 +66,12 @@ export const STATIC_PAGES: readonly StaticPage[] = [
     summary: 'The three plans, what each includes, billing in USD or INR, and the 14-day free trial.',
     section: 'Pricing',
   },
+  {
+    route: '/faq',
+    label: 'FAQ',
+    summary: 'Short answers on what Vyostra AI is, setup, where leads go, WhatsApp follow-up and cost.',
+    section: 'Product',
+  },
   { route: '/about-us', label: 'About Vyostra AI', summary: 'Who builds Vyostra AI and where: the founders, in Bangalore.', section: 'Company' },
   { route: '/help', label: 'Help Center', summary: 'Setup answers: embedding the widget, the knowledge base, WhatsApp, Zoho CRM, forms, billing.', section: 'Company' },
   { route: '/contact', label: 'Contact', summary: 'Reach sales or support; the team replies within 24 hours.', section: 'Company' },
