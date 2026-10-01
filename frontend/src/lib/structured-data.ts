@@ -216,6 +216,53 @@ export function pageGraphNodes(page: FeaturePageFields): JsonLd[] {
   return [webPageSchema(page), breadcrumbSchema([{ name: 'Home', path: '/' }, { name: page.name, path: page.path }])]
 }
 
+/**
+ * The about page: an AboutPage whose subject is the organization, one crumb
+ * below Home. Emit it alongside organizationSchema(), which carries the
+ * founders the page introduces.
+ */
+export function aboutPageNodes(page: FeaturePageFields): JsonLd[] {
+  const aboutPage: JsonLd = {
+    '@type': 'AboutPage',
+    '@id': absoluteUrl(page.path),
+    url: absoluteUrl(page.path),
+    name: page.name,
+    isPartOf: { '@id': absoluteUrl(`/${WEBSITE_ID}`) },
+    mainEntity: { '@id': absoluteUrl(`/${ORGANIZATION_ID}`) },
+  }
+  return [aboutPage, breadcrumbSchema([{ name: 'Home', path: '/' }, { name: page.name, path: page.path }])]
+}
+
+export interface BlogListing {
+  title: string
+  /** Path exactly as served, e.g. "/blog/a-post/". */
+  path: string
+}
+
+const BLOG_INDEX_PATH = '/blog/'
+
+/** The blog index: a Blog published by the organization, listing its posts in the order the page shows them. */
+export function blogIndexNodes(posts: readonly BlogListing[]): JsonLd[] {
+  const blog: JsonLd = {
+    '@type': 'Blog',
+    '@id': absoluteUrl(BLOG_INDEX_PATH),
+    url: absoluteUrl(BLOG_INDEX_PATH),
+    name: `${ORGANIZATION_NAME} Blog`,
+    isPartOf: { '@id': absoluteUrl(`/${WEBSITE_ID}`) },
+    publisher: { '@id': absoluteUrl(`/${ORGANIZATION_ID}`) },
+    mainEntity: {
+      '@type': 'ItemList',
+      itemListElement: posts.map((post, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        name: post.title,
+        url: absoluteUrl(post.path),
+      })),
+    },
+  }
+  return [blog, breadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'Blog', path: BLOG_INDEX_PATH }])]
+}
+
 /** Wraps nodes in one @graph so @id references resolve across them. */
 export function jsonLdGraph(nodes: readonly JsonLd[]): JsonLd {
   return { '@context': 'https://schema.org', '@graph': [...nodes] }

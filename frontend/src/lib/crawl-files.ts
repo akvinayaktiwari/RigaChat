@@ -186,17 +186,30 @@ function postLastModified(post: PostDate): string {
   return post.updatedAt ?? post.publishedAt
 }
 
-/** The blog index changes whenever a post is published or revised, whatever its own date says. */
-function staticPageLastModified(page: StaticPage, posts: readonly PostDate[]): string {
-  if (page.route !== BLOG_INDEX_ROUTE) return page.lastModified
+/**
+ * When the homepage's own copy last changed. Like a STATIC_PAGES date, bump it
+ * by hand on a real content change -- never from the build clock, which would
+ * tell crawlers every deploy rewrote the page.
+ */
+const HOME_LAST_MODIFIED = '2026-09-20'
+
+/** Pages that list the newest posts change whenever one is published or revised. */
+const LISTS_NEWEST_POSTS: readonly string[] = ['/', BLOG_INDEX_ROUTE]
+
+/** A page's own date, or its newest post's where the page lists posts and that is later. */
+function pageLastModified(route: string, ownDate: string, posts: readonly PostDate[]): string {
+  if (!LISTS_NEWEST_POSTS.includes(route)) return ownDate
   // ISO dates sort as strings.
-  return [page.lastModified, ...posts.map(postLastModified)].sort().at(-1) ?? page.lastModified
+  return [ownDate, ...posts.map(postLastModified)].sort().at(-1) ?? ownDate
 }
 
 /** Every public, indexable URL: SPA marketing pages, prerendered pages, blog posts. */
 export function sitemapEntries(posts: readonly PostDate[]): SitemapEntry[] {
-  const spa = SPA_MARKETING_ROUTES.map((path) => ({ path }))
-  const prerendered = STATIC_PAGES.map((page) => ({ path: servedPath(page.route), lastModified: staticPageLastModified(page, posts) }))
+  const spa = SPA_MARKETING_ROUTES.map((path) => ({ path, lastModified: pageLastModified(path, HOME_LAST_MODIFIED, posts) }))
+  const prerendered = STATIC_PAGES.map((page) => ({
+    path: servedPath(page.route),
+    lastModified: pageLastModified(page.route, page.lastModified, posts),
+  }))
   const blog = posts.map((post) => ({ path: servedPath(`/blog/${post.slug}`), lastModified: postLastModified(post) }))
   return [...spa, ...prerendered, ...blog]
 }
