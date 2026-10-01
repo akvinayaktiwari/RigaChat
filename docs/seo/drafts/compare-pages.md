@@ -55,7 +55,7 @@ here, and the pages get built once the table is filled.
 ## Before publishing a page
 
 - Build it as `frontend/src/pages/compare/<Name>.tsx` on `MarketingPageShell`.
-- Add the route in `App.tsx` (eager) and `prerender-entry.tsx`, an entry in
+- Add the route in `App.tsx` (eager), an entry in
   `STATIC_PAGES` (`frontend/src/lib/crawl-files.ts`), and `'/compare'` in
   `PRERENDERED_PREFIXES` (`deploy/cloudfront/viewer-request.js`). The tests in
   `crawl-files.test.ts` and `app-bundle-split.test.ts` fail on any of these missed.

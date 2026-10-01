@@ -1,7 +1,7 @@
 import { useReducedMotion, type Variants } from 'motion/react'
 import * as m from 'motion/react-m'
 import type { ReactNode } from 'react'
-import { isServerRender } from '../../lib/prerender-boot'
+import { bootedFromPrerender, isServerRender } from '../../lib/prerender-boot'
 
 // Shared motion tokens for the landing page. They live here rather than inline
 // per section so a duration is never copy-pasted -- one duration reused for
@@ -38,7 +38,7 @@ const VIEWPORT = { once: true, amount: 0.25, margin: '0px 0px -80px 0px' } as co
  */
 export function useStaticMotion(): boolean {
   const reduced = useReducedMotion()
-  return reduced === true || isServerRender()
+  return reduced === true || isServerRender() || bootedFromPrerender()
 }
 
 interface RevealProps {
