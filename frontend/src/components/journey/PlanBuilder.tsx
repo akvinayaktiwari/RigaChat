@@ -17,7 +17,7 @@ type MessageKey = NonNullable<TimelineEntry['edits']>
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
-const LABEL = 'text-[10px] font-bold tracking-[0.11em] uppercase text-gray-400 mb-2'
+const LABEL = 'text-[10px] font-bold tracking-[0.11em] uppercase text-gray-500 mb-2'
 const CARD = 'border border-gray-200 rounded-2xl bg-white p-4 mb-3'
 
 interface PlanBuilderProps {
@@ -91,7 +91,7 @@ function ChipList({
           type="button"
           onClick={commit}
           aria-label="Add"
-          className="rounded-full p-1 text-gray-400 hover:text-violet-700 hover:bg-violet-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-600"
+          className="rounded-full p-1 text-gray-500 hover:text-violet-700 hover:bg-violet-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-600"
         >
           <Plus size={12} />
         </button>
@@ -270,7 +270,7 @@ export default function PlanBuilder({ plan, onChange }: PlanBuilderProps) {
               placeholder="add a limit"
               tone="danger"
             />
-            <p className="text-[12px] text-gray-400 mt-2.5 leading-relaxed">
+            <p className="text-[12px] text-gray-500 mt-2.5 leading-relaxed">
               The assistant already only answers from your knowledge base. These are on top of that.
             </p>
           </div>
@@ -327,7 +327,7 @@ export default function PlanBuilder({ plan, onChange }: PlanBuilderProps) {
                     label="How many follow-ups"
                   />
                 </div>
-                <p className="text-[12px] text-gray-400 leading-relaxed">
+                <p className="text-[12px] text-gray-500 leading-relaxed">
                   {plan.followUp.waitDays === 0
                     ? 'Follows up as soon as WhatsApp\u2019s 24-hour reply window closes.'
                     : `Follows up ${plan.followUp.waitDays} ${plan.followUp.waitDays === 1 ? 'day' : 'days'} after the 24-hour reply window closes.`}
@@ -449,7 +449,7 @@ export default function PlanBuilder({ plan, onChange }: PlanBuilderProps) {
               return (
                 <div key={`${entry.when}-${i}`} className="border-b border-gray-200 last:border-b-0">
                   <div className="flex gap-3 text-[12.5px] text-gray-600 py-1.5 leading-snug items-start">
-                    <span className="font-mono text-[10.5px] text-gray-400 shrink-0 pt-0.5 w-20">
+                    <span className="font-mono text-[10.5px] text-gray-500 shrink-0 pt-0.5 w-20">
                       {entry.when}
                     </span>
                     <span className="flex-1">

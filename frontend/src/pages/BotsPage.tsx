@@ -291,12 +291,12 @@ export default function BotsPage() {
                 </div>
 
                 <div className="flex items-center gap-2 mb-1.5">
-                  <Globe size={14} className="text-gray-400 shrink-0" />
+                  <Globe size={14} className="text-gray-500 shrink-0" />
                   <span className="text-sm text-gray-500 truncate">
                     {bot.websiteUrl ? truncateUrl(bot.websiteUrl) : 'Knowledge Base only'}
                   </span>
                 </div>
-                <p className="text-xs text-gray-400 mb-4">Created {formatCreatedDate(bot.createdAt)}</p>
+                <p className="text-xs text-gray-500 mb-4">Created {formatCreatedDate(bot.createdAt)}</p>
 
                 {indexingBotId === bot.botId && (
                   <div className="mb-4">
@@ -329,7 +329,7 @@ export default function BotsPage() {
                       type="button"
                       onClick={() => setOpenMenuBotId(openMenuBotId === bot.botId ? null : bot.botId)}
                       title="More actions"
-                      className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                      className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
                     >
                       <MoreVertical size={16} />
                     </button>
@@ -410,7 +410,7 @@ export default function BotsPage() {
             <button
               type="button"
               onClick={() => setSelectedBotForEmbed(null)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-600 transition-colors"
               title="Close"
             >
               <X size={20} />

@@ -67,7 +67,7 @@ export default function TrendChart({
 
   if (data.length < 2) {
     return (
-      <div className="flex items-center justify-center text-sm text-gray-400" style={{ height }}>
+      <div className="flex items-center justify-center text-sm text-gray-500" style={{ height }}>
         Not enough data yet
       </div>
     )
@@ -117,7 +117,7 @@ export default function TrendChart({
 
         <circle cx={lastX} cy={lastY} r={4} fill="#ffffff" stroke={color} strokeWidth={2} />
       </svg>
-      <div className="flex items-center justify-between text-xs text-gray-400 mt-2">
+      <div className="flex items-center justify-between text-xs text-gray-500 mt-2">
         <span>{formatLabel(data[0].date)}</span>
         <span>{formatLabel(data[lastIndex].date)}</span>
       </div>

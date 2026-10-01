@@ -229,12 +229,12 @@ export default function VoiceAgentsPage() {
               </div>
 
               <div className="flex items-center gap-2 mb-1.5">
-                <Volume2 size={14} className="text-gray-400 shrink-0" />
+                <Volume2 size={14} className="text-gray-500 shrink-0" />
                 <span className="text-sm text-gray-500 capitalize">{agent.voice}</span>
               </div>
 
               <div className="flex items-center gap-2 mb-3">
-                <Globe size={14} className="text-gray-400 shrink-0" />
+                <Globe size={14} className="text-gray-500 shrink-0" />
                 <span className="text-sm text-gray-500 truncate">
                   {agent.websiteUrl ? truncateUrl(agent.websiteUrl) : 'Knowledge Base only'}
                 </span>
@@ -244,7 +244,7 @@ export default function VoiceAgentsPage() {
                 <IndexedBadge isIndexed={agent.isIndexed} />
               </div>
 
-              <p className="text-xs text-gray-400 mb-4">Created {formatCreatedDate(agent.createdAt)}</p>
+              <p className="text-xs text-gray-500 mb-4">Created {formatCreatedDate(agent.createdAt)}</p>
 
               <div className="flex items-center gap-2 pt-3 border-t border-gray-50">
                 <button
@@ -267,7 +267,7 @@ export default function VoiceAgentsPage() {
                   onClick={() => handleDelete(agent)}
                   disabled={deletingAgentId === agent.agentId}
                   title="Delete voice agent"
-                  className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors disabled:opacity-50 shrink-0"
+                  className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-500 hover:bg-red-50 hover:text-red-500 transition-colors disabled:opacity-50 shrink-0"
                 >
                   <Trash2 size={16} />
                 </button>

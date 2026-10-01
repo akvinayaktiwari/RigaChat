@@ -141,7 +141,7 @@ export default function MetaPagePicker({ onClose, onConnected, onTokenExpired }:
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] -mr-2 text-gray-400 hover:text-gray-700"
+            className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] -mr-2 text-gray-500 hover:text-gray-700"
           >
             <X size={18} />
           </button>

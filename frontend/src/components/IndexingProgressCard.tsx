@@ -108,13 +108,13 @@ function PhaseChecklist({ state, job }: { state: DerivedState; job: IndexingJob 
                     ? 'bg-success text-white'
                     : isActive
                       ? 'bg-gradient-to-br from-primary to-primary-container text-white vyostra-logo-glow'
-                      : 'bg-gray-100 text-gray-400',
+                      : 'bg-gray-100 text-gray-500',
                 ].join(' ')}
               >
                 {isDone ? <Check size={14} /> : i + 1}
               </div>
               <span
-                className={`text-xs whitespace-nowrap ${isActive ? 'text-on-surface font-medium' : 'text-gray-400'}`}
+                className={`text-xs whitespace-nowrap ${isActive ? 'text-on-surface font-medium' : 'text-gray-500'}`}
                 style={isActive ? JAKARTA_FONT : undefined}
               >
                 {phase.label}

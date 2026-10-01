@@ -33,7 +33,7 @@ export default function WidgetTestPage() {
             placeholder="e.g. 423677a9-05fc-4db1-a13d-a25a0c49cee0"
             className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
           />
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             Find this in a bot's "Get Embed Code" modal, in the data-bot-id attribute
           </p>
         </div>

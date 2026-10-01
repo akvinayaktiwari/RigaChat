@@ -30,7 +30,7 @@ export default function FilterBar({ searchValue, onSearchChange, searchPlacehold
     <div className="bg-white rounded-2xl border border-black/5 p-4 shadow-sm">
       <div className="flex gap-3 items-center flex-wrap">
         <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
           <input
             type="text"
             value={searchValue}

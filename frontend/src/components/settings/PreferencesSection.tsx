@@ -80,7 +80,7 @@ export default function PreferencesSection({ preferences, onToggle }: Preference
           return (
             <div key={item.key} className="flex items-start justify-between gap-4">
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400 mt-0.5 shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center text-gray-500 mt-0.5 shrink-0">
                   <Icon className="w-4 h-4" />
                 </div>
                 <div>

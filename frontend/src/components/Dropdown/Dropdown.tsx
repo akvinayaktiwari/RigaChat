@@ -246,12 +246,12 @@ export default function Dropdown<T extends string = string>({
           ${open ? 'border-violet-400' : ''}`
         }
       >
-        <span className={`flex-1 truncate ${selected ? 'text-gray-900' : 'text-gray-400'}`}>
+        <span className={`flex-1 truncate ${selected ? 'text-gray-900' : 'text-gray-500'}`}>
           {selected ? selected.label : placeholder}
         </span>
         <ChevronDown
           size={15}
-          className={`shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`shrink-0 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`}
           aria-hidden="true"
         />
       </button>
@@ -267,7 +267,7 @@ export default function Dropdown<T extends string = string>({
             ${dropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'}`}
         >
           {options.length === 0 && (
-            <li className="px-3.5 py-2.5 text-sm text-gray-400">Nothing to choose from</li>
+            <li className="px-3.5 py-2.5 text-sm text-gray-500">Nothing to choose from</li>
           )}
 
           {options.map((option, index) => {

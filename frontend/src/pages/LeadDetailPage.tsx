@@ -90,10 +90,10 @@ function InfoRow({ icon: Icon, label, value }: { icon: typeof Mail; label: strin
   return (
     <div className="flex items-center gap-3 py-3 border-b border-gray-50">
       <div className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center shrink-0">
-        <Icon className="w-4 h-4 text-gray-400" />
+        <Icon className="w-4 h-4 text-gray-500" />
       </div>
       <div className="min-w-0">
-        <span className="text-xs text-gray-400 block">{label}</span>
+        <span className="text-xs text-gray-500 block">{label}</span>
         <span className="text-sm text-gray-700 font-medium truncate block">{value}</span>
       </div>
     </div>
@@ -381,7 +381,7 @@ export default function LeadDetailPage() {
                 className={`flex-1 inline-flex items-center justify-center gap-2 font-semibold px-3 py-2.5 rounded-xl text-sm transition-opacity ${
                   dialNumber
                     ? 'bg-linear-to-r from-violet-600 to-purple-500 text-white shadow-md shadow-violet-200/50 hover:opacity-90'
-                    : 'bg-gray-100 text-gray-400 pointer-events-none'
+                    : 'bg-gray-100 text-gray-500 pointer-events-none'
                 }`}
               >
                 <Phone size={14} />
@@ -396,7 +396,7 @@ export default function LeadDetailPage() {
                 className={`flex-1 inline-flex items-center justify-center gap-2 font-semibold px-3 py-2.5 rounded-xl text-sm border transition-colors ${
                   whatsAppNumber
                     ? 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-                    : 'bg-gray-100 text-gray-400 border-transparent pointer-events-none'
+                    : 'bg-gray-100 text-gray-500 border-transparent pointer-events-none'
                 }`}
               >
                 <MessageSquare size={14} />
@@ -434,7 +434,7 @@ export default function LeadDetailPage() {
                 <dl className="space-y-2">
                   {customFields.map(([key, value]) => (
                     <div key={key} className="text-sm">
-                      <dt className="text-xs text-gray-400">{key}</dt>
+                      <dt className="text-xs text-gray-500">{key}</dt>
                       <dd className="text-gray-700 font-medium break-words">{value}</dd>
                     </div>
                   ))}
@@ -448,7 +448,7 @@ export default function LeadDetailPage() {
               Where this stands
             </h2>
 
-            <label className="text-xs text-gray-400 block mb-1.5" htmlFor="lead-status">
+            <label className="text-xs text-gray-500 block mb-1.5" htmlFor="lead-status">
               Status
             </label>
             <Dropdown<LeadStatus>
@@ -462,7 +462,7 @@ export default function LeadDetailPage() {
 
             {status === 'closed' && (
               <>
-                <label className="text-xs text-gray-400 block mb-1.5 mt-4" htmlFor="lead-outcome">
+                <label className="text-xs text-gray-500 block mb-1.5 mt-4" htmlFor="lead-outcome">
                   Outcome
                 </label>
                 <Dropdown
@@ -479,7 +479,7 @@ export default function LeadDetailPage() {
               </>
             )}
 
-            <label className="text-xs text-gray-400 block mb-1.5 mt-4" htmlFor="lead-next-action">
+            <label className="text-xs text-gray-500 block mb-1.5 mt-4" htmlFor="lead-next-action">
               Next action
             </label>
             <input
@@ -490,7 +490,7 @@ export default function LeadDetailPage() {
               onChange={(e) => applyPatch({ nextActionAt: fromLocalInputValue(e.target.value) })}
               className={FIELD_CLASSES}
             />
-            <p className="text-xs text-gray-400 mt-2">
+            <p className="text-xs text-gray-500 mt-2">
               Leads with an overdue next action are pinned to the top of your inbox.
             </p>
           </div>
@@ -523,14 +523,14 @@ export default function LeadDetailPage() {
             {notes.length === 0 ? (
               <div className="flex flex-col items-center text-center py-8">
                 <StickyNote size={28} className="text-gray-300 mb-2" />
-                <p className="text-gray-400 text-sm">No notes yet</p>
+                <p className="text-gray-500 text-sm">No notes yet</p>
               </div>
             ) : (
               <ul className="mt-5 space-y-3">
                 {[...notes].reverse().map((note) => (
                   <li key={note.noteId} className="border border-gray-100 rounded-xl px-4 py-3">
                     <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.body}</p>
-                    <p className="text-xs text-gray-400 mt-1.5">{formatFullDate(note.createdAt)}</p>
+                    <p className="text-xs text-gray-500 mt-1.5">{formatFullDate(note.createdAt)}</p>
                   </li>
                 ))}
               </ul>
@@ -559,7 +559,7 @@ export default function LeadDetailPage() {
             {transcriptLines.length === 0 ? (
               <div className="flex flex-col items-center text-center py-8">
                 <MessageSquare size={32} className="text-gray-300 mb-2" />
-                <p className="text-gray-400 text-sm">
+                <p className="text-gray-500 text-sm">
                   {lead.source === 'chat'
                     ? 'No conversation transcript available'
                     : `${SOURCE_LABELS[lead.source]} leads arrive as a submission, not a conversation`}
@@ -577,7 +577,7 @@ export default function LeadDetailPage() {
                   ) : (
                     <div key={i} className="flex gap-3 items-end">
                       <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-                        <BotIcon className="w-3.5 h-3.5 text-gray-400" />
+                        <BotIcon className="w-3.5 h-3.5 text-gray-500" />
                       </div>
                       <div className="bg-gray-100 rounded-2xl rounded-bl-sm px-4 py-3 text-sm text-gray-700 max-w-[80%] leading-relaxed">
                         {line.text}

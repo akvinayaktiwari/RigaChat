@@ -157,7 +157,7 @@ export default function FormLeadsPage() {
                         {field.fieldId ? (values[field.fieldId] ?? '-') : '-'}
                       </td>
                     ))}
-                    <td className="px-4 py-3 text-slate-400 text-sm whitespace-nowrap">
+                    <td className="px-4 py-3 text-slate-500 text-sm whitespace-nowrap">
                       {formatRelativeDate(new Date(lead.createdAt))}
                     </td>
                     {crmConnected && (
@@ -188,7 +188,7 @@ export default function FormLeadsPage() {
             <button
               type="button"
               onClick={() => setSelectedLead(null)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"
+              className="absolute top-4 right-4 text-slate-500 hover:text-slate-600 transition-colors"
               title="Close"
             >
               <X size={20} />

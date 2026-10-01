@@ -453,7 +453,7 @@ export default function DashboardHome() {
                 <h2 className="font-bold text-gray-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                   Leads over time
                 </h2>
-                <span className="text-xs text-gray-400">Last {TREND_CHART_WINDOW_DAYS} days</span>
+                <span className="text-xs text-gray-500">Last {TREND_CHART_WINDOW_DAYS} days</span>
               </div>
               <TrendChart data={dailyBuckets30.map((bucket) => ({ date: bucket.date, value: bucket.count }))} />
             </div>
@@ -501,7 +501,7 @@ export default function DashboardHome() {
                             {SOURCE_LABELS[lead.source]}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-400">{formatRelativeDate(new Date(lead.createdAt))}</td>
+                        <td className="px-6 py-4 text-sm text-gray-500">{formatRelativeDate(new Date(lead.createdAt))}</td>
                         <td className="px-6 py-4">
                           <span
                             className={`inline-flex text-xs font-semibold px-2.5 py-1 rounded-full border ${STATUS_BADGE_CLASSES[leadStatus(lead)]}`}

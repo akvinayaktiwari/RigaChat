@@ -97,7 +97,7 @@ export const URGENCY_CLASSES: Record<UrgencyTone, string> = {
   due: 'bg-orange-50 text-orange-700 border-orange-200',
   waiting: 'bg-amber-50 text-amber-700 border-amber-200',
   scheduled: 'bg-gray-50 text-gray-600 border-gray-200',
-  quiet: 'bg-gray-50 text-gray-400 border-gray-200',
+  quiet: 'bg-gray-50 text-gray-500 border-gray-200',
 }
 
 export function leadInitials(name: string | undefined): string {

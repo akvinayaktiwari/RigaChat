@@ -76,7 +76,7 @@ export default function FormTestPreviewPage() {
         </button>
       </div>
 
-      <footer className="px-10 py-6 text-xs text-slate-400 border-t border-slate-100">
+      <footer className="px-10 py-6 text-xs text-slate-500 border-t border-slate-100">
         &copy; 2026 Acme Real Estate (fake, for form testing only) — Form ID: {formId}
       </footer>
     </div>

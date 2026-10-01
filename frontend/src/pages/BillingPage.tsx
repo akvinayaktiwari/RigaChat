@@ -110,7 +110,7 @@ export default function BillingPage() {
                   <td className="px-4 py-3 whitespace-nowrap">
                     <StatusBadge status={payment.status} />
                   </td>
-                  <td className="px-4 py-3 text-slate-400 text-sm whitespace-nowrap font-mono">
+                  <td className="px-4 py-3 text-slate-500 text-sm whitespace-nowrap font-mono">
                     {payment.paymentId}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
@@ -125,7 +125,7 @@ export default function BillingPage() {
                         <ExternalLink size={12} />
                       </a>
                     ) : (
-                      <span className="text-slate-400 text-sm">—</span>
+                      <span className="text-slate-500 text-sm">—</span>
                     )}
                   </td>
                 </tr>

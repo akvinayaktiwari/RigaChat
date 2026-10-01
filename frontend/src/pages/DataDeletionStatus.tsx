@@ -40,7 +40,7 @@ function Step({
     <div className="flex gap-4">
       <div
         className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-          done ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400'
+          done ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-500'
         }`}
       >
         <Icon className="w-5 h-5" />

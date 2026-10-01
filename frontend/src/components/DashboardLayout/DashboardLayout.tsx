@@ -100,7 +100,7 @@ function SidebarContent({ initials, userName, userEmail, onLogout }: SidebarCont
             <NavLink key={link.to} to={link.to} end={link.end} className={({ isActive }) => navLinkClasses(isActive)}>
               {({ isActive }) => (
                 <>
-                  <Icon className={`w-4.5 h-4.5 shrink-0 ${isActive ? 'text-violet-600' : 'text-gray-400'}`} />
+                  <Icon className={`w-4.5 h-4.5 shrink-0 ${isActive ? 'text-violet-600' : 'text-gray-500'}`} />
                   <span>{link.label}</span>
                 </>
               )}
@@ -122,7 +122,7 @@ function SidebarContent({ initials, userName, userEmail, onLogout }: SidebarCont
             type="button"
             onClick={onLogout}
             title="Logout"
-            className="text-gray-400 hover:text-gray-700 transition-colors shrink-0"
+            className="text-gray-500 hover:text-gray-700 transition-colors shrink-0"
           >
             <LogOut className="w-4.5 h-4.5" />
           </button>

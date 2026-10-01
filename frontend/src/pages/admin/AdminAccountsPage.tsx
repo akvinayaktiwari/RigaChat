@@ -30,7 +30,7 @@ function EntitlementsSummary({ entitlements }: { entitlements: AdminAccountSumma
 }
 
 function InternalBadge({ isInternal }: { isInternal: boolean }) {
-  if (!isInternal) return <span className="text-xs text-gray-400">—</span>
+  if (!isInternal) return <span className="text-xs text-gray-500">—</span>
   return (
     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700">
       Internal
@@ -130,8 +130,8 @@ export default function AdminAccountsPage() {
                     onClick={() => setSelectedAccountId(account.accountId)}
                     className="border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50 transition-colors"
                   >
-                    <td className="px-4 py-3 text-gray-900">{account.email ?? <span className="text-gray-400">—</span>}</td>
-                    <td className="px-4 py-3 text-gray-700">{account.name ?? <span className="text-gray-400">—</span>}</td>
+                    <td className="px-4 py-3 text-gray-900">{account.email ?? <span className="text-gray-500">—</span>}</td>
+                    <td className="px-4 py-3 text-gray-700">{account.name ?? <span className="text-gray-500">—</span>}</td>
                     <td className="px-4 py-3 text-gray-700 capitalize">{account.plan}</td>
                     <td className="px-4 py-3 text-gray-700 capitalize">{account.status}</td>
                     <td className="px-4 py-3">
