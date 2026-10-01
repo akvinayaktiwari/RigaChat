@@ -43,6 +43,14 @@ describe('marketing page links', () => {
     expect(broken).toEqual([])
   })
 
+  // The features index is where a crawler discovers the feature pages, and it
+  // can only follow an href. Cards that navigate from onClick link nothing.
+  it('links the feature cards with real anchors', () => {
+    const features = files.find(([file]) => file.endsWith('/Features.tsx'))?.[1] ?? ''
+    expect(features).toContain('<Link to={card.href}')
+    expect(features).not.toMatch(/onClick=\{\(\) => navigate\(href\)\}/)
+  })
+
   // A bare "#" is a crawl dead end and reads as unfinished. The footer shipped
   // Changelog and Security that way while /help, a real page, had no link at all.
   it.each(files)('%s has no placeholder "#" links', (_file, source) => {
