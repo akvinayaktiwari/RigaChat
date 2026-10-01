@@ -67,7 +67,7 @@ export default function WhatsAppFeaturePage() {
           {
             icon: <Bell className="w-5 h-5" />,
             title: 'Instant Alerts',
-            body: 'Lead captured at 2am? You get the WhatsApp message at 2am. No batching, no delays. Average delivery time under 4 seconds.',
+            body: 'Lead captured at 2am? You get the WhatsApp message at 2am. Alerts are sent one by one as leads arrive, not batched.',
           },
           {
             icon: <Lock className="w-5 h-5" />,
