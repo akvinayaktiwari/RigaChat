@@ -6,6 +6,7 @@ const meta: BlogPostMeta = {
   excerpt:
     'A property buyer on your project page has questions that are simple to ask and costly to get wrong: is it available, what is the price, when is possession. A voice agent can answer some of them well. The skill is in deciding which, and in making the handoff to your sales team clean.',
   publishedAt: '2026-10-01',
+  authorId: 'vinayak-tiwari',
   category: 'Lead Generation Playbook',
   tags: ['Voice AI', 'Real Estate', 'India', 'Lead Generation'],
   readingMinutes: 7,

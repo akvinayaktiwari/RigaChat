@@ -28,6 +28,7 @@ const meta: BlogPostMeta = {
   title: 'Title as it appears on the page and in Google',
   excerpt: 'One or two sentences. Used as the meta description and the index card deck.',
   publishedAt: '2026-09-16',  // YYYY-MM-DD, drives ordering
+  authorId: 'vinayak-tiwari', // a key of PEOPLE in src/lib/people.ts
   category: 'Lead Generation Playbook',
   tags: ['WhatsApp', 'India'],
   readingMinutes: 9,
@@ -38,6 +39,16 @@ const meta: BlogPostMeta = {
 
 export default meta
 ```
+
+`authorId` is the byline under the title and the `BlogPosting` author, from one
+record. To add an author, add them to `PEOPLE` in `frontend/src/lib/people.ts`;
+its test requires their name, role and LinkedIn URL to be printed on `/about-us`
+first, because schema may only say what the site shows.
+
+When you substantially revise a post, add `updatedAt: 'YYYY-MM-DD'`. It shows as
+"Updated", becomes `dateModified` and the sitemap's `lastmod`. Do not set it for
+a typo fix: a date that moves without the content moving teaches crawlers to
+ignore it.
 
 `faq` renders a "Common questions" section at the end of the post **and**
 publishes FAQPage schema. One array feeds both, deliberately: schema that

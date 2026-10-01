@@ -143,13 +143,15 @@ export function buildSitemapXml(origin: string, entries: readonly SitemapEntry[]
 export interface PostDate {
   slug: string
   publishedAt: string
+  /** Last substantial revision, when there has been one. */
+  updatedAt?: string
 }
 
 /** Every public, indexable URL: SPA marketing pages, prerendered pages, blog posts. */
 export function sitemapEntries(posts: readonly PostDate[]): SitemapEntry[] {
   const spa = SPA_MARKETING_ROUTES.map((path) => ({ path }))
   const prerendered = PRERENDERED_STATIC_ROUTES.map((route) => ({ path: servedPath(route) }))
-  const blog = posts.map((post) => ({ path: servedPath(`/blog/${post.slug}`), lastModified: post.publishedAt }))
+  const blog = posts.map((post) => ({ path: servedPath(`/blog/${post.slug}`), lastModified: post.updatedAt ?? post.publishedAt }))
   return [...spa, ...prerendered, ...blog]
 }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { serializeJsonLd } from '../components/seo/StructuredData'
+import { FOUNDERS, PEOPLE } from './people'
 import { PRICING_TIERS } from './pricingTiers'
 import { absoluteUrl } from './site'
 import {
@@ -9,6 +10,7 @@ import {
   faqPageSchema,
   jsonLdGraph,
   organizationSchema,
+  personSchema,
   softwareApplicationSchema,
   type JsonLd,
   type JsonValue,
@@ -49,6 +51,38 @@ describe('organizationSchema', () => {
   })
 })
 
+describe('personSchema', () => {
+  const author = PEOPLE['vinayak-tiwari']
+
+  it('ties the person to their LinkedIn profile and to the organization', () => {
+    const person = personSchema(author)
+    expect(person.sameAs).toEqual([author.linkedinUrl])
+    expect(person.jobTitle).toBe(author.role)
+    expect(person.worksFor).toEqual({ '@id': organizationSchema()['@id'] })
+  })
+
+  it('lists each founder on the organization as that same node', () => {
+    expect(organizationSchema().founder).toEqual(FOUNDERS.map(personSchema))
+  })
+})
+
+describe('blogPostingSchema', () => {
+  const fields = { title: 't', excerpt: 'e', publishedAt: '2026-08-01', path: '/blog/t/', tags: ['a'], author: PEOPLE['vinayak-tiwari'] }
+
+  it('names a person as the author, not the organization', () => {
+    expect(blogPostingSchema(fields).author).toEqual(personSchema(PEOPLE['vinayak-tiwari']))
+  })
+
+  it('dates a post never revised by its publication', () => {
+    expect(blogPostingSchema(fields).dateModified).toBe('2026-08-01')
+  })
+
+  it('dates a revised post by the revision', () => {
+    const revised = blogPostingSchema({ ...fields, updatedAt: '2026-09-20' })
+    expect([revised.datePublished, revised.dateModified]).toEqual(['2026-08-01', '2026-09-20'])
+  })
+})
+
 describe('faqPageSchema', () => {
   it('maps each question to a Question with an accepted Answer', () => {
     const schema = faqPageSchema([{ question: 'Is there a free trial?', answer: 'Yes.' }])
@@ -59,14 +93,14 @@ describe('faqPageSchema', () => {
 })
 
 describe('jsonLdGraph', () => {
-  it('resolves the blog post author to the organization node in the same graph', () => {
+  it('resolves the blog post publisher to the organization node in the same graph', () => {
     const graph = jsonLdGraph([
       organizationSchema(),
-      blogPostingSchema({ title: 't', excerpt: 'e', publishedAt: '2026-08-01', path: '/blog/t/', tags: ['a'] }),
+      blogPostingSchema({ title: 't', excerpt: 'e', publishedAt: '2026-08-01', path: '/blog/t/', tags: ['a'], author: PEOPLE['vinayak-tiwari'] }),
     ])
     const [organization, post] = asArray(graph['@graph']).map(asRecord)
     expect(graph['@context']).toBe('https://schema.org')
-    expect(asRecord(post?.author)['@id']).toBe(organization?.['@id'])
+    expect(asRecord(post?.publisher)['@id']).toBe(organization?.['@id'])
   })
 })
 

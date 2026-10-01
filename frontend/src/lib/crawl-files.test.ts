@@ -61,6 +61,13 @@ describe('sitemapEntries', () => {
     expect(entries.find((entry) => entry.path === '/')?.lastModified).toBeUndefined()
   })
 
+  // lastmod is the crawler's cue to refetch; a revised post left at its
+  // publication date is a revision nobody is told about.
+  it('dates a revised post from its revision', () => {
+    const revised = sitemapEntries([{ slug: 'a-post', publishedAt: '2026-08-01', updatedAt: '2026-09-20' }])
+    expect(revised.find((entry) => entry.path === '/blog/a-post/')?.lastModified).toBe('2026-09-20')
+  })
+
   it('has no duplicate URLs', () => {
     expect(new Set(paths).size).toBe(paths.length)
   })

@@ -11,6 +11,7 @@ const meta: BlogPostMeta = {
   title: 'WhatsApp Chatbot for Real Estate in India',
   excerpt: 'An excerpt.',
   publishedAt: '2026-09-16',
+  authorId: 'vinayak-tiwari',
   category: 'Lead Generation Playbook',
   tags: ['WhatsApp', 'Real Estate', 'India'],
   readingMinutes: 9,

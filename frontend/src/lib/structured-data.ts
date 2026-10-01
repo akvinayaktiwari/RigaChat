@@ -6,6 +6,7 @@
  * violation, and AI answer engines quote it as fact. So there is deliberately no
  * AggregateRating: there are no third-party reviews to aggregate yet.
  */
+import { FOUNDERS, type Person } from './people'
 import type { PricingTier } from './pricingTiers'
 import { absoluteUrl } from './site'
 
@@ -30,6 +31,23 @@ const WEBSITE_ID = '#website'
 /** The product node. Feature pages point `about` at it, so they read as pages about one product. */
 const SOFTWARE_ID = '#software'
 
+/**
+ * A person, identified by @id so the same human is one node whether they appear
+ * as a founder or as a post's author. The LinkedIn profile is what tells an
+ * engine which "Vinayak Tiwari" this is.
+ */
+export function personSchema(person: Person): JsonLd {
+  return {
+    '@type': 'Person',
+    '@id': absoluteUrl(`/#${person.id}`),
+    name: person.name,
+    jobTitle: person.role,
+    worksFor: { '@id': absoluteUrl(`/${ORGANIZATION_ID}`) },
+    url: absoluteUrl('/about-us/'),
+    sameAs: [person.linkedinUrl],
+  }
+}
+
 export function organizationSchema(): JsonLd {
   return {
     '@type': 'Organization',
@@ -46,10 +64,7 @@ export function organizationSchema(): JsonLd {
       addressRegion: 'Karnataka',
       addressCountry: 'IN',
     },
-    founder: [
-      { '@type': 'Person', name: 'Vinayak Tiwari' },
-      { '@type': 'Person', name: 'Adarsh Jee Pandey' },
-    ],
+    founder: FOUNDERS.map(personSchema),
   }
 }
 
@@ -119,8 +134,12 @@ export interface ArticleFields {
   title: string
   excerpt: string
   publishedAt: string
+  /** When the post was last substantially revised. Absent on a post never revised. */
+  updatedAt?: string
   path: string
   tags: readonly string[]
+  /** The person the page's byline names. */
+  author: Person
 }
 
 export function blogPostingSchema(article: ArticleFields): JsonLd {
@@ -129,10 +148,11 @@ export function blogPostingSchema(article: ArticleFields): JsonLd {
     headline: article.title,
     description: article.excerpt,
     datePublished: article.publishedAt,
+    dateModified: article.updatedAt ?? article.publishedAt,
     mainEntityOfPage: absoluteUrl(article.path),
     image: absoluteUrl('/og-image.png'),
     keywords: article.tags.join(', '),
-    author: { '@id': absoluteUrl(`/${ORGANIZATION_ID}`) },
+    author: personSchema(article.author),
     publisher: { '@id': absoluteUrl(`/${ORGANIZATION_ID}`) },
   }
 }

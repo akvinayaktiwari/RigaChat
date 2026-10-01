@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react'
 import { FileText, Download } from 'lucide-react'
 import type { BlogAttachment, BlogPostMeta } from '../../types/blog'
+import { PEOPLE } from '../../lib/people'
 import { JAKARTA_FONT } from './BlogPrimitives'
 
 /**
@@ -47,11 +48,39 @@ export function PostTags({ tags }: { tags: string[] }) {
   )
 }
 
-/** Date · reading time line under a post title. */
-export function PostMetaLine({ meta }: { meta: BlogPostMeta }) {
+/**
+ * Byline · date · reading time line under a post title.
+ *
+ * The byline and the "Updated" date are what BlogPosting's author and
+ * dateModified claim, so they are printed here rather than left to the schema.
+ */
+export function PostMetaLine({ meta, linkAuthor = false }: { meta: BlogPostMeta; linkAuthor?: boolean }) {
+  const author = PEOPLE[meta.authorId]
+
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/40">
+      <span>
+        By{' '}
+        {/* Plain text on index cards: the whole card is already one link to the post. */}
+        {linkAuthor ? (
+          <a href="/about-us/" rel="author" className="font-medium text-white/60 underline-offset-4 hover:text-white hover:underline">
+            {author.name}
+          </a>
+        ) : (
+          <span className="font-medium text-white/60">{author.name}</span>
+        )}
+        , {author.role}
+      </span>
+      <span aria-hidden="true">·</span>
       <time dateTime={meta.publishedAt}>{formatPostDate(meta.publishedAt)}</time>
+      {meta.updatedAt ? (
+        <>
+          <span aria-hidden="true">·</span>
+          <span>
+            Updated <time dateTime={meta.updatedAt}>{formatPostDate(meta.updatedAt)}</time>
+          </span>
+        </>
+      ) : null}
       <span aria-hidden="true">·</span>
       <span>{meta.readingMinutes} min read</span>
     </div>

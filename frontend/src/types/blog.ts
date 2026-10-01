@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react'
+import type { PersonId } from '../lib/people'
 
 /**
  * A downloadable asset attached to a post (e.g. the source research PDF).
@@ -26,6 +27,18 @@ export interface BlogPostMeta {
   excerpt: string
   /** ISO-8601 date (YYYY-MM-DD). Drives sort order and <time dateTime>. */
   publishedAt: string
+  /**
+   * ISO-8601 date of the last substantial revision. Set it when the content
+   * changes, not for a typo: it is shown as "Updated", published as
+   * dateModified and becomes the sitemap's lastmod, and a date that moves
+   * without the content moving teaches a crawler to ignore all three.
+   */
+  updatedAt?: string
+  /**
+   * Who wrote the post, as a key of PEOPLE (lib/people.ts). Shown as the byline
+   * and published as the BlogPosting author, from the one record.
+   */
+  authorId: PersonId
   /** Eyebrow label above the title, e.g. "Hospitality Investment Research". */
   category: string
   tags: string[]

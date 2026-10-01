@@ -162,7 +162,7 @@ export function getRoutes(): string[] {
 /** robots.txt, sitemap.xml and llms.txt contents, keyed by the file name to write under dist/. */
 export function getCrawlFiles(): Record<string, string> {
   const metas = getAllPosts().map(({ meta }) => meta)
-  const posts = metas.map((meta) => ({ slug: meta.slug, publishedAt: meta.publishedAt }))
+  const posts = metas.map((meta) => ({ slug: meta.slug, publishedAt: meta.publishedAt, updatedAt: meta.updatedAt }))
   const summaries = metas.map((meta) => ({ slug: meta.slug, title: meta.title, description: postDescription(meta) }))
   return {
     'robots.txt': buildRobotsTxt(SITE_URL),

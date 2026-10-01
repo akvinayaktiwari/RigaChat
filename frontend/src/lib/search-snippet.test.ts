@@ -32,7 +32,7 @@ function pageMetaLiterals(): PageMetaLiteral[] {
 }
 
 function meta(overrides: Partial<BlogPostMeta>): BlogPostMeta {
-  return { slug: 's', title: 'Long on-page title', excerpt: 'On-page deck', publishedAt: '2026-09-01', category: '', tags: [], readingMinutes: 1, ...overrides }
+  return { slug: 's', title: 'Long on-page title', excerpt: 'On-page deck', publishedAt: '2026-09-01', authorId: 'vinayak-tiwari', category: '', tags: [], readingMinutes: 1, ...overrides }
 }
 
 describe('post snippet fallbacks', () => {
