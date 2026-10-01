@@ -89,6 +89,8 @@ export default function VoiceAgent() {
         headline="An AI voice agent that answers on your web page"
         subheadline="The Vyostra AI voice agent is a spoken conversation inside your web page. A visitor taps a button, asks out loud, and the agent answers from your website content and knowledge base. There is no phone number to dial, no app to install and no call charge."
         heroVisual={<VoiceWidgetMockup />}
+        howItWorksHeading="How does the Vyostra AI voice agent work?"
+        benefitsHeading="Why add a voice agent to your web page?"
         howItWorksSteps={[
           {
             number: '1',

@@ -1,8 +1,45 @@
 import PageMeta from '../../components/seo/PageMeta'
 import StructuredData from '../../components/seo/StructuredData'
-import { featurePageGraph } from '../../lib/structured-data'
+import { faqPageSchema, featurePageNodes, jsonLdGraph, type FaqItem } from '../../lib/structured-data'
 import { Key, ToggleRight, BarChart2, Bell, Lock, Bot, Users, RefreshCw } from 'lucide-react'
 import UseCaseLayout from '../../components/landing/UseCaseLayout'
+
+/**
+ * Rendered on the page and published as FAQPage from this one array.
+ *
+ * Alerts go through the client's own Gupshup account today. When connecting
+ * directly through Meta opens to clients, change these answers together with
+ * the Gupshup answers in Faq.tsx and Help.tsx.
+ */
+export const WHATSAPP_FAQ: FaqItem[] = [
+  {
+    question: 'Do I need a Gupshup account for WhatsApp lead alerts?',
+    answer:
+      'Yes. Gupshup is a WhatsApp Business API provider, and Vyostra AI sends alerts through your own Gupshup account. You enter your Gupshup API key and WhatsApp Business number once, then switch on Lead Notifications.',
+  },
+  {
+    question: 'Which leads trigger a WhatsApp alert?',
+    answer:
+      'Every new lead captured by any of your chat agents or lead forms. Each one sends its own WhatsApp message to your number as it arrives; alerts are not batched.',
+  },
+  {
+    question: 'When does the weekly WhatsApp report arrive?',
+    answer:
+      'Every Monday at 9am IST, once Weekly Reports is switched on. It counts the new leads from the past week, split between your chat agents and your forms.',
+  },
+  {
+    question: 'How does Vyostra AI store my Gupshup API key?',
+    answer:
+      'Encrypted. The key is encrypted with AWS KMS, never stored in plain text, and decrypted only in memory at the moment a message is sent.',
+  },
+  {
+    question: 'Does Vyostra AI also follow up with leads on WhatsApp?',
+    answer:
+      'Yes. A follow-up journey messages a new lead on WhatsApp, waits for a real reply rather than firing on a timer, and hands the lead to your team when it needs a person.',
+  },
+]
+
+const PAGE = { name: 'WhatsApp Automation', path: '/features/whatsapp/' }
 
 function WhatsAppNotificationMockup() {
   return (
@@ -36,12 +73,14 @@ export default function WhatsAppFeaturePage() {
         description="Get instant WhatsApp alerts every time a new lead is captured. Weekly reports every Monday. Powered by Gupshup."
         path="/features/whatsapp/"
       />
-      <StructuredData data={featurePageGraph({ name: 'WhatsApp Automation', path: '/features/whatsapp/' })} />
+      <StructuredData data={jsonLdGraph([...featurePageNodes(PAGE), faqPageSchema(WHATSAPP_FAQ)])} />
       <UseCaseLayout
         featurePath="/features/whatsapp"
         badge="WHATSAPP AUTOMATION"
-        headline="Never miss a lead — get notified instantly"
-        subheadline="Vyostra AI sends a WhatsApp message to your number the moment a lead is captured — from your agent or your forms. No app switching. No delays."
+        headline="WhatsApp alerts for every new lead"
+        subheadline="Vyostra AI WhatsApp lead notifications send a WhatsApp message to your own number the moment a lead is captured, whether it came from a chat agent or a lead form. A weekly summary of new leads arrives on WhatsApp every Monday at 9am IST."
+        howItWorksHeading="How do you set up WhatsApp lead alerts?"
+        benefitsHeading="Why get lead alerts on WhatsApp?"
         heroVisual={<WhatsAppNotificationMockup />}
         howItWorksSteps={[
           {
@@ -59,7 +98,7 @@ export default function WhatsAppFeaturePage() {
           {
             number: '3',
             title: 'Get Weekly Reports',
-            body: 'Every Monday at 9am IST, receive a full summary of your week — total leads, conversations, top performing bot — directly on WhatsApp.',
+            body: 'Every Monday at 9am IST, receive a summary of the past week’s new leads, split between chat agents and forms, directly on WhatsApp.',
             icon: <BarChart2 className="w-6 h-6" />,
           },
         ]}
@@ -67,7 +106,7 @@ export default function WhatsAppFeaturePage() {
           {
             icon: <Bell className="w-5 h-5" />,
             title: 'Instant Alerts',
-            body: 'Lead captured at 2am? You get the WhatsApp message at 2am. No batching, no delays. Average delivery time under 4 seconds.',
+            body: 'Lead captured at 2am? You get the WhatsApp message at 2am. Alerts are sent one by one as leads arrive, not batched.',
           },
           {
             icon: <Lock className="w-5 h-5" />,
@@ -77,7 +116,7 @@ export default function WhatsAppFeaturePage() {
           {
             icon: <BarChart2 className="w-5 h-5" />,
             title: 'Weekly Performance Reports',
-            body: 'Every Monday morning, a consolidated report arrives on your WhatsApp — leads by bot, total conversations, and your best performing agent of the week.',
+            body: 'Every Monday morning, one report arrives on your WhatsApp with the week’s new leads, counted separately for chat agents and forms.',
           },
         ]}
         integrations={[
@@ -85,6 +124,7 @@ export default function WhatsAppFeaturePage() {
           { icon: <Users className="w-4 h-4" />, title: 'Lead CRM', href: '/features/crm' },
           { icon: <RefreshCw className="w-4 h-4" />, title: 'Zoho Sync', href: '/features/crm' },
         ]}
+        faq={{ heading: 'What do people ask about WhatsApp lead alerts?', items: WHATSAPP_FAQ }}
         ctaHeadline="Start getting WhatsApp lead alerts today"
         ctaBody="Connect your Gupshup account in 2 minutes. Every lead. Instantly on WhatsApp."
       />

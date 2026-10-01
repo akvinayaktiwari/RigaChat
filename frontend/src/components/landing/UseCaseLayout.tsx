@@ -33,7 +33,11 @@ interface UseCaseLayoutProps {
   subheadline: string
   heroVisual: ReactNode
   howItWorksSteps: HowItWorksStep[]
+  /** Heading over the steps. Phrase it as the question the steps answer. */
+  howItWorksHeading?: string
   benefits: Benefit[]
+  /** Heading over the benefits. Phrase it as the question the benefits answer. */
+  benefitsHeading?: string
   integrations: Integration[]
   ctaHeadline: string
   ctaBody: string
@@ -86,10 +90,10 @@ function StepCard({ step }: { step: HowItWorksStep }) {
   )
 }
 
-function HowItWorksSection({ steps }: { steps: HowItWorksStep[] }) {
+function HowItWorksSection({ steps, heading = 'How It Works' }: { steps: HowItWorksStep[]; heading?: string }) {
   return (
     <section className="max-w-7xl mx-auto mb-20">
-      <h2 className="text-3xl md:text-4xl font-extrabold text-on-surface tracking-tight text-center mb-12">How It Works</h2>
+      <h2 className="text-3xl md:text-4xl font-extrabold text-on-surface tracking-tight text-center mb-12">{heading}</h2>
       <div className="relative grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="hidden md:block absolute top-6 left-[16.66%] right-[16.66%] border-t-2 border-dashed border-outline-variant -z-0" />
         {steps.map((step) => (
@@ -110,10 +114,10 @@ function BenefitCard({ benefit }: { benefit: Benefit }) {
   )
 }
 
-function BenefitsSection({ benefits }: { benefits: Benefit[] }) {
+function BenefitsSection({ benefits, heading = 'Why It Works' }: { benefits: Benefit[]; heading?: string }) {
   return (
     <section className="max-w-7xl mx-auto mb-20">
-      <h2 className="text-3xl md:text-4xl font-extrabold text-on-surface tracking-tight text-center mb-12">Why It Works</h2>
+      <h2 className="text-3xl md:text-4xl font-extrabold text-on-surface tracking-tight text-center mb-12">{heading}</h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {benefits.map((benefit) => (
           <BenefitCard key={benefit.title} benefit={benefit} />
@@ -187,8 +191,8 @@ export default function UseCaseLayout(props: UseCaseLayoutProps) {
 
       <main className="pt-36 pb-24 px-6 lg:px-8">
         <HeroSection badge={props.badge} headline={props.headline} subheadline={props.subheadline} heroVisual={props.heroVisual} />
-        <HowItWorksSection steps={props.howItWorksSteps} />
-        <BenefitsSection benefits={props.benefits} />
+        <HowItWorksSection steps={props.howItWorksSteps} heading={props.howItWorksHeading} />
+        <BenefitsSection benefits={props.benefits} heading={props.benefitsHeading} />
         <IntegrationsSection integrations={props.integrations} />
         {props.faq ? <FaqSection heading={props.faq.heading} items={props.faq.items} /> : null}
         <RelatedPosts posts={postsForFeature(props.featurePath)} heading="Go deeper" />
