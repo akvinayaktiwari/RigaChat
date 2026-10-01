@@ -6,6 +6,8 @@ import { ToastContainer } from './src/components/Toast/Toast'
 import { AnalyticsPageViews } from './src/hooks/useAnalyticsPageViews'
 import LandingPage from './src/pages/LandingPage'
 import NotFound from './src/pages/NotFound'
+import { preloadPostContent } from './src/content/blog/registry'
+import { lazyWithPreload } from './src/lib/lazy-with-preload'
 import About from './src/pages/About'
 import Contact from './src/pages/Contact'
 import Help from './src/pages/Help'
@@ -22,8 +24,26 @@ import Pricing from './src/pages/Pricing'
 import Faq from './src/pages/Faq'
 // Blog routes are lazy so post bodies (and the blog's motion/table components)
 // stay out of the main bundle every other page pays for.
-const BlogIndex = lazy(() => import('./src/pages/BlogIndex'))
-const BlogPost = lazy(() => import('./src/pages/BlogPost'))
+const BlogIndex = lazyWithPreload(() => import('./src/pages/BlogIndex'))
+const BlogPost = lazyWithPreload(() => import('./src/pages/BlogPost'))
+
+/** "/blog/my-post/" -> "my-post"; undefined for the index and every other path. */
+function blogSlug(pathname: string): string | undefined {
+  return pathname.match(/^\/blog\/([^/]+)\/?$/)?.[1]
+}
+
+/**
+ * Fetches the lazy chunks a prerendered path needs, before main.tsx hydrates it.
+ * Only the blog is both prerendered and lazy; every other path resolves at once.
+ */
+export async function preloadRoute(pathname: string): Promise<void> {
+  const slug = blogSlug(pathname)
+  if (slug) {
+    await Promise.all([BlogPost.preload(), preloadPostContent(slug)])
+  } else if (/^\/blog\/?$/.test(pathname)) {
+    await BlogIndex.preload()
+  }
+}
 
 /**
  * Everything behind sign-in, and the test harnesses, load on demand.

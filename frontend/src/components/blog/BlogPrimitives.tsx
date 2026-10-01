@@ -151,14 +151,21 @@ export function Callout({ title, tone = 'neutral', children }: { title?: string;
   )
 }
 
-/** Pull quote — the thesis-statement treatment. */
+/**
+ * Pull quote — the thesis-statement treatment.
+ *
+ * The text wrapper is a <div>, not a <p>: a markdown `>` quote arrives with its
+ * text already in a <p>, and a <p> inside a <p> is invalid HTML. The browser
+ * repairs it by closing the outer one early, so the DOM stops matching what
+ * React rendered and hydration of the whole post is thrown away.
+ */
 export function PullQuote({ children }: { children: ReactNode }) {
   return (
     <blockquote className="relative my-8 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-violet-500/[0.12] to-cyan-500/[0.06] px-6 py-6 md:px-8 md:py-7">
       <div aria-hidden="true" className="pointer-events-none absolute -left-8 -top-10 h-32 w-32 rounded-full bg-violet-500/20 blur-3xl" />
-      <p className="relative text-lg font-medium leading-relaxed text-white/90 md:text-xl" style={JAKARTA_FONT}>
+      <div className="relative text-lg font-medium leading-relaxed text-white/90 md:text-xl" style={JAKARTA_FONT}>
         {children}
-      </p>
+      </div>
     </blockquote>
   )
 }
@@ -238,7 +245,8 @@ export function FactCard({ label, children }: { label: string; children: ReactNo
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
       <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-300">{label}</div>
-      <p className="mt-2 text-sm leading-relaxed text-white/70">{children}</p>
+      {/* A <div> for the reason PullQuote gives: markdown children arrive in a <p>. */}
+      <div className="mt-2 text-sm leading-relaxed text-white/70">{children}</div>
     </div>
   )
 }

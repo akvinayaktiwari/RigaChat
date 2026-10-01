@@ -6,7 +6,7 @@ import { ArrowLeft } from 'lucide-react'
 import Navbar from '../components/landing/Navbar'
 import Footer from '../components/landing/Footer'
 import DemoModal from '../components/landing/modals/DemoModal'
-import { getPostBySlug, relatedPosts } from '../content/blog/registry'
+import { getPostBySlug, loadedPostContent, relatedPosts } from '../content/blog/registry'
 import { useBlogPostAnalytics } from '../hooks/useBlogPostAnalytics'
 import { AttachmentCard, BlogSurface, PostMetaLine, PostTags } from '../components/blog/BlogChrome'
 import { mdxComponents } from '../components/blog/MdxComponents'
@@ -112,7 +112,8 @@ function PostArticle({ post }: { post: BlogPost }) {
 
   // Keyed on slug so navigating between posts swaps the lazy component
   // instead of reusing the previously resolved one.
-  const Content = useMemo<ComponentType>(() => lazy(post.loadContent), [post])
+  // A body preloaded before hydration renders directly; see preloadPostContent().
+  const Content = useMemo<ComponentType>(() => loadedPostContent(post.meta.slug) ?? lazy(post.loadContent), [post])
 
   // Trailing slash: the prerendered post is served from blog/<slug>/index.html.
   const canonical = absoluteUrl(`/blog/${meta.slug}/`)

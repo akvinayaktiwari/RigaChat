@@ -21,6 +21,13 @@ describe('hydration contract', () => {
     expect(mainSource).toContain('createRoot(container).render(app)')
   })
 
+  // A lazy route still waiting on its chunk when hydration starts is discarded
+  // on the first update that reaches it (React error #421), which on a slow
+  // connection is every load of a blog page.
+  it('waits for the lazy chunks of the current route before hydrating', () => {
+    expect(mainSource).toMatch(/preloadRoute\(window\.location\.pathname\)[\s\S]*\.finally\(\(\) => ReactDOM\.hydrateRoot\(container, app\)\)/)
+  })
+
   it("prerenders App.tsx's own route tree, not a second list of routes", () => {
     expect(prerenderSource).toContain('<AppRoutes />')
     expect(prerenderSource).not.toMatch(/<Route\s/)

@@ -53,6 +53,29 @@ function buildPosts(): BlogPost[] {
 
 const posts = buildPosts()
 
+/** Post bodies already fetched, by slug. See preloadPostContent(). */
+const loadedContent = new Map<string, ComponentType>()
+
+/**
+ * Fetches a post's body ahead of its first render.
+ *
+ * The body is a lazy chunk inside its own Suspense boundary. main.tsx awaits
+ * this before hydrating a prerendered post, for the reason lazy-with-preload.tsx
+ * gives: a boundary still waiting on its chunk during hydration gets thrown
+ * away and rendered again, and the article blanks to its skeleton.
+ */
+export async function preloadPostContent(slug: string): Promise<void> {
+  const post = getPostBySlug(slug)
+  if (!post || loadedContent.has(slug)) return
+  const module = await post.loadContent()
+  loadedContent.set(slug, module.default)
+}
+
+/** The post body if it has been preloaded, else undefined. */
+export function loadedPostContent(slug: string): ComponentType | undefined {
+  return loadedContent.get(slug)
+}
+
 export function getAllPosts(): BlogPost[] {
   return posts
 }
