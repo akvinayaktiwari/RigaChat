@@ -1,4 +1,4 @@
-import { motion } from 'motion/react'
+import * as m from 'motion/react-m'
 import { useStaticMotion } from './motion-primitives'
 import { Reveal, RevealGroup, RevealItem, DURATION, EASE_OUT } from './motion-primitives'
 
@@ -50,7 +50,7 @@ export default function HowItWorksSection() {
               a stray rule growing out of the 02 badge. Sits at the badge's
               vertical centre (56px tall, so 28px = top-7) and passes behind
               them; the badges' ring-4 ring-white is what cuts it cleanly. */}
-          <motion.div
+          <m.div
             aria-hidden="true"
             className="hidden md:block absolute top-7 left-[16.666%] right-[16.666%] h-px bg-linear-to-r from-transparent via-violet-300 to-transparent origin-left"
             initial={reduced ? false : { scaleX: 0, opacity: 0 }}

@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { HelmetProvider } from 'react-helmet-async'
 import App from './App'
+import { MotionProvider } from './src/components/MotionProvider'
 import { AuthProvider } from './src/hooks/useAuth'
 import { StaffAuthProvider } from './src/hooks/useStaffAuth'
 import { SubscriptionProvider } from './src/hooks/useSubscription'
@@ -15,7 +16,9 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
             cache and to know when to drop it on an account switch. */}
         <SubscriptionProvider>
           <StaffAuthProvider>
-            <App />
+            <MotionProvider>
+              <App />
+            </MotionProvider>
           </StaffAuthProvider>
         </SubscriptionProvider>
       </AuthProvider>

@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react'
-import { motion } from 'motion/react'
+import * as m from 'motion/react-m'
 import { useStaticMotion } from '../landing/motion-primitives'
 
 /**
@@ -28,7 +28,7 @@ export function ScrollReveal({ children, delay = 0, className = '' }: { children
   }
 
   return (
-    <motion.div
+    <m.div
       className={className}
       initial={{ opacity: 0, y: 24 }}
       whileInView={{ opacity: 1, y: 0 }}
@@ -36,7 +36,7 @@ export function ScrollReveal({ children, delay = 0, className = '' }: { children
       transition={{ duration: 0.5, delay, ease: [0.16, 1, 0.3, 1] }}
     >
       {children}
-    </motion.div>
+    </m.div>
   )
 }
 

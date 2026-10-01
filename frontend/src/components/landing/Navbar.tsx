@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { AnimatePresence, useReducedMotion } from 'motion/react'
+import * as m from 'motion/react-m'
 import { Menu, X, ArrowRight } from 'lucide-react'
 import VyostraLogo from '../VyostraLogo'
 import { DURATION, EASE_OUT } from './motion-primitives'
@@ -87,7 +88,7 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
 
       <AnimatePresence>
         {mobileOpen && (
-          <motion.div
+          <m.div
             initial={reduced ? false : { opacity: 0, y: -8 }}
             animate={reduced ? undefined : { opacity: 1, y: 0 }}
             exit={reduced ? undefined : { opacity: 0, y: -8 }}
@@ -127,7 +128,7 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
             >
               Get started free
             </a>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </header>
