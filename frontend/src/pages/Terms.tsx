@@ -138,6 +138,7 @@ function TocSidebar({ activeSection, onNavigate }: { activeSection: string; onNa
     <aside className="print:hidden lg:col-span-3 lg:sticky lg:top-28">
       <div className="lg:hidden relative w-full mb-6">
         <select
+          aria-label="Jump to a section"
           value={activeSection}
           onChange={(e) => onNavigate(e.target.value)}
           className="w-full p-4 bg-white border border-outline-variant rounded-xl text-sm font-semibold text-on-surface shadow-xs cursor-pointer"
