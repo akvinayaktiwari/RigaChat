@@ -111,7 +111,7 @@ function StoryBlockOneText() {
             <Rocket className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="font-bold text-on-surface text-sm mb-1">Always On</h4>
+            <h3 className="font-bold text-on-surface text-sm mb-1">Always On</h3>
             <p className="text-xs text-on-surface-variant leading-relaxed">
               AI agent captures leads 24/7, even on holidays.
             </p>
@@ -122,7 +122,7 @@ function StoryBlockOneText() {
             <LinkIcon className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="font-bold text-on-surface text-sm mb-1">Seamless Integration</h4>
+            <h3 className="font-bold text-on-surface text-sm mb-1">Seamless Integration</h3>
             <p className="text-xs text-on-surface-variant leading-relaxed">
               Connect Zoho CRM and WhatsApp in minutes.
             </p>

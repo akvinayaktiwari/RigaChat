@@ -182,10 +182,17 @@ export default function Features() {
 
       <main className="pt-36 pb-24 px-6 lg:px-8">
         <FeaturesHero />
-        <section className="max-w-7xl mx-auto mb-20 grid grid-cols-1 md:grid-cols-2 gap-6">
-          {FEATURE_CARDS.map((card) => (
-            <FeatureCard key={card.title} card={card} />
-          ))}
+        <section className="max-w-7xl mx-auto mb-20" aria-labelledby="live-features">
+          {/* Read by screen readers and crawlers only: the cards are h3s, and
+              without a heading above them the outline jumps from h1 to h3. */}
+          <h2 id="live-features" className="sr-only">
+            Live features
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {FEATURE_CARDS.map((card) => (
+              <FeatureCard key={card.title} card={card} />
+            ))}
+          </div>
         </section>
         <ComingSoonSection />
         <FeaturesCta />
