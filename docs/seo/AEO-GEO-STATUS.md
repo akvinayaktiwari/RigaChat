@@ -1,6 +1,6 @@
 # AEO / GEO Status — vyostra.com
 
-**The one file to read first.** What has shipped for search and answer-engine visibility, what is left, and who has to do it. Last updated: 2026-10-02.
+**The one file to read first.** What has shipped for search and answer-engine visibility, what is left, and who has to do it. Last updated: 2026-10-03.
 
 How to keep it current: when something ships, move its row from "To do" to "Implemented" with the date. Do not record plans here; plans live in the documents listed at the bottom.
 
@@ -60,6 +60,7 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 | `/pricing/`, `/faq/`, `/features/voice-agent/` | 2026-10-02 |
 | Chat agent, WhatsApp, CRM and forms pages rebuilt: definition in the first paragraph, question H2s, five visible FAQ answers each | 2026-10-02 |
 | Free tool: `/whatsapp-link-generator/` | 2026-10-02 |
+| Zoho CRM integration page: `/features/zoho-crm/` | 2026-10-03 |
 | Author byline, "Updated" date and four fixed categories on posts | 2026-10-02 |
 | Question H2s in posts; Meta and WhatsApp primary sources cited in the WhatsApp post | 2026-09-19 |
 | Internal links: help in the footer, feature pages to related posts, latest posts on the homepage, related posts on each post | 2026-09-19 |
@@ -75,6 +76,7 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 | "Drag and drop" form builder | 2026-10-02 |
 | Answers are "always accurate" | 2026-10-02 |
 | Weekly WhatsApp report covers conversations and top agent | 2026-10-02 |
+| "Every new lead" syncs to Zoho (only form and Meta lead ad leads do; chat and voice do not), and Zoho receives a "bot name" | 2026-10-03 |
 
 ### Performance and accessibility
 
@@ -124,12 +126,13 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 | 8 | Register `message_index` as a GA4 custom metric | Collected but unreportable until then. |
 | 9 | A client case study with real numbers | Needs a client's approval. |
 | 10 | Run the Rich Results Test on the homepage and one post | Not run yet. |
+| 10a | Check the Priya S. testimonial on the homepage | It says leads "from the AI agent" sync to Zoho. Chat leads do not sync; only form and Meta lead ad leads do. It is a customer's own quote, so it was left unchanged: confirm with her how leads reach her Zoho, then reword with her approval or drop the sentence. |
 
 ### Claude tasks, ready now
 
 | # | Task | Note |
 |---|---|---|
-| 11 | Integration pages for Zoho CRM, Meta Lead Ads and WhatsApp | All three are shipped, so every sentence can be checked against the code. |
+| 11 | Integration pages for Meta Lead Ads and WhatsApp | Zoho CRM shipped 2026-10-03 at `/features/zoho-crm/`. Same pattern: every sentence checked against the backend. |
 | 12 | Industries template, real estate first | Three existing posts supply verified material. Other industries need input from the owner. |
 | 13 | A top-level URL that matches no route (for example `/no-such-page`) returns 200 with the app shell, which then shows "not found" in the browser | A soft 404. Fixing it means teaching the CloudFront function which top-level paths the app really has. Low priority: nothing links to such URLs. |
 | 13a | Schema on `/contact/`, `/careers/` and the legal pages | They carry none. Low value. |
