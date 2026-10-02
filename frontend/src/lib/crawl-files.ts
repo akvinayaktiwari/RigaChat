@@ -43,7 +43,7 @@ export interface StaticPage {
  * disagree about which pages exist.
  */
 export const STATIC_PAGES: readonly StaticPage[] = [
-  { route: '/features', label: 'Features', summary: 'Every live feature of Vyostra AI on one page.', section: 'Product', lastModified: '2026-10-02' },
+  { route: '/features', label: 'Features', summary: 'Every live feature of Vyostra AI on one page.', section: 'Product', lastModified: '2026-10-03' },
   {
     route: '/features/chatbot',
     label: 'AI Agent',
@@ -56,7 +56,7 @@ export const STATIC_PAGES: readonly StaticPage[] = [
     label: 'WhatsApp',
     summary: 'Instant WhatsApp alerts for each new lead and a weekly report, sent through Gupshup.',
     section: 'Product',
-    lastModified: '2026-10-02',
+    lastModified: '2026-10-03',
   },
   {
     route: '/features/crm',
@@ -78,6 +78,13 @@ export const STATIC_PAGES: readonly StaticPage[] = [
     summary: 'The on-page voice agent: visitors talk to your site in the browser, with no phone number. An add-on.',
     section: 'Product',
     lastModified: '2026-10-02',
+  },
+  {
+    route: '/features/zoho-crm',
+    label: 'Zoho CRM Integration',
+    summary: 'New leads from Vyostra AI lead forms and Meta lead ads created in Zoho CRM automatically; chat and voice leads are not synced.',
+    section: 'Product',
+    lastModified: '2026-10-03',
   },
   {
     route: '/pricing',
