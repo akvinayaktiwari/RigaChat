@@ -22,6 +22,7 @@ import VoiceAgent from './src/pages/features/VoiceAgent'
 import Careers from './src/pages/Careers'
 import Pricing from './src/pages/Pricing'
 import Faq from './src/pages/Faq'
+import WhatsAppLinkGenerator from './src/pages/tools/WhatsAppLinkGenerator'
 // Blog routes are lazy so post bodies (and the blog's motion/table components)
 // stay out of the main bundle every other page pays for.
 const BlogIndex = lazyWithPreload(() => import('./src/pages/BlogIndex'))
@@ -172,6 +173,7 @@ export function AppRoutes() {
           <Route path="/careers" element={<Careers />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/faq" element={<Faq />} />
+          <Route path="/whatsapp-link-generator" element={<WhatsAppLinkGenerator />} />
           <Route
             path="/blog"
             element={

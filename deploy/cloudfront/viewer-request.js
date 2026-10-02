@@ -22,8 +22,8 @@
 // Keep in step with PRERENDERED_STATIC_ROUTES in frontend/src/lib/crawl-files.ts;
 // crawl-files.test.ts fails if a prerendered route is missing here.
 var PRERENDERED_PREFIXES = [
-    '/features', '/pricing', '/faq', '/about-us', '/help', '/contact', '/careers',
-    '/blog', '/privacy-policy', '/terms-of-service'
+    '/features', '/pricing', '/faq', '/whatsapp-link-generator', '/about-us', '/help',
+    '/contact', '/careers', '/blog', '/privacy-policy', '/terms-of-service'
 ];
 
 /** Re-serialises the query string, keeping multi-value keys. '' when there is none. */

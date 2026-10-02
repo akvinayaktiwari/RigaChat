@@ -93,6 +93,13 @@ export const STATIC_PAGES: readonly StaticPage[] = [
     section: 'Product',
     lastModified: '2026-10-02',
   },
+  {
+    route: '/whatsapp-link-generator',
+    label: 'WhatsApp Link Generator',
+    summary: 'A free tool that builds a wa.me click-to-chat link with a pre-filled message, in the browser.',
+    section: 'Product',
+    lastModified: '2026-10-02',
+  },
   { route: '/about-us', label: 'About Vyostra AI', summary: 'Who builds Vyostra AI and where: the founders, in Bangalore.', section: 'Company', lastModified: '2026-10-01' },
   { route: '/help', label: 'Help Center', summary: 'Setup answers: embedding the widget, the knowledge base, WhatsApp, Zoho CRM, forms, billing.', section: 'Company', lastModified: '2026-10-02' },
   { route: '/contact', label: 'Contact', summary: 'Reach sales or support; the team replies within 24 hours.', section: 'Company', lastModified: '2026-09-20' },

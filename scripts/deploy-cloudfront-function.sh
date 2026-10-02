@@ -91,6 +91,8 @@ expect vyostra.com     /pricing '.response.headers.location.value'             '
 expect vyostra.com     /pricing/ '.request.uri'                                '/pricing/'
 expect vyostra.com     /faq     '.response.headers.location.value'             '/faq/'
 expect vyostra.com     /features/voice-agent '.response.headers.location.value' '/features/voice-agent/'
+expect vyostra.com     /whatsapp-link-generator '.response.headers.location.value' '/whatsapp-link-generator/'
+expect vyostra.com     /whatsapp-link-generator/ '.request.uri'                '/whatsapp-link-generator/'
 # A path that merely STARTS with a prerendered prefix is not one.
 expect vyostra.com     /blogging '.request.uri'                                '/app-shell.html'
 expect vyostra.com     /featuresx '.request.uri'                               '/app-shell.html'

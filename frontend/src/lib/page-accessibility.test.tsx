@@ -46,8 +46,11 @@ function skippedLevels(levels: number[]): string[] {
   })
 }
 
+/** Selects with neither an aria-label nor a <label for> pointing at their id. */
 function unlabelledSelects(html: string): number {
-  return (html.match(/<select(?![^>]*aria-label)/g) ?? []).length
+  const labelledIds = new Set([...html.matchAll(/<label[^>]*\sfor="([^"]+)"/g)].map((match) => match[1] ?? ''))
+  const selects = [...html.matchAll(/<select([^>]*)>/g)].map((match) => match[1] ?? '')
+  return selects.filter((attributes) => !attributes.includes('aria-label') && !labelledIds.has(/\sid="([^"]+)"/.exec(attributes)?.[1] ?? '')).length
 }
 
 describe('skippedLevels', () => {
