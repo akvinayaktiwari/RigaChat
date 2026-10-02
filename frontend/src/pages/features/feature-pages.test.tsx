@@ -1,8 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import { PRERENDERED_STATIC_ROUTES } from '../../lib/crawl-files'
-import type { JsonLd, JsonValue } from '../../lib/structured-data'
-import { renderPublicPage } from '../../test-render'
+import { openingParagraph, plainText, publishedFaqText, questionHeadings, renderPublicPage } from '../../test-render'
 
 /**
  * What makes a feature page quotable by a search or answer engine: it says
@@ -12,37 +11,6 @@ import { renderPublicPage } from '../../test-render'
  */
 
 const FEATURE_PAGES = PRERENDERED_STATIC_ROUTES.filter((route) => route.startsWith('/features/'))
-
-function plainText(html: string): string {
-  const text = html.replace(/<!-- -->/g, '').replace(/<[^>]+>/g, ' ')
-  return text.replace(/&amp;/g, '&').replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim()
-}
-
-/** The paragraph directly under the page's h1. */
-function openingParagraph(html: string): string {
-  return plainText(/<\/h1>\s*<p[^>]*>([\s\S]*?)<\/p>/.exec(html)?.[1] ?? '')
-}
-
-function questionHeadings(html: string): string[] {
-  return [...html.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/g)].map((match) => plainText(match[1] ?? '')).filter((heading) => heading.endsWith('?'))
-}
-
-function asRecord(value: JsonValue | undefined): JsonLd {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) throw new Error('expected an object')
-  return value
-}
-
-function asArray(value: JsonValue | undefined): JsonValue[] {
-  if (!Array.isArray(value)) throw new Error('expected an array')
-  return value
-}
-
-/** Every question and answer the page publishes as FAQPage schema. */
-function publishedFaqText(jsonLd: JsonLd[]): string[] {
-  const nodes = jsonLd.flatMap((block) => asArray(block['@graph']).map(asRecord))
-  const questions = nodes.filter((node) => node['@type'] === 'FAQPage').flatMap((node) => asArray(node.mainEntity).map(asRecord))
-  return questions.flatMap((question) => [String(question.name), String(asRecord(question.acceptedAnswer).text)])
-}
 
 it('finds the feature pages it checks', () => {
   expect(FEATURE_PAGES).toContain('/features/crm')

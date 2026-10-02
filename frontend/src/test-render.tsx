@@ -7,7 +7,7 @@ import { MotionProvider } from './components/MotionProvider'
 import { AuthProvider } from './hooks/useAuth'
 import { StaffAuthProvider } from './hooks/useStaffAuth'
 import { SubscriptionProvider } from './hooks/useSubscription'
-import type { JsonLd } from './lib/structured-data'
+import type { JsonLd, JsonValue } from './lib/structured-data'
 
 export interface RenderedPage {
   /** The page body, as the build-time prerender would write it. */
@@ -45,4 +45,37 @@ export async function renderPublicPage(route: string, page?: ReactElement): Prom
     </HelmetProvider>,
   )
   return { html, jsonLd: parseJsonLd(helmetContext.helmet) }
+}
+
+/** A page's visible text, tags and React's comment markers removed, entities decoded. */
+export function plainText(html: string): string {
+  const text = html.replace(/<!-- -->/g, '').replace(/<[^>]+>/g, ' ')
+  return text.replace(/&amp;/g, '&').replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim()
+}
+
+/** The paragraph directly under the page's h1. */
+export function openingParagraph(html: string): string {
+  return plainText(/<\/h1>\s*<p[^>]*>([\s\S]*?)<\/p>/.exec(html)?.[1] ?? '')
+}
+
+/** The page's h2 headings that are phrased as questions. */
+export function questionHeadings(html: string): string[] {
+  return [...html.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/g)].map((match) => plainText(match[1] ?? '')).filter((heading) => heading.endsWith('?'))
+}
+
+export function asRecord(value: JsonValue | undefined): JsonLd {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) throw new Error('expected an object')
+  return value
+}
+
+export function asArray(value: JsonValue | undefined): JsonValue[] {
+  if (!Array.isArray(value)) throw new Error('expected an array')
+  return value
+}
+
+/** Every question and answer the page publishes as FAQPage schema. */
+export function publishedFaqText(jsonLd: JsonLd[]): string[] {
+  const nodes = jsonLd.flatMap((block) => asArray(block['@graph']).map(asRecord))
+  const questions = nodes.filter((node) => node['@type'] === 'FAQPage').flatMap((node) => asArray(node.mainEntity).map(asRecord))
+  return questions.flatMap((question) => [String(question.name), String(asRecord(question.acceptedAnswer).text)])
 }
