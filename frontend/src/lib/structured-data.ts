@@ -216,6 +216,21 @@ export function pageGraphNodes(page: FeaturePageFields): JsonLd[] {
   return [webPageSchema(page), breadcrumbSchema([{ name: 'Home', path: '/' }, { name: page.name, path: page.path }])]
 }
 
+const INTEGRATIONS_CRUMBS: readonly Crumb[] = [
+  { name: 'Home', path: '/' },
+  { name: 'Integrations', path: '/integrations/' },
+]
+
+/** The integrations index: a WebPage about the product, one crumb below Home. */
+export function integrationsIndexNodes(): JsonLd[] {
+  return [webPageSchema({ name: 'Integrations', path: '/integrations/' }), breadcrumbSchema(INTEGRATIONS_CRUMBS)]
+}
+
+/** One integration's page: a WebPage about the product, trailing Home > Integrations > the page. */
+export function integrationPageNodes(page: FeaturePageFields): JsonLd[] {
+  return [webPageSchema(page), breadcrumbSchema([...INTEGRATIONS_CRUMBS, { name: page.name, path: page.path }])]
+}
+
 /**
  * The about page: an AboutPage whose subject is the organization, one crumb
  * below Home. Emit it alongside organizationSchema(), which carries the

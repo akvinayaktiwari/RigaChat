@@ -6,6 +6,7 @@
  * site origin (see ./site.ts) and the sitemap and llms.txt need the blog's
  * slugs, neither of which a static file can know.
  */
+import { INTEGRATIONS } from '../content/integrations/registry'
 import type { PricingTier } from './pricingTiers'
 
 /** Marketing routes rendered client-side. Served at the bare path, no trailing slash. */
@@ -93,6 +94,23 @@ export const STATIC_PAGES: readonly StaticPage[] = [
     section: 'Product',
     lastModified: '2026-10-02',
   },
+  {
+    route: '/integrations',
+    label: 'Integrations',
+    summary: 'The tools Vyostra AI connects to today, and what each connection does.',
+    section: 'Product',
+    lastModified: '2026-10-02',
+  },
+  // One page per shipped integration, from the same content files the pages render.
+  ...INTEGRATIONS.map(
+    (integration): StaticPage => ({
+      route: `/integrations/${integration.slug}`,
+      label: `${integration.name} integration`,
+      summary: integration.summary,
+      section: 'Product',
+      lastModified: integration.lastModified,
+    }),
+  ),
   {
     route: '/whatsapp-link-generator',
     label: 'WhatsApp Link Generator',
