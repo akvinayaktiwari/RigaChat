@@ -61,9 +61,9 @@ export const STATIC_PAGES: readonly StaticPage[] = [
   {
     route: '/features/crm',
     label: 'Lead CRM',
-    summary: 'The built-in lead CRM: every captured lead stored, filterable, and synced to Zoho CRM.',
+    summary: 'The built-in lead CRM: every captured lead stored and filterable; form and Meta lead ad leads sync to Zoho CRM.',
     section: 'Product',
-    lastModified: '2026-10-02',
+    lastModified: '2026-10-03',
   },
   {
     route: '/features/forms',
@@ -91,7 +91,7 @@ export const STATIC_PAGES: readonly StaticPage[] = [
     label: 'FAQ',
     summary: 'Short answers on what Vyostra AI is, setup, where leads go, WhatsApp follow-up and cost.',
     section: 'Product',
-    lastModified: '2026-10-02',
+    lastModified: '2026-10-03',
   },
   {
     route: '/whatsapp-link-generator',
@@ -101,7 +101,7 @@ export const STATIC_PAGES: readonly StaticPage[] = [
     lastModified: '2026-10-02',
   },
   { route: '/about-us', label: 'About Vyostra AI', summary: 'Who builds Vyostra AI and where: the founders, in Bangalore.', section: 'Company', lastModified: '2026-10-01' },
-  { route: '/help', label: 'Help Center', summary: 'Setup answers: embedding the widget, the knowledge base, WhatsApp, Zoho CRM, forms, billing.', section: 'Company', lastModified: '2026-10-02' },
+  { route: '/help', label: 'Help Center', summary: 'Setup answers: embedding the widget, the knowledge base, WhatsApp, Zoho CRM, forms, billing.', section: 'Company', lastModified: '2026-10-03' },
   { route: '/contact', label: 'Contact', summary: 'Reach sales or support; the team replies within 24 hours.', section: 'Company', lastModified: '2026-09-20' },
   { route: '/careers', label: 'Careers', summary: 'Working at Vyostra AI, a fully remote team.', section: 'Company', lastModified: '2026-09-16' },
   { route: '/blog', label: 'All articles', summary: 'The blog index, newest first.', section: 'Blog', lastModified: '2026-09-15' },

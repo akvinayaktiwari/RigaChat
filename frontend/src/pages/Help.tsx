@@ -122,7 +122,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     categoryId: 'integrations',
     question: 'How do I connect Zoho CRM?',
     answer:
-      'Go to Settings, Integrations, Zoho CRM, Connect. Authorize Vyostra AI in Zoho. All new leads sync automatically after that.',
+      'Go to Settings, Integrations, Zoho CRM, Connect. Authorize Vyostra AI in Zoho. New leads from your lead forms and Meta lead ads sync to Zoho automatically after that. Chat and voice leads stay in the Vyostra AI CRM.',
   },
   {
     id: 'art-8',

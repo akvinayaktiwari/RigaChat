@@ -36,7 +36,7 @@ export const LEAD_CRM_FAQ: FaqItem[] = [
   {
     question: 'Does the lead CRM sync with other CRMs?',
     answer:
-      'It syncs with Zoho CRM. You connect Zoho once from Settings, and every new lead is then sent to Zoho automatically.',
+      'It syncs with Zoho CRM. You connect Zoho once from Settings, and every new lead from a lead form or a Meta lead ad is then sent to Zoho automatically. Leads from chat and voice conversations stay in the Vyostra AI CRM.',
   },
   {
     question: 'Can I remove a lead from the CRM?',
@@ -86,7 +86,7 @@ export default function Crm() {
     <>
       <PageMeta
         title="Built-in Lead CRM — Vyostra AI"
-        description="Every lead captured, stored, and organized automatically. Filter, track, and sync to Zoho CRM in real-time."
+        description="Every lead captured, stored and organized automatically. Filter and track leads, and sync form and Meta lead ad leads to Zoho CRM."
         path="/features/crm/"
       />
       <StructuredData data={jsonLdGraph([...featurePageNodes(PAGE), faqPageSchema(LEAD_CRM_FAQ)])} />
@@ -94,7 +94,7 @@ export default function Crm() {
         featurePath="/features/crm"
         badge="LEAD CRM"
         headline="A built-in lead CRM for every enquiry"
-        subheadline="The Vyostra AI lead CRM is the dashboard where every captured lead lands, from your chat agents, lead forms and Meta lead ads. Each lead keeps its transcript or form answers, a status and your notes, and new leads can sync to Zoho CRM automatically."
+        subheadline="The Vyostra AI lead CRM is the dashboard where every captured lead lands, from your chat agents, lead forms and Meta lead ads. Each lead keeps its transcript or form answers, a status and your notes, and new form and Meta lead ad leads can sync to Zoho CRM automatically."
         howItWorksHeading="How does the Vyostra AI lead CRM work?"
         benefitsHeading="Why keep leads in a built-in CRM?"
         heroVisual={<CrmTableMockup />}
@@ -114,7 +114,7 @@ export default function Crm() {
           {
             number: '3',
             title: 'Sync to Zoho CRM',
-            body: 'Connect Zoho CRM once. Every new lead syncs automatically in real-time. Your sales team always has fresh, accurate data.',
+            body: 'Connect Zoho CRM once. Every new lead from a form or a Meta lead ad is then created in Zoho as it arrives, so nobody types it in.',
             icon: <RefreshCw className="w-6 h-6" />,
           },
         ]}
@@ -132,7 +132,7 @@ export default function Crm() {
           {
             icon: <RefreshCw className="w-5 h-5" />,
             title: 'Zoho CRM Integration',
-            body: 'One-click Zoho CRM connection. Leads sync in real-time with full field mapping — name, phone, email, source, and bot name.',
+            body: 'Connect Zoho CRM from Settings. Form and Meta lead ad leads arrive in Zoho with their name, email, phone and source page.',
           },
         ]}
         integrations={[

@@ -70,7 +70,7 @@ export const FAQ_SECTIONS: FaqSection[] = [
       {
         question: 'Where do captured leads go?',
         answer:
-          'Every lead goes into the built-in lead CRM in your Vyostra AI dashboard, with its conversation transcript. You can filter leads by date, source and status, and sync them to Zoho CRM.',
+          'Every lead goes into the built-in lead CRM in your Vyostra AI dashboard, with its conversation transcript. You can filter leads by date, source and status, and leads from forms and Meta lead ads sync to Zoho CRM.',
       },
       {
         question: 'How will I know when a new lead arrives?',
