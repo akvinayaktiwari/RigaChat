@@ -9,6 +9,7 @@ const LINK_COLUMNS = [
       { label: 'Integrations', href: '/#integrations' },
       { label: 'Pricing', href: '/pricing' },
       { label: 'FAQ', href: '/faq' },
+      { label: 'WhatsApp Link Generator', href: '/whatsapp-link-generator' },
     ],
   },
   {
