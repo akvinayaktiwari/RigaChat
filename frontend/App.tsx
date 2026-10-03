@@ -1,5 +1,5 @@
-import { Suspense, lazy } from 'react'
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { Suspense } from 'react'
+import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { ProtectedRoute } from './src/components/ProtectedRoute/ProtectedRoute'
 import { AdminProtectedRoute } from './src/components/AdminProtectedRoute/AdminProtectedRoute'
 import { ToastContainer } from './src/components/Toast/Toast'
@@ -8,6 +8,8 @@ import LandingPage from './src/pages/LandingPage'
 import NotFound from './src/pages/NotFound'
 import { preloadPostContent } from './src/content/blog/registry'
 import { lazyWithPreload } from './src/lib/lazy-with-preload'
+import { lazyRoute } from './src/lib/chunk-reload'
+import { RouteErrorBoundary } from './src/components/RouteErrorBoundary/RouteErrorBoundary'
 import About from './src/pages/About'
 import Contact from './src/pages/Contact'
 import Help from './src/pages/Help'
@@ -63,50 +65,50 @@ export async function preloadRoute(pathname: string): Promise<void> {
  * Adding a page: if it is prerendered (see PRERENDERED_STATIC_ROUTES in
  * src/lib/crawl-files.ts) import it eagerly; otherwise lazy() it here.
  */
-const DashboardLayout = lazy(() =>
+const DashboardLayout = lazyRoute(() =>
   import('./src/components/DashboardLayout/DashboardLayout').then((m) => ({ default: m.DashboardLayout })),
 )
-const LoginPage = lazy(() => import('./src/pages/LoginPage'))
-const SignupPage = lazy(() => import('./src/pages/SignupPage'))
-const ForgotPasswordPage = lazy(() => import('./src/pages/ForgotPasswordPage'))
-const ResetPasswordPage = lazy(() => import('./src/pages/ResetPasswordPage'))
-const VerifyEmailPage = lazy(() => import('./src/pages/VerifyEmailPage'))
-const AuthCallbackPage = lazy(() => import('./src/pages/AuthCallbackPage'))
-const WidgetTestPage = lazy(() => import('./src/pages/WidgetTestPage'))
-const WidgetTestPreviewPage = lazy(() => import('./src/pages/WidgetTestPreviewPage'))
-const FormTestPage = lazy(() => import('./src/pages/FormTestPage'))
-const FormTestPreviewPage = lazy(() => import('./src/pages/FormTestPreviewPage'))
-const VoiceTestPage = lazy(() => import('./src/pages/VoiceTestPage'))
-const VoiceTestPreviewPage = lazy(() => import('./src/pages/VoiceTestPreviewPage'))
-const DashboardHome = lazy(() => import('./src/pages/DashboardHome'))
-const BotsPage = lazy(() => import('./src/pages/BotsPage'))
-const NewBotPage = lazy(() => import('./src/pages/NewBotPage'))
-const BotDetailPage = lazy(() => import('./src/pages/BotDetailPage'))
-const LeadsPage = lazy(() => import('./src/pages/LeadsPage'))
-const LeadLinkPage = lazy(() => import('./src/pages/LeadLinkPage'))
-const LeadDetailPage = lazy(() => import('./src/pages/LeadDetailPage'))
-const SchedulerPage = lazy(() => import('./src/pages/SchedulerPage'))
-const AppointmentsPage = lazy(() => import('./src/pages/AppointmentsPage'))
-const JourneysPage = lazy(() => import('./src/pages/JourneysPage'))
-const JourneyBuilderPage = lazy(() => import('./src/pages/JourneyBuilderPage'))
-const KnowledgeBasePage = lazy(() => import('./src/pages/KnowledgeBasePage'))
-const VoiceKnowledgeBasePage = lazy(() => import('./src/pages/VoiceKnowledgeBasePage'))
-const Settings = lazy(() => import('./src/pages/Settings'))
-const WhatsApp = lazy(() => import('./src/pages/WhatsApp'))
-const MetaAds = lazy(() => import('./src/pages/MetaAds'))
-const BillingPage = lazy(() => import('./src/pages/BillingPage'))
-const FormsPage = lazy(() => import('./src/pages/FormsPage'))
-const NewFormPage = lazy(() => import('./src/pages/NewFormPage'))
-const FormDetailPage = lazy(() => import('./src/pages/FormDetailPage'))
-const FormLeadsPage = lazy(() => import('./src/pages/FormLeadsPage'))
-const VoiceAgentsPage = lazy(() => import('./src/pages/VoiceAgentsPage'))
-const NewVoiceAgentPage = lazy(() => import('./src/pages/NewVoiceAgentPage'))
-const VoiceAgentDetailPage = lazy(() => import('./src/pages/VoiceAgentDetailPage'))
-const DataDeletionStatus = lazy(() => import('./src/pages/DataDeletionStatus'))
-const Status = lazy(() => import('./src/pages/Status'))
-const AdminLoginPage = lazy(() => import('./src/pages/admin/AdminLoginPage'))
-const AdminAccountsPage = lazy(() => import('./src/pages/admin/AdminAccountsPage'))
-const AdminContactMessagesPage = lazy(() => import('./src/pages/admin/AdminContactMessagesPage'))
+const LoginPage = lazyRoute(() => import('./src/pages/LoginPage'))
+const SignupPage = lazyRoute(() => import('./src/pages/SignupPage'))
+const ForgotPasswordPage = lazyRoute(() => import('./src/pages/ForgotPasswordPage'))
+const ResetPasswordPage = lazyRoute(() => import('./src/pages/ResetPasswordPage'))
+const VerifyEmailPage = lazyRoute(() => import('./src/pages/VerifyEmailPage'))
+const AuthCallbackPage = lazyRoute(() => import('./src/pages/AuthCallbackPage'))
+const WidgetTestPage = lazyRoute(() => import('./src/pages/WidgetTestPage'))
+const WidgetTestPreviewPage = lazyRoute(() => import('./src/pages/WidgetTestPreviewPage'))
+const FormTestPage = lazyRoute(() => import('./src/pages/FormTestPage'))
+const FormTestPreviewPage = lazyRoute(() => import('./src/pages/FormTestPreviewPage'))
+const VoiceTestPage = lazyRoute(() => import('./src/pages/VoiceTestPage'))
+const VoiceTestPreviewPage = lazyRoute(() => import('./src/pages/VoiceTestPreviewPage'))
+const DashboardHome = lazyRoute(() => import('./src/pages/DashboardHome'))
+const BotsPage = lazyRoute(() => import('./src/pages/BotsPage'))
+const NewBotPage = lazyRoute(() => import('./src/pages/NewBotPage'))
+const BotDetailPage = lazyRoute(() => import('./src/pages/BotDetailPage'))
+const LeadsPage = lazyRoute(() => import('./src/pages/LeadsPage'))
+const LeadLinkPage = lazyRoute(() => import('./src/pages/LeadLinkPage'))
+const LeadDetailPage = lazyRoute(() => import('./src/pages/LeadDetailPage'))
+const SchedulerPage = lazyRoute(() => import('./src/pages/SchedulerPage'))
+const AppointmentsPage = lazyRoute(() => import('./src/pages/AppointmentsPage'))
+const JourneysPage = lazyRoute(() => import('./src/pages/JourneysPage'))
+const JourneyBuilderPage = lazyRoute(() => import('./src/pages/JourneyBuilderPage'))
+const KnowledgeBasePage = lazyRoute(() => import('./src/pages/KnowledgeBasePage'))
+const VoiceKnowledgeBasePage = lazyRoute(() => import('./src/pages/VoiceKnowledgeBasePage'))
+const Settings = lazyRoute(() => import('./src/pages/Settings'))
+const WhatsApp = lazyRoute(() => import('./src/pages/WhatsApp'))
+const MetaAds = lazyRoute(() => import('./src/pages/MetaAds'))
+const BillingPage = lazyRoute(() => import('./src/pages/BillingPage'))
+const FormsPage = lazyRoute(() => import('./src/pages/FormsPage'))
+const NewFormPage = lazyRoute(() => import('./src/pages/NewFormPage'))
+const FormDetailPage = lazyRoute(() => import('./src/pages/FormDetailPage'))
+const FormLeadsPage = lazyRoute(() => import('./src/pages/FormLeadsPage'))
+const VoiceAgentsPage = lazyRoute(() => import('./src/pages/VoiceAgentsPage'))
+const NewVoiceAgentPage = lazyRoute(() => import('./src/pages/NewVoiceAgentPage'))
+const VoiceAgentDetailPage = lazyRoute(() => import('./src/pages/VoiceAgentDetailPage'))
+const DataDeletionStatus = lazyRoute(() => import('./src/pages/DataDeletionStatus'))
+const Status = lazyRoute(() => import('./src/pages/Status'))
+const AdminLoginPage = lazyRoute(() => import('./src/pages/admin/AdminLoginPage'))
+const AdminAccountsPage = lazyRoute(() => import('./src/pages/admin/AdminAccountsPage'))
+const AdminContactMessagesPage = lazyRoute(() => import('./src/pages/admin/AdminContactMessagesPage'))
 
 /**
  * Everything inside the router. Exported so the build-time prerender renders
@@ -115,6 +117,8 @@ const AdminContactMessagesPage = lazy(() => import('./src/pages/admin/AdminConta
  * same components in the same order, Suspense boundary included.
  */
 export function AppRoutes() {
+  const { pathname } = useLocation()
+
   return (
     <>
       {/* Inside the router so it can see navigations; above Routes so page
@@ -122,6 +126,8 @@ export function AppRoutes() {
       <AnalyticsPageViews />
       {/* One boundary for every lazy route. The fallback is a plain surface:
           these are post-navigation loads, so a spinner would flash and go. */}
+      {/* Keyed by path so navigating away from a failed page clears the error. */}
+      <RouteErrorBoundary key={pathname}>
       <Suspense fallback={<div className="min-h-screen bg-white" />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -233,6 +239,7 @@ export function AppRoutes() {
         <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
+      </RouteErrorBoundary>
       <ToastContainer />
     </>
   )
