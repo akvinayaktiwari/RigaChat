@@ -122,7 +122,7 @@ export default function WhatsAppFeaturePage() {
         integrations={[
           { icon: <Bot className="w-4 h-4" />, title: 'AI Agent', href: '/features/chatbot' },
           { icon: <Users className="w-4 h-4" />, title: 'Lead CRM', href: '/features/crm' },
-          { icon: <RefreshCw className="w-4 h-4" />, title: 'Zoho Sync', href: '/features/zoho-crm' },
+          { icon: <RefreshCw className="w-4 h-4" />, title: 'Zoho CRM', href: '/features/zoho-crm' },
         ]}
         faq={{ heading: 'What do people ask about WhatsApp lead alerts?', items: WHATSAPP_FAQ }}
         ctaHeadline="Start getting WhatsApp lead alerts today"

@@ -11,9 +11,15 @@ import UseCaseLayout from '../../components/landing/UseCaseLayout'
  * - which leads sync: only form-lead-service and meta-lead-service call
  *   crm-service; chat and voice leads do not.
  * - fields: ZohoProvider.syncLead and mapLead in providers/zoho-provider.ts.
+ *   A Meta lead's website is its Facebook Page URL (meta-lead-service.ts).
  * - access: the OAuth scope ZohoCRM.modules.leads.CREATE,UPDATE.
  * - data centre: ZOHO_ACCOUNTS_URL and ZOHO_API_URL are the .in hosts.
- * - retries: MAX_RETRY_ATTEMPTS and PERMANENT_FAILURE_CODES.
+ * - retries: MAX_RETRY_ATTEMPTS in services/crm-service.ts counts attempts,
+ *   the first one included, so 3 means tried three times, retried twice.
+ *   PERMANENT_FAILURE_CODES is in providers/zoho-provider.ts.
+ * - failure records: a lead Zoho turns down gets crmSyncError. A token refresh
+ *   that throws is only logged for Meta leads, so do not promise every lead
+ *   records its outcome.
  * Change the copy when the code changes, never the other way round.
  */
 export const ZOHO_CRM_FAQ: FaqItem[] = [
@@ -25,7 +31,7 @@ export const ZOHO_CRM_FAQ: FaqItem[] = [
   {
     question: 'Which Zoho CRM fields does a synced lead fill?',
     answer:
-      "Each lead is created in Zoho's Leads module with the lead's name, email, phone and company, the page it came from as the website, and VyostraAI as the lead source. Any other answers the lead gave go into the description.",
+      "Each lead is created in Zoho's Leads module with the lead's name, email, phone and company, the page of your site its form was on as the website (your Facebook Page, for a Meta lead ad), and VyostraAI as the lead source. Any other answers the lead gave go into the description.",
   },
   {
     question: 'What access does Vyostra AI ask for in Zoho?',
@@ -40,7 +46,7 @@ export const ZOHO_CRM_FAQ: FaqItem[] = [
   {
     question: 'What happens if a lead fails to sync?',
     answer:
-      'A temporary error is retried up to three times. A lead Zoho rejects, for example as a duplicate or for a missing mandatory field, is not retried. Either way the lead stays in the Vyostra AI lead CRM, so nothing is lost.',
+      'A temporary error is tried up to three times. A lead Zoho rejects, for example as a duplicate or for a missing mandatory field, is not retried. Either way the lead stays in the Vyostra AI lead CRM, so nothing is lost.',
   },
   {
     question: 'How do I disconnect Zoho CRM?',
@@ -74,7 +80,7 @@ function ZohoLeadMockup() {
           <span className="text-xs font-semibold text-on-surface truncate">{field.value}</span>
         </div>
       ))}
-      <div className="bg-surface-container-low/50 px-4 py-2 text-[10px] text-on-surface-variant">From a Meta lead ad, synced on arrival</div>
+      <div className="bg-surface-container-low/50 px-4 py-2 text-[10px] text-on-surface-variant">From a lead form, synced on arrival</div>
     </div>
   )
 }
@@ -120,7 +126,7 @@ export default function ZohoCrm() {
           {
             icon: <Keyboard className="w-5 h-5" />,
             title: 'No Copying Leads by Hand',
-            body: 'Form and lead ad leads reach Zoho without anyone exporting a spreadsheet or retyping a phone number.',
+            body: 'Form and Meta lead ad leads reach Zoho without anyone exporting a spreadsheet or retyping a phone number.',
           },
           {
             icon: <ListChecks className="w-5 h-5" />,
@@ -130,7 +136,7 @@ export default function ZohoCrm() {
           {
             icon: <RotateCw className="w-5 h-5" />,
             title: 'Retries, Then a Record',
-            body: 'Temporary Zoho errors are retried up to three times, and each lead records whether it synced, so a failure is visible rather than silent.',
+            body: 'Temporary Zoho errors are tried up to three times, and a lead Zoho turns down is marked Sync failed in its lead list.',
           },
         ]}
         integrations={[
