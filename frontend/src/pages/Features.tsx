@@ -3,7 +3,7 @@ import PageMeta from '../components/seo/PageMeta'
 import StructuredData from '../components/seo/StructuredData'
 import { featurePageGraph } from '../lib/structured-data'
 import { Link, useNavigate } from 'react-router-dom'
-import { Bot, MessageSquare, Users, FileText, Mic, Route, CalendarCheck } from 'lucide-react'
+import { Bot, MessageSquare, Users, FileText, Mic, Route, CalendarCheck, RefreshCw } from 'lucide-react'
 import Navbar from '../components/landing/Navbar'
 import Footer from '../components/landing/Footer'
 import DemoModal from '../components/landing/modals/DemoModal'
@@ -27,7 +27,7 @@ const FEATURE_CARDS: FeatureCardData[] = [
     body: 'Instant lead alerts, weekly reports, and a two-way AI agent that answers replies.',
     href: '/features/whatsapp',
   },
-  { icon: <Users className="w-6 h-6" />, title: 'Lead CRM', body: 'Every lead organized and trackable. Sync to Zoho in one click.', href: '/features/crm' },
+  { icon: <Users className="w-6 h-6" />, title: 'Lead CRM', body: 'Every lead organized and trackable, with notes and statuses.', href: '/features/crm' },
   {
     icon: <FileText className="w-6 h-6" />,
     title: 'Form Builder',
@@ -44,6 +44,12 @@ const FEATURE_CARDS: FeatureCardData[] = [
     title: 'AI Voice Agent',
     body: 'Visitors talk to your agent on the page — no app, no phone call. Same knowledge base, same CRM.',
     href: '/features/voice-agent',
+  },
+  {
+    icon: <RefreshCw className="w-6 h-6" />,
+    title: 'Zoho CRM Integration',
+    body: 'New leads from your forms and Meta lead ads created in Zoho CRM automatically.',
+    href: '/features/zoho-crm',
   },
   {
     icon: <CalendarCheck className="w-6 h-6" />,

@@ -62,7 +62,7 @@ const STAGES: Stage[] = [
     step: '03',
     icon: Database,
     title: 'The lead lands in your CRM',
-    body: 'Every field captured, with the full transcript and the page they came from. Syncs to Zoho.',
+    body: 'Every field captured, with the full transcript and the page they came from.',
     accent: 'text-sky-600',
     iconBg: 'bg-sky-100',
   },

@@ -43,7 +43,7 @@ const BENTO_FEATURES: BentoFeature[] = [
     icon: Mic,
     title: 'AI Voice Agent (on page)',
     description:
-      'Visitors can talk to your AI agent right on your website — no app, no phone call. Same knowledge base, same CRM sync, now with a voice.',
+      'Visitors can talk to your AI agent right on your website — no app, no phone call. Same knowledge base, same CRM, now with a voice.',
     gradient: 'from-indigo-50 to-blue-50',
     accentColor: 'text-indigo-600',
     iconBg: 'bg-indigo-100',
