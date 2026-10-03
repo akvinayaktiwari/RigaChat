@@ -14,7 +14,7 @@ Framing: Google's own guidance is that optimizing for AI search is ordinary SEO.
 |---|---|---|---|
 | GEO readiness (estimate) | 71 / 100 | 2026-10-02 | From `GEO-ANALYSIS-2026-10-02.md`, before the feature-page rebuild. Baseline was 63 on 2026-09-19. |
 | Indexed in Google | Unknown | — | Search Console is not verified. This is the top blocker. |
-| Public pages in the sitemap | 22 | 2026-10-02 | All dated. |
+| Public pages in the sitemap | 23 | 2026-10-03 | All dated. `/features/zoho-crm/` was the 23rd. |
 | Blog posts | 5 | 2026-10-02 | 4 published in the last three weeks. |
 | Mobile LCP (lab) | about 1.7 s | 2026-10-02 | Was 2.3 s on the homepage and 3.25 s on a post. No field data yet. |
 | Lighthouse accessibility | 100 | 2026-10-02 | On every public page audited. |
@@ -47,6 +47,7 @@ Framing: Google's own guidance is that optimizing for AI search is ordinary SEO.
 | About | `AboutPage`, `Organization`, both founders | 2026-10-02 |
 | Pricing, FAQ | `WebPage`, `FAQPage`, `BreadcrumbList` (pricing also `SoftwareApplication`) | 2026-10-02 |
 | Five feature pages | `WebPage`, `FAQPage`, `BreadcrumbList` | 2026-10-02 |
+| Zoho CRM integration page | `WebPage`, `FAQPage`, `BreadcrumbList` | 2026-10-03 |
 | WhatsApp link generator | `WebPage`, `FAQPage`, `BreadcrumbList` | 2026-10-02 |
 | Help | `FAQPage` | 2026-09-19 |
 
@@ -77,6 +78,7 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 | Answers are "always accurate" | 2026-10-02 |
 | Weekly WhatsApp report covers conversations and top agent | 2026-10-02 |
 | "Every new lead" syncs to Zoho (only form and Meta lead ad leads do; chat and voice do not), and Zoho receives a "bot name" | 2026-10-03 |
+| Homepage: a chat lead "Syncs to Zoho.", the voice agent has the "same CRM sync", and the Zoho card offers "Activity logging" and "Custom field mapping" (neither exists); Help: leads sync to "other tools" besides Zoho | 2026-10-03 |
 
 ### Performance and accessibility
 
@@ -104,7 +106,8 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 |---|---|
 | `page-accessibility.test.tsx` | A public page skips a heading level or has an unlabelled dropdown |
 | `page-schema.test.tsx` | The about page or blog index loses its schema, or names something the page does not show |
-| `feature-pages.test.tsx` | A feature page stops opening with an answer, drops its question headings, or publishes FAQ schema for hidden text |
+| `feature-pages.test.tsx` | A feature page stops opening with an answer, drops its question headings, publishes FAQ schema for hidden text, or gives its schema a URL other than the one it is served on |
+| `zoho-claims.test.ts` | Marketing copy, a published FAQ answer or an `llms.txt` line says leads reach Zoho without naming forms and Meta lead ads, or names chat, voice or WhatsApp as a source that syncs |
 | `crawl-files.test.ts` | A sitemap URL has no route, no date, or no CloudFront prefix |
 | `hydration-contract.test.ts` | The prerender and the browser stop rendering the same tree |
 

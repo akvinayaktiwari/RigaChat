@@ -67,7 +67,7 @@ Name → Phone → Email, one field at a time. Required or optional per field, s
 Add FAQs, policies, product details as text entries embedded straight to Pinecone. KB-only bots need no website at all.
 
 **🔌 Zoho CRM Integration**
-One OAuth click, leads auto-sync with smart field mapping and non-retryable error handling.
+One OAuth click, then form and Meta lead ad leads auto-sync with smart field mapping and non-retryable error handling. Chat and voice leads stay in the dashboard.
 
 **📝 Form Builder**
 Embeddable lead forms for any page. Dynamic columns generated from field definitions, synced to the CRM automatically.
