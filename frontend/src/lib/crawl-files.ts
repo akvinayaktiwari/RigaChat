@@ -205,7 +205,7 @@ function postLastModified(post: PostDate): string {
  * by hand on a real content change -- never from the build clock, which would
  * tell crawlers every deploy rewrote the page.
  */
-const HOME_LAST_MODIFIED = '2026-10-02'
+const HOME_LAST_MODIFIED = '2026-10-03'
 
 /** Pages that list the newest posts change whenever one is published or revised. */
 const LISTS_NEWEST_POSTS: readonly string[] = ['/', BLOG_INDEX_ROUTE]

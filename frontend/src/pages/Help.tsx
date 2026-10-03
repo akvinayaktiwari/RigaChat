@@ -56,7 +56,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
     heading: 'Which tools does Vyostra AI connect to?',
     label: 'Integrations',
     icon: 'Cpu',
-    description: 'Connect Zoho CRM and other tools to sync leads automatically.',
+    description: 'Connect Zoho CRM to send form and Meta lead ad leads to it automatically.',
   },
   {
     id: 'leads',
