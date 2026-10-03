@@ -21,9 +21,9 @@ function eagerComponents(): Set<string> {
   return new Set([...appSource.matchAll(/^import (\w+) from '\.\/src\/(?:pages|components)\//gm)].map((m) => m[1] ?? ''))
 }
 
-/** Components declared as lazy(): these get their own chunk. */
+/** Components declared as lazy() or lazyRoute() (lazy plus deploy recovery): these get their own chunk. */
 function lazyComponents(): Set<string> {
-  return new Set([...appSource.matchAll(/^const (\w+) = lazy\(/gm)].map((m) => m[1] ?? ''))
+  return new Set([...appSource.matchAll(/^const (\w+) = lazy(?:Route)?\(/gm)].map((m) => m[1] ?? ''))
 }
 
 /** Route path -> the component name in its element prop. */

@@ -1,4 +1,5 @@
 import { lazy, type ComponentType } from 'react'
+import { importOrReload } from './chunk-reload'
 
 /** Route components take no props, which is all this needs to support. */
 type Loader = () => Promise<{ default: ComponentType }>
@@ -23,7 +24,9 @@ export type PreloadableComponent = ComponentType & {
  * main.tsx can await it and hydrate a tree that has nothing left to wait for.
  */
 export function lazyWithPreload(loader: Loader): PreloadableComponent {
-  const Lazy = lazy(loader)
+  // Rendering recovers from a chunk a deploy deleted; preload() below still
+  // rejects, because main.tsx falls back to hydrating without the route.
+  const Lazy = lazy(() => importOrReload(loader))
   let Loaded: ComponentType | null = null
 
   function Preloadable() {
