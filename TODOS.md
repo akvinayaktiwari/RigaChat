@@ -361,6 +361,30 @@ Gupshup is explicitly out of scope (being deprecated).
 
 ## Security
 
+### Zoho tokens are stored in plaintext, sent to the browser, and the privacy policy says otherwise
+
+**What:** `CRMConnection` keeps the Zoho `accessToken` and `refreshToken` as plain strings
+(`backend/src/types/index.ts:351-352`; the comment at line 675 calls them unencrypted).
+`GET /api/integrations/status` returns that whole object (`integration-routes.ts:135` via
+`getCRMStatus`), so the browser receives the live refresh token on every Settings and
+FormLeadsPage load. Every other status route strips its secrets. `Privacy.tsx:322` says Zoho
+CRM secrets are "fully encrypted with envelope keys managed by AWS KMS", which is false, on
+the page Meta App Review reads.
+
+**Why:** any XSS in the dashboard yields a long-lived token with write access to the
+customer's Zoho Leads module, and the privacy policy misstates how it is held.
+
+**Fix:** strip the tokens from the status response; KMS-encrypt them at rest with the helpers
+Meta and Cal.com already use; migrate the stored rows; then the privacy sentence becomes true.
+While there: `Privacy.tsx:78` says agent-captured leads are "synced to CRM" (only form and Meta
+lead ad leads are), and `syncMetaLeadToCRM` has no try/catch, so a token-refresh throw leaves a
+Meta lead with no sync status at all (`meta-lead-service.ts:888` only logs it).
+
+**Found:** /ship review of `fix/zoho-sync-claims`, 2026-10-03. Deferred to its own branch by
+the owner.
+
+**Priority:** P1
+
 ### Secrets live in the Lambda environment, so any env dump exposes all of them
 
 **What:** all three Lambdas carry ~44 environment variables, and the sensitive ones hold
