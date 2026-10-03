@@ -345,14 +345,25 @@ export interface ApiResponse<T> {
   error?: string
 }
 
+// Tokens KMS-encrypted (lib/kms.ts), like CalComConnection. Rows connected
+// before 2026-10-03 hold the plaintext accessToken/refreshToken instead, until
+// scripts/encrypt-zoho-tokens.ts or their next token refresh rewrites them
+// encrypted. Nothing writes the plaintext fields any more.
 export interface CRMConnection {
   provider: 'zoho'
   connected: boolean
-  accessToken: string
-  refreshToken: string
+  accessTokenEncrypted?: string
+  refreshTokenEncrypted?: string
+  /** Legacy plaintext, read only until the row is re-encrypted. */
+  accessToken?: string
+  /** Legacy plaintext, read only until the row is re-encrypted. */
+  refreshToken?: string
   tokenExpiry: string
   connectedAt: string
 }
+
+/** What the dashboard is told about the connection: never a token, in either form. */
+export type CRMConnectionStatus = Pick<CRMConnection, 'provider' | 'connected' | 'tokenExpiry' | 'connectedAt'>
 
 export interface WhatsAppConnection {
   provider: 'gupshup'
@@ -671,10 +682,8 @@ export function resolveNotificationPreferences(
   }
 }
 
-// Tokens KMS-encrypted (lib/kms.ts), matching WhatsApp/Meta's connection
-// pattern -- not CRMConnection's (Zoho) unencrypted accessToken/refreshToken,
-// a pre-existing weaker pattern this deliberately doesn't propagate into new
-// code. defaultEventTypeId is required before booking-mcp-server.ts's
+// Tokens KMS-encrypted (lib/kms.ts), matching the WhatsApp, Meta and Zoho
+// connections. defaultEventTypeId is required before booking-mcp-server.ts's
 // bookAppointment() can create a real booking (Cal.com's POST /v2/bookings
 // needs an eventTypeId) -- connected without one means "OAuth done, not yet
 // configured," a real intermediate state, not an error.

@@ -50,7 +50,7 @@ import {
 import type {
   ApiResponse,
   CalComConnection,
-  CRMConnection,
+  CRMConnectionStatus,
   MetaConnection,
   MetaConnectPagesResult,
   MetaDirectWhatsAppConnection,
@@ -132,7 +132,7 @@ integrationRoutes.get('/status', requireAuth, async (c) => {
 
   try {
     const status = await getCRMStatus(clientId)
-    return c.json<ApiResponse<CRMConnection | null>>({ success: true, data: status }, 200)
+    return c.json<ApiResponse<CRMConnectionStatus | null>>({ success: true, data: status }, 200)
   } catch (error) {
     return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
   }
