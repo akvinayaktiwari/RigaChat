@@ -44,7 +44,7 @@ export interface StaticPage {
  * disagree about which pages exist.
  */
 export const STATIC_PAGES: readonly StaticPage[] = [
-  { route: '/features', label: 'Features', summary: 'Every live feature of Vyostra AI on one page.', section: 'Product', lastModified: '2026-10-02' },
+  { route: '/features', label: 'Features', summary: 'Every live feature of Vyostra AI on one page.', section: 'Product', lastModified: '2026-10-03' },
   {
     route: '/features/chatbot',
     label: 'AI Agent',
@@ -57,14 +57,14 @@ export const STATIC_PAGES: readonly StaticPage[] = [
     label: 'WhatsApp',
     summary: 'Instant WhatsApp alerts for each new lead and a weekly report, sent through Gupshup.',
     section: 'Product',
-    lastModified: '2026-10-02',
+    lastModified: '2026-10-03',
   },
   {
     route: '/features/crm',
     label: 'Lead CRM',
-    summary: 'The built-in lead CRM: every captured lead stored, filterable, and synced to Zoho CRM.',
+    summary: 'The built-in lead CRM: every captured lead stored and filterable; form and Meta lead ad leads sync to Zoho CRM.',
     section: 'Product',
-    lastModified: '2026-10-02',
+    lastModified: '2026-10-03',
   },
   {
     route: '/features/forms',
@@ -81,6 +81,13 @@ export const STATIC_PAGES: readonly StaticPage[] = [
     lastModified: '2026-10-02',
   },
   {
+    route: '/features/zoho-crm',
+    label: 'Zoho CRM Integration',
+    summary: 'New leads from Vyostra AI lead forms and Meta lead ads created in Zoho CRM automatically; chat and voice leads are not synced.',
+    section: 'Product',
+    lastModified: '2026-10-03',
+  },
+  {
     route: '/pricing',
     label: 'Pricing',
     summary: 'The three plans, what each includes, billing in USD or INR, and the 14-day free trial.',
@@ -92,7 +99,7 @@ export const STATIC_PAGES: readonly StaticPage[] = [
     label: 'FAQ',
     summary: 'Short answers on what Vyostra AI is, setup, where leads go, WhatsApp follow-up and cost.',
     section: 'Product',
-    lastModified: '2026-10-02',
+    lastModified: '2026-10-03',
   },
   {
     route: '/integrations',
@@ -119,7 +126,7 @@ export const STATIC_PAGES: readonly StaticPage[] = [
     lastModified: '2026-10-02',
   },
   { route: '/about-us', label: 'About Vyostra AI', summary: 'Who builds Vyostra AI and where: the founders, in Bangalore.', section: 'Company', lastModified: '2026-10-01' },
-  { route: '/help', label: 'Help Center', summary: 'Setup answers: embedding the widget, the knowledge base, WhatsApp, Zoho CRM, forms, billing.', section: 'Company', lastModified: '2026-10-02' },
+  { route: '/help', label: 'Help Center', summary: 'Setup answers: embedding the widget, the knowledge base, WhatsApp, Zoho CRM, forms, billing.', section: 'Company', lastModified: '2026-10-03' },
   { route: '/contact', label: 'Contact', summary: 'Reach sales or support; the team replies within 24 hours.', section: 'Company', lastModified: '2026-09-20' },
   { route: '/careers', label: 'Careers', summary: 'Working at Vyostra AI, a fully remote team.', section: 'Company', lastModified: '2026-09-16' },
   { route: '/blog', label: 'All articles', summary: 'The blog index, newest first.', section: 'Blog', lastModified: '2026-09-15' },
@@ -216,7 +223,7 @@ function postLastModified(post: PostDate): string {
  * by hand on a real content change -- never from the build clock, which would
  * tell crawlers every deploy rewrote the page.
  */
-const HOME_LAST_MODIFIED = '2026-10-02'
+const HOME_LAST_MODIFIED = '2026-10-03'
 
 /** Pages that list the newest posts change whenever one is published or revised. */
 const LISTS_NEWEST_POSTS: readonly string[] = ['/', BLOG_INDEX_ROUTE]

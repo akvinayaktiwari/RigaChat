@@ -19,6 +19,7 @@ import WhatsAppFeature from './src/pages/features/WhatsApp'
 import Crm from './src/pages/features/Crm'
 import Forms from './src/pages/features/Forms'
 import VoiceAgent from './src/pages/features/VoiceAgent'
+import ZohoCrm from './src/pages/features/ZohoCrm'
 import Careers from './src/pages/Careers'
 import Pricing from './src/pages/Pricing'
 import Faq from './src/pages/Faq'
@@ -174,6 +175,7 @@ export function AppRoutes() {
           <Route path="/features/crm" element={<Crm />} />
           <Route path="/features/forms" element={<Forms />} />
           <Route path="/features/voice-agent" element={<VoiceAgent />} />
+          <Route path="/features/zoho-crm" element={<ZohoCrm />} />
           <Route path="/careers" element={<Careers />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/faq" element={<Faq />} />

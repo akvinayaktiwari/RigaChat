@@ -1,7 +1,9 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { PRERENDERED_STATIC_ROUTES } from '../../lib/crawl-files'
-import { openingParagraph, plainText, publishedFaqText, questionHeadings, renderPublicPage } from '../../test-render'
+import { PRERENDERED_STATIC_ROUTES, servedPath } from '../../lib/crawl-files'
+import { absoluteUrl } from '../../lib/site'
+import type { JsonLd } from '../../lib/structured-data'
+import { asArray, asRecord, openingParagraph, plainText, publishedFaqText, questionHeadings, renderPublicPage } from '../../test-render'
 
 /**
  * What makes a feature page quotable by a search or answer engine: it says
@@ -11,6 +13,14 @@ import { openingParagraph, plainText, publishedFaqText, questionHeadings, render
  */
 
 const FEATURE_PAGES = PRERENDERED_STATIC_ROUTES.filter((route) => route.startsWith('/features/'))
+
+/** The URLs the page's schema gives for itself: its WebPage node and the last crumb of its trail. */
+function publishedPageUrls(jsonLd: JsonLd[]): string[] {
+  const nodes = jsonLd.flatMap((block) => asArray(block['@graph']).map(asRecord))
+  const pages = nodes.filter((node) => node['@type'] === 'WebPage').map((node) => String(node.url))
+  const trails = nodes.filter((node) => node['@type'] === 'BreadcrumbList').map((node) => asArray(node.itemListElement).map(asRecord))
+  return [...pages, ...trails.map((trail) => String(trail.at(-1)?.item))]
+}
 
 it('finds the feature pages it checks', () => {
   expect(FEATURE_PAGES).toContain('/features/crm')
@@ -36,5 +46,13 @@ describe.each(FEATURE_PAGES)('%s', (route) => {
     const shown = plainText(html)
     expect(published.length).toBeGreaterThanOrEqual(6)
     expect(published.filter((text) => !shown.includes(text))).toEqual([])
+  })
+
+  // Each page hand-types its own path. A page copied from another that kept
+  // the old PAGE.path, or dropped the trailing slash, would describe itself at
+  // the wrong URL or at one that redirects.
+  it('describes itself, in its schema, at the URL it is served on', async () => {
+    const urls = publishedPageUrls((await renderPublicPage(route)).jsonLd)
+    expect(urls).toEqual([absoluteUrl(servedPath(route)), absoluteUrl(servedPath(route))])
   })
 })

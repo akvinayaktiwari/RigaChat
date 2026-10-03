@@ -42,7 +42,7 @@ const INTEGRATIONS: Integration[] = [
     iconColor: 'text-red-600',
     iconBg: 'bg-red-100',
     bg: 'from-red-50 to-rose-50',
-    perks: ['Lead capture', 'Activity logging', 'Custom field mapping'],
+    perks: ['Form and Meta lead ad leads', 'Created as they arrive', 'Leads module access only'],
     status: 'live',
   },
   {

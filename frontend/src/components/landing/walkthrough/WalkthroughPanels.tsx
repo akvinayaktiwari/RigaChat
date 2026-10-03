@@ -145,7 +145,7 @@ export function CrmPanel({ script, localTick }: PanelProps) {
             className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1.5"
           >
             <Check className="w-3.5 h-3.5 shrink-0" />
-            Saved with the full transcript, and pushed to Zoho if connected
+            Saved to the lead CRM with the full transcript
           </m.p>
         )}
       </div>

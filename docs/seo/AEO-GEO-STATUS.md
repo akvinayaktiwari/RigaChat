@@ -1,6 +1,6 @@
 # AEO / GEO Status — vyostra.com
 
-**The one file to read first.** What has shipped for search and answer-engine visibility, what is left, and who has to do it. Last updated: 2026-10-02.
+**The one file to read first.** What has shipped for search and answer-engine visibility, what is left, and who has to do it. Last updated: 2026-10-03.
 
 How to keep it current: when something ships, move its row from "To do" to "Implemented" with the date. Do not record plans here; plans live in the documents listed at the bottom.
 
@@ -14,7 +14,7 @@ Framing: Google's own guidance is that optimizing for AI search is ordinary SEO.
 |---|---|---|---|
 | GEO readiness (estimate) | 71 / 100 | 2026-10-02 | From `GEO-ANALYSIS-2026-10-02.md`, before the feature-page rebuild. Baseline was 63 on 2026-09-19. |
 | Indexed in Google | Unknown | — | Search Console is not verified. This is the top blocker. |
-| Public pages in the sitemap | 22 | 2026-10-02 | All dated. |
+| Public pages in the sitemap | 23 | 2026-10-03 | All dated. `/features/zoho-crm/` was the 23rd. |
 | Blog posts | 5 | 2026-10-02 | 4 published in the last three weeks. |
 | Mobile LCP (lab) | about 1.7 s | 2026-10-02 | Was 2.3 s on the homepage and 3.25 s on a post. No field data yet. |
 | Lighthouse accessibility | 100 | 2026-10-02 | On every public page audited. |
@@ -47,6 +47,7 @@ Framing: Google's own guidance is that optimizing for AI search is ordinary SEO.
 | About | `AboutPage`, `Organization`, both founders | 2026-10-02 |
 | Pricing, FAQ | `WebPage`, `FAQPage`, `BreadcrumbList` (pricing also `SoftwareApplication`) | 2026-10-02 |
 | Five feature pages | `WebPage`, `FAQPage`, `BreadcrumbList` | 2026-10-02 |
+| Zoho CRM integration page | `WebPage`, `FAQPage`, `BreadcrumbList` | 2026-10-03 |
 | WhatsApp link generator | `WebPage`, `FAQPage`, `BreadcrumbList` | 2026-10-02 |
 | Help | `FAQPage` | 2026-09-19 |
 
@@ -60,6 +61,7 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 | `/pricing/`, `/faq/`, `/features/voice-agent/` | 2026-10-02 |
 | Chat agent, WhatsApp, CRM and forms pages rebuilt: definition in the first paragraph, question H2s, five visible FAQ answers each | 2026-10-02 |
 | Free tool: `/whatsapp-link-generator/` | 2026-10-02 |
+| Zoho CRM integration page: `/features/zoho-crm/` | 2026-10-03 |
 | Author byline, "Updated" date and four fixed categories on posts | 2026-10-02 |
 | Question H2s in posts; Meta and WhatsApp primary sources cited in the WhatsApp post | 2026-09-19 |
 | Internal links: help in the footer, feature pages to related posts, latest posts on the homepage, related posts on each post | 2026-09-19 |
@@ -75,6 +77,8 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 | "Drag and drop" form builder | 2026-10-02 |
 | Answers are "always accurate" | 2026-10-02 |
 | Weekly WhatsApp report covers conversations and top agent | 2026-10-02 |
+| "Every new lead" syncs to Zoho (only form and Meta lead ad leads do; chat and voice do not), and Zoho receives a "bot name" | 2026-10-03 |
+| Homepage: a chat lead "Syncs to Zoho.", the voice agent has the "same CRM sync", and the Zoho card offers "Activity logging" and "Custom field mapping" (neither exists); Help: leads sync to "other tools" besides Zoho | 2026-10-03 |
 
 ### Performance and accessibility
 
@@ -102,7 +106,8 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 |---|---|
 | `page-accessibility.test.tsx` | A public page skips a heading level or has an unlabelled dropdown |
 | `page-schema.test.tsx` | The about page or blog index loses its schema, or names something the page does not show |
-| `feature-pages.test.tsx` | A feature page stops opening with an answer, drops its question headings, or publishes FAQ schema for hidden text |
+| `feature-pages.test.tsx` | A feature page stops opening with an answer, drops its question headings, publishes FAQ schema for hidden text, or gives its schema a URL other than the one it is served on |
+| `zoho-claims.test.ts` | Marketing copy, a published FAQ answer or an `llms.txt` line says leads reach Zoho without naming forms and Meta lead ads, or names chat, voice or WhatsApp as a source that syncs |
 | `crawl-files.test.ts` | A sitemap URL has no route, no date, or no CloudFront prefix |
 | `hydration-contract.test.ts` | The prerender and the browser stop rendering the same tree |
 
@@ -124,12 +129,13 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 | 8 | Register `message_index` as a GA4 custom metric | Collected but unreportable until then. |
 | 9 | A client case study with real numbers | Needs a client's approval. |
 | 10 | Run the Rich Results Test on the homepage and one post | Not run yet. |
+| 10a | Check the Priya S. testimonial on the homepage | It says leads "from the AI agent" sync to Zoho. Chat leads do not sync; only form and Meta lead ad leads do. It is a customer's own quote, so it was left unchanged: confirm with her how leads reach her Zoho, then reword with her approval or drop the sentence. |
 
 ### Claude tasks, ready now
 
 | # | Task | Note |
 |---|---|---|
-| 11 | Integration pages for Zoho CRM, Meta Lead Ads and WhatsApp | All three are shipped, so every sentence can be checked against the code. |
+| 11 | Integration pages for Meta Lead Ads and WhatsApp | Zoho CRM shipped 2026-10-03 at `/features/zoho-crm/`. Same pattern: every sentence checked against the backend. |
 | 12 | Industries template, real estate first | Three existing posts supply verified material. Other industries need input from the owner. |
 | 13 | A top-level URL that matches no route (for example `/no-such-page`) returns 200 with the app shell, which then shows "not found" in the browser | A soft 404. Fixing it means teaching the CloudFront function which top-level paths the app really has. Low priority: nothing links to such URLs. |
 | 13a | Schema on `/contact/`, `/careers/` and the legal pages | They carry none. Low value. |
