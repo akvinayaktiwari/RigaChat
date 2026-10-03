@@ -1,9 +1,13 @@
 import { META_LEAD_ADS } from './meta-lead-ads'
 import type { IntegrationContent } from './types'
-import { ZOHO_CRM } from './zoho-crm'
 
-/** Shipped integrations only. One that is merely planned does not get a page. */
-export const INTEGRATIONS: readonly IntegrationContent[] = [META_LEAD_ADS, ZOHO_CRM]
+/**
+ * Shipped integrations only. One that is merely planned does not get a page.
+ * Zoho CRM and WhatsApp are shipped too, but each already has a feature page,
+ * so the integrations index links there rather than publishing a second page
+ * that says the same thing under the same title.
+ */
+export const INTEGRATIONS: readonly IntegrationContent[] = [META_LEAD_ADS]
 
 export function integrationPath(integration: IntegrationContent): string {
   return `/integrations/${integration.slug}/`

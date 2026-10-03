@@ -94,7 +94,7 @@ expect vyostra.com     /features/voice-agent '.response.headers.location.value' 
 expect vyostra.com     /whatsapp-link-generator '.response.headers.location.value' '/whatsapp-link-generator/'
 expect vyostra.com     /whatsapp-link-generator/ '.request.uri'                '/whatsapp-link-generator/'
 expect vyostra.com     /integrations '.response.headers.location.value'        '/integrations/'
-expect vyostra.com     /integrations/zoho-crm '.response.headers.location.value' '/integrations/zoho-crm/'
+expect vyostra.com     /integrations/meta-lead-ads '.response.headers.location.value' '/integrations/meta-lead-ads/'
 expect vyostra.com     /integrations/meta-lead-ads/ '.request.uri'             '/integrations/meta-lead-ads/'
 # A path that merely STARTS with a prerendered prefix is not one.
 expect vyostra.com     /blogging '.request.uri'                                '/app-shell.html'

@@ -21,7 +21,7 @@ describe('the integrations registry', () => {
   })
 
   it('finds an integration by slug and nothing for an unknown one', () => {
-    expect(getIntegrationBySlug('zoho-crm')?.name).toBe('Zoho CRM')
+    expect(getIntegrationBySlug('meta-lead-ads')?.name).toBe('Meta Lead Ads')
     expect(getIntegrationBySlug('salesforce')).toBeUndefined()
     expect(getIntegrationBySlug(undefined)).toBeUndefined()
   })
@@ -77,11 +77,12 @@ describe('/integrations', () => {
   })
 })
 
-// The Zoho sync covers two lead sources today, and the page must not promise a third.
-describe('the Zoho CRM page', () => {
-  it('says chat-agent leads are not sent to Zoho', async () => {
-    const text = plainText((await renderPublicPage('/integrations/zoho-crm')).html)
-    expect(text).toContain('Leads captured by the chat agent stay in the Vyostra AI lead CRM and are not sent to Zoho.')
-    expect(text).not.toMatch(/every lead (is|syncs|goes)/i)
+// Zoho CRM has one page, /features/zoho-crm. A second under /integrations
+// would carry the same title and compete with it for the same search.
+describe('the Zoho CRM card', () => {
+  it('links to the Zoho feature page, and no integration page duplicates it', async () => {
+    const html = (await renderPublicPage('/integrations')).html
+    expect(html).toContain('href="/features/zoho-crm"')
+    expect(PRERENDERED_STATIC_ROUTES).not.toContain('/integrations/zoho-crm')
   })
 })

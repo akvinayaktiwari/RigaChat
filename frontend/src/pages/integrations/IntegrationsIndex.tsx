@@ -7,12 +7,25 @@ import { integrationsIndexNodes, jsonLdGraph, organizationSchema } from '../../l
 
 const CARD = 'block rounded-2xl border border-outline-variant/30 bg-white p-6 shadow-xs hover:border-primary/40 hover:shadow-md transition-all'
 
-/** WhatsApp is connected from the product too, but its page is the feature page, not a second page saying the same thing. */
-const WHATSAPP = {
-  name: 'WhatsApp',
-  summary: 'An instant WhatsApp alert for every new lead, a weekly summary, and follow-up journeys.',
-  path: '/features/whatsapp',
+interface FeaturePageIntegration {
+  name: string
+  summary: string
+  path: string
 }
+
+/** Connected from the product too, but each one's page is its feature page, not a second page saying the same thing. */
+const FEATURE_PAGE_INTEGRATIONS: readonly FeaturePageIntegration[] = [
+  {
+    name: 'Zoho CRM',
+    summary: 'Leads from your lead forms and Meta lead ads are created in Zoho CRM as they arrive.',
+    path: '/features/zoho-crm',
+  },
+  {
+    name: 'WhatsApp',
+    summary: 'An instant WhatsApp alert for every new lead, a weekly summary, and follow-up journeys.',
+    path: '/features/whatsapp',
+  },
+]
 
 function IntegrationCard({ name, summary, to }: { name: string; summary: string; to: string }) {
   return (
@@ -35,7 +48,7 @@ export default function IntegrationsIndex() {
       <MarketingPageShell
         badge="INTEGRATIONS"
         headline="Vyostra AI integrations"
-        lead="Vyostra AI connects to Meta Lead Ads, Zoho CRM and WhatsApp today. Meta Lead Ads brings the leads from your ads into the lead CRM as they are submitted, Zoho CRM receives leads from your forms and ads, and WhatsApp carries your lead alerts and follow-up. Each page below says exactly what the connection does and where it stops."
+        lead="Vyostra AI connects to Meta Lead Ads, Zoho CRM and WhatsApp today. Meta Lead Ads brings the leads from your ads into the lead CRM as they are submitted. Zoho CRM receives the leads from your forms and Meta lead ads. WhatsApp carries your lead alerts and follow-up. Each page below says exactly what the connection does and where it stops."
       >
         <section className="max-w-5xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-extrabold text-on-surface tracking-tight text-center mb-10">Which tools does Vyostra AI connect to?</h2>
@@ -43,7 +56,9 @@ export default function IntegrationsIndex() {
             {INTEGRATIONS.map((integration) => (
               <IntegrationCard key={integration.slug} name={integration.name} summary={integration.summary} to={integrationPath(integration).replace(/\/$/, '')} />
             ))}
-            <IntegrationCard name={WHATSAPP.name} summary={WHATSAPP.summary} to={WHATSAPP.path} />
+            {FEATURE_PAGE_INTEGRATIONS.map((integration) => (
+              <IntegrationCard key={integration.path} name={integration.name} summary={integration.summary} to={integration.path} />
+            ))}
           </div>
         </section>
       </MarketingPageShell>
