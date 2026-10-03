@@ -75,7 +75,7 @@ const USE_BLOCKS: UseBlock[] = [
   {
     icon: 'RefreshCw',
     label: 'CRM Sync',
-    text: 'To sync captured leads with connected CRMs including Zoho CRM. Leads sourced from Meta Lead Ads are handled identically to leads captured via agent or forms — synced to CRM and never sold or shared.',
+    text: 'To send leads from your lead forms and Meta Lead Ads to a CRM you connect, such as Zoho CRM. Leads captured by the chat or voice agent stay in Vyostra AI. Leads from any source, including Meta Lead Ads, are never sold or shared.',
   },
   {
     icon: 'ShieldCheck',
