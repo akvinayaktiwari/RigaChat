@@ -52,6 +52,8 @@ Framing: Google's own guidance is that optimizing for AI search is ordinary SEO.
 | Meta Lead Ads integration page | `WebPage`, `FAQPage`, `BreadcrumbList` | 2026-10-03 |
 | Integrations index | `WebPage`, `BreadcrumbList` | 2026-10-03 |
 | Real estate industry page | `WebPage`, `FAQPage`, `BreadcrumbList` | 2026-10-05 |
+| Contact | `ContactPage`, `BreadcrumbList` | 2026-10-04 |
+| Careers, privacy policy, terms of service | `WebPage`, `BreadcrumbList` | 2026-10-04 |
 | WhatsApp link generator | `WebPage`, `FAQPage`, `BreadcrumbList` | 2026-10-02 |
 | Help | `FAQPage` | 2026-09-19 |
 
@@ -70,6 +72,7 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 | WhatsApp and Zoho CRM have no page under `/integrations/` on purpose: the index links each to its feature page, so two pages do not compete for one search | 2026-10-03 |
 | Author byline, "Updated" date and four fixed categories on posts | 2026-10-02 |
 | Question H2s in posts; Meta and WhatsApp primary sources cited in the WhatsApp post | 2026-09-19 |
+| Question sub-headings in the two long sections of the WhatsApp post. The pilgrimage post needed none: its long block is a data table and its sections already carry sub-headings | 2026-10-04 |
 | Internal links: help in the footer, feature pages to related posts, latest posts on the homepage, related posts on each post | 2026-09-19 |
 | The WhatsApp real estate post links the two ad-lead posts from its lead-source table | 2026-10-05 |
 | Real estate industry page: `/industries/real-estate/`, linked from the footer. Written against the prebuilt real estate journey and its WhatsApp templates | 2026-10-05 |
@@ -149,11 +152,9 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 |---|---|---|
 | 12 | Further industry pages (clinics, coaching institutes, home services and others) | The template and real estate shipped 2026-10-05. Each further industry needs copy from the owner: a content file in `frontend/src/content/industries/`, with nothing generated. |
 | 13 | A top-level URL that matches no route (for example `/no-such-page`) returns 200 with the app shell, which then shows "not found" in the browser | A soft 404. Fixing it means teaching the CloudFront function which top-level paths the app really has. Low priority: nothing links to such URLs. |
-| 13a | Schema on `/contact/`, `/careers/` and the legal pages | They carry none. Low value. |
 | 14 | Embed the walkthrough video once it exists, with `VideoObject` | Depends on 5. |
 | 15 | A diagram in each post, with `image` on `BlogPosting` | Needs design assets or a decision to draw them in SVG. |
 | 16 | A built-in QR code for the link generator | Needs a small library. |
-| 17 | Sub-headings in the long sections of the WhatsApp and pilgrimage posts | Sections run 300 to 600 words under one heading. |
 
 ### Blocked
 
