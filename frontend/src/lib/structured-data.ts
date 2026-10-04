@@ -248,6 +248,23 @@ export function aboutPageNodes(page: FeaturePageFields): JsonLd[] {
   return [aboutPage, breadcrumbSchema([{ name: 'Home', path: '/' }, { name: page.name, path: page.path }])]
 }
 
+/**
+ * A page about the company rather than the product: contact, careers, the
+ * legal pages. Its subject is the organization, one crumb below Home. Emit it
+ * alongside organizationSchema(), which is the node `about` points at.
+ */
+export function companyPageNodes(page: FeaturePageFields, type: 'WebPage' | 'ContactPage' = 'WebPage'): JsonLd[] {
+  const companyPage: JsonLd = {
+    '@type': type,
+    '@id': absoluteUrl(page.path),
+    url: absoluteUrl(page.path),
+    name: page.name,
+    isPartOf: { '@id': absoluteUrl(`/${WEBSITE_ID}`) },
+    about: { '@id': absoluteUrl(`/${ORGANIZATION_ID}`) },
+  }
+  return [companyPage, breadcrumbSchema([{ name: 'Home', path: '/' }, { name: page.name, path: page.path }])]
+}
+
 export interface BlogListing {
   title: string
   /** Path exactly as served, e.g. "/blog/a-post/". */

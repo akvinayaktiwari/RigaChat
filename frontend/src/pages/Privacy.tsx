@@ -23,6 +23,8 @@ import Navbar from '../components/landing/Navbar'
 import Footer from '../components/landing/Footer'
 import DemoModal from '../components/landing/modals/DemoModal'
 import { absoluteUrl } from '../lib/site'
+import StructuredData from '../components/seo/StructuredData'
+import { companyPageNodes, jsonLdGraph, organizationSchema } from '../lib/structured-data'
 
 interface TOCItem {
   id: string
@@ -470,6 +472,7 @@ export default function Privacy() {
         />
         <link rel="canonical" href={absoluteUrl('/privacy-policy/')} />
       </Helmet>
+      <StructuredData data={jsonLdGraph([organizationSchema(), ...companyPageNodes({ name: 'Privacy Policy', path: '/privacy-policy/' })])} />
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 
       <main className="pt-36 pb-24 px-6 lg:px-8">
