@@ -76,3 +76,26 @@ describe('/blog structured data', () => {
     expect(nodeOfType(nodes, 'Blog').publisher).toEqual({ '@id': nodeOfType(nodes, 'Organization')['@id'] })
   })
 })
+
+// Contact, careers and the legal pages are about the company, not the product,
+// and shipped with no schema at all.
+describe.each([
+  ['/contact', 'ContactPage', 'Contact'],
+  ['/careers', 'WebPage', 'Careers'],
+  ['/privacy-policy', 'WebPage', 'Privacy Policy'],
+  ['/terms-of-service', 'WebPage', 'Terms of Service'],
+] as const)('%s structured data', (route, type, name) => {
+  it(`is a ${type} about the organization in the same graph, at the URL it is served on`, async () => {
+    const nodes = await graphNodes(route)
+    const page = nodeOfType(nodes, type)
+    expect(page.about).toEqual({ '@id': nodeOfType(nodes, 'Organization')['@id'] })
+    expect(page.url).toBe(absoluteUrl(`${route}/`))
+  })
+
+  it('trails Home > the page, under a name the page shows', async () => {
+    const nodes = await graphNodes(route)
+    const crumbs = asArray(nodeOfType(nodes, 'BreadcrumbList').itemListElement).map(asRecord)
+    expect(crumbs.map((crumb) => crumb.item)).toEqual([absoluteUrl('/'), absoluteUrl(`${route}/`)])
+    expect((await renderPublicPage(route)).html).toContain(name)
+  })
+})

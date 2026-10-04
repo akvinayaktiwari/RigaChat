@@ -5,6 +5,8 @@ import Navbar from '../components/landing/Navbar'
 import Footer from '../components/landing/Footer'
 import DemoModal from '../components/landing/modals/DemoModal'
 import { absoluteUrl } from '../lib/site'
+import StructuredData from '../components/seo/StructuredData'
+import { companyPageNodes, jsonLdGraph, organizationSchema } from '../lib/structured-data'
 
 // Must match Privacy.tsx and the site footer exactly -- Meta App Review
 // cross-checks the declared legal entity against what is published.
@@ -290,6 +292,7 @@ export default function Terms() {
         />
         <link rel="canonical" href={absoluteUrl('/terms-of-service/')} />
       </Helmet>
+      <StructuredData data={jsonLdGraph([organizationSchema(), ...companyPageNodes({ name: 'Terms of Service', path: '/terms-of-service/' })])} />
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 
       <main className="pt-36 pb-24 px-6 lg:px-8">

@@ -3,6 +3,8 @@ import { CheckCircle2, Mail, MessageSquare, Send } from 'lucide-react'
 import Navbar from '../components/landing/Navbar'
 import Footer from '../components/landing/Footer'
 import PageMeta from '../components/seo/PageMeta'
+import StructuredData from '../components/seo/StructuredData'
+import { companyPageNodes, jsonLdGraph, organizationSchema } from '../lib/structured-data'
 import DemoModal from '../components/landing/modals/DemoModal'
 import { submitContactMessage } from '../services/api'
 import { trackEvent } from '../lib/analytics'
@@ -96,6 +98,7 @@ export default function Contact() {
         description="Talk to the Vyostra AI team about AI chat and voice agents, WhatsApp follow-up, pricing or an existing account. We respond within 24 hours."
         path="/contact/"
       />
+      <StructuredData data={jsonLdGraph([organizationSchema(), ...companyPageNodes({ name: 'Contact', path: '/contact/' }, 'ContactPage')])} />
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 
       <main className="pt-36 pb-24 px-6 lg:px-8">

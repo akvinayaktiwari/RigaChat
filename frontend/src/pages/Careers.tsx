@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import PageMeta from '../components/seo/PageMeta'
+import StructuredData from '../components/seo/StructuredData'
+import { companyPageNodes, jsonLdGraph, organizationSchema } from '../lib/structured-data'
 import { Globe, Zap, Heart, Laptop, Calendar, BookOpen, TrendingUp, Shield, Coffee, MessageSquare, Star, Code2, Megaphone, Mail } from 'lucide-react'
 import Navbar from '../components/landing/Navbar'
 import Footer from '../components/landing/Footer'
@@ -193,6 +195,7 @@ export default function Careers() {
         description="Join Vyostra AI. Fully remote. Build AI products that help businesses grow. Send your resume to support@vyostra.com"
         path="/careers/"
       />
+      <StructuredData data={jsonLdGraph([organizationSchema(), ...companyPageNodes({ name: 'Careers', path: '/careers/' })])} />
       <Navbar onOpenDemo={() => setIsDemoOpen(true)} />
 
       <main className="pt-36 pb-24 px-6 lg:px-8">
