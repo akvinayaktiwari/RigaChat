@@ -45,38 +45,38 @@ None of these is a secret. Export them or prefix the command.
 
 | Variable | Needed for | What it is |
 |---|---|---|
-| `APP_REVIEW_NOTIFICATION_NUMBER` | management | Test number that receives lead alerts. Digits with country code, e.g. `9198…`. |
+| `APP_REVIEW_NOTIFICATION_NUMBER` | management, only when not connected | Test number that receives lead alerts. Digits with country code, e.g. `9198…`. |
 | `APP_REVIEW_FORM_ID` | messaging | Id of a lead form on the test account (Dashboard → Forms). |
 | `APP_REVIEW_LEAD_PHONE` | messaging | The test customer's number — the one that will message the business. |
 | `APP_REVIEW_LEAD_EMAIL` | optional | Defaults to `test-lead@example.com`. |
 | `APP_REVIEW_TEMPLATE` | optional | Template created on camera. Defaults to `lead_notification_2`. |
 | `APP_REVIEW_BASE_URL` | optional | Defaults to `https://vyostra.com`. |
 | `APP_REVIEW_CHANNEL` | optional | `chrome` to use installed Chrome. |
+| `APP_REVIEW_EXECUTABLE` | optional | Full path to another Chromium-based browser, e.g. Brave. Turn Brave Shields off for the site, or Meta's SDK and popup are blocked. |
 
 The test lead is always named **Test Lead — App Review**.
 
 ## Video A — `whatsapp_business_management`
 
+Meta asks for one thing in this video: the app being used to create a message
+template. Embedded Signup does not have to appear, and Meta says the review need
+not wait for it. So run this with WhatsApp **already connected**:
+
 ```bash
-APP_REVIEW_NOTIFICATION_NUMBER=91XXXXXXXXXX npm run record:app-review -- --video=management
+npm run record:app-review -- --video=management
 ```
 
-**Before you run it:** the Meta card on Dashboard → WhatsApp must read
-**Not Connected**. The script will not disconnect anything for you; it stops with
-a message if a connection exists. Read "Before disconnecting" below first.
+What it films: the WhatsApp page → the connected number → the Message Templates
+section → **Create template** → the status Meta assigned.
 
-What it films: the WhatsApp page → the notification number → **Connect with
-Meta** → Embedded Signup → the connected number and verified name → the Message
-Templates section → **Create template** → the status Meta assigned.
+Where it waits for you: **sign-in** only. If the dashboard bounces to the login
+page, sign in and it carries on by itself.
 
-Where it waits for you:
-
-1. **Sign-in.** If the dashboard bounces to the login page, sign in. It carries on
-   by itself.
-2. **Embedded Signup popup.** Click through it yourself: business → WhatsApp
-   Business Account → phone number → Finish. Hold the permissions screen for
-   about three seconds so every line is legible. You have five minutes. The
-   script continues when the popup closes.
+If the Meta card reads **Not Connected** instead, the script also films the
+connect: it needs `APP_REVIEW_NOTIFICATION_NUMBER`, clicks **Connect with Meta**,
+and waits up to five minutes while you click through the Embedded Signup popup
+yourself. As of 2026-10-01 Meta refuses that popup for this app ("can't onboard
+customers at the moment"), so use the connected path.
 
 ## Video B — `whatsapp_business_messaging`
 
@@ -130,15 +130,6 @@ macOS screen recording, as `scripts/record-meta-screencast.sh` does for Lead Ads
 Watch each MP4 end to end before uploading. A take in which a wait timed out, a
 caption covered something, or a real customer's name is visible in the CRM or in
 WhatsApp Web should be thrown away and re-recorded.
-
-## Before disconnecting
-
-Video A needs the not-connected state, and the test account is currently
-connected. Disconnecting deletes the stored connection record, including the
-number's two-step verification PIN. Meta keeps the old PIN bound to the number,
-so the reconnect's registration call is expected to be refused. The connection is
-still stored and still sends, but the app no longer holds the PIN. Decide whether
-that is acceptable for the test number before pressing Disconnect.
 
 ## What is not automated, on purpose
 
