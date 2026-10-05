@@ -59,6 +59,22 @@ The frontend var is build-time: changing it needs a CI rerun, and you verify it
 by grepping the deployed bundle at `https://vyostra.com/assets/index-*.js` for
 the id — never by trusting the repo variable.
 
+### Corrections, 2026-10-01 — read these before the work items
+
+Two claims below were wrong and are kept only so the history reads straight.
+
+- **Video A does not need the Embedded Signup popup.** Meta's App Review page for
+  Tech Providers asks for "a video of your app, or WhatsApp Manager, being used to
+  create a message template", and says the review need not wait for Embedded
+  Signup. The dashboard now has a Message Templates section for exactly this;
+  `e2e/app-review/` records it.
+- **No new template is needed on the `meta_direct` WABA.** It is the same WABA
+  (`1353319399571291`) the approved templates already live on.
+
+The popup itself is currently refused by Meta ("Vyostra AI can't onboard customers
+at the moment") even for an app Administrator, most likely until this review
+grants Advanced access. The redirect flow connects fine.
+
 ### Work items, in order
 
 1. **Drive the popup path end to end, once, before recording anything.**

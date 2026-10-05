@@ -17,6 +17,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline/promises'
+import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { chromium, type BrowserContext, type Locator, type Page } from '@playwright/test'
 
@@ -26,6 +27,9 @@ const E2E_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PROFILE_DIR = join(E2E_DIR, '.pw-profile')
 const RECORDINGS_DIR = join(E2E_DIR, 'recordings')
 const RAW_DIR = join(RECORDINGS_DIR, '.raw')
+// Creating this file is the same as pressing Enter. It is how a run started
+// without a terminal (by another program) is told a person has finished.
+const CONTINUE_FILE = join(RECORDINGS_DIR, '.continue')
 
 const VIEWPORT = { width: 1440, height: 900 }
 const SLOW_MO_MS = 400
@@ -43,6 +47,7 @@ const OUTPUT_NAMES: Record<VideoName, string> = {
 interface RecorderConfig {
   baseUrl: string
   channel?: string
+  executablePath?: string
   notificationNumber?: string
   formId?: string
   leadPhone?: string
@@ -68,6 +73,7 @@ function readConfig(): RecorderConfig {
   return {
     baseUrl: (process.env.APP_REVIEW_BASE_URL ?? 'https://vyostra.com').replace(/\/$/, ''),
     channel: process.env.APP_REVIEW_CHANNEL,
+    executablePath: process.env.APP_REVIEW_EXECUTABLE,
     notificationNumber: process.env.APP_REVIEW_NOTIFICATION_NUMBER,
     formId: process.env.APP_REVIEW_FORM_ID,
     leadPhone: process.env.APP_REVIEW_LEAD_PHONE,
@@ -88,13 +94,38 @@ function parseVideoArg(): VideoName | 'setup' {
   throw new Error('Pass --setup, --video=management or --video=messaging')
 }
 
-async function waitForHuman(instruction: string): Promise<void> {
+async function waitForEnter(signal: AbortSignal): Promise<void> {
   const prompt = createInterface({ input: process.stdin, output: process.stdout })
   try {
-    await prompt.question(`\n>>> ${instruction}\n    Press Enter when done. `)
+    await prompt.question('    Press Enter when done. ', { signal })
+  } catch (error) {
+    // Aborted means something else finished the wait first; anything else is real.
+    if (!(error instanceof Error && error.name === 'AbortError')) throw error
   } finally {
     prompt.close()
   }
+}
+
+async function waitForContinueFile(signal: AbortSignal): Promise<void> {
+  rmSync(CONTINUE_FILE, { force: true })
+  console.log(`    Continues on its own, or when ${CONTINUE_FILE} is created.`)
+  while (!signal.aborted && !existsSync(CONTINUE_FILE)) {
+    await delay(500)
+  }
+  rmSync(CONTINUE_FILE, { force: true })
+}
+
+// Waits for a person. Ends on Enter (or the continue file when there is no
+// terminal), when `orWhen` settles first, or after HUMAN_TIMEOUT_MS -- a
+// recording left waiting forever is worse than one that moves on.
+async function waitForHuman(instruction: string, orWhen?: Promise<void>): Promise<void> {
+  console.log(`\n>>> ${instruction}`)
+  const finished = new AbortController()
+  const manual = process.stdin.isTTY ? waitForEnter(finished.signal) : waitForContinueFile(finished.signal)
+  const timedOut = delay(HUMAN_TIMEOUT_MS, undefined, { ref: false })
+
+  await Promise.race([manual, timedOut, ...(orWhen ? [orWhen] : [])])
+  finished.abort()
 }
 
 async function launch(config: RecorderConfig, record: boolean): Promise<BrowserContext> {
@@ -103,6 +134,8 @@ async function launch(config: RecorderConfig, record: boolean): Promise<BrowserC
     slowMo: SLOW_MO_MS,
     viewport: VIEWPORT,
     ...(config.channel ? { channel: config.channel } : {}),
+    // Any Chromium-based browser Playwright has no channel name for (Brave).
+    ...(config.executablePath ? { executablePath: config.executablePath } : {}),
     ...(record ? { recordVideo: { dir: RAW_DIR, size: VIEWPORT } } : {}),
   })
 }
@@ -203,7 +236,7 @@ async function connectThroughEmbeddedSignup(page: Page, context: BrowserContext,
 
 async function createTemplateOnCamera(page: Page, templateName: string): Promise<void> {
   await page.getByTestId('whatsapp-templates').scrollIntoViewIfNeeded()
-  await caption(page, 'Step 4 — Creating a message template on the connected WhatsApp Business Account')
+  await caption(page, 'Creating a message template on the connected WhatsApp Business Account')
 
   const row = page.getByTestId(`template-row-${templateName}`)
   await row.scrollIntoViewIfNeeded()
@@ -220,16 +253,30 @@ async function createTemplateOnCamera(page: Page, templateName: string): Promise
     .getByTestId(`template-status-${templateName}`)
     .filter({ hasNotText: 'Not created' })
     .waitFor({ timeout: 45_000 })
-  await caption(page, 'Step 5 — The template is submitted to Meta and its review status is shown')
+  await caption(page, 'The template is submitted to Meta and its review status is shown')
   await page.waitForTimeout(HOLD_MS)
 }
 
-async function recordManagement(context: BrowserContext, config: RecorderConfig): Promise<Take> {
+// Meta's popup is filmed only when there is something to connect. The video
+// Meta asks for is the app creating a message template, so an account that is
+// already connected goes straight to that.
+async function connectOnCamera(
+  page: Page,
+  context: BrowserContext,
+  config: RecorderConfig,
+  startedAt: number
+): Promise<PopupWindow> {
   const notificationNumber = requireSetting(
     config.notificationNumber,
     'APP_REVIEW_NOTIFICATION_NUMBER',
     'the test number that receives lead alerts, digits only with country code'
   )
+  await page.locator('#meta-wa-notification-number').fill(notificationNumber)
+  await caption(page, 'The business owner connects WhatsApp via Embedded Signup')
+  return connectThroughEmbeddedSignup(page, context, startedAt)
+}
+
+async function recordManagement(context: BrowserContext, config: RecorderConfig): Promise<Take> {
   const { page, startedAt } = await startTake(context, config)
 
   await openDashboard(page, config, '/dashboard/whatsapp')
@@ -239,23 +286,17 @@ async function recordManagement(context: BrowserContext, config: RecorderConfig)
     .locator('#meta-wa-notification-number, [data-testid="meta-wa-display-number"]')
     .first()
     .waitFor({ timeout: 30_000 })
-  await caption(page, "Step 1 — Connecting a client's WhatsApp Business Account in Vyostra AI")
+  await caption(page, "A client's WhatsApp Business Account in the Vyostra AI dashboard")
 
-  const connect = page.getByRole('button', { name: 'Connect with Meta' })
-  if (!(await connect.isVisible())) {
-    throw new Error('WhatsApp is already connected through Meta. Disconnect it by hand first, then rerun.')
-  }
-  await page.locator('#meta-wa-notification-number').fill(notificationNumber)
-  await caption(page, 'Step 2 — Business owner connects WhatsApp via Embedded Signup')
-
-  const popup = await connectThroughEmbeddedSignup(page, context, startedAt)
+  const needsConnect = await page.getByRole('button', { name: 'Connect with Meta' }).isVisible()
+  const popup = needsConnect ? await connectOnCamera(page, context, config, startedAt) : undefined
 
   await page.getByTestId('meta-wa-display-number').waitFor({ timeout: 90_000 })
-  await caption(page, 'Step 3 — The connected phone number and its verified name')
+  await caption(page, 'The connected WhatsApp Business phone number')
   await page.waitForTimeout(HOLD_MS)
 
   await createTemplateOnCamera(page, config.templateName)
-  return { page, popup }
+  return popup ? { page, popup } : { page }
 }
 
 // ---------------------------------------------------------------- Video B
@@ -298,8 +339,25 @@ async function submitLead(page: Page, config: RecorderConfig, formId: string, le
   await caption(page, 'Step 3 — Vyostra AI alerts the business owner on WhatsApp')
 }
 
+// Resolves once the newest chat bubble is an incoming one that arrived AFTER an
+// outgoing one: the person sent the customer's message and the AI answered.
+// Read-only -- it looks at one element's class and touches nothing. If WhatsApp
+// Web's markup has changed it simply never resolves, and waitForHuman's other
+// endings take over.
+async function aiReplyOnScreen(page: Page): Promise<void> {
+  const newest = page.locator('.message-in, .message-out').last()
+  let customerSent = false
+
+  while (!page.isClosed()) {
+    const classes = (await newest.getAttribute('class', { timeout: 1000 }).catch(() => null)) ?? ''
+    if (classes.includes('message-out')) customerSent = true
+    else if (customerSent && classes.includes('message-in')) return
+    await delay(1000)
+  }
+}
+
 // WhatsApp Web is only ever LOOKED at. The script never types or clicks there:
-// the person sends the customer's message, by hand, in the window or on a phone.
+// the person opens the chat and sends the customer's message by hand.
 async function showWhatsApp(page: Page): Promise<void> {
   await page.goto(WHATSAPP_WEB_URL)
 
@@ -308,16 +366,17 @@ async function showWhatsApp(page: Page): Promise<void> {
   } catch {
     await waitForHuman(
       'The lead alert was not found in WhatsApp Web. Open the chat that shows it — or, if the alert ' +
-        "went to a phone that is not this WhatsApp Web session, screen-record that phone for this segment."
+        'went to a phone that is not this WhatsApp Web session, screen-record that phone for this segment.'
     )
   }
   await page.waitForTimeout(HOLD_MS)
 
   await waitForHuman(
     'Customer messages the business on WhatsApp: open the chat with the business number and send a ' +
-      'question by hand (here or from the test phone). Wait until the AI reply is on screen.'
+      'question by hand (here or from the test phone). Wait until the AI reply is on screen.',
+    aiReplyOnScreen(page)
   )
-  await page.waitForTimeout(HOLD_MS)
+  await page.waitForTimeout(HOLD_MS * 2)
 }
 
 async function showLeadInCrm(page: Page, config: RecorderConfig): Promise<void> {
