@@ -652,6 +652,14 @@ export interface ClientRecord {
   metaUserTokenEncrypted?: string
   calComConnection?: CalComConnection
   notificationPreferences?: NotificationPreferences
+  /**
+   * The country calling code (digits only, e.g. "1", "44", "971") assumed for a
+   * lead's phone number that was typed without one. Per account because no
+   * single code is right for every customer. Absent on accounts that have not
+   * chosen: the dashboard then keeps its original India (91) assumption, so
+   * nothing changes for an existing account until it picks.
+   */
+  defaultCountryCode?: string
   createdAt: string
   updatedAt: string
 }

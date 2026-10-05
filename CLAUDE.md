@@ -83,6 +83,9 @@ DELETE /api/integrations/meta/disconnect -> disconnect-all: every Page row AND t
                                   Facebook assets (auth required)
 POST /api/kb                -> add knowledge base entry + embed it
 GET  /api/kb                -> fetch all KB entries (auth required)
+PATCH /api/clients/me/default-country -> set the country calling code assumed for a lead number typed without one
+                                  (body {countryCode}, digits only, 1-3 digits). Unset accounts keep the legacy
+                                  India (91) assumption, so nothing changes until an account picks (auth required)
 GET  /api/integrations/meta-whatsapp/templates -> the WhatsApp template library (lib/whatsapp-templates.ts), each
                                   with its review status on the caller's OWN WABA. Read live from Meta, never
                                   cached -- a stored copy would show PENDING long after approval. 409 when the

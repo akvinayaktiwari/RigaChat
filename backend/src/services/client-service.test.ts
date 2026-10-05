@@ -21,7 +21,7 @@ vi.mock('../repositories/bot-repository.js', () => ({
   countBotsForClient: (...a: unknown[]) => countBotsForClient(...a),
 }))
 
-const { upsertClient, ensureTrialSubscription, getAppBootstrap, updateNotificationPreferences } =
+const { upsertClient, ensureTrialSubscription, getAppBootstrap, updateNotificationPreferences, updateDefaultCountryCode, InvalidCountryCodeError } =
   await import('./client-service.js')
 
 const CLIENT_ID = 'client-1'
@@ -257,5 +257,27 @@ describe('updateNotificationPreferences', () => {
     expect(updateClient).toHaveBeenCalledWith('c-1', {
       notificationPreferences: { push: false, whatsapp: false, email: false },
     })
+  })
+})
+
+describe('updateDefaultCountryCode', () => {
+  beforeEach(() => {
+    getClientById.mockReset().mockResolvedValue({ clientId: 'c-1' })
+    updateClient.mockReset()
+    updateClient.mockImplementation((_id: string, updates: unknown) => Promise.resolve({ clientId: 'c-1', ...(updates as object) }))
+  })
+
+  it('stores the code as digits', async () => {
+    const client = await updateDefaultCountryCode('c-1', '971')
+
+    expect(updateClient).toHaveBeenCalledWith('c-1', { defaultCountryCode: '971' })
+    expect(client.defaultCountryCode).toBe('971')
+  })
+
+  // The value is concatenated into a wa.me link, so anything that is not a
+  // calling code would produce links that open nothing.
+  it.each(['+1', '0', '1234', 'us', '', '1 '])('refuses %j and writes nothing', async (code) => {
+    await expect(updateDefaultCountryCode('c-1', code)).rejects.toBeInstanceOf(InvalidCountryCodeError)
+    expect(updateClient).not.toHaveBeenCalled()
   })
 })
