@@ -1,4 +1,7 @@
 import type {
+  ApiKeySummary,
+  ApiScope,
+  CreatedApiKey,
   ApiResponse,
   AppointmentRequest,
   BotConfig,
@@ -383,6 +386,18 @@ export function getLinkedDevices(): Promise<ApiResponse<LinkedDevice[]>> {
 // calls the same route.
 export function revokeDevice(deviceId: string): Promise<ApiResponse<null>> {
   return apiClient<null>(`/api/devices/${encodeURIComponent(deviceId)}`, 'DELETE')
+}
+
+export function getApiKeys(): Promise<ApiResponse<ApiKeySummary[]>> {
+  return apiClient<ApiKeySummary[]>('/api/api-keys')
+}
+
+export function createApiKey(name: string, scopes: ApiScope[]): Promise<ApiResponse<CreatedApiKey>> {
+  return apiClient<CreatedApiKey>('/api/api-keys', 'POST', { name, scopes })
+}
+
+export function revokeApiKey(keyId: string): Promise<ApiResponse<null>> {
+  return apiClient<null>(`/api/api-keys/${encodeURIComponent(keyId)}`, 'DELETE')
 }
 
 export function getMySubscription(): Promise<ApiResponse<SubscriptionSummary>> {
