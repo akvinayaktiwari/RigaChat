@@ -1,6 +1,6 @@
 # AEO / GEO Status — vyostra.com
 
-**The one file to read first.** What has shipped for search and answer-engine visibility, what is left, and who has to do it. Last updated: 2026-10-05.
+**The one file to read first.** What has shipped for search and answer-engine visibility, what is left, and who has to do it. Last updated: 2026-10-05. Next steps: `HANDOFF-2026-10-05.md`.
 
 How to keep it current: when something ships, move its row from "To do" to "Implemented" with the date. Do not record plans here; plans live in the documents listed at the bottom.
 
@@ -14,8 +14,8 @@ Framing: Google's own guidance is that optimizing for AI search is ordinary SEO.
 |---|---|---|---|
 | GEO readiness (estimate) | 71 / 100 | 2026-10-02 | From `GEO-ANALYSIS-2026-10-02.md`, before the feature-page rebuild. Baseline was 63 on 2026-09-19. |
 | Indexed in Google | Unknown | — | Search Console is not verified. This is the top blocker. |
-| Public pages in the sitemap | 25 | 2026-10-05 | All dated. Counted on the live file; `/integrations/` and `/integrations/meta-lead-ads/` were the 24th and 25th. |
-| Blog posts | 5 | 2026-10-02 | 4 published in the last three weeks. |
+| Public pages in the sitemap | 27 | 2026-10-05 | All dated. The two posts published 2026-10-05 were the 26th and 27th. |
+| Blog posts | 7 | 2026-10-05 | Two published 2026-10-05: Meta lead ads auto-reply, and click-to-WhatsApp vs lead forms for real estate. |
 | Mobile LCP (lab) | about 1.7 s | 2026-10-02 | Was 2.3 s on the homepage and 3.25 s on a post. No field data yet. |
 | Lighthouse accessibility | 100 | 2026-10-02 | On every public page audited. |
 | Real referring domains | 0 known | 2026-10-02 | Not in the Common Crawl graph; all six competitors checked are. |
