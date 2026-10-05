@@ -123,6 +123,27 @@ POST /mcp/booking    -> MCP server, book_appointment tool (real: persists an App
 POST /mcp/reminder   -> MCP server, schedule_reminder tool (real: creates a lead_reminder ScheduledAction). Interim shared-secret auth, not Cognito.
 POST /mcp/quotation  -> MCP server, get_quotation tool (STUB -- no pricing-rule data model exists yet). Interim shared-secret auth, not Cognito.
 POST /mcp/brochure   -> MCP server, send_brochure tool (STUB -- no document/asset management exists yet). Interim shared-secret auth, not Cognito.
+POST /api/api-keys          -> create a developer API key. The response is the ONLY time the secret is returned;
+                                  only its SHA-256 is stored. 403 when the plan has no API access, 409 at the
+                                  10-key ceiling (auth required -- Cognito only, a key can never mint a key)
+GET  /api/api-keys          -> the caller's keys: name, last4, scopes, createdAt, lastUsedAt. Never the hash
+                                  (auth required)
+DELETE /api/api-keys/:keyId -> revoke. The row is deleted, so the next request with that key is a 401
+                                  (auth required)
+GET  /v1/leads              -> DEVELOPER API. Paginated lead list (limit 1-200, default 50; cursor;
+                                  includeArchived). Body is {data, nextCursor, total}, plus incompleteSources
+                                  when a lead source could not be read. API KEY auth, scope leads:read
+GET  /v1/leads/:id          -> one lead with transcript and submitted answers. `id` is the opaque lead_...
+                                  string the list hands out (an encoded LeadRef), never a bare leadId
+                                  (API key, leads:read)
+GET  /v1/bots, /v1/bots/:botId                 -> (API key, bots:read)
+GET  /v1/forms, /v1/forms/:formId              -> (API key, forms:read)
+GET  /v1/voice-agents, /v1/voice-agents/:agentId -> (API key, voice_agents:read)
+                                  Every /v1 route: `Authorization: Bearer vy_live_...`, NOT Cognito. Success is
+                                  {data}, failure is {error:{code,message}} -- not the dashboard's ApiResponse.
+                                  Shapes are explicit allowlists in services/public-api-service.ts; a field
+                                  published there can never be removed. API keys are NOT accepted on /api/*.
+                                  No CORS on purpose (keys are server-side secrets). 120 req/min per key.
 POST /api/contact           -> marketing-site "Get in touch" form: store the message + email support (public, no auth; honeypot + per-ip/email rate limit)
 GET  /api/webhooks/meta/data-deletion/:code -> public status lookup for a Meta data-deletion request; the confirmation code is the only credential (no auth)
 GET  /api/admin/contact-messages -> staff console list of contact submissions; defaults to un-notified only, ?unnotifiedOnly=false for all (STAFF Cognito auth)
@@ -215,6 +236,9 @@ interface KnowledgeBaseEntry {
   path — routing stays a point read, because connecting a call is not the place to accept eventual consistency)
 - voice_leads — partition key: clientId, sort key: leadId (a phone call's CRM record, partitioned like
   meta_leads)
+- api_keys — partition key: keyHash, GSI clientId-createdAt-index (developer API keys. keyHash is the SHA-256 of
+  the secret and is the partition key because a /v1 request carries a key and no clientId, so authenticating is
+  a point read. The row IS the key: revoking deletes it. No TTL. Provisioned by scripts/provision-api-keys.sh)
 
 ## Environment Variables
 OPENAI_API_KEY
