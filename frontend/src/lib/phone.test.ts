@@ -54,6 +54,33 @@ describe('toWhatsAppNumber', () => {
   })
 })
 
+// An account that has picked its country in Settings. The cases are the ways a
+// local lead writes a number without its country code.
+describe('toWhatsAppNumber with an account default country', () => {
+  it('prefixes a bare US number with 1, not with the legacy India code', () => {
+    expect(toWhatsAppNumber('(415) 555-0134', '1')).toBe('14155550134')
+  })
+
+  it('drops the trunk zero from a UK or UAE number before adding the code', () => {
+    expect(toWhatsAppNumber('07700 900123', '44')).toBe('447700900123')
+    expect(toWhatsAppNumber('050 123 4567', '971')).toBe('971501234567')
+  })
+
+  it('leaves a number that already carries its country code alone', () => {
+    expect(toWhatsAppNumber('14155550134', '1')).toBe('14155550134')
+    expect(toWhatsAppNumber('971501234567', '971')).toBe('971501234567')
+  })
+
+  it('never applies the default over an explicit +', () => {
+    expect(toWhatsAppNumber('+91 96486 58889', '1')).toBe('919648658889')
+  })
+
+  it('returns null for a number too short for the country', () => {
+    expect(toWhatsAppNumber('555 0134', '1')).toBeNull()
+    expect(toWhatsAppNumber('12345', '44')).toBeNull()
+  })
+})
+
 describe('toDialNumber', () => {
   it('keeps domestic formatting but strips punctuation', () => {
     expect(toDialNumber('(964) 865-8889')).toBe('9648658889')

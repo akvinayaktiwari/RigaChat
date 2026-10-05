@@ -109,6 +109,7 @@ The owner's decision on 2026-10-06: Vyostra AI sells globally and quotes US doll
 | Every blog post declares a `market` (`global`, `us`, `uk`, `ca`, `au`, `ae`, `in`). The registry refuses a post without one. The label is printed beside the category, the index filters by it, and a market post publishes `spatialCoverage`. Six posts are `in`; three are `global` (the Facebook lead ads post lost "in India" from its title) | 2026-10-06 |
 | WhatsApp link generator: the format answer names the country code for each market, and the picker leads with the US, UAE, UK, Australia, India and Canada | 2026-10-06 |
 | Zoho CRM connects accounts in any Zoho data centre (US, EU, India, Australia, Japan, Saudi Arabia, Canada): the callback's `accounts-server` decides where the code is redeemed, and the data centre is stored with the tokens. **Not yet proven against a live non-India account**, so `/features/zoho-crm/` still says India only (owner task 26) | 2026-10-06 |
+| Per-account default country for phone numbers (Settings). The WhatsApp button on a lead adds the account's own calling code to a number typed without one; an account that has not chosen keeps the old India assumption | 2026-10-06 |
 | Terms section 4 says prices are in USD (was INR). The rest of the sentence, and the Privacy page, are unchanged pending legal review (owner task 25) | 2026-10-06 |
 
 ### Performance and accessibility
@@ -172,7 +173,6 @@ The owner's decision on 2026-10-06: Vyostra AI sells globally and quotes US doll
 | 27 | Remove `RAZORPAY_PLAN_ID_STARTER_INR`, `_GROWTH_INR` and `_AGENCY_INR` from the three Lambdas, and archive the three INR plans in Razorpay | Nothing reads them any more. Removing them also frees room under the Lambda's 4 KB environment ceiling. |
 | 28 | A USD ad-spend figure for the Head of Sales bio on `/about-us/` | The "₹10L+ a month" figure was removed rather than converted. The bio now says "Has managed monthly ad spend for developers." |
 | 29 | Confirm the "Real Estate Developer, Bengaluru" testimonial is real and approved | Left as it is. It is the one India-specific line still on the homepage. |
-| 30 | Decide on a per-account default country for phone numbers | `frontend/src/lib/phone.ts` still assumes a bare 10-digit number is Indian, so a US lead typed without +1 gets a wrong WhatsApp link. No single constant is right; it needs an account setting. |
 | 31 | Test the chat and voice agents in Arabic, including right-to-left rendering in the widget | "arabic chatbot" has about 2,400 searches a month in the UAE. No Arabic claim may be published until this passes. |
 | 32 | Decide telephony priority | "AI receptionist" is the largest query in the set (about 49,500 a month in the US) and means phone answering. Content must not call Vyostra AI an AI receptionist until phone answering is live. |
 

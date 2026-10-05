@@ -231,6 +231,8 @@ export interface ClientRecord {
   authProvider: 'google'
   plan: 'starter' | 'growth' | 'agency'
   notificationPreferences?: NotificationPreferences
+  /** Country calling code assumed for lead numbers typed without one; digits only. Absent until chosen. */
+  defaultCountryCode?: string
   createdAt: string
   updatedAt: string
 }

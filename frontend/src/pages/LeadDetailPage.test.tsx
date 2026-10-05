@@ -20,6 +20,7 @@ vi.mock('../services/api', () => ({
   addLeadNote: (...a: unknown[]) => addLeadNote(...a),
   setLeadArchived: (...a: unknown[]) => setLeadArchived(...a),
   eraseLead: (...a: unknown[]) => eraseLead(...a),
+  getMe: () => Promise.resolve({ success: true, data: {} }),
 }))
 
 const toastShow = vi.fn()

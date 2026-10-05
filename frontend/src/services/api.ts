@@ -378,6 +378,11 @@ export function updateNotificationPreferences(
   return apiClient<ClientRecord>('/api/clients/me/notification-preferences', 'PATCH', patch)
 }
 
+/** Sets the country code assumed for a lead number typed without one (digits only, e.g. "1"). */
+export function updateDefaultCountryCode(countryCode: string): Promise<ApiResponse<ClientRecord>> {
+  return apiClient<ClientRecord>('/api/clients/me/default-country', 'PATCH', { countryCode })
+}
+
 export function getLinkedDevices(): Promise<ApiResponse<LinkedDevice[]>> {
   return apiClient<LinkedDevice[]>('/api/devices')
 }

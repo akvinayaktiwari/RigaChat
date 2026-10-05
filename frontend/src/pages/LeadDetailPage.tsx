@@ -21,6 +21,7 @@ import { useToast } from '../components/Toast/Toast'
 import { describeApiError } from '../lib/api-error'
 import { parseLeadRef } from '../lib/lead-ref'
 import { toDialNumber, toWhatsAppNumber } from '../lib/phone'
+import { useDefaultCountryCode } from '../hooks/useDefaultCountryCode'
 import {
   leadInitials,
   OUTCOME_LABELS,
@@ -138,6 +139,7 @@ export default function LeadDetailPage() {
   const leadRef = parseLeadRef(leadId, searchParams)
 
   const [lead, setLead] = useState<UnifiedLeadDetail | null>(null)
+  const defaultCountryCode = useDefaultCountryCode()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -298,7 +300,7 @@ export default function LeadDetailPage() {
   // Resolved once so a number that cannot make a valid wa.me link disables the
   // button instead of opening WhatsApp's "number is invalid" page.
   const dialNumber = toDialNumber(lead.phone)
-  const whatsAppNumber = toWhatsAppNumber(lead.phone)
+  const whatsAppNumber = toWhatsAppNumber(lead.phone, defaultCountryCode)
   const transcriptLines = parseTranscript(lead.chatTranscript ?? '')
   const notes = lead.state?.notes ?? []
   const customFields = Object.entries(lead.customFields ?? {})
