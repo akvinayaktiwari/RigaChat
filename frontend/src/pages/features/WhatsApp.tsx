@@ -1,7 +1,7 @@
 import PageMeta from '../../components/seo/PageMeta'
 import StructuredData from '../../components/seo/StructuredData'
 import { faqPageSchema, featurePageNodes, jsonLdGraph, type FaqItem } from '../../lib/structured-data'
-import { Key, ToggleRight, BarChart2, Bell, Lock, Bot, Users, RefreshCw } from 'lucide-react'
+import { Key, ToggleRight, BarChart2, Bell, Lock, Bot, Users, RefreshCw, Megaphone } from 'lucide-react'
 import UseCaseLayout from '../../components/landing/UseCaseLayout'
 
 /**
@@ -20,7 +20,7 @@ export const WHATSAPP_FAQ: FaqItem[] = [
   {
     question: 'Which leads trigger a WhatsApp alert?',
     answer:
-      'Every new lead captured by any of your chat agents or lead forms. Each one sends its own WhatsApp message to your number as it arrives; alerts are not batched.',
+      'Every new lead captured by any of your chat agents or lead forms, and every lead from a connected Meta lead ad. Each one sends its own WhatsApp message to your number as it arrives; alerts are not batched.',
   },
   {
     question: 'When does the weekly WhatsApp report arrive?',
@@ -78,7 +78,7 @@ export default function WhatsAppFeaturePage() {
         featurePath="/features/whatsapp"
         badge="WHATSAPP AUTOMATION"
         headline="WhatsApp alerts for every new lead"
-        subheadline="Vyostra AI WhatsApp lead notifications send a WhatsApp message to your own number the moment a lead is captured, whether it came from a chat agent or a lead form. A weekly summary of new leads arrives on WhatsApp every Monday at 9am IST."
+        subheadline="Vyostra AI WhatsApp lead notifications send a WhatsApp message to your own number the moment a lead is captured, whether it came from a chat agent, a lead form or a Meta lead ad. A weekly summary of new leads arrives on WhatsApp every Monday at 9am IST."
         howItWorksHeading="How do you set up WhatsApp lead alerts?"
         benefitsHeading="Why get lead alerts on WhatsApp?"
         heroVisual={<WhatsAppNotificationMockup />}
@@ -92,7 +92,7 @@ export default function WhatsAppFeaturePage() {
           {
             number: '2',
             title: 'Enable Lead Notifications',
-            body: 'Turn on the Lead Notifications toggle. From that moment, every new lead captured by any of your agents or forms triggers an instant WhatsApp message to your number.',
+            body: 'Turn on the Lead Notifications toggle. From that moment, every new lead from your chat agents, lead forms and connected Meta lead ads triggers an instant WhatsApp message to your number.',
             icon: <ToggleRight className="w-6 h-6" />,
           },
           {
@@ -123,6 +123,7 @@ export default function WhatsAppFeaturePage() {
           { icon: <Bot className="w-4 h-4" />, title: 'AI Agent', href: '/features/chatbot' },
           { icon: <Users className="w-4 h-4" />, title: 'Lead CRM', href: '/features/crm' },
           { icon: <RefreshCw className="w-4 h-4" />, title: 'Zoho CRM', href: '/features/zoho-crm' },
+          { icon: <Megaphone className="w-4 h-4" />, title: 'Meta Lead Ads', href: '/integrations/meta-lead-ads' },
         ]}
         faq={{ heading: 'What do people ask about WhatsApp lead alerts?', items: WHATSAPP_FAQ }}
         ctaHeadline="Start getting WhatsApp lead alerts today"

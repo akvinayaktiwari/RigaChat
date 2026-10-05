@@ -56,3 +56,19 @@ describe.each(FEATURE_PAGES)('%s', (route) => {
     expect(urls).toEqual([absoluteUrl(servedPath(route)), absoluteUrl(servedPath(route))])
   })
 })
+
+// backend/src/services/lead-notification-service.ts is called from three
+// places: chat leads, form leads and Meta leads. The page named two of them,
+// so a buyer running lead ads could not tell their leads would alert too.
+describe('/features/whatsapp', () => {
+  it('names all three lead sources that send an alert, where it answers which leads do', async () => {
+    const { jsonLd } = await renderPublicPage('/features/whatsapp')
+    const published = publishedFaqText(jsonLd)
+    const answer = published[published.indexOf('Which leads trigger a WhatsApp alert?') + 1] ?? ''
+    expect(['chat agents', 'lead forms', 'Meta lead ad'].filter((source) => !answer.includes(source))).toEqual([])
+  })
+
+  it('links the Meta Lead Ads page', async () => {
+    expect((await renderPublicPage('/features/whatsapp')).html).toContain('href="/integrations/meta-lead-ads"')
+  })
+})
