@@ -6,6 +6,9 @@ import type { ApiKeySummary, ApiScope, CreatedApiKey } from '../../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
+// The docs deliberately print no API host; this is where a developer gets it.
+const API_BASE_URL: string = import.meta.env.VITE_API_URL ?? ''
+
 const SCOPE_LABELS: Record<ApiScope, string> = {
   'leads:read': 'Read leads',
   'bots:read': 'Read chatbots',
@@ -248,9 +251,22 @@ export default function ApiKeysSection({ apiEnabled, onUpgradeClick }: ApiKeysSe
 
       {error ? <p className="mt-4 text-xs text-red-600">{error}</p> : null}
 
+      <div className="mt-4 rounded-xl border border-gray-100 p-4">
+        <p className="text-xs font-medium text-gray-700">API base URL</p>
+        <code className="mt-1 block break-all text-xs text-gray-900 select-all">{API_BASE_URL}</code>
+        <p className="mt-2 text-xs text-gray-500">
+          Add a path such as <code>/v1/leads</code> to this. Read it from configuration rather than typing it into
+          your code.
+        </p>
+      </div>
+
       <p className="mt-4 text-xs text-gray-500 leading-relaxed">
         Keys are secrets: use them from a server, never in a web page or a mobile app. Send one as{' '}
-        <code>Authorization: Bearer &lt;key&gt;</code> to the <code>/v1</code> endpoints.
+        <code>Authorization: Bearer &lt;key&gt;</code>.{' '}
+        <a href="/docs/" className="font-medium text-blue-600 underline">
+          Read the developer docs
+        </a>
+        .
       </p>
     </div>
   )
