@@ -361,7 +361,15 @@ Gupshup is explicitly out of scope (being deprecated).
 
 ## Security
 
-### Zoho tokens are stored in plaintext, sent to the browser, and the privacy policy says otherwise
+### [RESOLVED 2026-10-03] Zoho tokens are stored in plaintext, sent to the browser, and the privacy policy says otherwise
+
+**Resolved:** `crm-service.ts` stores only KMS-encrypted tokens and `GET /api/integrations/status`
+returns no token in either form (merge 291b393). `scripts/encrypt-zoho-tokens.ts` ran in
+production on 2026-10-03: 16 clients scanned, the one Zoho connection rewritten encrypted, a rerun
+is a no-op, and both ciphertexts decrypt with the production key. `Privacy.tsx:322` is now true.
+A token that cannot be decrypted or renewed is recorded as a failed sync on Meta and form leads
+alike, and `Privacy.tsx:78` no longer says agent leads sync. Tests: `crm-service.test.ts`.
+
 
 **What:** `CRMConnection` keeps the Zoho `accessToken` and `refreshToken` as plain strings
 (`backend/src/types/index.ts:351-352`; the comment at line 675 calls them unencrypted).
