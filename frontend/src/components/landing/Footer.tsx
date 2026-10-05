@@ -1,4 +1,5 @@
 import { LinkedInIcon, WhatsAppIcon, XIcon, ZohoIcon } from './BrandIcons'
+import { FREE_TOOLS, TOOLS_HUB } from '../../lib/free-tools'
 import { SOCIAL_PROFILES, type SocialProfile } from '../../lib/social-profiles'
 import VyostraLogo from '../VyostraLogo'
 
@@ -11,8 +12,11 @@ const LINK_COLUMNS = [
       { label: 'For Real Estate', href: '/industries/real-estate' },
       { label: 'Pricing', href: '/pricing' },
       { label: 'FAQ', href: '/faq' },
-      { label: 'WhatsApp Link Generator', href: '/whatsapp-link-generator' },
     ],
+  },
+  {
+    heading: 'Free Tools',
+    links: [...FREE_TOOLS.map((tool) => ({ label: tool.name, href: tool.route })), { label: 'All free tools', href: TOOLS_HUB.route }],
   },
   {
     heading: 'Company',
@@ -71,8 +75,8 @@ export default function Footer() {
   return (
     <footer className="border-t border-gray-100 py-12 px-4">
       <div className="max-w-6xl mx-auto">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
-          <div className="col-span-2">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8 mb-12">
+          <div className="col-span-2 md:col-span-3 lg:col-span-2">
             <a href="/" className="flex items-center gap-2.5 mb-4">
               <VyostraLogo size={32} animate={false} />
               <span className="font-bold text-gray-900 text-lg" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>

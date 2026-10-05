@@ -337,6 +337,70 @@ export function blogIndexNodes(posts: readonly BlogListing[]): JsonLd[] {
   return [blog, breadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'Blog', path: BLOG_INDEX_PATH }])]
 }
 
+const TOOLS_CRUMBS: readonly Crumb[] = [
+  { name: 'Home', path: '/' },
+  { name: 'Free tools', path: '/tools/' },
+]
+
+export interface ToolPageFields extends FeaturePageFields {
+  /** One sentence on what the tool does, as the page itself says it. */
+  description: string
+}
+
+/**
+ * A free tool's page: the tool as a WebApplication anyone can use at no cost,
+ * the page that holds it, and its Home > Free tools trail. Emit it alongside
+ * organizationSchema(), which is the node `provider` points at.
+ */
+export function toolPageNodes(page: ToolPageFields): JsonLd[] {
+  const url = absoluteUrl(page.path)
+  const tool: JsonLd = {
+    '@type': 'WebApplication',
+    '@id': `${url}#tool`,
+    name: page.name,
+    url,
+    description: page.description,
+    applicationCategory: 'BusinessApplication',
+    operatingSystem: 'Any',
+    browserRequirements: 'Requires JavaScript',
+    isAccessibleForFree: true,
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    provider: { '@id': absoluteUrl(`/${ORGANIZATION_ID}`) },
+  }
+  const webPage: JsonLd = {
+    '@type': 'WebPage',
+    '@id': url,
+    url,
+    name: page.name,
+    isPartOf: { '@id': absoluteUrl(`/${WEBSITE_ID}`) },
+    mainEntity: { '@id': `${url}#tool` },
+  }
+  return [tool, webPage, breadcrumbSchema([...TOOLS_CRUMBS, { name: page.name, path: page.path }])]
+}
+
+/** The free tools hub: a CollectionPage listing each tool in the order the page shows them. */
+export function toolsIndexNodes(tools: readonly FeaturePageFields[]): JsonLd[] {
+  const hubUrl = absoluteUrl('/tools/')
+  const hub: JsonLd = {
+    '@type': 'CollectionPage',
+    '@id': hubUrl,
+    url: hubUrl,
+    name: 'Free tools',
+    isPartOf: { '@id': absoluteUrl(`/${WEBSITE_ID}`) },
+    publisher: { '@id': absoluteUrl(`/${ORGANIZATION_ID}`) },
+    mainEntity: {
+      '@type': 'ItemList',
+      itemListElement: tools.map((tool, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        name: tool.name,
+        url: absoluteUrl(tool.path),
+      })),
+    },
+  }
+  return [hub, breadcrumbSchema(TOOLS_CRUMBS)]
+}
+
 /** Wraps nodes in one @graph so @id references resolve across them. */
 export function jsonLdGraph(nodes: readonly JsonLd[]): JsonLd {
   return { '@context': 'https://schema.org', '@graph': [...nodes] }

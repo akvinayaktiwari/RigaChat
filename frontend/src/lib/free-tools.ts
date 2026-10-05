@@ -1,0 +1,48 @@
+/**
+ * The free tools, in the order the hub and the footer list them.
+ *
+ * One list on purpose: the hub page, the footer column, the sitemap and
+ * llms.txt all read it, so a tool that ships cannot be missing from one of
+ * them. Adding a tool means adding it here, its route in App.tsx, and its page.
+ */
+
+export interface FreeTool {
+  /** Path as the router matches it, without a trailing slash. */
+  route: string
+  name: string
+  /** One sentence on what it does, for the hub card, the sitemap and llms.txt. */
+  summary: string
+  /** What the hub card's link says. */
+  action: string
+  /** ISO date the page last changed in a way a reader would notice. */
+  lastModified: string
+}
+
+export const TOOLS_HUB = {
+  route: '/tools',
+  name: 'Free tools',
+  summary: 'Free WhatsApp tools from Vyostra AI that run in your browser, with no sign-up.',
+  lastModified: '2026-10-06',
+}
+
+export const FREE_TOOLS: readonly FreeTool[] = [
+  {
+    route: '/tools/whatsapp-qr-code-generator',
+    name: 'WhatsApp QR Code Generator',
+    summary: 'A free tool that turns a WhatsApp number and an optional pre-filled message into a QR code, saved as PNG or SVG, in the browser.',
+    action: 'Make a QR code',
+    lastModified: '2026-10-06',
+  },
+  {
+    route: '/whatsapp-link-generator',
+    name: 'WhatsApp Link Generator',
+    summary: 'A free tool that builds a wa.me click-to-chat link with a pre-filled message, in the browser.',
+    action: 'Build a link',
+    lastModified: '2026-10-06',
+  },
+]
+
+/** The path a page is served at: prerendered routes end in a slash. */
+export function servedPath(route: string): string {
+  return `${route}/`
+}
