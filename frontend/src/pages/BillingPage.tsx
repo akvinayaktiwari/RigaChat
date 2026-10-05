@@ -98,7 +98,7 @@ export default function BillingPage() {
                   className="border-b border-slate-50 hover:bg-slate-50 transition-colors"
                 >
                   <td className="px-4 py-3 text-slate-700 text-sm whitespace-nowrap">
-                    {new Date(payment.paidAt).toLocaleDateString('en-IN', {
+                    {new Date(payment.paidAt).toLocaleDateString(undefined, {
                       day: 'numeric',
                       month: 'short',
                       year: 'numeric',
