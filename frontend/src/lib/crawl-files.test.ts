@@ -28,7 +28,23 @@ describe('buildRobotsTxt', () => {
     expect(robots).toContain('Sitemap: https://vyostra.com/sitemap.xml')
   })
 
-  it.each(['GPTBot', 'OAI-SearchBot', 'ClaudeBot', 'PerplexityBot', 'Google-Extended'])(
+  it.each([
+    'GPTBot',
+    'OAI-SearchBot',
+    'ChatGPT-User',
+    'ClaudeBot',
+    'Claude-SearchBot',
+    'Claude-User',
+    'PerplexityBot',
+    'Perplexity-User',
+    'Google-Extended',
+    'Applebot-Extended',
+    'Meta-ExternalAgent',
+    'Amazonbot',
+    'DuckAssistBot',
+    'MistralAI-User',
+    'CCBot',
+  ])(
     'explicitly allows %s',
     (bot) => {
       expect(groupFor(robots, bot)).toContain('Allow: /')
