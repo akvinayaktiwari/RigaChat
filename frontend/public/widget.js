@@ -54,7 +54,7 @@
   var botId = getBotId();
   if (!botId) {
     if (window.console && console.warn) {
-      console.warn('[ChatIQ] Missing data-bot-id on widget script tag.');
+      console.warn('[VyostraAI] Missing data-bot-id on widget script tag.');
     }
     return;
   }
