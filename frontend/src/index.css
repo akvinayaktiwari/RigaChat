@@ -424,7 +424,7 @@ body {
   }
 }
 
-/* FAQ cards (FaqList and the blog post's "Common questions").
+/* FAQ cards (FaqList, the blog post's "Common questions", the Help accordion).
 
    The answers stay printed in full -- see FaqList for why there is no accordion
    -- so the motion here is all on top of content that is already visible:
@@ -472,7 +472,8 @@ body {
 }
 
 /* Keyboard users get the same lit state as a pointer does. */
-.faq-card:focus-within::after {
+.faq-card:focus-within::after,
+.faq-card[data-open='true']::after {
   height: calc(100% - 3rem);
 }
 
@@ -502,13 +503,32 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .faq-card,
-  .faq-card::after {
+  .faq-card::after,
+  .faq-answer {
     transition: none;
   }
 
   .faq-card:hover {
     translate: none;
   }
+}
+
+/* The Help accordion's answer panel. Animating the grid track from 0fr to 1fr
+   opens to the answer's real height; the max-height it replaces clipped any
+   answer taller than 24rem and eased over a distance the answer did not have. */
+.faq-answer {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.faq-answer[data-open='true'] {
+  grid-template-rows: 1fr;
+}
+
+.faq-answer > div {
+  overflow: hidden;
+  min-height: 0;
 }
 
 /* Legal page PDF export: hide site chrome, print only the document body */
