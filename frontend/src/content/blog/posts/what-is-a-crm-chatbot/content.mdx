@@ -1,0 +1,103 @@
+{/*
+  A definition post. No market sizes, adoption figures, response times or
+  conversion rates: none are sourced, so none appear.
+
+  Product claims match frontend/src/pages/features/Crm.tsx (LEAD_CRM_FAQ) as it
+  is: leads from chat agents, lead forms and Meta lead ads in one list; four
+  statuses (New, Contacted, Qualified, Closed); notes; filters by source, status
+  and date; archive and erase; Zoho CRM sync for form and Meta lead ad leads
+  only. zoho-claims.test.ts holds the Zoho sentence.
+
+  The CRM here is described as a lead queue on purpose. It is not a pipeline
+  CRM and the post says what it does not do.
+*/}
+
+A CRM chatbot is a chatbot that answers people on your website or a messaging app and saves each conversation as a lead record: who they are, how to reach them and what they asked. The record lives either in a CRM built into the chatbot or in a separate CRM it is connected to, so no one copies leads from a chat window into a spreadsheet.
+
+The term covers two different products, and the difference decides what you should buy. This post explains both, what each stores, and how a small business in India should choose.
+
+## How does a CRM chatbot work?
+
+It does three things in a row, and the third is what makes it a CRM chatbot rather than a chatbot.
+
+1. **It answers.** A visitor asks a question and the chatbot replies, from scripted flows or from content you have given it.
+2. **It captures.** At some point it asks for the visitor's name and contact details, in the conversation or in a short form.
+3. **It records.** It creates a lead with those details and the conversation attached, in a place your team works from.
+
+A chatbot that stops at step two emails you a transcript, or leaves it in an inbox. That works at five leads a week. It stops working when two people follow up the same lead and a third lead gets no call at all, because nothing shows who has done what.
+
+## What is the difference between a chatbot and a CRM?
+
+A chatbot talks to people; a CRM remembers them. [A CRM](https://www.zoho.com/crm/what-is-crm.html) is the system a business uses to keep its customer and lead records and track what the team does with each one.
+
+| | Chatbot | CRM | CRM chatbot |
+| --- | --- | --- | --- |
+| Main job | Answer questions in a conversation | Store records and track follow-up | Both, as one flow |
+| Who uses it | Your visitors | Your team | Visitors talk to it; your team works from it |
+| What it holds | The conversation | Contacts, statuses, notes, history | The conversation attached to the contact |
+| What goes wrong alone | Leads sit in transcripts nobody opens | Someone has to type every lead in | Depends on which kind you bought, below |
+
+## What are the two kinds of CRM chatbot?
+
+One has the CRM built in. The other connects to a CRM you already have. Vendors use "CRM chatbot" for both, so ask which one you are looking at.
+
+| | Chatbot with a built-in CRM | Chatbot integrated with a separate CRM |
+| --- | --- | --- |
+| Where the lead lives | In the chatbot product's own lead list | In your CRM, such as Zoho CRM, HubSpot or Salesforce |
+| Setup | Nothing to connect | Connect the two and map the fields |
+| What can go wrong | You outgrow the built-in CRM | The sync breaks, or only some leads are sent |
+| Best when | You have no CRM, or your follow-up is simple | Your team already lives in a CRM |
+| What you pay for | One product | Two products, sometimes a connector as well |
+
+Some products do both: a built-in lead list for day-to-day follow-up, and a sync to a larger CRM for the teams that need one.
+
+### What should you check about an integration?
+
+Which leads are sent, not only whether an integration exists. "Integrates with Zoho CRM" can mean every lead, or only leads from one source. Ask the vendor three things: which lead sources sync, which fields arrive, and what happens to a lead when the sync fails.
+
+## What should a CRM chatbot store about each lead?
+
+Five things. If one is missing, your team will rebuild it by hand.
+
+- **Who and how to reach them.** Name, phone, email.
+- **Where the lead came from.** Website chat, a form, an ad. It tells you which channel is worth paying for.
+- **What was said.** The transcript, or the answers the person submitted. This is the part a contact form cannot give you.
+- **A status.** Something your team changes as they follow up, so a lead cannot be called twice or not at all.
+- **Notes.** What the salesperson learned on the call.
+
+<Callout title="The transcript is the point" tone="neutral">
+  A lead record without the conversation is a phone number. With it, the salesperson's first sentence can be about the thing the buyer asked, and the buyer does not have to explain it again.
+</Callout>
+
+## When is a built-in CRM enough, and when do you need a full one?
+
+A built-in CRM is enough when your follow-up is a queue: new leads come in, someone contacts each one, and the lead is marked done. You need a full CRM when you are managing a process, not a queue.
+
+| Your situation | What fits |
+| --- | --- |
+| One to five people follow up leads, and each lead is contacted, qualified or closed | A chatbot with a built-in CRM |
+| You need to know who to call today and what they already asked | A chatbot with a built-in CRM |
+| Deals have stages with values, and you forecast revenue from them | A full CRM, with the chatbot feeding it |
+| Several teams need different access, territories or approval rules | A full CRM, with the chatbot feeding it |
+| You need custom reports across leads, deals and invoices | A full CRM, with the chatbot feeding it |
+| You already run Zoho CRM, HubSpot or Salesforce and the team will not leave it | A chatbot that syncs to it |
+
+Be honest about which row you are in. A small team that buys a full CRM for a queue-shaped problem spends its first month configuring fields. A larger team that tries to run a pipeline from a lead list ends up back in a spreadsheet.
+
+## What should a small business in India check before buying?
+
+Five things, in this order.
+
+1. **Where do WhatsApp leads go?** If your customers enquire on WhatsApp, check whether those conversations reach the same lead list, and read [what WhatsApp allows a business to send](/blog/whatsapp-chatbot-for-real-estate-india/) before you plan follow-up on it.
+2. **Do ad leads arrive too?** If you run Meta lead ads, the leads should land in the same list as chat leads, without a CSV download. See [how Meta lead ads connect](/integrations/meta-lead-ads/).
+3. **Does it answer from your content?** A chatbot that guesses creates leads your team then has to correct.
+4. **What does the lead list not do?** Ask for the limits in writing. A vendor who cannot tell you where the built-in CRM stops has not thought about it.
+5. **Can you leave?** Check that leads can be sent to a CRM you might move to later.
+
+<div className="mt-16 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+  ### Where Vyostra AI sits
+
+  Vyostra AI is the first kind: a chat agent with a built-in lead CRM. Every lead from your chat agents, lead forms and Meta lead ads lands in one list with its transcript or submitted answers. A lead has one of four statuses (New, Contacted, Qualified, Closed) and your notes, and you can filter the list by source, status and date.
+
+  It is a follow-up queue, not a pipeline CRM. It has no deal stages with values, no forecasting and no custom report builder. If you need those, connect Zoho CRM: new leads from your lead forms and Meta lead ads are created there automatically, while leads from chat and voice conversations stay in the Vyostra AI lead CRM. More on [the lead CRM](/features/crm), [the chat agent](/features/chatbot) and [the Zoho CRM integration](/features/zoho-crm).
+</div>

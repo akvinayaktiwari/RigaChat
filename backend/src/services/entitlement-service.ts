@@ -8,7 +8,7 @@ import { getUsage, incrementIfUnderLimit, incrementUsage } from '../repositories
 import { countBotsForClient } from '../repositories/bot-repository.js'
 import { getPeriodKey } from '../lib/usage-period.js'
 import { FEATURES, PLANS, TRIAL } from '../config/entitlements-config.js'
-import type { Entitlements, PlanTier, Subscription } from '../types/index.js'
+import type { ApiAccess, Entitlements, PlanTier, Subscription } from '../types/index.js'
 
 const ENTITLEMENTS_CACHE_TTL_SECONDS = 60
 
@@ -52,6 +52,10 @@ function pickOverride(overrideVal: number | null | undefined, fallback: number |
   return overrideVal === undefined ? fallback : overrideVal
 }
 
+// Off for trial, degraded and cancelled accounts. A key is a standing
+// credential, so it follows the paid plan rather than the trial.
+const API_DISABLED: Entitlements['features']['api'] = { enabled: false, access: null }
+
 function buildInternalEntitlements(accountId: string): Entitlements {
   return {
     accountId,
@@ -62,6 +66,7 @@ function buildInternalEntitlements(accountId: string): Entitlements {
       agents: { enabled: true, limits: { max: null } },
       voice: { enabled: true, limits: { minutes: null } },
       kbFileSize: { enabled: true, limits: { maxBytes: null } },
+      api: { enabled: true, access: 'full' },
     },
   }
 }
@@ -76,6 +81,7 @@ function buildFullTrialEntitlements(accountId: string): Entitlements {
       agents: { enabled: true, limits: { max: TRIAL.agents } },
       voice: { enabled: false, limits: { minutes: 0 } },
       kbFileSize: { enabled: true, limits: { maxBytes: TRIAL.kbFileSize.maxMB * 1024 * 1024 } },
+      api: API_DISABLED,
     },
   }
 }
@@ -98,6 +104,7 @@ function buildDegradedEntitlements(
       // Mirrors crm/agents above: reuses TRIAL's cap rather than the null
       // (unlimited) it would get in buildActiveEntitlements.
       kbFileSize: { enabled: true, limits: { maxBytes: TRIAL.kbFileSize.maxMB * 1024 * 1024 } },
+      api: API_DISABLED,
     },
   }
 }
@@ -110,6 +117,7 @@ function buildActiveEntitlements(accountId: string, subscription: Subscription):
   const agentsMax = pickOverride(overrides.agents?.max, planDefaults.agents)
   const leadsMax = pickOverride(overrides.leads?.max, planDefaults.leads)
   const chatConversations = pickOverride(overrides.chat?.conversations, planDefaults.chat.conversations)
+  const apiAccess: ApiAccess | null = planDefaults.api
   const voiceMinutes = pickOverride(
     overrides.voice?.minutes,
     voiceSubscribed ? FEATURES.voice.defaultLimits.minutes : 0
@@ -124,6 +132,7 @@ function buildActiveEntitlements(accountId: string, subscription: Subscription):
       agents: { enabled: true, limits: { max: agentsMax } },
       voice: { enabled: voiceSubscribed, limits: { minutes: voiceMinutes } },
       kbFileSize: { enabled: true, limits: { maxBytes: planDefaults.kbFileSize.maxMB * 1024 * 1024 } },
+      api: { enabled: apiAccess !== null, access: apiAccess },
     },
   }
 }
@@ -143,6 +152,7 @@ function buildCancelledEntitlements(accountId: string, subscription: Subscriptio
       // a training/content feature, closer in kind to chat than to CRM
       // record-keeping. Not specified for the cancelled state; flagged.
       kbFileSize: { enabled: false, limits: { maxBytes: null } },
+      api: API_DISABLED,
     },
   }
 }
@@ -191,6 +201,17 @@ export async function resolveEntitlements(accountId: string): Promise<Entitlemen
 
   await setCachedEntitlements(accountId, entitlements, ENTITLEMENTS_CACHE_TTL_SECONDS)
   return entitlements
+}
+
+// The developer API's plan gate. Null means no access.
+//
+// Reads `api` defensively: entitlements are cached in Redis for
+// ENTITLEMENTS_CACHE_TTL_SECONDS, so for that long after the deploy that added
+// this field a cached object has no `api` at all. Absent reads as no access.
+export async function resolveApiAccess(accountId: string): Promise<ApiAccess | null> {
+  const entitlements = await resolveEntitlements(accountId)
+  const api = entitlements.features.api as Entitlements['features']['api'] | undefined
+  return api?.enabled ? api.access : null
 }
 
 export async function invalidateEntitlementsCache(accountId: string): Promise<void> {

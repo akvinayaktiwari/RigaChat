@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { adminRoutes } from './admin-routes.js'
 import { agentRoutes } from './agent-routes.js'
+import { apiKeyRoutes } from './api-key-routes.js'
 import { appointmentRoutes } from './appointment-routes.js'
 import { authRoutes } from './auth-routes.js'
 import { billingRoutes } from './billing-routes.js'
@@ -17,6 +18,7 @@ import { kbRoutes } from './kb-routes.js'
 import { leadRoutes } from './lead-routes.js'
 import { mcpRoutes } from './mcp-routes.js'
 import { schedulerRoutes } from './scheduler-routes.js'
+import { v1Routes } from './v1-routes.js'
 import { voiceRoutes } from './voice-routes.js'
 import { webhookRoutes } from './webhooks.js'
 import { whatsAppTemplateRoutes } from './whatsapp-template-routes.js'
@@ -65,6 +67,7 @@ app.use('/api/clients/*', dashboardCors)
 // is blocked by CORS in production while working fine on the phone.
 app.use('/api/devices/*', dashboardCors)
 app.use('/api/billing/*', dashboardCors)
+app.use('/api/api-keys/*', dashboardCors)
 app.use('/api/kb/*', dashboardCors)
 app.use('/api/journeys/*', dashboardCors)
 app.use('/api/scheduler/*', dashboardCors)
@@ -156,6 +159,7 @@ app.route('/api/auth', authRoutes)
 app.route('/api/billing', billingRoutes)
 app.route('/api/bots', botRoutes)
 app.route('/api/agents', agentRoutes)
+app.route('/api/api-keys', apiKeyRoutes)
 app.route('/api/chat', chatRoutes)
 app.route('/api/leads', leadRoutes)
 app.route('/api/kb', kbRoutes)
@@ -177,6 +181,12 @@ app.route('/api/webhooks', webhookRoutes)
 // browser -- no CORS config applies or is needed. Auth is mcp-routes.ts's
 // own interim shared-secret middleware, not Cognito.
 app.route('/mcp', mcpRoutes)
+
+// The developer API, authenticated by API key. No CORS config on purpose, like
+// /mcp above: keys are secrets meant for a server, and a browser that cannot
+// complete the preflight is a browser that is not being handed one. The
+// widgets' own public routes are what a page calls directly.
+app.route('/v1', v1Routes)
 
 app.notFound((c) => {
   return c.json<ApiResponse<null>>({

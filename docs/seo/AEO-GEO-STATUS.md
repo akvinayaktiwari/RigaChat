@@ -14,8 +14,8 @@ Framing: Google's own guidance is that optimizing for AI search is ordinary SEO.
 |---|---|---|---|
 | GEO readiness (estimate) | 71 / 100 | 2026-10-02 | From `GEO-ANALYSIS-2026-10-02.md`, before the feature-page rebuild. Baseline was 63 on 2026-09-19. |
 | Indexed in Google | Unknown | — | Search Console is not verified. This is the top blocker. |
-| Public pages in the sitemap | 28 | 2026-10-05 | All dated. `/industries/real-estate/` was the 28th. |
-| Blog posts | 7 | 2026-10-05 | Two published 2026-10-05: Meta lead ads auto-reply, and click-to-WhatsApp vs lead forms for real estate. |
+| Public pages in the sitemap | 30 | 2026-10-05 | All dated. The two posts published late on 2026-10-05 were the 29th and 30th. |
+| Blog posts | 9 | 2026-10-05 | Four published 2026-10-05: Meta lead ads auto-reply, click-to-WhatsApp vs lead forms, real estate chatbot qualification questions, and what a CRM chatbot is. |
 | Mobile LCP (lab) | about 1.7 s | 2026-10-02 | Was 2.3 s on the homepage and 3.25 s on a post. No field data yet. |
 | Lighthouse accessibility | 100 | 2026-10-02 | On every public page audited. |
 | Real referring domains | 0 known | 2026-10-02 | Not in the Common Crawl graph; all six competitors checked are. |
@@ -75,6 +75,7 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 | Question sub-headings in the two long sections of the WhatsApp post. The pilgrimage post needed none: its long block is a data table and its sections already carry sub-headings | 2026-10-04 |
 | Internal links: help in the footer, feature pages to related posts, latest posts on the homepage, related posts on each post | 2026-09-19 |
 | The WhatsApp real estate post links the two ad-lead posts from its lead-source table | 2026-10-05 |
+| Two posts chosen from keyword data (OpenSEO, India): `/blog/real-estate-chatbot-lead-qualification-questions/` for "real estate chatbot" (about 480 searches a month) and `/blog/what-is-a-crm-chatbot/` for "crm chatbot" (about 90) | 2026-10-05 |
 | Real estate industry page: `/industries/real-estate/`, linked from the footer. Written against the prebuilt real estate journey and its WhatsApp templates | 2026-10-05 |
 | Help FAQs grouped under question headings | 2026-09-19 |
 

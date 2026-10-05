@@ -12,13 +12,19 @@ export const TRIAL = {
 } as const
 
 // null = unlimited
+//
+// `api` is the one field here where null does NOT mean unlimited: it is the
+// developer API access level (null = none, 'read' = read scopes only, 'full' =
+// every scope). Only read scopes exist today, so 'read' and 'full' behave the
+// same until write endpoints ship -- the split is recorded now because it is a
+// pricing decision, and the gate belongs where the write scopes get defined.
 export const PLANS = {
   // maxMB not specified by product for 'free' -- mirrors TRIAL.kbFileSize
   // above (Starter's ceiling), flagged rather than assumed silently.
-  free: { agents: 1, leads: 25, chat: { conversations: 50 }, kbFileSize: { maxMB: 5 } },
-  starter: { agents: 1, leads: 50, chat: { conversations: 500 }, kbFileSize: { maxMB: 5 } },
-  growth: { agents: 3, leads: null, chat: { conversations: 2000 }, kbFileSize: { maxMB: 15 } },
-  agency: { agents: null, leads: null, chat: { conversations: null }, kbFileSize: { maxMB: 100 } },
+  free: { agents: 1, leads: 25, chat: { conversations: 50 }, kbFileSize: { maxMB: 5 }, api: null },
+  starter: { agents: 1, leads: 50, chat: { conversations: 500 }, kbFileSize: { maxMB: 5 }, api: 'read' },
+  growth: { agents: 3, leads: null, chat: { conversations: 2000 }, kbFileSize: { maxMB: 15 }, api: 'full' },
+  agency: { agents: null, leads: null, chat: { conversations: null }, kbFileSize: { maxMB: 100 }, api: 'full' },
 } as const
 
 export const FEATURES = {
@@ -86,3 +92,22 @@ export const CHAT_START_RATE_LIMIT_SECONDS = 300
 export const CHAT_MESSAGE_RATE_LIMIT_MAX = 60
 export const CHAT_MESSAGE_RATE_LIMIT_SECONDS = 60
 
+// ---------------------------------------------------------------------------
+// Developer API (/v1, authenticated by API key)
+// ---------------------------------------------------------------------------
+
+// Soft ceiling: the count comes from a GSI, which is eventually consistent, so
+// two creates racing at 9 can both land. It exists to stop a script minting
+// keys without bound, not to enforce an exact number.
+export const API_KEY_MAX_PER_ACCOUNT = 10
+
+// Per KEY, not per IP: an API caller is a server, and one customer's
+// integration should not be throttled by another's sharing an egress address.
+// Generous for a sync job, and it matters more than it looks -- GET /v1/leads
+// re-runs the whole cross-table inbox read on every page (see
+// lead-inbox-service.ts), so an unthrottled loop is a real DynamoDB bill.
+export const API_RATE_LIMIT = { max: 120, windowSeconds: 60 } as const
+
+// lastUsedAt is for a human deciding which key is safe to revoke, so minutes
+// of staleness are fine and a write on every request is not.
+export const API_KEY_LAST_USED_WRITE_INTERVAL_SECONDS = 600

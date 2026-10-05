@@ -5,6 +5,7 @@ import UserProfileSection from '../components/settings/UserProfileSection'
 import SubscriptionSection from '../components/settings/SubscriptionSection'
 import PreferencesSection from '../components/settings/PreferencesSection'
 import MobileAppSection from '../components/settings/MobileAppSection'
+import ApiKeysSection from '../components/settings/ApiKeysSection'
 import IntegrationsSection from '../components/settings/IntegrationsSection'
 import DangerZoneSection from '../components/settings/DangerZoneSection'
 import EditProfileModal from '../components/settings/EditProfileModal'
@@ -274,6 +275,11 @@ export default function Settings() {
         </div>
 
         <MobileAppSection />
+
+        <ApiKeysSection
+          apiEnabled={subscription.features.api?.enabled === true}
+          onUpgradeClick={() => setShowUpgradeModal(true)}
+        />
 
         <DangerZoneSection onSignOut={logout} onDeleteAccount={() => setShowDeleteConfirm(true)} />
       </div>

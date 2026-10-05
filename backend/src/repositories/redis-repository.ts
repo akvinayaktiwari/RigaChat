@@ -197,6 +197,15 @@ export async function incrementChatRate(
   return await redis.incr(`chat:rl:${bucket}:${ip}:${window}`, windowSeconds)
 }
 
+// Same fixed-window counter, keyed by API key rather than by IP. Returns null
+// when Redis is unreachable, which the caller treats as "allow" for the same
+// reason the chat limiter does.
+export async function incrementApiKeyRate(keyId: string, windowSeconds: number): Promise<number | null> {
+  const redis = getRedisProvider()
+  const window = Math.floor(Date.now() / 1000 / windowSeconds)
+  return await redis.incr(`api:rl:${keyId}:${window}`, windowSeconds)
+}
+
 
 // The form schema behind mapMetaFieldData's most authoritative layer. Cached
 // per FORM rather than per lead: one Graph call covers every lead that form

@@ -530,6 +530,23 @@ export interface NotificationPreferences {
   email: boolean
 }
 
+export type ApiScope = 'leads:read' | 'bots:read' | 'forms:read' | 'voice_agents:read'
+
+// A developer API key as the dashboard sees it. The secret is not here: it is
+// returned once, on creation, and never again.
+export interface ApiKeySummary {
+  keyId: string
+  name: string
+  last4: string
+  scopes: ApiScope[]
+  createdAt: string
+  lastUsedAt?: string
+}
+
+export interface CreatedApiKey extends ApiKeySummary {
+  key: string
+}
+
 // One registered mobile install. expoPushToken is never sent to the browser --
 // it is a send credential of no use to a human.
 export interface LinkedDevice {
@@ -657,6 +674,9 @@ export interface EntitlementFeatures {
   agents: { enabled: boolean; limits: { max: number | null } }
   voice: { enabled: boolean; limits: { minutes: number | null } }
   kbFileSize: { enabled: boolean; limits: { maxBytes: number | null } }
+  // Optional because subscription-cache.ts can hold a summary from before this
+  // field existed for up to an hour. Absent reads as no access.
+  api?: { enabled: boolean; access: 'read' | 'full' | null }
 }
 
 export interface SubscriptionSummary {
