@@ -14,7 +14,7 @@ Framing: Google's own guidance is that optimizing for AI search is ordinary SEO.
 |---|---|---|---|
 | GEO readiness (estimate) | 71 / 100 | 2026-10-02 | From `GEO-ANALYSIS-2026-10-02.md`, before the feature-page rebuild. Baseline was 63 on 2026-09-19. |
 | Indexed in Google | Unknown | — | Search Console is not verified. This is the top blocker. |
-| Public pages in the sitemap | 33 | 2026-10-06 | All dated. Three global pillar posts were added on 2026-10-06. The two posts published late on 2026-10-05 were the 29th and 30th. |
+| Public pages in the sitemap | 44 | 2026-10-06 | Counted from the built `sitemap.xml`. The free tools hub and two new tools were added on 2026-10-06. |
 | Blog posts | 12 | 2026-10-06 | Three global pillars published 2026-10-06 (WhatsApp CRM, real estate chatbot guide, AI receptionist vs website voice agent). Four published 2026-10-05: Meta lead ads auto-reply, click-to-WhatsApp vs lead forms, real estate chatbot qualification questions, and what a CRM chatbot is. |
 | Mobile LCP (lab) | about 1.7 s | 2026-10-02 | Was 2.3 s on the homepage and 3.25 s on a post. No field data yet. |
 | Lighthouse accessibility | 100 | 2026-10-02 | On every public page audited. |
@@ -68,6 +68,10 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 | `/pricing/`, `/faq/`, `/features/voice-agent/` | 2026-10-02 |
 | Chat agent, WhatsApp, CRM and forms pages rebuilt: definition in the first paragraph, question H2s, five visible FAQ answers each | 2026-10-02 |
 | Free tool: `/whatsapp-link-generator/` | 2026-10-02 |
+| Free tools hub `/tools/` (`CollectionPage` + `ItemList`) and a Free Tools footer column. The hub, the footer, the sitemap and `llms.txt` all read `frontend/src/lib/free-tools.ts` | 2026-10-06 |
+| Free tool: `/tools/whatsapp-qr-code-generator/`. Primary keyword "whatsapp qr code generator". PNG and SVG, drawn in the browser; an optional "Made with vyostra.com" line under the code, on by default. The link generator's new "Get QR code" button opens it with the number filled in | 2026-10-06 |
+| Free tool: `/tools/whatsapp-text-formatter/`. Primary keyword "whatsapp text formatter", secondary "whatsapp bold text". The syntax restates WhatsApp's help article, checked 2026-10-06 | 2026-10-06 |
+| Every tool page publishes `WebApplication` (free offer), `BreadcrumbList` (Home > Free tools > page) and `FAQPage`, and sends analytics only `tool_used` and `tool_cta_click` with the tool's name | 2026-10-06 |
 | Zoho CRM integration page: `/features/zoho-crm/` | 2026-10-03 |
 | Meta Lead Ads integration page: `/integrations/meta-lead-ads/`, with an index at `/integrations/`. Every claim rechecked against the backend on 2026-10-05 | 2026-10-03 |
 | WhatsApp and Zoho CRM have no page under `/integrations/` on purpose: the index links each to its feature page, so two pages do not compete for one search | 2026-10-03 |
@@ -156,7 +160,7 @@ The owner's decision on 2026-10-06: Vyostra AI sells globally and leads with US 
 
 | # | Task | Why it matters |
 |---|---|---|
-| 0a | **Publish the CloudFront function after the docs merge**: `./scripts/deploy-cloudfront-function.sh` | Until it runs, `/docs/...` is answered with the empty app shell. People see the page; crawlers and AI engines see nothing. CI does not ship the function. |
+| 0a | **Publish the CloudFront function**: `./scripts/deploy-cloudfront-function.sh` | Needed again for the free tools (2026-10-06): until it runs, `/tools/...` and `/docs/...` are answered with the empty app shell. People see the page; crawlers and AI engines see nothing. CI does not ship the function. |
 | 0b | A stable API hostname such as `api.vyostra.com` | The API is served from a Lambda Function URL, so the docs print no host and send developers to Settings for it. With a stable host the examples can be copy-paste complete. |
 | 1 | **Verify `vyostra.com` in Google Search Console** (Domain property, DNS TXT), submit the sitemap, request indexing for the new pages | Everything below assumes the site is indexed. A web search for the brand returned the GitHub repos, not the site. |
 | 2 | Import the property into Bing Webmaster Tools | Bing feeds ChatGPT Search and Copilot. |
@@ -170,7 +174,7 @@ The owner's decision on 2026-10-06: Vyostra AI sells globally and leads with US 
 | 10 | Run the Rich Results Test on the homepage and one post | Not run yet. |
 | 10a | Check the Priya S. testimonial on the homepage | It says leads "from the AI agent" sync to Zoho. Chat leads do not sync; only form and Meta lead ad leads do. It is a customer's own quote, so it was left unchanged: confirm with her how leads reach her Zoho, then reword with her approval or drop the sentence. |
 
-| 25 | Legal review of Terms and Privacy for international customers | Terms now says "Prices in USD, inclusive of applicable taxes"; only the currency was changed. Privacy states data is held in `ap-south-1` (Mumbai), which needs a lawful transfer basis for EU/UK customers and a check against UAE data protection law. |
+| 25 | Legal review of Terms and Privacy for international customers | Terms now says prices are in USD and that customers in India can choose to pay in INR; nothing else in it was changed. Privacy states data is held in `ap-south-1` (Mumbai), which needs a lawful transfer basis for EU/UK customers and a check against UAE data protection law. |
 | 26 | Enable multi-data-centre on the Zoho OAuth client (Zoho API Console), then connect one zoho.com or zoho.eu account and sync one lead | The code is in place but unproven outside India. When enabling it, choose the same client ID and secret for every data centre: the code sends one secret to all of them. Once a non-India account syncs, the India-only sentence on `/features/zoho-crm/` can go and global content may mention Zoho. |
 | 28 | A USD ad-spend figure for the Head of Sales bio on `/about-us/` | The "₹10L+ a month" figure was removed rather than converted. The bio now says "Has managed monthly ad spend for developers." |
 | 29 | Confirm the "Real Estate Developer, Bengaluru" testimonial is real and approved | Left as it is. It is the one India-specific line still on the homepage. |
@@ -185,7 +189,7 @@ The owner's decision on 2026-10-06: Vyostra AI sells globally and leads with US 
 | 13 | A top-level URL that matches no route (for example `/no-such-page`) returns 200 with the app shell, which then shows "not found" in the browser | A soft 404. Fixing it means teaching the CloudFront function which top-level paths the app really has. Low priority: nothing links to such URLs. |
 | 14 | Embed the walkthrough video once it exists, with `VideoObject` | Depends on 5. |
 | 15 | A diagram in each post, with `image` on `BlogPosting` | Needs design assets or a decision to draw them in SVG. |
-| 16 | A built-in QR code for the link generator | Needs a small library. |
+| 16 | The next free tools in `FREE-TOOLS-HANDOFF.md` (WhatsApp fonts, then the real estate calculators) | The hub, QR code generator and text formatter shipped 2026-10-06. Their keyword difficulty could not be re-checked before building because OpenSEO was out of credits, so the handoff's figures were used; re-check when credits return. |
 | 17 | The remaining nine posts in `GLOBAL-MARKET-HANDOFF.md` section B3 | Three global pillars shipped 2026-10-06 (posts 1, 2 and 3). "Speed to lead" (post 4) is held: the HBR study it rests on is paywalled, so its figures could not be checked from the page and are not quoted. The market posts (UAE, US, UK, Australia, India) each cite a local rule (Trakheesi, TCPA, PECR, the Spam Act) that must be read at its primary source first. |
 | 17a | Make `/industries/real-estate/` global with market sections | Waits for the market posts it would link to: no market section without three real posts behind it. The compliance line already names RERA and Trakheesi as examples. |
 
