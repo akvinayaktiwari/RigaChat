@@ -1,16 +1,18 @@
 import { ArrowRight } from 'lucide-react'
 import { Reveal } from './motion-primitives'
 import { PRICING_TIERS, formatPrice } from '../../lib/pricingTiers'
+import type { Region } from '../../lib/pricingTiers'
 
 interface CTASectionProps {
   onStartTrial: () => void
+  region: Region
 }
 
 // PRICING_TIERS is declared in ascending price order (starter, growth,
-// agency) — see pricingTiers.ts.
+// agency) in both regions — see pricingTiers.ts.
 const LOWEST_TIER = PRICING_TIERS[0]
 
-export default function CTASection({ onStartTrial }: CTASectionProps) {
+export default function CTASection({ onStartTrial, region }: CTASectionProps) {
   return (
     <section id="pricing" className="py-24 px-4">
       <div className="max-w-4xl mx-auto">
@@ -59,7 +61,7 @@ export default function CTASection({ onStartTrial }: CTASectionProps) {
             </div>
 
             <p className="mt-6 text-white/50 text-xs">
-              Plans from {formatPrice(LOWEST_TIER.priceUsd)}/mo · Cancel anytime
+              Plans from {formatPrice(LOWEST_TIER.priceUsd, region)}/mo · Cancel anytime
             </p>
           </div>
         </Reveal>

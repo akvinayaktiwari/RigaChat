@@ -1,10 +1,13 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Check, CheckCircle2, Loader2, X } from 'lucide-react'
-import { PRICING_TIERS, formatPrice, isUpgradeFrom, nextTierUp } from '../../lib/pricingTiers'
+import { DEFAULT_REGION, INR_METHODS_NOTE, PRICING_TIERS, currencyForRegion, formatPrice, isUpgradeFrom, nextTierUp } from '../../lib/pricingTiers'
+import type { Region } from '../../lib/pricingTiers'
 import type { PlanTier } from '../../types/index'
 import { useTierCheckout } from '../../hooks/useTierCheckout'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
+
+// Same address PricingSection.tsx uses for its international CTA.
 
 const FOCUSABLE_SELECTOR = 'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
 
@@ -21,6 +24,11 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }: UpgradeMo
   const { stage, submittingTier, errorMessage, pendingCheckout, selectTier, reset } = useTierCheckout(() => {
     setTimeout(() => onClose(), 1500)
   })
+  // Region decides the currency the subscription is created in: rupees through
+  // the INR plans (UPI, netbanking, RuPay, cards) or dollars through the USD
+  // ones (international cards). Both are real checkouts — the international
+  // mailto this modal used to show existed only because no USD plan existed.
+  const [region, setRegion] = useState<Region>(DEFAULT_REGION)
   const dialogRef = useRef<HTMLDivElement>(null)
 
   // Payment is mid-confirmation and the copy says not to close the window, so
@@ -98,11 +106,37 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }: UpgradeMo
 
         {stage === 'idle' && (
           <>
-            <div className="mb-6 pr-8">
-              <h2 className="font-bold text-2xl text-gray-900 mb-1" style={JAKARTA_FONT}>
-                Choose your plan
-              </h2>
-              <p className="text-sm text-gray-500">All plans include a 14-day free trial. Cancel anytime. Billed in USD.</p>
+            <div className="flex flex-wrap items-start justify-between gap-4 mb-6 pr-8">
+              <div>
+                <h2 className="font-bold text-2xl text-gray-900 mb-1" style={JAKARTA_FONT}>
+                  Choose your plan
+                </h2>
+                <p className="text-sm text-gray-500">
+                  All plans include a 14-day free trial. Cancel anytime.
+                  {region === 'in' ? ` ${INR_METHODS_NOTE}.` : ' Billed in USD.'}
+                </p>
+              </div>
+
+              <div className="inline-flex bg-gray-100 rounded-xl p-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setRegion('intl')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                    region === 'intl' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  US dollars ($)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRegion('in')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                    region === 'in' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  India (₹)
+                </button>
+              </div>
             </div>
 
             {errorMessage && (
@@ -155,7 +189,7 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }: UpgradeMo
 
                     <div className="flex items-baseline gap-1 mb-5">
                       <span className="text-3xl font-extrabold text-gray-900" style={JAKARTA_FONT}>
-                        {formatPrice(plan.priceUsd)}
+                        {formatPrice(plan.priceUsd, region)}
                       </span>
                       <span className="text-sm text-gray-500">/mo</span>
                     </div>
@@ -176,7 +210,7 @@ export default function UpgradeModal({ isOpen, onClose, currentPlan }: UpgradeMo
                     ) : (
                       <button
                         type="button"
-                        onClick={() => selectTier(plan.tier)}
+                        onClick={() => selectTier(plan.tier, currencyForRegion(region))}
                         disabled={submittingTier !== null}
                         className={ctaClasses}
                       >

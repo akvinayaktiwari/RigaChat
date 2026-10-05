@@ -1,7 +1,7 @@
 import { Check } from 'lucide-react'
 import { Reveal, RevealGroup, RevealItem } from './motion-primitives'
-import { PRICING_TIERS, formatPrice } from '../../lib/pricingTiers'
-import type { BillableTier } from '../../lib/pricingTiers'
+import { INR_METHODS_NOTE, PRICING_TIERS, formatPrice } from '../../lib/pricingTiers'
+import type { BillableTier, Region } from '../../lib/pricingTiers'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -12,10 +12,14 @@ interface PricingSectionProps {
   // Not wired up yet — checkout/signup wiring is a later module. Defaults to
   // a console.log so this component is usable standalone until then.
   onSelectTier?: (tier: BillableTier) => void
+  region: Region
+  onRegionChange: (region: Region) => void
 }
 
 export default function PricingSection({
   onSelectTier = (tier) => console.log('[PricingSection] onSelectTier not wired yet:', tier),
+  region,
+  onRegionChange,
 }: PricingSectionProps) {
   return (
     <section id="plans" className="py-24 px-4">
@@ -28,10 +32,36 @@ export default function PricingSection({
           >
             Simple, transparent pricing
           </h2>
-          <p className="text-gray-500 text-lg max-w-xl mx-auto">
+          <p className="text-gray-500 text-lg max-w-xl mx-auto mb-8">
             Pick a plan and get started today. Cancel anytime.
           </p>
-          <p className="mt-3 text-xs text-gray-500">Billed in USD · card</p>
+
+          <div className="inline-flex bg-gray-50 border border-gray-200 rounded-full p-1">
+            <button
+              type="button"
+              onClick={() => onRegionChange('intl')}
+              className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
+                region === 'intl' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              🌍 US dollars ($)
+            </button>
+            <button
+              type="button"
+              onClick={() => onRegionChange('in')}
+              className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
+                region === 'in' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              🇮🇳 India (₹)
+            </button>
+          </div>
+
+          {/* Naming the methods is the point of the rupee list: a USD plan cannot
+              accept UPI, netbanking or RuPay, and those are why the INR plans exist. */}
+          <p className="mt-3 text-xs text-gray-500">
+            {region === 'in' ? INR_METHODS_NOTE : 'Billed in USD · card'}
+          </p>
         </Reveal>
 
         <RevealGroup className="grid grid-cols-1 md:grid-cols-3 gap-5" stagger={0.09}>
@@ -65,7 +95,7 @@ export default function PricingSection({
 
                 <div className="flex items-baseline gap-1 mb-5">
                   <span className="text-3xl font-extrabold text-gray-900" style={JAKARTA_FONT}>
-                    {formatPrice(plan.priceUsd)}
+                    {formatPrice(plan.priceUsd, region)}
                   </span>
                   <span className="text-sm text-gray-400">/mo</span>
                 </div>
@@ -79,6 +109,9 @@ export default function PricingSection({
                   ))}
                 </ul>
 
+                {/* Both regions check out for real now: the INR plans take UPI and
+                    cards, the USD plans take international cards. The mailto that
+                    used to stand in for international payments is gone. */}
                 <button type="button" onClick={() => onSelectTier(plan.tier)} className={ctaClasses}>
                   Get Started
                 </button>

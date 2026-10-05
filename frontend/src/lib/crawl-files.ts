@@ -91,7 +91,7 @@ export const STATIC_PAGES: readonly StaticPage[] = [
   {
     route: '/pricing',
     label: 'Pricing',
-    summary: 'The three plans, what each includes, billing in US dollars, and the 14-day free trial.',
+    summary: 'The three plans, what each includes, billing in USD or INR, and the 14-day free trial.',
     section: 'Pricing',
     lastModified: '2026-10-02',
   },
