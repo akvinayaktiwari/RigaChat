@@ -34,6 +34,13 @@ export const FREE_TOOLS: readonly FreeTool[] = [
     lastModified: '2026-10-06',
   },
   {
+    route: '/tools/whatsapp-text-formatter',
+    name: 'WhatsApp Text Formatter',
+    summary: 'A free tool that adds WhatsApp formatting to a message (bold, italic, strikethrough, monospace, lists and quotes) with a preview, in the browser.',
+    action: 'Format a message',
+    lastModified: '2026-10-06',
+  },
+  {
     route: '/whatsapp-link-generator',
     name: 'WhatsApp Link Generator',
     summary: 'A free tool that builds a wa.me click-to-chat link with a pre-filled message, in the browser.',

@@ -121,8 +121,11 @@ export function applyWhatsAppFormat(selection: TextSelection, id: WhatsAppFormat
 
 export type InlineNode =
   | { type: 'text'; text: string }
-  | { type: 'code' | 'monospace'; text: string }
-  | { type: 'bold' | 'italic' | 'strikethrough'; children: InlineNode[] }
+  | { type: 'code'; text: string }
+  | { type: 'monospace'; text: string }
+  | { type: 'bold'; children: InlineNode[] }
+  | { type: 'italic'; children: InlineNode[] }
+  | { type: 'strikethrough'; children: InlineNode[] }
 
 export type MessageBlock =
   | { type: 'line'; children: InlineNode[] }
