@@ -57,7 +57,7 @@ export const STATIC_PAGES: readonly StaticPage[] = [
     label: 'WhatsApp',
     summary: 'Instant WhatsApp alerts for each new lead and a weekly report, sent through Gupshup.',
     section: 'Product',
-    lastModified: '2026-10-03',
+    lastModified: '2026-10-05',
   },
   {
     route: '/features/crm',
