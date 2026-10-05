@@ -1018,6 +1018,8 @@ export interface Entitlements {
     // No per-account override support (unlike chat/agents/voice above) --
     // not requested for this feature, kept out to avoid unrequested scope.
     kbFileSize: { enabled: boolean; limits: { maxBytes: number | null } }
+    // The developer API. `access` is null exactly when `enabled` is false.
+    api: { enabled: boolean; access: ApiAccess | null }
   }
 }
 
@@ -2119,4 +2121,56 @@ export interface MetaDeletionRequestStatus {
   confirmationCode: string
   status: MetaDeletionRequest['status']
   requestedAt: string
+}
+
+// ---------------------------------------------------------------------------
+// Developer API: keys and the /v1 surface. Added 2026-10-05.
+// ---------------------------------------------------------------------------
+
+export type ApiAccess = 'read' | 'full'
+
+// A union rather than string[] so a typo in a route's required scope is a
+// compile error, not an endpoint nobody can ever be granted.
+export type ApiScope = 'leads:read' | 'bots:read' | 'forms:read' | 'voice_agents:read'
+
+// One row per key, in the api_keys table (PK keyHash, GSI
+// clientId-createdAt-index). The row IS the key: revoking deletes it.
+//
+// The secret itself is never stored. keyHash is the SHA-256 of the full key,
+// which is enough here and bcrypt is not needed: the key is 192 random bits,
+// so there is no dictionary to slow an attacker down against.
+export interface ApiKeyRecord {
+  keyHash: string
+  // What the dashboard addresses a key by. Separate from keyHash so the hash
+  // never leaves the backend.
+  keyId: string
+  clientId: string
+  name: string
+  // Last four characters of the secret, so a person can tell which key in
+  // their password manager a row is.
+  last4: string
+  scopes: ApiScope[]
+  createdAt: string
+  lastUsedAt?: string
+}
+
+export type ApiKeySummary = Omit<ApiKeyRecord, 'keyHash' | 'clientId'>
+
+// The only response that ever carries the secret.
+export interface CreatedApiKey extends ApiKeySummary {
+  key: string
+}
+
+// Who a /v1 request is acting as. clientId comes from the key's row and never
+// from the request.
+export interface ApiPrincipal {
+  clientId: string
+  keyId: string
+  scopes: ApiScope[]
+}
+
+// The /v1 error envelope. Deliberately not ApiResponse: /v1 is a contract with
+// code we do not control, and `code` is what that code branches on.
+export interface PublicApiError {
+  error: { code: string; message: string }
 }
