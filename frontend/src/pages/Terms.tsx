@@ -64,7 +64,7 @@ const TERMS_SECTIONS: TermsSection[] = [
     order: '4',
     title: 'Payments and Billing',
     icon: 'CreditCard',
-    body: 'Subscriptions billed monthly. Cancel anytime, no refunds for partial months. Prices in USD, inclusive of applicable taxes.',
+    body: 'Subscriptions billed monthly. Cancel anytime, no refunds for partial months. Prices are in USD; customers in India can choose to pay in INR. Prices are inclusive of applicable taxes.',
   },
   {
     id: 'section-5',

@@ -53,7 +53,7 @@ describe('a payment Razorpay rejects', () => {
     const { result } = renderHook(() => useTierCheckout())
 
     await act(async () => {
-      await result.current.selectTier('starter')
+      await result.current.selectTier('starter', 'INR')
     })
     act(() => {
       lastCheckout.fail({
@@ -71,7 +71,7 @@ describe('a payment Razorpay rejects', () => {
     const { result } = renderHook(() => useTierCheckout())
 
     await act(async () => {
-      await result.current.selectTier('starter')
+      await result.current.selectTier('starter', 'INR')
     })
     act(() => {
       lastCheckout.fail({ error: { description: 'Payment failed.' } })
@@ -80,6 +80,7 @@ describe('a payment Razorpay rejects', () => {
     await waitFor(() => {
       expect(result.current.pendingCheckout).toEqual({
         tier: 'starter',
+        currency: 'INR',
         subscriptionId: 'sub_1',
         razorpayKeyId: 'rzp_live_x',
       })
@@ -90,7 +91,7 @@ describe('a payment Razorpay rejects', () => {
     const { result } = renderHook(() => useTierCheckout())
 
     await act(async () => {
-      await result.current.selectTier('starter')
+      await result.current.selectTier('starter', 'USD')
     })
     act(() => {
       lastCheckout.fail({})
@@ -110,7 +111,7 @@ describe('a pending checkout the browser remembers', () => {
     const { result } = renderHook(() => useTierCheckout())
 
     await act(async () => {
-      await result.current.selectTier('starter')
+      await result.current.selectTier('starter', 'INR')
     })
     act(() => {
       lastCheckout.options.modal?.ondismiss?.()
@@ -119,10 +120,10 @@ describe('a pending checkout the browser remembers', () => {
 
     subscribeToTier.mockClear()
     await act(async () => {
-      await result.current.selectTier('starter')
+      await result.current.selectTier('starter', 'INR')
     })
 
-    expect(subscribeToTier).toHaveBeenCalledWith('starter')
+    expect(subscribeToTier).toHaveBeenCalledWith('starter', 'INR')
   })
 
   it('reopens the subscription the server says is still pending', async () => {
@@ -134,7 +135,7 @@ describe('a pending checkout the browser remembers', () => {
     const { result } = renderHook(() => useTierCheckout())
 
     await act(async () => {
-      await result.current.selectTier('growth')
+      await result.current.selectTier('growth', 'USD')
     })
 
     expect(lastCheckout.options.subscription_id).toBe('sub_held')
@@ -148,7 +149,7 @@ describe('the checkout request itself failing', () => {
     const { result } = renderHook(() => useTierCheckout())
 
     await act(async () => {
-      await result.current.selectTier('starter')
+      await result.current.selectTier('starter', 'USD')
     })
 
     await waitFor(() => {
@@ -162,11 +163,11 @@ describe('the checkout request itself failing', () => {
     const { result } = renderHook(() => useTierCheckout())
 
     await act(async () => {
-      await result.current.selectTier('starter')
+      await result.current.selectTier('starter', 'INR')
     })
 
     await waitFor(() => {
-      expect(result.current.errorMessage).toContain('not set up for this plan')
+      expect(result.current.errorMessage).toContain('not set up for this currency')
     })
   })
 })

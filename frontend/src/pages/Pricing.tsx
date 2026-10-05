@@ -12,15 +12,21 @@ const PAGE = { name: 'Pricing', path: '/pricing/' }
 
 const SECTION_HEADING = 'text-3xl md:text-4xl font-extrabold text-on-surface tracking-tight text-center mb-10'
 
+/**
+ * One plan. Both prices are printed, not toggled: the page is prerendered once
+ * for every visitor, and a crawler should read the rupee price without running
+ * the script that would have switched to it.
+ */
 function PlanCard({ tier }: { tier: PricingTier }) {
   return (
     <div className="flex flex-col bg-white border border-outline-variant/30 rounded-2xl p-6 shadow-xs">
       <h3 className="font-bold text-on-surface text-lg">{tier.name}</h3>
       <p className="mt-1 text-sm text-on-surface-variant">{tier.description}</p>
       <p className="mt-5 text-3xl font-extrabold text-on-surface">
-        {formatPrice(tier.priceUsd)}
+        {formatPrice(tier.priceUsd, 'intl')}
         <span className="text-sm font-medium text-on-surface-variant"> /month</span>
       </p>
+      <p className="mt-1 text-sm text-on-surface-variant">{formatPrice(tier.priceUsd, 'in')} /month in India</p>
       <ul className="mt-6 space-y-2.5 flex-1">
         {tier.features.map((feature) => (
           <li key={feature} className="flex items-start gap-2 text-sm text-on-surface-variant">
@@ -46,7 +52,7 @@ export default function Pricing() {
     <>
       <PageMeta
         title="Vyostra AI Pricing — Plans from $49 a Month"
-        description="Vyostra AI costs $49, $129 or $349 a month. What each plan includes, who it is for, billing in US dollars, and the 14-day free trial."
+        description="Vyostra AI costs $49, $129 or $349 a month. What each plan includes, who it is for, billing in USD or INR, and the 14-day free trial."
         path="/pricing/"
       />
       <StructuredData
