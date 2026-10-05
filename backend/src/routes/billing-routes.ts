@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { requireAuth } from '../lib/cognito.js'
-import { BILLING_CURRENCY, BillingError, getPaymentHistory, subscribeToTier } from '../services/billing-service.js'
-import type { BillableTier, SubscribeResult } from '../services/billing-service.js'
+import { BillingError, getPaymentHistory, subscribeToTier } from '../services/billing-service.js'
+import type { BillableTier, BillingCurrency, SubscribeResult } from '../services/billing-service.js'
 import type { ApiResponse, PaymentRecord } from '../types/index.js'
 
 interface AuthEnv {
@@ -13,6 +13,7 @@ interface AuthEnv {
 export const billingRoutes = new Hono<AuthEnv>()
 
 const VALID_TIERS: BillableTier[] = ['starter', 'growth', 'agency']
+const VALID_CURRENCIES: BillingCurrency[] = ['INR', 'USD']
 
 interface SubscribeBody {
   tier?: string
@@ -51,20 +52,16 @@ billingRoutes.post('/subscribe', requireAuth, async (c) => {
     return c.json<ApiResponse<null>>({ success: false, error: 'tier must be one of: starter, growth, agency' }, 400)
   }
 
-  // Callers no longer send a currency: every plan is charged in USD. A request
-  // that names another one comes from a page still showing the retired rupee
-  // list, and it is refused rather than quietly charged in dollars -- billing a
-  // different currency than the one on the caller's screen is the worst
-  // possible way to be lenient.
-  if (body.currency !== undefined && body.currency !== BILLING_CURRENCY) {
-    return c.json<ApiResponse<null>>(
-      { success: false, error: `Plans are billed in ${BILLING_CURRENCY} only. Refresh the page to see current prices.` },
-      400
-    )
+  // Absent means USD, the global list price. An unrecognised value is rejected
+  // rather than defaulted: silently charging a different currency than the one
+  // the caller asked for is the worst possible way to be lenient.
+  const currency = body.currency ?? 'USD'
+  if (!VALID_CURRENCIES.includes(currency as BillingCurrency)) {
+    return c.json<ApiResponse<null>>({ success: false, error: 'currency must be INR or USD' }, 400)
   }
 
   try {
-    const result = await subscribeToTier(clientId, body.tier as BillableTier)
+    const result = await subscribeToTier(clientId, body.tier as BillableTier, currency as BillingCurrency)
     return c.json<ApiResponse<SubscribeResult>>({ success: true, data: result }, 200)
   } catch (error) {
     if (error instanceof BillingError) {
