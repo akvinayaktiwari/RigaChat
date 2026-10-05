@@ -1,0 +1,98 @@
+{/*
+  Platform rules here (opt-in, the 24-hour customer service window, templates,
+  the leadgen webhook and its permissions) are Meta's, each linked to the Meta
+  page that states it. The pages were opened and the claims checked on
+  2026-10-05. Pricing is deliberately not quoted: Meta changed what it charges
+  inside the customer service window from 2026-10-01, and a number would date
+  badly. No performance figures anywhere.
+
+  Product claims are limited to what /integrations/meta-lead-ads/ and /faq/
+  already state, both checked against the backend.
+*/}
+
+To auto-reply on WhatsApp to a Facebook or Instagram lead ad, you need three things in place: the person must have **opted in** to hear from your business, your software must **receive the lead the moment it is submitted** through Meta's lead webhook, and the first message must be a **WhatsApp template that Meta has approved**. Get those right and the message can reach the lead within seconds of the form being submitted.
+
+The template is the part people miss. A lead form is not a WhatsApp conversation. The person tapped "Submit" inside Facebook or Instagram; they never messaged you on WhatsApp. That single fact decides what your first message is allowed to be.
+
+> A lead form gives you a phone number and permission. It does not give you an open WhatsApp conversation. You have to start that one yourself, and WhatsApp decides how.
+
+## Why must the first WhatsApp message be a template?
+
+WhatsApp lets a business send free-form messages only within [24 hours of the customer's last message](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages). A person who filled in a lead form has sent you no WhatsApp message at all, so there is no window open. The only way to start that conversation is a [template message](https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/overview): text you submitted to Meta in advance and Meta approved.
+
+Once the lead replies, the 24-hour customer service window opens, and from then on you can answer normally until they go quiet for a day.
+
+| Moment | What you can send |
+| --- | --- |
+| Lead just submitted the form | An approved template only |
+| Lead replied to your template | Free-form messages, for 24 hours from their last message |
+| Lead went quiet for more than 24 hours | An approved template only, to re-open the conversation |
+
+<Callout title="The mistake this rule causes" tone="warning">
+  A setup that sends "Hi Rahul, thanks for your interest!" as plain text works in testing, because the tester messaged the number first. With real leads it fails, because no window is open. The first message has to be a template, every time.
+</Callout>
+
+## Does a lead form count as WhatsApp opt-in?
+
+It can, if the form says so. Meta's [opt-in policy](https://developers.facebook.com/documentation/business-messaging/whatsapp/getting-opt-in) asks for two things: the person must be clearly told they are opting in to receive messages, and told the **name of the business** that will message them. The same page allows opt-in to be collected on a website or form, not only inside WhatsApp, and says it does not have to be WhatsApp-specific as long as you follow local law.
+
+What that means for an instant form:
+
+<CheckList
+  items={[
+    <>Say it on the form. Meta lets you [add a custom disclaimer to an instant form](https://www.facebook.com/business/help/1550411888622740). Use it for a plain line such as "By submitting, you agree that [Your Business] may contact you on WhatsApp about this enquiry."</>,
+    <>Name the business that will send the message. If an agency runs the ads for a developer, the name on the form should be the one the buyer will see on WhatsApp.</>,
+    <>Ask for the phone number the person uses on WhatsApp. A landline or an office number collects a lead you cannot message.</>,
+  ]}
+/>
+
+A form that only collects a phone number, with nothing about messaging, is not opt-in. Messaging those numbers anyway is how a business number gets reported and its [messaging limits](https://developers.facebook.com/documentation/business-messaging/whatsapp/messaging-limits) cut.
+
+## How does the lead reach your software instantly?
+
+Through Meta's lead webhook. When someone submits an instant form, Meta sends a [webhook notification on the `leadgen` field](https://developers.facebook.com/docs/graph-api/webhooks/getting-started/webhooks-for-leadgen/) to the software subscribed to your Page. The notification carries IDs, not answers: a `leadgen_id`, the Page, the form and the ad. Your software then uses the `leadgen_id` to fetch the actual answers (name, phone, every question) through the Graph API.
+
+<PhaseTimeline
+  phases={[
+    { phase: '1', timeline: 'Form submitted', action: 'The person taps Submit on your instant form in Facebook or Instagram.' },
+    { phase: '2', timeline: 'Webhook sent', action: 'As the lead is created, Meta notifies your software with the leadgen_id and the Page, form and ad IDs.' },
+    { phase: '3', timeline: 'Lead fetched', action: 'Your software reads the answers through the Graph API using the leadgen_id.' },
+    { phase: '4', timeline: 'Template sent', action: 'Your WhatsApp number sends the approved template to the lead’s phone number.' },
+  ]}
+/>
+
+To subscribe, the software needs a Page access token with Meta's lead permissions, among them `leads_retrieval` and `pages_manage_metadata`, granted by someone who can advertise on that Page. This is why connecting lead ads always starts with a Facebook sign-in that asks you to pick your Pages.
+
+The alternative, downloading leads as a CSV from Meta Business Suite, works, but the WhatsApp message then waits for whoever exports the file. If speed of first reply matters to you, the webhook is the only route that does not depend on a person.
+
+## What should the first template say?
+
+Short, specific and obviously connected to the ad they just responded to. The person should recognise you in the first line.
+
+<div className="mt-6 grid gap-4 md:grid-cols-2">
+  <FactCard label="Do">
+    Name your business and the thing they enquired about. Ask one easy question they can answer in a word, such as their preferred time for a call or their budget range. A reply opens the 24-hour window, so make replying effortless.
+  </FactCard>
+  <FactCard label="Don't">
+    Send a brochure, three links and a discount in the first message. It reads like a broadcast, it invites a block, and blocks feed the [quality rating](https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/overview) that decides whether your templates keep working.
+  </FactCard>
+</div>
+
+Meta reviews every template and assigns it a category, which affects both what you may write and [what you are charged](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing). Submit the template before the campaign starts, not on launch day: a lead that arrives while the template is still in review gets nothing.
+
+## What usually breaks?
+
+Most failed setups fail in one of four places, and none of them show up as an error the advertiser sees.
+
+| Symptom | Likely cause |
+| --- | --- |
+| Leads appear in Meta but never in your software | The Page is not subscribed to the lead webhook, or the subscription dropped |
+| Leads arrive but no WhatsApp message goes out | The first message is plain text instead of a template, or the template is not approved yet |
+| Messages fail for some leads only | The number is not on WhatsApp, or is missing the country code (+91 for India) |
+| Template gets paused after a good start | People are blocking or reporting it: check the opt-in wording and the message itself |
+
+## How does Vyostra AI handle this?
+
+Vyostra AI connects to Meta Lead Ads through the Facebook sign-in described above. Meta notifies Vyostra AI as each form is submitted, and the lead is saved in the [lead CRM](/features/crm) with every answer it gave. If you have published a follow-up journey for Meta leads, it starts for that lead: the journey messages the lead on WhatsApp, waits for a real reply rather than firing on a timer, and hands the lead to your team when it needs a person. If [WhatsApp lead notifications](/features/whatsapp) are on, you also get a WhatsApp message with the lead's name and phone number.
+
+The details of what is connected, which permissions are asked for and how a dropped Page subscription is repaired are on the [Meta Lead Ads integration page](/integrations/meta-lead-ads). For the wider picture of what WhatsApp allows in a sales conversation, read [WhatsApp chatbot for real estate in India](/blog/whatsapp-chatbot-for-real-estate-india).
