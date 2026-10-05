@@ -164,8 +164,16 @@ const AI_CRAWLERS: readonly string[] = [
   'ChatGPT-User',
   'ClaudeBot',
   'Claude-SearchBot',
+  'Claude-User',
   'PerplexityBot',
+  'Perplexity-User',
   'Google-Extended',
+  'Applebot-Extended',
+  'Meta-ExternalAgent',
+  'Amazonbot',
+  'DuckAssistBot',
+  'MistralAI-User',
+  'CCBot',
 ]
 
 export interface SitemapEntry {
