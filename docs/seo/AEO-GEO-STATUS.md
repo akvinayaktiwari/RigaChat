@@ -83,6 +83,7 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 | Weekly WhatsApp report covers conversations and top agent | 2026-10-02 |
 | "Every new lead" syncs to Zoho (only form and Meta lead ad leads do; chat and voice do not), and Zoho receives a "bot name" | 2026-10-03 |
 | Homepage: a chat lead "Syncs to Zoho.", the voice agent has the "same CRM sync", and the Zoho card offers "Activity logging" and "Custom field mapping" (neither exists); Help: leads sync to "other tools" besides Zoho | 2026-10-03 |
+| WhatsApp page named chat and form leads as the only ones that send an alert (Meta lead ad leads do too), and "any of your agents" read as including the voice agent, which alerts only on a handoff | 2026-10-05 |
 
 ### Performance and accessibility
 
