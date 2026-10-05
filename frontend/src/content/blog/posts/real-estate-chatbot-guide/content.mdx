@@ -1,0 +1,96 @@
+{/*
+  A global pillar for "real estate chatbot". No country-specific rule, portal or
+  currency is assumed; where markets differ the post says so and links to the
+  market posts. The qualification-questions post is this post's child.
+
+  No market sizes, response times or conversion rates: none are sourced.
+
+  Product claims match content/industries/real-estate.ts and the feature pages
+  as they are: chat and on-page voice answer from the knowledge base and say
+  when they do not know; lead fields are name, phone, email, property interest
+  and budget range; the WhatsApp follow-up journey starts for chat and Meta
+  lead ad leads, waits for a reply, nudges once after 24 hours and hands over;
+  voice is English-first and an add-on. Nothing here claims phone answering.
+*/}
+
+A real estate chatbot is an automated agent on a property website or messaging channel that answers a buyer's questions at once, asks the few things a viewing depends on, saves the buyer as a lead and hands the conversation to a person. A useful one answers from your own listing or project details. A poor one is a contact form with a chat bubble in front of it.
+
+This guide covers what the chatbot should do, where it belongs, what it must leave to your team, and how to judge one before you put it on your site.
+
+## What should a real estate chatbot do?
+
+Four jobs, in this order.
+
+<PhaseTimeline
+  phases={[
+    { phase: 'Answer', timeline: 'At once', action: 'Reply to the question the buyer actually asked, from your listing or project details. Bedrooms, area, location, what is nearby.' },
+    { phase: 'Qualify', timeline: 'A few questions', action: 'Which property or area, a budget range, a timeline. Nothing your team will not act on.' },
+    { phase: 'Capture', timeline: 'Once it has helped', action: 'Ask for a name and number, and save them as a lead with the conversation attached.' },
+    { phase: 'Hand over', timeline: 'On any real signal', action: 'A viewing request, a price negotiation or a question it cannot answer goes to a person, with the transcript.' },
+  ]}
+/>
+
+The order matters. A buyer who has just had a question answered has a reason to leave a number. A buyer greeted with a request for their phone number has none. The companion post lists [the qualification questions to ask, and the order to ask them in](/blog/real-estate-chatbot-lead-qualification-questions/).
+
+## Where does a real estate chatbot belong?
+
+On the pages buyers land on, and then on the channel they prefer to continue in.
+
+| Place | What it is good for | What to watch |
+| --- | --- | --- |
+| Website chat | Answering the question that brought the buyer to the page | It only reaches people who open your site |
+| On-page voice | Buyers who would rather speak than type | Needs a browser and microphone permission |
+| WhatsApp | Continuing after the first contact, in a thread the buyer keeps | WhatsApp's own rules on opt-in and timing apply |
+| Lead forms and lead ads | Structured answers and a phone number | Nobody is talking yet, so the first message has to come from you |
+
+Which channel buyers prefer differs by market. In some, WhatsApp is where almost every enquiry ends up; in others, text messages, phone calls and email carry more of it. Follow your own buyers, not a general rule.
+
+If you follow up on WhatsApp, the platform decides what you may send and when. [What a WhatsApp CRM is](/blog/what-is-a-whatsapp-crm/) explains the opt-in, 24-hour window and template rules, which are the same in every country.
+
+## What should a real estate chatbot never do?
+
+Three things, and each one costs more than the lead it was trying to win.
+
+<div className="mt-6 grid gap-4 md:grid-cols-3">
+  <NumberedCard number="①" title="Invent facts">
+    A made-up price, floor plan, availability or completion date becomes a promise your sales team has to take back. If the answer is not in what you gave it, it should say so and offer a person.
+  </NumberedCard>
+  <NumberedCard number="②" title="Negotiate">
+    Final price, discounts and payment terms belong with a person who has the authority to agree them.
+  </NumberedCard>
+  <NumberedCard number="③" title="Ask more than it uses">
+    Every extra question is a chance to close the chat. Do not collect details nobody will act on, and do not collect sensitive ones in a chat window.
+  </NumberedCard>
+</div>
+
+Property advertising is also regulated, and the rules are local. Registration numbers, permits and required wording differ from one country and city to the next. A chatbot should repeat only the text you have approved; check what your own regulator requires in marketing.
+
+## How do you tell a useful chatbot from a form with a chat bubble?
+
+Test it yourself before a buyer does. Five checks.
+
+1. **Ask something specific about one listing.** A useful chatbot answers from your content. A scripted one sends you down a menu.
+2. **Ask something it cannot know.** It should say it does not have the answer, not guess.
+3. **Ask for a person.** See what happens next, and how your team finds out.
+4. **Look at the lead it created.** The conversation should be attached, not summarised away.
+5. **Go quiet.** See whether the follow-up waits for you or keeps messaging on a timer.
+
+<Callout title="The lead record is the product" tone="neutral">
+  The chat window is what the buyer sees. What your team works from is the lead: who it is, what they asked and what they were told. Judge a chatbot by that record, because that is what decides whether the first call starts well.
+</Callout>
+
+## What does a chatbot leave to an agent?
+
+Everything that needs judgement. Viewings, negotiation, objections and the questions that are really about trust stay with a person. The chatbot's job is to make sure the enquiry at 11pm gets an answer, and that the agent who calls the next morning already knows what the buyer wants.
+
+## Where can you read about one market?
+
+This guide is written for any country. For India, read [WhatsApp chatbots for real estate in India](/blog/whatsapp-chatbot-for-real-estate-india/) and [AI voice agents for real estate in India](/blog/ai-voice-agent-for-real-estate-india/).
+
+<div className="mt-16 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+  ### How Vyostra AI does it
+
+  Vyostra AI answers property enquiries on your website by chat, and by on-page voice as an add-on, using only your website content and the knowledge base you give it. When the answer is not there, it says so. It captures the buyer's name, phone, email, property interest and budget range as a lead with the transcript attached.
+
+  For a lead from chat or a Meta lead ad, a follow-up journey then messages the buyer on WhatsApp, waits for a real reply, nudges once after 24 hours of silence and hands the lead to your team when a person is needed. It does not answer phone calls, and the voice agent is English-first today. More on [Vyostra AI for real estate](/industries/real-estate/) and [the chat agent](/features/chatbot).
+</div>
