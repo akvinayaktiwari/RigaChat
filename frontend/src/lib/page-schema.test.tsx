@@ -99,3 +99,20 @@ describe.each([
     expect((await renderPublicPage(route)).html).toContain(name)
   })
 })
+
+// sameAs says "this profile is us". The footer is on every public page, so
+// each profile the schema names has to be a link a visitor can follow there.
+describe('the company profiles', () => {
+  it('links from the footer every profile the Organization names as sameAs', async () => {
+    const { html } = await renderPublicPage('/')
+    const profiles = asArray(nodeOfType(await graphNodes('/'), 'Organization').sameAs)
+    expect(profiles).toContain('https://x.com/vyostra_ai')
+    expect(profiles.filter((url) => typeof url !== 'string' || !html.includes(`href="${url}"`))).toEqual([])
+  })
+
+  it('gives each icon link a name, since the icon alone says nothing', async () => {
+    const { html } = await renderPublicPage('/')
+    expect(html).toContain('aria-label="Vyostra AI on X"')
+    expect(html).toContain('aria-label="Vyostra AI on LinkedIn"')
+  })
+})

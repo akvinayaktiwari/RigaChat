@@ -1,4 +1,5 @@
-import { WhatsAppIcon, ZohoIcon } from './BrandIcons'
+import { LinkedInIcon, WhatsAppIcon, XIcon, ZohoIcon } from './BrandIcons'
+import { SOCIAL_PROFILES, type SocialProfile } from '../../lib/social-profiles'
 import VyostraLogo from '../VyostraLogo'
 
 const LINK_COLUMNS = [
@@ -33,6 +34,39 @@ const LINK_COLUMNS = [
   },
 ]
 
+const SOCIAL_ICONS: Record<SocialProfile['id'], (props: { className?: string }) => JSX.Element> = {
+  linkedin: LinkedInIcon,
+  x: XIcon,
+}
+
+/**
+ * The company's profiles, as icon links. Each is a 44px target with a name a
+ * screen reader can say; the icon alone names nothing. rel="me" marks the
+ * profile as ours, the same claim the Organization schema makes with sameAs.
+ */
+function SocialLinks() {
+  return (
+    <ul className="mt-5 flex items-center gap-2">
+      {SOCIAL_PROFILES.map((profile) => {
+        const Icon = SOCIAL_ICONS[profile.id]
+        return (
+          <li key={profile.id}>
+            <a
+              href={profile.url}
+              target="_blank"
+              rel="me noopener noreferrer"
+              aria-label={`Vyostra AI on ${profile.network}`}
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors"
+            >
+              <Icon className="h-4 w-4" />
+            </a>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
 export default function Footer() {
   return (
     <footer className="border-t border-gray-100 py-12 px-4">
@@ -48,6 +82,7 @@ export default function Footer() {
             <p className="text-sm text-gray-500 leading-relaxed max-w-56">
               Conversational AI agents with native CRM for Indian businesses.
             </p>
+            <SocialLinks />
           </div>
 
           {LINK_COLUMNS.map((col) => (

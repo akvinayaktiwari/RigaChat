@@ -51,8 +51,8 @@ describe('softwareApplicationSchema', () => {
 })
 
 describe('organizationSchema', () => {
-  it('links the LinkedIn company page, the signal that separates this entity from similarly named ones', () => {
-    expect(organizationSchema().sameAs).toEqual(['https://www.linkedin.com/company/vyostra-ai'])
+  it('links the company\'s own profiles, the signal that separates this entity from similarly named ones', () => {
+    expect(organizationSchema().sameAs).toEqual(['https://www.linkedin.com/company/vyostra-ai', 'https://x.com/vyostra_ai'])
   })
 })
 
