@@ -1,0 +1,81 @@
+{/*
+  Platform facts are Meta's and are linked: what a click-to-WhatsApp ad does
+  and where it runs, the leadgen webhook, the 24-hour customer service window,
+  templates, opt-in, and the 72-hour free entry point (quoted from Meta's
+  pricing page as it read on 2026-10-05, alongside its 2026-10-01 changes).
+  RERA Section 11(2) is quoted from the Act. No conversion rates, costs per
+  lead or lead-quality figures: none are sourced, so none appear.
+*/}
+
+A click-to-WhatsApp ad and a lead form ad both run on Facebook and Instagram, but they start completely different things. A **click-to-WhatsApp ad** opens a WhatsApp chat with your business, so the buyer sends the first message and the conversation is open from the start. A **lead form ad** opens an instant form that collects answers like name, phone and budget, and nobody is talking yet: you have to start the WhatsApp conversation yourself, with an approved template.
+
+For a property developer or broker in India, that difference decides who your sales team talks to first, how fast, and what WhatsApp lets you send.
+
+## How do the two ad types compare?
+
+| | Click-to-WhatsApp ad | Lead form ad |
+| --- | --- | --- |
+| What the buyer does | Taps the ad and lands in a WhatsApp chat with you | Fills in an instant form without leaving Facebook or Instagram |
+| Who sends the first message | The buyer | You, after the form is submitted |
+| What your first message can be | Any reply, within 24 hours of the buyer's last message | An approved template only |
+| What you capture | Whatever the buyer types, plus their WhatsApp number | Structured answers to the questions you set, and the phone number they enter |
+| How the lead reaches your team | As a WhatsApp conversation on your business number | Through Meta's lead webhook to your CRM, or a CSV export |
+| What it needs | A Facebook Page with a WhatsApp number linked | A Facebook Page and an instant form |
+
+Sources: Meta's pages on [ads that click to WhatsApp](https://developers.facebook.com/documentation/ads-commerce/marketing-api/ad-creative/messaging-ads/click-to-whatsapp), the [lead webhook](https://developers.facebook.com/docs/graph-api/webhooks/getting-started/webhooks-for-leadgen/) and [sending messages](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages).
+
+## What does a click-to-WhatsApp ad actually do?
+
+Meta describes it plainly: these ads "send people who click on your ads directly into conversations with your business in WhatsApp." They run on [Facebook and Instagram, in feeds, Stories and Marketplace](https://whatsappbusiness.com/products/ads-that-click-to-whatsapp/), and the chat opens with a pre-filled message the buyer can send or edit.
+
+Because the buyer sends that first message, two WhatsApp rules work in your favour:
+
+<div className="mt-6 grid gap-4 md:grid-cols-2">
+  <FactCard label="The 24-hour window is open">
+    You can reply with ordinary messages for [24 hours from the buyer's last message](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages). No template is needed to answer "Is the 2BHK still available?"
+  </FactCard>
+  <FactCard label="The 72-hour free entry point">
+    Meta's pricing page says messages "sent within the 72-hour free entry point window, from Click to WhatsApp Ads or Facebook call-to-action buttons, remain free for message delivery." Meta changed what it charges inside the customer service window from 1 October 2026, so read the [current pricing page](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing) before you budget.
+  </FactCard>
+</div>
+
+The catch is the other side of the same coin: the buyer is now waiting in a live chat. A click-to-WhatsApp campaign that sends enquiries to a number nobody watches after 7pm turns ad spend into unanswered messages.
+
+## What does a lead form ad do better?
+
+It asks everyone the same questions. For a launch, that matters more than speed of chat: the sales team calls with budget, configuration, preferred location and possession timeline already in hand, and the leads can be sorted before anyone dials.
+
+A lead form also delivers the lead to software the moment it is submitted. Meta sends a [webhook notification](https://developers.facebook.com/docs/graph-api/webhooks/getting-started/webhooks-for-leadgen/) with a lead ID, and your system fetches the answers through the Graph API. From there the lead can go straight into your CRM and, if the buyer opted in, receive a WhatsApp template within seconds. The full chain is in [how to auto-reply on WhatsApp to Facebook lead ads](/blog/facebook-lead-ads-whatsapp-auto-reply).
+
+<Callout title="Opt-in belongs on the form" tone="warning">
+  A lead form only lets you message someone on WhatsApp if they agreed to it. Meta's [opt-in policy](https://developers.facebook.com/documentation/business-messaging/whatsapp/getting-opt-in) asks that the person is clearly told they are opting in to messages and the name of the business sending them. Put that line on the form. A phone number on its own is not permission.
+</Callout>
+
+## Which should a property developer in India choose?
+
+Choose by what your team can do with the lead, not by which ad looks cheaper in Ads Manager.
+
+<div className="mt-6 grid gap-4 md:grid-cols-2">
+  <NumberedCard number="①" title="Click-to-WhatsApp, when you can reply fast">
+    Resale, rentals, ready-to-move inventory and brokers with a team on WhatsApp all day. The buyer has a question now; answering it while they are still in the chat is the whole point.
+  </NumberedCard>
+  <NumberedCard number="②" title="Lead forms, when you need the same answers from everyone">
+    New launches and large projects, where sales needs budget, configuration and timeline before calling, and leads have to be sorted and assigned in a CRM.
+  </NumberedCard>
+  <NumberedCard number="③" title="Both, when you can measure them separately">
+    Run each as its own campaign, send both into the same CRM, and compare site visits booked per lead rather than cost per lead.
+  </NumberedCard>
+  <NumberedCard number="④" title="Neither, until someone owns the reply">
+    Whichever ad you run, the enquiry goes cold if nobody answers. Decide who replies, and by when, before the campaign goes live.
+  </NumberedCard>
+</div>
+
+## What does RERA require in these ads?
+
+The ad type does not change your RERA duties. [Section 11(2) of the RERA Act](https://ibclaw.in/section-11-of-real-estate-regulation-and-development-act-2016-rera-functions-and-duties-of-promoter/) says an advertisement or prospectus issued by a promoter "shall mention prominently the website address of the Authority" and "include the registration number obtained from the Authority." That applies to the creative of a click-to-WhatsApp ad and a lead form ad alike. Several state authorities have issued their own directions on how prominently to show it, so check your state RERA's circulars. This is a summary of the Act, not legal advice.
+
+## How does Vyostra AI fit in?
+
+For lead form ads, Vyostra AI connects to [Meta Lead Ads](/integrations/meta-lead-ads): each submission arrives in the [lead CRM](/features/crm) as the form is submitted, with every answer the buyer gave. A published follow-up journey can then message the lead on WhatsApp, wait for a real reply, and hand the lead to your team when it needs a person. If WhatsApp lead notifications are on, your team also gets a WhatsApp alert with the lead's name and number.
+
+For the rules that shape every WhatsApp conversation with a property buyer, read [WhatsApp chatbot for real estate in India](/blog/whatsapp-chatbot-for-real-estate-india).
