@@ -95,14 +95,14 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 | Homepage: a chat lead "Syncs to Zoho.", the voice agent has the "same CRM sync", and the Zoho card offers "Activity logging" and "Custom field mapping" (neither exists); Help: leads sync to "other tools" besides Zoho | 2026-10-03 |
 | WhatsApp page named chat and form leads as the only ones that send an alert (Meta lead ad leads do too), and "any of your agents" read as including the voice agent, which alerts only on a handoff | 2026-10-05 |
 
-### Global market (USD only)
+### Global market (USD first, rupees as an India option)
 
-The owner's decision on 2026-10-06: Vyostra AI sells globally and quotes US dollars only. This goes further than `GLOBAL-MARKET-HANDOFF.md`, which kept a rupee option for India; where the two disagree, this section is what shipped.
+The owner's decision on 2026-10-06: Vyostra AI sells globally and leads with US dollars. The first version of this work removed rupees entirely; the owner reversed that the same day, so a customer in India can still switch the price list to INR and pay by UPI, netbanking, RuPay or card. This matches `GLOBAL-MARKET-HANDOFF.md`.
 
 | Item | Shipped |
 |---|---|
-| Prices in USD only. The India (₹) toggle, the timezone region guess, the rupee line under each plan on `/pricing/` and the "cost in India" FAQ are gone. Checkout sends no currency | 2026-10-06 |
-| `POST /api/billing/subscribe` creates USD subscriptions only. A request that still names INR (a tab opened before the change) is refused with a 400 rather than charged in dollars. A checkout abandoned on an INR plan is released, not resumed | 2026-10-06 |
+| Every visitor opens on the USD price list; the timezone guess that showed rupees to visitors in India is gone. The currency switch stays, with US dollars first and India (₹) second, and `/pricing/` keeps the rupee line under each plan and the "cost in India" FAQ | 2026-10-06 |
+| `POST /api/billing/subscribe` takes USD or INR. Rupee checkout was switched off for a short time on 2026-10-06 and restored the same day | 2026-10-06 |
 | Shared pages read as global: footer, homepage "What is Vyostra AI", About (title, description and body), `llms.txt` summaries, Careers. Bangalore stays as the headquarters fact | 2026-10-06 |
 | `Organization` schema has `areaServed: Worldwide`; `WebSite` and `BlogPosting` use `inLanguage: en` (was `en-IN`). No hreflang, on purpose: one English site | 2026-10-06 |
 | Homepage walkthrough and feature-page mockups use a dollar budget, bedrooms and numbers from several countries instead of crore, BHK, NEET and +91 | 2026-10-06 |
@@ -112,7 +112,7 @@ The owner's decision on 2026-10-06: Vyostra AI sells globally and quotes US doll
 | Per-account default country for phone numbers (Settings). The WhatsApp button on a lead adds the account's own calling code to a number typed without one; an account that has not chosen keeps the old India assumption | 2026-10-06 |
 | Three global pillar posts: `/blog/what-is-a-whatsapp-crm/`, `/blog/real-estate-chatbot-guide/` and `/blog/ai-receptionist-vs-website-voice-agent/`. The last one says plainly that Vyostra AI is not an AI receptionist. Each pillar links to its India posts and each India post links back | 2026-10-06 |
 | Chat widget lays out right-to-left text correctly (each message takes its direction from its own first letter). Whether the agents ANSWER well in Arabic is still untested (owner task 31) | 2026-10-06 |
-| Terms section 4 says prices are in USD (was INR). The rest of the sentence, and the Privacy page, are unchanged pending legal review (owner task 25) | 2026-10-06 |
+| Terms section 4 says prices are in USD and that customers in India can choose to pay in INR. The rest of the sentence, and the Privacy page, are unchanged pending legal review (owner task 25) | 2026-10-06 |
 
 ### Performance and accessibility
 
@@ -172,7 +172,6 @@ The owner's decision on 2026-10-06: Vyostra AI sells globally and quotes US doll
 
 | 25 | Legal review of Terms and Privacy for international customers | Terms now says "Prices in USD, inclusive of applicable taxes"; only the currency was changed. Privacy states data is held in `ap-south-1` (Mumbai), which needs a lawful transfer basis for EU/UK customers and a check against UAE data protection law. |
 | 26 | Enable multi-data-centre on the Zoho OAuth client (Zoho API Console), then connect one zoho.com or zoho.eu account and sync one lead | The code is in place but unproven outside India. When enabling it, choose the same client ID and secret for every data centre: the code sends one secret to all of them. Once a non-India account syncs, the India-only sentence on `/features/zoho-crm/` can go and global content may mention Zoho. |
-| 27 | Remove `RAZORPAY_PLAN_ID_STARTER_INR`, `_GROWTH_INR` and `_AGENCY_INR` from the three Lambdas, and archive the three INR plans in Razorpay | Nothing reads them any more. Removing them also frees room under the Lambda's 4 KB environment ceiling. |
 | 28 | A USD ad-spend figure for the Head of Sales bio on `/about-us/` | The "₹10L+ a month" figure was removed rather than converted. The bio now says "Has managed monthly ad spend for developers." |
 | 29 | Confirm the "Real Estate Developer, Bengaluru" testimonial is real and approved | Left as it is. It is the one India-specific line still on the homepage. |
 | 31 | Test the chat and voice agents in Arabic on a real bot | "arabic chatbot" has about 2,400 searches a month in the UAE. No Arabic claim may be published until this passes. |
@@ -198,7 +197,7 @@ The owner's decision on 2026-10-06: Vyostra AI sells globally and quotes US doll
 | 19 | Outside sources and first-hand evidence for the two voice posts that cite none | Real measurements or transcripts from the owner. |
 | 20 | Sources for the pilgrimage post's figures | The owner's source list. |
 | 21 | Change "Gupshup" wording in `/faq/`, `/help/`, `/features/whatsapp/` and `llms.txt` | Accurate today. Change all four together when the Meta direct route opens to clients, after WhatsApp App Review. |
-| 22 | `purchase` event | A first real charge. Charges are in USD only since 2026-10-06, so the INR currency trap in `prompt-analytics.md` no longer applies to new payments. |
+| 22 | `purchase` event | A first real charge. Charges can be in USD or INR, so the INR currency trap in `prompt-analytics.md` still applies. |
 | 23 | Striking-distance work and the weekly scoreboard | Search Console data (owner task 1). |
 | 24 | Three posts a week from the clusters | Keyword validation, which needs Search Console or a keyword tool. |
 
@@ -211,7 +210,7 @@ The owner's decision on 2026-10-06: Vyostra AI sells globally and quotes US doll
 | `docs/seo/GEO-ANALYSIS-2026-10-02.md` | Latest scored analysis, with per-crawler access and passage-level detail |
 | `docs/seo/GEO-AUDIT-2026-09-19.md` | The baseline audit (63/100) and its commit record |
 | `docs/seo/GEO-FIX-PLAN.md` | The original fix plan and its progress log |
-| `docs/seo/GLOBAL-MARKET-HANDOFF.md` | The global market handoff: markets, keyword data and the first twelve posts. Its INR guidance is superseded by the USD-only decision above |
+| `docs/seo/GLOBAL-MARKET-HANDOFF.md` | The global market handoff: markets, keyword data and the first twelve posts |
 | `docs/SEO_AEO_HANDOFF.md` | The handoff this round of work started from, with a status section |
 | `docs/SEO_GROWTH_PLAN.md` | The 6-month growth plan: clusters, programmatic pages, authority |
 | `docs/seo/drafts/compare-pages.md` | Comparison page drafts, unpublished |
