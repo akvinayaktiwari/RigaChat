@@ -52,6 +52,9 @@ const PRODUCTION_TABLE_NAMES: Record<TableKey, string> = {
   // scripts/provision-voice-phone-lookup.sh.
   voice_phone_lookup: 'voice_phone_lookup',
   voice_leads: 'voice_leads',
+  // Added 2026-10-05 with the developer API. Never a DYNAMODB_TABLE_* variable.
+  // Provisioned by scripts/provision-api-keys.sh.
+  api_keys: 'api_keys',
 }
 
 // vitest.config.ts sets DYNAMODB_TABLE_PREFIX=test- as a safety boundary, so an

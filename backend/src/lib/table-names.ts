@@ -65,6 +65,7 @@ export type TableKey =
   | 'device_tokens'
   | 'voice_phone_lookup'
   | 'voice_leads'
+  | 'api_keys'
 
 // Verified against the live rigachat-api environment on 2026-08-16. Every value
 // here is byte-identical to the variable it replaces; table-names.test.ts pins
@@ -106,6 +107,7 @@ export const TABLE_NAMES: Record<TableKey, string> = {
   device_tokens: 'device_tokens',
   voice_phone_lookup: 'voice_phone_lookup',
   voice_leads: 'voice_leads',
+  api_keys: 'api_keys',
 }
 
 // Read per call rather than captured at module load, so a test can set it and
