@@ -20,9 +20,10 @@ export interface PricingTier {
 /**
  * One global price list, in USD, charged in USD.
  *
- * There used to be a rupee list beside it (and, before that, a cheaper India
- * tier). Both are gone: the product sells globally and quotes one currency, so
- * the number on the page is the number on the card for every visitor.
+ * There used to be a second, India-only list beside it (and, before that, a
+ * cheaper India tier). Both are gone: the product sells globally and quotes
+ * one currency, so the number on the page is the number on the card for every
+ * visitor. global-market.test.ts keeps a second currency from creeping back.
  */
 export const PRICING_TIERS: PricingTier[] = [
   {

@@ -64,6 +64,10 @@ export function organizationSchema(): JsonLd {
       addressRegion: 'Karnataka',
       addressCountry: 'IN',
     },
+    // Where the company is, above; who it sells to, here. Without this the
+    // only geography in the graph is the Bangalore address, which reads as a
+    // local business.
+    areaServed: 'Worldwide',
     founder: FOUNDERS.map(personSchema),
   }
 }
@@ -74,7 +78,7 @@ export function websiteSchema(): JsonLd {
     '@id': absoluteUrl(`/${WEBSITE_ID}`),
     name: ORGANIZATION_NAME,
     url: absoluteUrl('/'),
-    inLanguage: 'en-IN',
+    inLanguage: 'en',
     publisher: { '@id': absoluteUrl(`/${ORGANIZATION_ID}`) },
   }
 }

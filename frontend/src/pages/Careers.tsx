@@ -29,7 +29,7 @@ const CULTURE_CARDS: CultureCard[] = [
   {
     icon: <Globe className="w-6 h-6" />,
     title: '100% Remote',
-    body: 'Work from anywhere in India. We are async-first, results-driven, and trust our team to own their work completely. No daily standups. No micromanagement.',
+    body: 'Work from anywhere. We are async-first, results-driven, and trust our team to own their work completely. No daily standups. No micromanagement.',
   },
   {
     icon: <Zap className="w-6 h-6" />,

@@ -80,7 +80,7 @@ export default function Footer() {
               </span>
             </a>
             <p className="text-sm text-gray-500 leading-relaxed max-w-56">
-              Conversational AI agents with native CRM for Indian businesses.
+              AI chat, voice and WhatsApp agents with a built-in lead CRM.
             </p>
             <SocialLinks />
           </div>

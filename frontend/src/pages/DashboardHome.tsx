@@ -49,8 +49,8 @@ interface DailyBucket {
 
 // toISOString() converts to UTC before formatting, so calling it on a
 // local-midnight Date silently rolls the date back a day for anyone in a
-// timezone ahead of UTC (IST included — this product's stated target market
-// is Indian SMBs, so this isn't a theoretical edge case). Build the key from
+// timezone ahead of UTC (most of Europe, the Gulf, India and Australia --
+// a large share of the customers this sells to). Build the key from
 // local Y/M/D components directly instead.
 function localDateKey(date: Date): string {
   const year = date.getFullYear()
