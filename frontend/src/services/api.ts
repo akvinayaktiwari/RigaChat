@@ -430,16 +430,9 @@ export interface SubscribeResponse extends ApiResponse<SubscribeResult> {
   details?: { status?: string; providerSubscriptionId?: string | null; razorpayKeyId?: string | null }
 }
 
-/**
- * `currency` picks which Razorpay plan the subscription is created against.
- * INR exists so Indian customers can pay by UPI, netbanking or RuPay — a USD
- * plan accepts none of those. The price is the same either way.
- */
-export function subscribeToTier(
-  tier: 'starter' | 'growth' | 'agency',
-  currency: 'INR' | 'USD' = 'USD'
-): Promise<SubscribeResponse> {
-  return apiClient<SubscribeResult>('/api/billing/subscribe', 'POST', { tier, currency }) as Promise<SubscribeResponse>
+/** Every plan is charged in USD, so the tier is all the server needs. */
+export function subscribeToTier(tier: 'starter' | 'growth' | 'agency'): Promise<SubscribeResponse> {
+  return apiClient<SubscribeResult>('/api/billing/subscribe', 'POST', { tier }) as Promise<SubscribeResponse>
 }
 
 export function getPaymentHistory(): Promise<ApiResponse<PaymentRecord[]>> {

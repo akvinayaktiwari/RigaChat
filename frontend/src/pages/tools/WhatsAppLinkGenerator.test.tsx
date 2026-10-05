@@ -28,9 +28,9 @@ describe('LinkBuilder', () => {
 
   it('builds the link as the number and message are typed', () => {
     render(<LinkBuilder />)
-    type(/WhatsApp number/, '098765 43210')
+    type(/WhatsApp number/, '(415) 555-0132')
     type(/Pre-filled message/, 'Hi there')
-    expect(screen.getByText('https://wa.me/919876543210?text=Hi%20there')).toBeTruthy()
+    expect(screen.getByText('https://wa.me/14155550132?text=Hi%20there')).toBeTruthy()
   })
 
   it('uses the country that was picked', () => {
@@ -43,7 +43,7 @@ describe('LinkBuilder', () => {
   it('offers the same link to test in WhatsApp', () => {
     render(<LinkBuilder />)
     type(/WhatsApp number/, '9876543210')
-    expect(screen.getByRole('link', { name: 'Test the link' }).getAttribute('href')).toBe('https://wa.me/919876543210')
+    expect(screen.getByRole('link', { name: 'Test the link' }).getAttribute('href')).toBe('https://wa.me/19876543210')
   })
 
   it('copies the link', async () => {
@@ -51,7 +51,7 @@ describe('LinkBuilder', () => {
     type(/WhatsApp number/, '9876543210')
     fireEvent.click(screen.getByRole('button', { name: 'Copy link' }))
     expect(await screen.findByRole('button', { name: 'Copied' })).toBeTruthy()
-    expect(writeText).toHaveBeenCalledWith('https://wa.me/919876543210')
+    expect(writeText).toHaveBeenCalledWith('https://wa.me/19876543210')
   })
 
   // The page promises the number never leaves the browser. The one event it

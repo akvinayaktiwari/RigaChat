@@ -83,7 +83,6 @@ beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
   process.env.RAZORPAY_KEY_ID = 'rzp_test_key'
   process.env.RAZORPAY_PLAN_ID_GROWTH = 'plan_growth'
-  process.env.RAZORPAY_PLAN_ID_GROWTH_INR = 'plan_growth_inr'
 })
 
 describe('the currency a subscription is charged in', () => {
@@ -91,36 +90,21 @@ describe('the currency a subscription is charged in', () => {
     ensureTrialSubscription.mockResolvedValue(trialRow())
   })
 
-  // One Razorpay plan holds one currency, so INR and USD are different plan
-  // objects at the same price. Picking the wrong one charges the right number
-  // in the wrong currency, which nothing downstream would flag.
-  it('uses the INR plan when the caller asks for rupees', async () => {
-    await subscribeToTier(CLIENT, 'growth', 'INR')
-
-    expect(createSubscription).toHaveBeenCalledWith('plan_growth_inr', {
-      clientId: CLIENT,
-      tier: 'growth',
-      currency: 'INR',
-    })
-  })
-
-  it('defaults to the USD plan when no currency is given', async () => {
+  it('creates the subscription against the USD plan', async () => {
     await subscribeToTier(CLIENT, 'growth')
 
     expect(createSubscription).toHaveBeenCalledWith('plan_growth', expect.objectContaining({ currency: 'USD' }))
   })
 
-  // Falling back to the USD plan here would charge a customer who chose UPI in
-  // dollars, on a card, which is not a payment method they picked.
-  // The bug this covers: a visitor abandons an INR checkout, switches the
-  // toggle to International, clicks again, and Razorpay opens the OLD
-  // subscription — ₹4,299 under a page reading $49. Razorpay charges what the
-  // subscription says, so the hold has to be released, not resumed.
-  it('releases a pending hold created for a different currency and starts a new one', async () => {
+  // An account can still be holding a checkout it abandoned on one of the
+  // retired INR plans. Razorpay charges what the subscription says, so
+  // resuming it would bill rupees under a page reading $129 -- the hold has to
+  // be released, not resumed.
+  it('releases a pending hold left on a retired INR plan and starts a USD one', async () => {
     ensureTrialSubscription.mockResolvedValue({ ...pendingRow(2), pendingPlanId: 'plan_growth_inr' })
     fetchSubscription.mockResolvedValue({ id: SUB_ID, status: 'created', paid_count: 0 })
 
-    const result = await subscribeToTier(CLIENT, 'growth', 'USD')
+    const result = await subscribeToTier(CLIENT, 'growth')
 
     expect(cancelSubscription).toHaveBeenCalledWith(SUB_ID)
     expect(createSubscription).toHaveBeenCalledWith('plan_growth', expect.objectContaining({ currency: 'USD' }))
@@ -130,7 +114,7 @@ describe('the currency a subscription is charged in', () => {
   it('resumes rather than replaces a pending hold for the SAME plan', async () => {
     ensureTrialSubscription.mockResolvedValue({ ...pendingRow(2), pendingPlanId: 'plan_growth' })
 
-    const error = (await subscribeToTier(CLIENT, 'growth', 'USD').catch((e: unknown) => e)) as InstanceType<
+    const error = (await subscribeToTier(CLIENT, 'growth').catch((e: unknown) => e)) as InstanceType<
       typeof BillingError
     >
 
@@ -139,13 +123,13 @@ describe('the currency a subscription is charged in', () => {
     expect(createSubscription).not.toHaveBeenCalled()
   })
 
-  it('fails loudly when the INR plan for that tier is not configured', async () => {
-    delete process.env.RAZORPAY_PLAN_ID_GROWTH_INR
+  it('fails loudly when the plan for that tier is not configured', async () => {
+    delete process.env.RAZORPAY_PLAN_ID_GROWTH
 
-    const error = await subscribeToTier(CLIENT, 'growth', 'INR').catch((e: unknown) => e)
+    const error = await subscribeToTier(CLIENT, 'growth').catch((e: unknown) => e)
 
     expect((error as InstanceType<typeof BillingError>).code).toBe('CONFIG_ERROR')
-    expect((error as Error).message).toContain('RAZORPAY_PLAN_ID_GROWTH_INR')
+    expect((error as Error).message).toContain('RAZORPAY_PLAN_ID_GROWTH')
     expect(createSubscription).not.toHaveBeenCalled()
   })
 })

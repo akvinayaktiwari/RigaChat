@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react'
 import type { BlogPost, BlogPostMeta } from '../../types/blog'
+import { isBlogMarket } from '../../lib/blog-markets'
 
 /**
  * Post discovery.
@@ -33,6 +34,12 @@ function buildPosts(): BlogPost[] {
 
     if (meta.slug !== slug) {
       throw new Error(`Blog post slug mismatch: ${path} declares slug "${meta.slug}" but lives in directory "${slug}". They must match or the post URL will 404.`)
+    }
+
+    // The type already requires `market`, but the production build does not
+    // typecheck, so this is what actually stops an unlabelled post shipping.
+    if (!isBlogMarket(meta.market)) {
+      throw new Error(`Blog post "${slug}" has no valid market in its meta.ts. Set market to 'global' or the country it is written for.`)
     }
 
     const loadContent = contentModules[`./posts/${slug}/content.mdx`] ?? contentModules[`./posts/${slug}/content.tsx`]

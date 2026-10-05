@@ -91,7 +91,7 @@ export const STATIC_PAGES: readonly StaticPage[] = [
   {
     route: '/pricing',
     label: 'Pricing',
-    summary: 'The three plans, what each includes, billing in USD or INR, and the 14-day free trial.',
+    summary: 'The three plans, what each includes, billing in US dollars, and the 14-day free trial.',
     section: 'Pricing',
     lastModified: '2026-10-02',
   },
@@ -136,7 +136,7 @@ export const STATIC_PAGES: readonly StaticPage[] = [
     section: 'Product',
     lastModified: '2026-10-02',
   },
-  { route: '/about-us', label: 'About Vyostra AI', summary: 'Who builds Vyostra AI and where: the founders, in Bangalore.', section: 'Company', lastModified: '2026-10-01' },
+  { route: '/about-us', label: 'About Vyostra AI', summary: 'Who builds Vyostra AI: the founders and the company.', section: 'Company', lastModified: '2026-10-01' },
   { route: '/help', label: 'Help Center', summary: 'Setup answers: embedding the widget, the knowledge base, WhatsApp, Zoho CRM, forms, billing.', section: 'Company', lastModified: '2026-10-03' },
   { route: '/contact', label: 'Contact', summary: 'Reach sales or support; the team replies within 24 hours.', section: 'Company', lastModified: '2026-09-20' },
   { route: '/careers', label: 'Careers', summary: 'Working at Vyostra AI, a fully remote team.', section: 'Company', lastModified: '2026-09-16' },

@@ -360,6 +360,14 @@ export interface CRMConnection {
   refreshToken?: string
   tokenExpiry: string
   connectedAt: string
+  /**
+   * The Zoho data centre this account lives in, recorded at connect time from
+   * the OAuth callback. Tokens refresh against accountsServer and leads are
+   * pushed to apiDomain. Absent on rows connected before this was recorded;
+   * those are India (zoho.in), the only data centre that could connect then.
+   */
+  accountsServer?: string
+  apiDomain?: string
 }
 
 /** What the dashboard is told about the connection: never a token, in either form. */

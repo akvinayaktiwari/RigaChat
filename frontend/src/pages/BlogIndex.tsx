@@ -5,9 +5,10 @@ import Navbar from '../components/landing/Navbar'
 import Footer from '../components/landing/Footer'
 import DemoModal from '../components/landing/modals/DemoModal'
 import { getAllPosts } from '../content/blog/registry'
-import { BlogSurface, PostMetaLine, PostTags } from '../components/blog/BlogChrome'
+import { BlogSurface, PostEyebrow, PostMetaLine, PostTags } from '../components/blog/BlogChrome'
 import { JAKARTA_FONT, ScrollReveal, StatTile } from '../components/blog/BlogPrimitives'
-import type { BlogPost } from '../types/blog'
+import type { BlogMarket, BlogPost } from '../types/blog'
+import { marketLabel, marketsInUse } from '../lib/blog-markets'
 import PageMeta from '../components/seo/PageMeta'
 import StructuredData from '../components/seo/StructuredData'
 import { blogIndexNodes, jsonLdGraph, organizationSchema } from '../lib/structured-data'
@@ -24,7 +25,7 @@ function FeaturedPost({ post }: { post: BlogPost }) {
             <span className="rounded-full border border-violet-400/30 bg-violet-500/15 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-violet-300">
               Latest
             </span>
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/55">{meta.category}</span>
+            <PostEyebrow meta={meta} className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/55" />
           </div>
 
           <h2 className="mt-5 text-2xl font-extrabold leading-tight text-white md:text-4xl" style={JAKARTA_FONT}>
@@ -72,7 +73,7 @@ function PostCard({ post, index }: { post: BlogPost; index: number }) {
   return (
     <ScrollReveal delay={index * 0.05}>
       <article className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition-colors hover:border-violet-400/30">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/55">{meta.category}</span>
+        <PostEyebrow meta={meta} className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/55" />
         <h3 className="mt-3 text-lg font-bold leading-snug text-white" style={JAKARTA_FONT}>
           <Link to={`/blog/${meta.slug}`} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-violet-300">
             <span className="absolute inset-0" aria-hidden="true" />
@@ -91,9 +92,40 @@ function PostCard({ post, index }: { post: BlogPost; index: number }) {
   )
 }
 
+type MarketFilter = BlogMarket | 'all'
+
+const FILTER_BUTTON = 'rounded-full border px-4 py-1.5 text-xs font-semibold transition-colors'
+const FILTER_ACTIVE = 'border-violet-400/60 bg-violet-500/20 text-white'
+const FILTER_IDLE = 'border-white/10 bg-white/[0.03] text-white/60 hover:border-violet-400/30 hover:text-white'
+
+/** One button per market that has a post, so no filter ever leads to an empty list. */
+function MarketFilterBar({ markets, selected, onSelect }: { markets: BlogMarket[]; selected: MarketFilter; onSelect: (market: MarketFilter) => void }) {
+  const options: MarketFilter[] = ['all', ...markets]
+
+  return (
+    <div className="mt-10 flex flex-wrap gap-2" role="group" aria-label="Filter posts by market">
+      {options.map((option) => (
+        <button
+          key={option}
+          type="button"
+          aria-pressed={selected === option}
+          onClick={() => onSelect(option)}
+          className={`${FILTER_BUTTON} ${selected === option ? FILTER_ACTIVE : FILTER_IDLE}`}
+        >
+          {option === 'all' ? 'All markets' : marketLabel(option)}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function BlogIndex() {
   const [isDemoOpen, setIsDemoOpen] = useState(false)
-  const posts = getAllPosts()
+  // Starts on 'all' so the first client render matches the prerendered page,
+  // which lists every post for crawlers.
+  const [market, setMarket] = useState<MarketFilter>('all')
+  const allPosts = getAllPosts()
+  const posts = market === 'all' ? allPosts : allPosts.filter((post) => post.meta.market === market)
   const [featured, ...rest] = posts
 
   return (
@@ -106,7 +138,7 @@ export default function BlogIndex() {
       <StructuredData
         data={jsonLdGraph([
           organizationSchema(),
-          ...blogIndexNodes(posts.map(({ meta }) => ({ title: meta.title, path: `/blog/${meta.slug}/` }))),
+          ...blogIndexNodes(allPosts.map(({ meta }) => ({ title: meta.title, path: `/blog/${meta.slug}/` }))),
         ])}
       />
 
@@ -126,6 +158,10 @@ export default function BlogIndex() {
               Deep dives, feasibility models and field notes — the kind of work we do to understand the markets our customers sell into.
             </p>
           </ScrollReveal>
+
+          {allPosts.length > 0 ? (
+            <MarketFilterBar markets={marketsInUse(allPosts.map((post) => post.meta.market))} selected={market} onSelect={setMarket} />
+          ) : null}
 
           {posts.length === 0 ? (
             <p className="mt-16 rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center text-white/50">

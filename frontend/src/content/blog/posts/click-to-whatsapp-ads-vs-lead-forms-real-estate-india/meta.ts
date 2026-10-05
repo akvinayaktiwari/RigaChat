@@ -8,6 +8,7 @@ const meta: BlogPostMeta = {
   publishedAt: '2026-10-05',
   authorId: 'vinayak-tiwari',
   category: 'Real Estate',
+  market: 'in',
   tags: ['Real Estate', 'WhatsApp', 'Meta Lead Ads', 'India'],
   readingMinutes: 7,
   seoTitle: 'Click-to-WhatsApp vs Lead Ads: Real Estate',

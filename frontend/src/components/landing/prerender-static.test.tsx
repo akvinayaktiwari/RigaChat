@@ -1,7 +1,6 @@
 // @vitest-environment node
 import { renderToString } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { detectRegion } from '../../lib/pricingTiers'
 import { bootedFromPrerender, isServerRender } from '../../lib/prerender-boot'
 import { Reveal, RevealGroup, RevealItem } from './motion-primitives'
 import { ScrollReveal } from '../blog/BlogPrimitives'
@@ -40,11 +39,5 @@ describe('landing components in a server render', () => {
     const html = renderToString(<StatsBar />).replace(/<!-- -->/g, '')
     expect(html).toContain('$49')
     expect(html).toContain('24/7')
-  })
-
-  // The static page and the JSON-LD on it must name the same currency, and the
-  // schema publishes the global USD list.
-  it('prices in USD regardless of the build machine timezone', () => {
-    expect(detectRegion()).toBe('intl')
   })
 })

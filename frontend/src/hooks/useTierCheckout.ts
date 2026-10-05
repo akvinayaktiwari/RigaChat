@@ -6,8 +6,6 @@ import type { RazorpayPaymentFailure } from '../lib/razorpay-checkout'
 import { PRICING_TIERS } from '../lib/pricingTiers'
 import type { BillableTier } from '../lib/pricingTiers'
 
-/** Which Razorpay plan the subscription is created against; see api.ts. */
-export type BillingCurrency = 'INR' | 'USD'
 import { useSubscription } from './useSubscription'
 
 const POLL_INTERVAL_MS = 3000
@@ -23,11 +21,6 @@ export interface PendingTierCheckout {
   // checkout is keyed by subscription_id, so the amount/plan shown to the
   // user is authoritative regardless of what we display locally.
   tier: BillableTier | null
-  // The currency the pending subscription was created in, or null when it was
-  // recovered from a 409 and we cannot know. Resuming is only safe when it
-  // matches what is being asked for now: Razorpay charges what the subscription
-  // says, so resuming an INR hold under a page showing $49 bills ₹4,299.
-  currency: BillingCurrency | null
   subscriptionId: string
   razorpayKeyId: string
 }
@@ -57,7 +50,7 @@ function resolveBillingErrorMessage(
     // everyone to "try again", including the cases where trying again cannot
     // possibly work.
     case 'CONFIG_ERROR':
-      return 'Checkout is not set up for this currency yet. Switch the currency, or contact us and we will take the payment directly.'
+      return 'Checkout is not set up for this plan yet. Contact us and we will take the payment directly.'
 
     case 'PROVIDER_ERROR':
       return 'Our payment provider rejected the request. Nothing has been charged. Please try again in a moment.'
@@ -75,7 +68,7 @@ export interface UseTierCheckoutResult {
   submittingTier: BillableTier | null
   errorMessage: string | null
   pendingCheckout: PendingTierCheckout | null
-  selectTier: (tier: BillableTier, currency?: BillingCurrency) => Promise<void>
+  selectTier: (tier: BillableTier) => Promise<void>
   reset: () => void
 }
 
@@ -143,14 +136,7 @@ export function useTierCheckout(onConfirmed?: () => void): UseTierCheckoutResult
     poll()
   }
 
-  async function openRazorpayCheckout(
-    tier: BillableTier | null,
-    // Carried so a dismissed checkout is stored with the currency it was
-    // actually created in, not the currency selected the next time.
-    currency: BillingCurrency | null,
-    subscriptionId: string,
-    razorpayKeyId: string
-  ) {
+  async function openRazorpayCheckout(tier: BillableTier | null, subscriptionId: string, razorpayKeyId: string) {
     try {
       await loadRazorpayScript()
     } catch {
@@ -182,7 +168,7 @@ export function useTierCheckout(onConfirmed?: () => void): UseTierCheckoutResult
         // fail — the only way forward is to resume this exact Razorpay
         // subscription, not create a new one.
         ondismiss: () => {
-          setPendingCheckout({ tier, currency, subscriptionId, razorpayKeyId })
+          setPendingCheckout({ tier, subscriptionId, razorpayKeyId })
           setStage('idle')
         },
       },
@@ -200,7 +186,7 @@ export function useTierCheckout(onConfirmed?: () => void): UseTierCheckoutResult
         reason,
         paymentId: failure?.error?.metadata?.payment_id,
       })
-      setPendingCheckout({ tier, currency, subscriptionId, razorpayKeyId })
+      setPendingCheckout({ tier, subscriptionId, razorpayKeyId })
       setStage('idle')
       setErrorMessage(
         reason
@@ -212,12 +198,12 @@ export function useTierCheckout(onConfirmed?: () => void): UseTierCheckoutResult
     checkout.open()
   }
 
-  async function selectTier(tier: BillableTier, currency: BillingCurrency = 'USD') {
+  async function selectTier(tier: BillableTier) {
     setErrorMessage(null)
 
     // No client-side resume shortcut. The browser's idea of a pending checkout
     // can be arbitrarily stale — the subscription may have been cancelled,
-    // replaced after a currency switch, or already paid in another tab — and
+    // replaced by a different plan, or already paid in another tab — and
     // reopening a dead subscription_id makes Razorpay throw its own
     // "Payment Failed" alert, which reads as our bug and cannot be recovered
     // from by clicking again. The server knows the real state, so ask it every
@@ -225,7 +211,7 @@ export function useTierCheckout(onConfirmed?: () => void): UseTierCheckoutResult
     // creates a fresh subscription when there is not.
     setSubmittingTier(tier)
     try {
-      const res = await subscribeToTier(tier, currency)
+      const res = await subscribeToTier(tier)
       if (!res.success || !res.data) {
         // Fresh ALREADY_SUBSCRIBED with no local pendingCheckout (e.g. after
         // a page refresh) but the server handed back enough to resume
@@ -237,18 +223,17 @@ export function useTierCheckout(onConfirmed?: () => void): UseTierCheckoutResult
         if (res.code === 'ALREADY_SUBSCRIBED' && res.details?.providerSubscriptionId && res.details?.razorpayKeyId) {
           const recovered: PendingTierCheckout = {
             tier: null,
-            currency: null,
             subscriptionId: res.details.providerSubscriptionId,
             razorpayKeyId: res.details.razorpayKeyId,
           }
           setPendingCheckout(recovered)
-          await openRazorpayCheckout(recovered.tier, recovered.currency, recovered.subscriptionId, recovered.razorpayKeyId)
+          await openRazorpayCheckout(recovered.tier, recovered.subscriptionId, recovered.razorpayKeyId)
           return
         }
         setErrorMessage(resolveBillingErrorMessage(res.code, res.error, pendingCheckout))
         return
       }
-      await openRazorpayCheckout(tier, currency, res.data.subscriptionId, res.data.razorpayKeyId)
+      await openRazorpayCheckout(tier, res.data.subscriptionId, res.data.razorpayKeyId)
     } catch (error) {
       // Reaching here means the request never completed — offline, a blocked
       // request, or the API being unreachable. Distinguish it from a payment

@@ -1,8 +1,8 @@
 import type { CRMCredentials, CRMLead, CRMProvider, CRMSyncResult } from '../lib/crm-provider.js'
 import type { FormField } from '../types/index.js'
+import { DEFAULT_ZOHO_DATA_CENTRE, zohoApiDomain, zohoDataCentreForCallback } from './zoho-data-centre.js'
 
-const ZOHO_ACCOUNTS_URL = 'https://accounts.zoho.in'
-const ZOHO_API_URL = 'https://www.zohoapis.in/crm/v2'
+const ZOHO_CRM_API_PATH = '/crm/v2'
 
 function requireEnv(name: string): string {
   const value = process.env[name]
@@ -24,6 +24,7 @@ interface ZohoTokenResponse {
   access_token?: string
   refresh_token?: string
   expires_in?: number
+  api_domain?: string
   error?: string
   error_description?: string
 }
@@ -75,6 +76,18 @@ export function toPublicWebsiteUrl(sourceUrl: string): string | null {
   return sourceUrl
 }
 
+// Where a connection's tokens are refreshed and where its leads are pushed.
+// Both come from the connection itself, never from a constant: a US or EU
+// account's tokens are refused by the India hosts. Connections stored before
+// the data centre was recorded have neither field and are India.
+function accountsServerFor(credentials: CRMCredentials): string {
+  return credentials.accountsServer ?? DEFAULT_ZOHO_DATA_CENTRE.accountsServer
+}
+
+function crmApiUrlFor(credentials: CRMCredentials): string {
+  return `${credentials.apiDomain ?? DEFAULT_ZOHO_DATA_CENTRE.apiDomain}${ZOHO_CRM_API_PATH}`
+}
+
 function isTokenExpiringSoon(tokenExpiry: string): boolean {
   const expiry = new Date(tokenExpiry)
   return new Date() >= new Date(expiry.getTime() - TOKEN_EXPIRY_BUFFER_MS)
@@ -94,10 +107,16 @@ export class ZohoProvider implements CRMProvider {
       access_type: 'offline',
       state,
     })
-    return `${ZOHO_ACCOUNTS_URL}/oauth/v2/auth?${params.toString()}`
+    // Started at the data centre the OAuth client is registered in. Zoho sends
+    // an account that lives elsewhere to its own data centre to sign in, and
+    // names that data centre on the callback (see exchangeCodeForTokens).
+    return `${DEFAULT_ZOHO_DATA_CENTRE.accountsServer}/oauth/v2/auth?${params.toString()}`
   }
 
-  async exchangeCodeForTokens(code: string): Promise<CRMCredentials> {
+  // accountsServer is the callback's `accounts-server` param: the data centre
+  // the person signed in at, which is the only one that can redeem this code.
+  async exchangeCodeForTokens(code: string, accountsServer?: string): Promise<CRMCredentials> {
+    const dataCentre = zohoDataCentreForCallback(accountsServer)
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
       client_id: ZOHO_CLIENT_ID,
@@ -106,7 +125,7 @@ export class ZohoProvider implements CRMProvider {
       code,
     })
 
-    const response = await fetch(`${ZOHO_ACCOUNTS_URL}/oauth/v2/token`, {
+    const response = await fetch(`${dataCentre.accountsServer}/oauth/v2/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),
@@ -125,6 +144,8 @@ export class ZohoProvider implements CRMProvider {
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
       tokenExpiry: new Date(Date.now() + data.expires_in * 1000).toISOString(),
+      accountsServer: dataCentre.accountsServer,
+      apiDomain: zohoApiDomain(dataCentre, data.api_domain),
     }
   }
 
@@ -136,7 +157,7 @@ export class ZohoProvider implements CRMProvider {
       refresh_token: credentials.refreshToken,
     })
 
-    const response = await fetch(`${ZOHO_ACCOUNTS_URL}/oauth/v2/token`, {
+    const response = await fetch(`${accountsServerFor(credentials)}/oauth/v2/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),
@@ -159,7 +180,7 @@ export class ZohoProvider implements CRMProvider {
 
   async validateCredentials(credentials: CRMCredentials): Promise<boolean> {
     try {
-      const response = await fetch(`${ZOHO_API_URL}/users?type=CurrentUser`, {
+      const response = await fetch(`${crmApiUrlFor(credentials)}/users?type=CurrentUser`, {
         headers: { Authorization: `Zoho-oauthtoken ${credentials.accessToken}` },
       })
       return response.status === 200
@@ -201,7 +222,7 @@ export class ZohoProvider implements CRMProvider {
     }
 
     const postLead = (accessToken: string) =>
-      fetch(`${ZOHO_API_URL}/Leads`, {
+      fetch(`${crmApiUrlFor(credentials)}/Leads`, {
         method: 'POST',
         headers: {
           Authorization: `Zoho-oauthtoken ${accessToken}`,

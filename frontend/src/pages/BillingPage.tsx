@@ -4,14 +4,14 @@ import { useToast } from '../components/Toast/Toast'
 import { getPaymentHistory } from '../services/api'
 import type { PaymentRecord } from '../types/index'
 
-// Razorpay amounts are always in the smallest currency unit (paise for INR),
-// never whole rupees - dividing by 100 here matches how the amount is
+// Razorpay amounts are always in the smallest currency unit (cents for USD),
+// never whole dollars - dividing by 100 here matches how the amount is
 // captured in webhook-service.ts's subscription.charged handling.
 function formatAmount(amount: number, currency: string): string {
   try {
-    return new Intl.NumberFormat('en-IN', { style: 'currency', currency }).format(amount / 100)
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount / 100)
   } catch {
-    return `${(amount / 100).toLocaleString('en-IN')} ${currency}`
+    return `${(amount / 100).toLocaleString('en-US')} ${currency}`
   }
 }
 
@@ -98,7 +98,7 @@ export default function BillingPage() {
                   className="border-b border-slate-50 hover:bg-slate-50 transition-colors"
                 >
                   <td className="px-4 py-3 text-slate-700 text-sm whitespace-nowrap">
-                    {new Date(payment.paidAt).toLocaleDateString('en-IN', {
+                    {new Date(payment.paidAt).toLocaleDateString(undefined, {
                       day: 'numeric',
                       month: 'short',
                       year: 'numeric',

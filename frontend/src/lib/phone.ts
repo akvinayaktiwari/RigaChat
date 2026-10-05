@@ -4,10 +4,11 @@
 // "09876543210" and "+91 98765 43210". Linking those straight through lands on
 // WhatsApp's "phone number shared via url is invalid" page every time.
 //
-// DEFAULT_COUNTRY_CODE is India because that is who this product sells to
-// (INR pricing, RERA compliance, Gupshup/WhatsApp-first). A bare 10-digit
-// number is assumed Indian. Selling outside India means making this a per-client
-// setting, not changing the constant.
+// DEFAULT_COUNTRY_CODE is India because that is where the product started. A
+// bare 10-digit number is assumed Indian, which is WRONG for a US or Canadian
+// lead typed without its +1 -- a known gap now that the product sells
+// globally. The fix is a per-client default country, not a different constant:
+// no single country code is right for every account.
 const DEFAULT_COUNTRY_CODE = '91'
 const NATIONAL_NUMBER_LENGTH = 10
 

@@ -8,6 +8,7 @@ const meta: BlogPostMeta = {
   publishedAt: '2026-10-01',
   authorId: 'vinayak-tiwari',
   category: 'Comparison',
+  market: 'in',
   tags: ['Voice AI', 'India', 'Comparison'],
   readingMinutes: 6,
   seoTitle: 'On-Page Voice Agent vs Phone AI Agent (India)',

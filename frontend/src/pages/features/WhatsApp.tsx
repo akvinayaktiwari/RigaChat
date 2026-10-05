@@ -54,7 +54,7 @@ function WhatsAppNotificationMockup() {
 
       <div className="bg-[#005C4B] rounded-2xl rounded-tl-none p-4">
         <p className="text-white font-mono text-xs leading-relaxed whitespace-pre-line">
-          {'🔔 New Lead — Vyostra AI\n\nName: Rahul Sharma\nPhone: +91 98765 43210\nEmail: rahul@example.com\nBot: Property Assistant\nTime: Today, 2:34 PM\n\nvyostra.com/leads'}
+          {'🔔 New Lead — Vyostra AI\n\nName: Rahul Sharma\nPhone: +1 (555) 010-4821\nEmail: rahul@example.com\nBot: Property Assistant\nTime: Today, 2:34 PM\n\nvyostra.com/leads'}
         </p>
         <div className="flex items-center justify-end gap-1 mt-2">
           <span className="text-white/50 text-[10px]">2:34 PM</span>

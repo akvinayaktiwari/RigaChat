@@ -2,13 +2,14 @@ import type { BlogPostMeta } from '../../../../types/blog'
 
 const meta: BlogPostMeta = {
   slug: 'facebook-lead-ads-whatsapp-auto-reply',
-  title: 'How to Auto-Reply on WhatsApp to Facebook Lead Ads in India',
+  title: 'How to Auto-Reply on WhatsApp to Facebook Lead Ads',
   excerpt:
     'A Facebook or Instagram lead form does not open a WhatsApp chat, so the first message has to be sent by you, as an approved template, to someone who opted in. Here is the whole chain: opt-in on the form, the lead webhook, the first template, and what changes when the lead replies.',
   publishedAt: '2026-10-05',
   authorId: 'vinayak-tiwari',
   category: 'WhatsApp',
-  tags: ['WhatsApp', 'Meta Lead Ads', 'India', 'Lead Generation'],
+  market: 'global',
+  tags: ['WhatsApp', 'Meta Lead Ads', 'Lead Generation'],
   readingMinutes: 8,
   seoTitle: 'WhatsApp Auto-Reply to Facebook Lead Ads',
   seoDescription:

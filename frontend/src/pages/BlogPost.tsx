@@ -8,7 +8,7 @@ import Footer from '../components/landing/Footer'
 import DemoModal from '../components/landing/modals/DemoModal'
 import { getPostBySlug, loadedPostContent, relatedPosts } from '../content/blog/registry'
 import { useBlogPostAnalytics } from '../hooks/useBlogPostAnalytics'
-import { AttachmentCard, BlogSurface, PostMetaLine, PostTags } from '../components/blog/BlogChrome'
+import { AttachmentCard, BlogSurface, PostEyebrow, PostMetaLine, PostTags } from '../components/blog/BlogChrome'
 import { mdxComponents } from '../components/blog/MdxComponents'
 import { JAKARTA_FONT, ScrollReveal, StatRow, StatTile } from '../components/blog/BlogPrimitives'
 import { absoluteUrl } from '../lib/site'
@@ -35,7 +35,7 @@ function RelatedReading({ posts }: { posts: readonly BlogPostMeta[] }) {
               to={`/blog/${related.slug}/`}
               className="block rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition-colors hover:border-violet-300/60"
             >
-              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-violet-300">{related.category}</span>
+              <PostEyebrow meta={related} className="text-[11px] font-bold uppercase tracking-[0.2em] text-violet-300" />
               <span className="mt-2 block text-base font-bold text-white" style={JAKARTA_FONT}>
                 {related.title}
               </span>
@@ -168,7 +168,7 @@ function PostArticle({ post }: { post: BlogPost }) {
           <header>
             <ScrollReveal>
               <BackToBlog />
-              <div className="mt-6 text-[11px] font-bold uppercase tracking-[0.2em] text-violet-300">{meta.category}</div>
+              <PostEyebrow meta={meta} className="mt-6 block text-[11px] font-bold uppercase tracking-[0.2em] text-violet-300" />
               <h1 className="mt-4 text-3xl font-extrabold leading-[1.12] text-white md:text-5xl" style={JAKARTA_FONT}>
                 {meta.title}
               </h1>

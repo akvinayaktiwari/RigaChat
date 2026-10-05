@@ -65,7 +65,7 @@ interface SyncedField {
 const SYNCED_FIELDS: SyncedField[] = [
   { zoho: 'Last Name', value: 'Rahul Sharma' },
   { zoho: 'Email', value: 'rahul@example.com' },
-  { zoho: 'Phone', value: '+91 98xxx xxxxx' },
+  { zoho: 'Phone', value: '+1 (555) 010-xxxx' },
   { zoho: 'Lead Source', value: 'VyostraAI' },
   { zoho: 'Website', value: 'yoursite.com/3bhk' },
 ]

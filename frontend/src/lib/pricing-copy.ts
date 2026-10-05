@@ -6,13 +6,13 @@
  * behind when the plan changes, and then the page contradicts its own cards
  * and its own Offer schema.
  */
-import { INR_METHODS_NOTE, formatPrice, type PricingTier, type Region } from './pricingTiers'
+import { formatPrice, type PricingTier } from './pricingTiers'
 import { SUPPORT_EMAIL, type FaqItem } from './structured-data'
 
 /** "$49 a month on Starter, $129 on Growth and $349 on Agency". */
-export function planPriceList(tiers: readonly PricingTier[], region: Region): string {
+export function planPriceList(tiers: readonly PricingTier[]): string {
   const parts = tiers.map((tier, index) => {
-    const price = formatPrice(tier.priceUsd, region)
+    const price = formatPrice(tier.priceUsd)
     return index === 0 ? `${price} a month on ${tier.name}` : `${price} on ${tier.name}`
   })
   if (parts.length < 2) return parts.join('')
@@ -20,11 +20,8 @@ export function planPriceList(tiers: readonly PricingTier[], region: Region): st
 }
 
 export function pricingSummary(tiers: readonly PricingTier[]): string {
-  return `Vyostra AI costs ${planPriceList(tiers, 'intl')}.`
+  return `Vyostra AI costs ${planPriceList(tiers)}.`
 }
-
-/** "UPI, netbanking, RuPay or card", from the note the plan toggle shows. */
-const INR_METHODS = INR_METHODS_NOTE.replace(/^Pay by /, '')
 
 /** The pricing page's questions. Rendered on the page and published as FAQPage from this one array. */
 export function pricingFaq(tiers: readonly PricingTier[]): FaqItem[] {
@@ -34,12 +31,9 @@ export function pricingFaq(tiers: readonly PricingTier[]): FaqItem[] {
       answer: `${pricingSummary(tiers)} Plans are billed monthly, and every new account starts with a 14-day free trial that needs no credit card.`,
     },
     {
-      question: 'How much does an AI chatbot for a website cost in India?',
-      answer: `With Vyostra AI it costs ${planPriceList(tiers, 'in')}. These are the same plans as the US dollar list, priced in rupees so that you can pay by ${INR_METHODS}.`,
-    },
-    {
       question: 'Which currency will I be billed in?',
-      answer: `You choose. The rupee price list is paid by ${INR_METHODS}, and the US dollar list is paid by card. The amount shown on the plan is the amount charged.`,
+      answer:
+        'US dollars, wherever you are. Plans are paid by card, and the amount shown on the plan is the amount charged. Your bank may convert it to your local currency.',
     },
     {
       question: 'Is there a free trial?',

@@ -42,7 +42,7 @@ const FOUNDERS: FounderInfo[] = [
     name: 'V. Sai Kavshik',
     role: 'Head of Sales',
     description:
-      'Runs the client side of every launch at Vyostra AI. Has managed ₹10L+ a month in ad spend for developers.',
+      'Runs the client side of every launch at Vyostra AI. Has managed monthly ad spend for developers.',
     avatarGradient: 'from-orange-500 to-amber-400',
     linkedinUrl: 'https://www.linkedin.com/in/v-s-kavshik',
   },
@@ -88,7 +88,7 @@ function HeroBanner() {
           </span>
         </h1>
         <p className="mt-4 text-base md:text-lg text-on-surface-variant max-w-2xl mx-auto leading-relaxed">
-          Vyostra AI is an AI-powered lead generation platform built by Vyostra AI, Bangalore. We bridge the gap
+          Vyostra AI is an AI-powered lead generation platform for businesses worldwide. We bridge the gap
           between initial customer contact and closed deals.
         </p>
       </div>
@@ -180,10 +180,10 @@ function StoryBlockTwo() {
           Vyostra AI
         </div>
         <h2 className="text-3xl md:text-4xl font-extrabold text-on-surface tracking-tight leading-tight">
-          Built in Bangalore. Designed for growth.
+          Based in Bangalore. Serving customers worldwide.
         </h2>
         <p className="text-base md:text-lg text-on-surface-variant leading-relaxed">
-          Vyostra AI is a performance marketing and technology company based in Bangalore, India. We build tools
+          Vyostra AI is a performance marketing and technology company based in Bangalore, India, serving customers worldwide. We build tools
           that help businesses grow faster using AI, automation, and data.
         </p>
       </div>
@@ -280,8 +280,8 @@ export default function About() {
   return (
     <div className="landing-page bg-background">
       <PageMeta
-        title="About Vyostra AI — AI Lead Generation, Built in Bangalore"
-        description="Vyostra AI is a Bangalore-built platform that captures every lead with AI chat and voice agents, WhatsApp follow-up and a built-in CRM. Meet the founders."
+        title="About Vyostra AI — The Team Behind the AI Lead Platform"
+        description="Vyostra AI captures every lead with AI chat and voice agents, WhatsApp follow-up and a built-in CRM, for businesses worldwide. Meet the founders."
         path="/about-us/"
       />
       <StructuredData data={jsonLdGraph([organizationSchema(), ...aboutPageNodes({ name: 'About Vyostra AI', path: '/about-us/' })])} />

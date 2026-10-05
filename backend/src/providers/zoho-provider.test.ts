@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FormField } from '../types/index.js'
 import { toPublicWebsiteUrl, zohoProvider } from './zoho-provider.js'
 
@@ -140,5 +140,114 @@ describe('toPublicWebsiteUrl', () => {
 
   it('rejects a URL longer than the Zoho field allows', () => {
     expect(toPublicWebsiteUrl(`https://example.com/${'a'.repeat(260)}`)).toBeNull()
+  })
+})
+
+// An account lives in one Zoho data centre, and its tokens work nowhere else.
+// Every host below used to be the India constant, which is why only zoho.in
+// accounts could connect.
+describe('Zoho data centres', () => {
+  const US = { accountsServer: 'https://accounts.zoho.com', apiDomain: 'https://www.zohoapis.com' }
+  const LATER = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+  const PAST = new Date(Date.now() - 60 * 1000).toISOString()
+  const lead = { lastName: 'Reyes', leadSource: 'VyostraAI', description: '', sourceUrl: 'https://example.com/' }
+  const created = { data: [{ code: 'SUCCESS', status: 'success', details: { id: 'z1' } }] }
+
+  const fetchMock = vi.fn()
+
+  function respond(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), { status })
+  }
+
+  function requestedUrls(): string[] {
+    return fetchMock.mock.calls.map((call) => String(call[0]))
+  }
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('redeems the code at the data centre the callback names, and records it', async () => {
+    fetchMock.mockResolvedValue(
+      respond({ access_token: 'a', refresh_token: 'r', expires_in: 3600, api_domain: 'https://www.zohoapis.com' })
+    )
+
+    const credentials = await zohoProvider.exchangeCodeForTokens('code', 'https://accounts.zoho.com')
+
+    expect(requestedUrls()).toEqual(['https://accounts.zoho.com/oauth/v2/token'])
+    expect(credentials).toMatchObject(US)
+  })
+
+  it('treats a callback with no accounts-server as the India data centre', async () => {
+    fetchMock.mockResolvedValue(respond({ access_token: 'a', refresh_token: 'r', expires_in: 3600 }))
+
+    const credentials = await zohoProvider.exchangeCodeForTokens('code')
+
+    expect(requestedUrls()).toEqual(['https://accounts.zoho.in/oauth/v2/token'])
+    expect(credentials.apiDomain).toBe('https://www.zohoapis.in')
+  })
+
+  // The exchange carries our client secret, and accounts-server arrives in a
+  // query string anyone can craft.
+  it.each(['https://accounts.zoho.com.evil.example', 'https://evil.example', 'http://accounts.zoho.com', 'not a url'])(
+    'refuses to send the code to %s',
+    async (accountsServer) => {
+      await expect(zohoProvider.exchangeCodeForTokens('code', accountsServer)).rejects.toThrow(/Unrecognised Zoho/)
+      expect(fetchMock).not.toHaveBeenCalled()
+    }
+  )
+
+  it('ignores an api_domain that is not a Zoho API host', async () => {
+    fetchMock.mockResolvedValue(
+      respond({ access_token: 'a', refresh_token: 'r', expires_in: 3600, api_domain: 'https://evil.example' })
+    )
+
+    const credentials = await zohoProvider.exchangeCodeForTokens('code', 'https://accounts.zoho.eu')
+
+    expect(credentials.apiDomain).toBe('https://www.zohoapis.eu')
+  })
+
+  it('refreshes against the stored accounts server and keeps the data centre', async () => {
+    fetchMock.mockResolvedValue(respond({ access_token: 'a2', expires_in: 3600 }))
+
+    const refreshed = await zohoProvider.refreshAccessToken({
+      provider: 'zoho',
+      accessToken: 'a',
+      refreshToken: 'r',
+      tokenExpiry: PAST,
+      ...US,
+    })
+
+    expect(requestedUrls()).toEqual(['https://accounts.zoho.com/oauth/v2/token'])
+    expect(refreshed).toMatchObject({ accessToken: 'a2', ...US })
+  })
+
+  it('pushes the lead to the stored API domain', async () => {
+    fetchMock.mockResolvedValue(respond(created, 201))
+
+    const result = await zohoProvider.syncLead(lead, {
+      provider: 'zoho',
+      accessToken: 'a',
+      refreshToken: 'r',
+      tokenExpiry: LATER,
+      ...US,
+    })
+
+    expect(result).toEqual({ success: true, externalId: 'z1' })
+    expect(requestedUrls()).toEqual(['https://www.zohoapis.com/crm/v2/Leads'])
+  })
+
+  // Every connection stored before the data centre was recorded.
+  it('keeps a connection with no recorded data centre on India', async () => {
+    fetchMock.mockResolvedValue(respond(created, 201))
+
+    await zohoProvider.syncLead(lead, { provider: 'zoho', accessToken: 'a', refreshToken: 'r', tokenExpiry: LATER })
+
+    expect(requestedUrls()).toEqual(['https://www.zohoapis.in/crm/v2/Leads'])
   })
 })

@@ -18,7 +18,7 @@ export const WHAT_IS_VYOSTRA: readonly string[] = [
   'Vyostra AI is a lead-capture platform for businesses that sell through enquiries. You train an AI agent on your website and your own knowledge base, and it answers visitors on website chat, voice and WhatsApp at any hour.',
   "When a conversation turns into interest, the agent collects the lead's details and writes them into a built-in lead CRM, so every enquiry lands in one queue with its transcript. Leads from lead forms and Meta lead ads arrive in the same place.",
   'Follow-up journeys then keep the conversation going on WhatsApp, waiting for a real reply rather than firing on a timer, and hand the lead to your team when it needs a person. The agent answers only from the content you give it; when the answer is not there, it says so.',
-  'Plans start at $49 a month. Vyostra AI is built in Bangalore, India.',
+  'Plans start at $49 a month. Vyostra AI is built by a team in Bangalore, India, for businesses worldwide.',
 ]
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }

@@ -51,7 +51,7 @@ export const REAL_ESTATE: IndustryContent = {
     points: [
       'Final price, discounts and negotiation. The agent is instructed never to invent a price, availability, a floor plan, a possession date or an approval status.',
       'Anything not in your knowledge base. The agent says it does not have the answer and offers a person, rather than guessing.',
-      'RERA statements. It repeats only the registration text you have given it; check what your state authority requires in marketing.',
+      'Local advertising rules (for example RERA registration in India, or Trakheesi permits in Dubai). It repeats only the registration or permit text you have given it; check what your local authority requires in marketing.',
       'Languages other than English on voice. The voice agent is English-first today.',
       'Following up on lead form submissions. A form lead is saved and alerted, but only chat and Meta lead ad leads start the WhatsApp follow-up journey today.',
       'Sending chat and voice leads to Zoho CRM. Only leads from your lead forms and Meta lead ads are created in Zoho CRM.',

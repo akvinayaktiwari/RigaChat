@@ -23,15 +23,20 @@ export interface DialCode {
   code: string
 }
 
-/** The product's two content markets first, then the rest alphabetically. */
+/**
+ * The markets the product is sold in first, then the rest alphabetically. The
+ * first entry is the picker's default, so the order is a product decision.
+ */
 export const DIAL_CODES: readonly DialCode[] = [
-  { country: 'India', code: '91' },
+  { country: 'United States', code: '1' },
   { country: 'United Arab Emirates', code: '971' },
+  { country: 'United Kingdom', code: '44' },
   { country: 'Australia', code: '61' },
+  { country: 'India', code: '91' },
+  { country: 'Canada', code: '1' },
   { country: 'Bahrain', code: '973' },
   { country: 'Bangladesh', code: '880' },
   { country: 'Brazil', code: '55' },
-  { country: 'Canada', code: '1' },
   { country: 'Germany', code: '49' },
   { country: 'Indonesia', code: '62' },
   { country: 'Kuwait', code: '965' },
@@ -45,8 +50,6 @@ export const DIAL_CODES: readonly DialCode[] = [
   { country: 'Singapore', code: '65' },
   { country: 'South Africa', code: '27' },
   { country: 'Sri Lanka', code: '94' },
-  { country: 'United Kingdom', code: '44' },
-  { country: 'United States', code: '1' },
 ]
 
 export interface WhatsAppLinkInput {

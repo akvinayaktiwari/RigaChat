@@ -25,8 +25,7 @@ import { bootedFromPrerender } from '../lib/prerender-boot'
 import { useAuth } from '../hooks/useAuth'
 import type { AuthUser } from '../hooks/useAuth'
 import { useTierCheckout } from '../hooks/useTierCheckout'
-import { currencyForRegion, detectRegion } from '../lib/pricingTiers'
-import type { BillableTier, Region } from '../lib/pricingTiers'
+import type { BillableTier } from '../lib/pricingTiers'
 
 /** Newest posts linked from the homepage, the site's most-linked page. */
 const HOMEPAGE_POST_COUNT = 3
@@ -39,10 +38,6 @@ type SignupModalRequest = { mode: 'trial' } | { mode: 'checkout'; tier: Billable
 export default function LandingPage() {
   const [isDemoOpen, setIsDemoOpen] = useState(false)
   const [signupModal, setSignupModal] = useState<SignupModalRequest | null>(null)
-  // A prerendered page was rendered with the USD list, and hydration needs the
-  // first client render to say the same thing; the visitor's own region is
-  // applied in the effect below, once React owns the markup.
-  const [region, setRegion] = useState<Region>(() => (bootedFromPrerender() ? 'intl' : detectRegion()))
   const voiceWidgetInjected = useRef(false)
   const { isAuthenticated, setSession } = useAuth()
 
@@ -68,7 +63,7 @@ export default function LandingPage() {
     // the billing call — the modal is only for turning an anonymous visitor
     // into an authenticated one.
     if (isAuthenticated) {
-      tierCheckout.selectTier(tier, currencyForRegion(region))
+      tierCheckout.selectTier(tier)
       return
     }
     setSignupModal({ mode: 'checkout', tier })
@@ -80,15 +75,11 @@ export default function LandingPage() {
     setSignupModal(null)
 
     if (pending?.mode === 'checkout') {
-      tierCheckout.selectTier(pending.tier, currencyForRegion(region))
+      tierCheckout.selectTier(pending.tier)
     } else {
       window.location.href = '/dashboard'
     }
   }
-
-  useEffect(() => {
-    setRegion(detectRegion())
-  }, [])
 
   useEffect(() => {
     if (!window.location.hash) return
@@ -130,8 +121,8 @@ export default function LandingPage() {
       <RoadmapSection />
       <HowItWorksSection />
       <TestimonialsSection />
-      <PricingSection onSelectTier={handleSelectTier} region={region} onRegionChange={setRegion} />
-      <CTASection onStartTrial={handleStartTrial} region={region} />
+      <PricingSection onSelectTier={handleSelectTier} />
+      <CTASection onStartTrial={handleStartTrial} />
       <div className="px-6 lg:px-8 pt-20">
         <RelatedPosts posts={getAllPosts().slice(0, HOMEPAGE_POST_COUNT).map((post) => post.meta)} heading="From the blog" />
       </div>
