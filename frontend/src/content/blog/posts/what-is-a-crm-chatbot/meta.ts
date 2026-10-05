@@ -8,7 +8,8 @@ const meta: BlogPostMeta = {
   publishedAt: '2026-10-05',
   authorId: 'vinayak-tiwari',
   category: 'Comparison',
-  tags: ['CRM', 'Chatbot', 'Lead Management', 'India'],
+  market: 'global',
+  tags: ['CRM', 'Chatbot', 'Lead Management'],
   readingMinutes: 6,
   seoTitle: 'What Is a CRM Chatbot? How It Works',
   seoDescription:

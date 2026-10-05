@@ -6,6 +6,8 @@
  * violation, and AI answer engines quote it as fact. So there is deliberately no
  * AggregateRating: there are no third-party reviews to aggregate yet.
  */
+import type { BlogMarket } from '../types/blog'
+import { marketCountry } from './blog-markets'
 import { FOUNDERS, type Person } from './people'
 import type { PricingTier } from './pricingTiers'
 import { absoluteUrl } from './site'
@@ -144,6 +146,14 @@ export interface ArticleFields {
   tags: readonly string[]
   /** The person the page's byline names. */
   author: Person
+  market: BlogMarket
+}
+
+// A post written for one country says which. A global post claims no place at
+// all, rather than "Worldwide", which is not a Place.
+function spatialCoverage(market: BlogMarket): { spatialCoverage?: JsonLd } {
+  const country = marketCountry(market)
+  return country ? { spatialCoverage: { '@type': 'Country', name: country } } : {}
 }
 
 export function blogPostingSchema(article: ArticleFields): JsonLd {
@@ -156,6 +166,10 @@ export function blogPostingSchema(article: ArticleFields): JsonLd {
     mainEntityOfPage: absoluteUrl(article.path),
     image: absoluteUrl('/og-image.png'),
     keywords: article.tags.join(', '),
+    // One English site. Market posts are not translations of each other, so
+    // there is deliberately no hreflang anywhere.
+    inLanguage: 'en',
+    ...spatialCoverage(article.market),
     author: personSchema(article.author),
     publisher: { '@id': absoluteUrl(`/${ORGANIZATION_ID}`) },
   }

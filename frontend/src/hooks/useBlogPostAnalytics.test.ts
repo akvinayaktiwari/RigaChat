@@ -13,6 +13,7 @@ const meta: BlogPostMeta = {
   publishedAt: '2026-09-16',
   authorId: 'vinayak-tiwari',
   category: 'WhatsApp',
+  market: 'in',
   tags: ['WhatsApp', 'Real Estate', 'India'],
   readingMinutes: 9,
 }

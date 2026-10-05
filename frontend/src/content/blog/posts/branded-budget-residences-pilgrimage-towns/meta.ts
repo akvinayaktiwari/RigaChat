@@ -8,6 +8,7 @@ const meta: BlogPostMeta = {
   publishedAt: '2026-08-01',
   authorId: 'vinayak-tiwari',
   category: 'Real Estate',
+  market: 'in',
   tags: ['Hospitality', 'Real Estate', 'India', 'Feasibility Study'],
   readingMinutes: 14,
   seoDescription:

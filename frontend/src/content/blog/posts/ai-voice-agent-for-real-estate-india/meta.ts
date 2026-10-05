@@ -8,6 +8,7 @@ const meta: BlogPostMeta = {
   publishedAt: '2026-10-01',
   authorId: 'vinayak-tiwari',
   category: 'Voice AI',
+  market: 'in',
   tags: ['Voice AI', 'Real Estate', 'India', 'Lead Generation'],
   readingMinutes: 7,
   seoTitle: 'AI Voice Agent for Real Estate in India',

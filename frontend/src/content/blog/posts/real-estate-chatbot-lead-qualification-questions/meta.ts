@@ -8,6 +8,7 @@ const meta: BlogPostMeta = {
   publishedAt: '2026-10-05',
   authorId: 'vinayak-tiwari',
   category: 'Real Estate',
+  market: 'global',
   tags: ['Real Estate', 'Lead Qualification', 'Chatbot', 'India', 'UAE'],
   readingMinutes: 7,
   seoTitle: 'Real Estate Chatbot Qualification Questions',

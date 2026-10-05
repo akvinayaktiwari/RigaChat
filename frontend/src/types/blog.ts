@@ -25,6 +25,17 @@ export const BLOG_CATEGORIES = ['WhatsApp', 'Voice AI', 'Real Estate', 'Comparis
 export type BlogCategory = (typeof BLOG_CATEGORIES)[number]
 
 /**
+ * Who a post is written for. `global` makes no country-specific assumption;
+ * every other value is one country, whose currency, portals and rules the post
+ * is free to use because it says so in its title.
+ *
+ * One English site, not localized copies: a market is a label and a filter,
+ * never a separate URL, and never an hreflang alternate.
+ */
+export const BLOG_MARKETS = ['global', 'us', 'uk', 'ca', 'au', 'ae', 'in'] as const
+export type BlogMarket = (typeof BLOG_MARKETS)[number]
+
+/**
  * Post metadata. Lives in its own `meta.ts` next to the post body so the
  * index page can eagerly import every post's metadata without pulling any
  * post body into the initial bundle.
@@ -51,6 +62,13 @@ export interface BlogPostMeta {
   authorId: PersonId
   /** The post's cluster. Shown as the eyebrow label above the title. */
   category: BlogCategory
+  /**
+   * The market the post is written for. Required, with no default: a post
+   * that quotes one country's rules or currency without saying so is how a
+   * global site ends up reading as a local one. The registry also refuses a
+   * post without it, so the build fails rather than publishing it unlabelled.
+   */
+  market: BlogMarket
   tags: string[]
   /** Estimated read time in minutes, shown in the post meta bar. */
   readingMinutes: number

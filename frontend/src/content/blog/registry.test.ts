@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { PRERENDERED_STATIC_ROUTES } from '../../lib/crawl-files'
+import { isBlogMarket, marketsInUse } from '../../lib/blog-markets'
 import type { BlogPostMeta } from '../../types/blog'
 import { RELATED_POST_LIMIT, getAllPosts, loadedPostContent, postsForFeature, preloadPostContent, relatedPosts } from './registry'
 
 function meta(slug: string, relatedFeatures?: string[], tags: string[] = []): BlogPostMeta {
-  return { slug, title: slug, excerpt: '', publishedAt: '2026-09-01', authorId: 'vinayak-tiwari', category: 'WhatsApp', tags, readingMinutes: 1, relatedFeatures }
+  return { slug, title: slug, excerpt: '', publishedAt: '2026-09-01', authorId: 'vinayak-tiwari', category: 'WhatsApp', market: 'global', tags, readingMinutes: 1, relatedFeatures }
 }
 
 describe('postsForFeature', () => {
@@ -78,5 +79,31 @@ describe('preloadPostContent', () => {
   it('does nothing for a slug that is not a post', async () => {
     await preloadPostContent('no-such-post')
     expect(loadedPostContent('no-such-post')).toBeUndefined()
+  })
+})
+
+describe('market on real posts', () => {
+  const metas = getAllPosts().map((post) => post.meta)
+
+  it.each(metas.map((postMeta) => [postMeta.slug, postMeta.market] as const))('%s declares a known market', (_slug, market) => {
+    expect(isBlogMarket(market)).toBe(true)
+  })
+
+  // A global post makes no country-specific promise, starting with its title.
+  it('keeps country names out of the titles of global posts', () => {
+    const offenders = metas.filter((postMeta) => postMeta.market === 'global' && /\bin (india|the uae|dubai|the us|the uk|australia|canada)\b/i.test(postMeta.title))
+    expect(offenders.map((postMeta) => postMeta.slug)).toEqual([])
+  })
+
+  // The slug is permanent, so a post written for India keeps saying so in its tag.
+  it('tags every post with india in its slug as an India post', () => {
+    const mislabelled = metas.filter((postMeta) => postMeta.slug.includes('india') && postMeta.market !== 'in')
+    expect(mislabelled.map((postMeta) => postMeta.slug)).toEqual([])
+  })
+})
+
+describe('marketsInUse', () => {
+  it('lists each market once, global first, whatever order the posts come in', () => {
+    expect(marketsInUse(['in', 'ae', 'global', 'in'])).toEqual(['global', 'ae', 'in'])
   })
 })

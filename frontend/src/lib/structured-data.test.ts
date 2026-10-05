@@ -72,7 +72,7 @@ describe('personSchema', () => {
 })
 
 describe('blogPostingSchema', () => {
-  const fields = { title: 't', excerpt: 'e', publishedAt: '2026-08-01', path: '/blog/t/', tags: ['a'], author: PEOPLE['vinayak-tiwari'] }
+  const fields = { title: 't', excerpt: 'e', publishedAt: '2026-08-01', path: '/blog/t/', tags: ['a'], author: PEOPLE['vinayak-tiwari'], market: 'global' as const }
 
   it('names a person as the author, not the organization', () => {
     expect(blogPostingSchema(fields).author).toEqual(personSchema(PEOPLE['vinayak-tiwari']))
@@ -80,6 +80,13 @@ describe('blogPostingSchema', () => {
 
   it('dates a post never revised by its publication', () => {
     expect(blogPostingSchema(fields).dateModified).toBe('2026-08-01')
+  })
+
+  // One English site: the market is a claim about coverage, not a locale.
+  it('names the country a market post covers, and no place for a global one', () => {
+    expect(blogPostingSchema({ ...fields, market: 'ae' }).spatialCoverage).toEqual({ '@type': 'Country', name: 'United Arab Emirates' })
+    expect(blogPostingSchema(fields)).not.toHaveProperty('spatialCoverage')
+    expect(blogPostingSchema(fields).inLanguage).toBe('en')
   })
 
   it('dates a revised post by the revision', () => {
@@ -101,7 +108,7 @@ describe('jsonLdGraph', () => {
   it('resolves the blog post publisher to the organization node in the same graph', () => {
     const graph = jsonLdGraph([
       organizationSchema(),
-      blogPostingSchema({ title: 't', excerpt: 'e', publishedAt: '2026-08-01', path: '/blog/t/', tags: ['a'], author: PEOPLE['vinayak-tiwari'] }),
+      blogPostingSchema({ title: 't', excerpt: 'e', publishedAt: '2026-08-01', path: '/blog/t/', tags: ['a'], author: PEOPLE['vinayak-tiwari'], market: 'global' as const }),
     ])
     const [organization, post] = asArray(graph['@graph']).map(asRecord)
     expect(graph['@context']).toBe('https://schema.org')
