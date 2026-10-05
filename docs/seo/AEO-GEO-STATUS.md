@@ -35,6 +35,7 @@ Framing: Google's own guidance is that optimizing for AI search is ordinary SEO.
 | `llms.txt`, generated from the same list as the sitemap | 2026-10-02 |
 | CloudFront function: bare URLs 301 to the trailing-slash form; `www` 301s to the apex | 2026-10-02 |
 | Titles at 60 characters or fewer, descriptions within limits, with a guard test | 2026-09-19 |
+| App shell title (`index.html`, shown on login, signup and the dashboard) matches the homepage title; it still said "AI Chatbot with Native CRM" | 2026-10-05 |
 | A missing file or a missing URL under a prerendered path returns 404 with the site's own not-found page (`noindex`), not the homepage | 2026-10-02 |
 
 ### Structured data
@@ -69,6 +70,7 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 | Author byline, "Updated" date and four fixed categories on posts | 2026-10-02 |
 | Question H2s in posts; Meta and WhatsApp primary sources cited in the WhatsApp post | 2026-09-19 |
 | Internal links: help in the footer, feature pages to related posts, latest posts on the homepage, related posts on each post | 2026-09-19 |
+| The WhatsApp real estate post links the two ad-lead posts from its lead-source table | 2026-10-05 |
 | Help FAQs grouped under question headings | 2026-09-19 |
 
 ### Accuracy (claims removed or corrected)
@@ -114,6 +116,7 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 | `feature-pages.test.tsx` | A feature page stops opening with an answer, drops its question headings, publishes FAQ schema for hidden text, or gives its schema a URL other than the one it is served on |
 | `zoho-claims.test.ts` | Marketing copy, a published FAQ answer or an `llms.txt` line says leads reach Zoho without naming forms and Meta lead ads, or names chat, voice or WhatsApp as a source that syncs |
 | `integrations.test.tsx` | An integration page stops opening with an answer, drops its limits, publishes FAQ schema for hidden text, or a second Zoho page appears under `/integrations/` |
+| `app-shell-title.test.ts` | The title in `index.html` differs from the homepage title, or the shell gains a second title |
 | `crawl-files.test.ts` | A sitemap URL has no route, no date, or no CloudFront prefix |
 | `hydration-contract.test.ts` | The prerender and the browser stop rendering the same tree |
 
