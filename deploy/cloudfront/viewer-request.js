@@ -23,7 +23,7 @@
 // crawl-files.test.ts fails if a prerendered route is missing here.
 var PRERENDERED_PREFIXES = [
     '/features', '/pricing', '/faq', '/whatsapp-link-generator', '/integrations', '/industries', '/about-us', '/help',
-    '/contact', '/careers', '/blog', '/privacy-policy', '/terms-of-service'
+    '/contact', '/careers', '/blog', '/docs', '/privacy-policy', '/terms-of-service'
 ];
 
 /** Re-serialises the query string, keeping multi-value keys. '' when there is none. */
