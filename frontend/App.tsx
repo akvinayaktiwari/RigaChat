@@ -29,6 +29,8 @@ import WhatsAppLinkGenerator from './src/pages/tools/WhatsAppLinkGenerator'
 import IntegrationPage from './src/pages/integrations/IntegrationPage'
 import IntegrationsIndex from './src/pages/integrations/IntegrationsIndex'
 import { META_LEAD_ADS } from './src/content/integrations/meta-lead-ads'
+import IndustryPage from './src/pages/industries/IndustryPage'
+import { REAL_ESTATE } from './src/content/industries/real-estate'
 // Blog routes are lazy so post bodies (and the blog's motion/table components)
 // stay out of the main bundle every other page pays for.
 const BlogIndex = lazyWithPreload(() => import('./src/pages/BlogIndex'))
@@ -187,6 +189,7 @@ export function AppRoutes() {
           <Route path="/whatsapp-link-generator" element={<WhatsAppLinkGenerator />} />
           <Route path="/integrations" element={<IntegrationsIndex />} />
           <Route path="/integrations/meta-lead-ads" element={<IntegrationPage integration={META_LEAD_ADS} />} />
+          <Route path="/industries/real-estate" element={<IndustryPage industry={REAL_ESTATE} />} />
           <Route
             path="/blog"
             element={

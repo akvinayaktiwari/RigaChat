@@ -96,6 +96,8 @@ expect vyostra.com     /whatsapp-link-generator/ '.request.uri'                '
 expect vyostra.com     /integrations '.response.headers.location.value'        '/integrations/'
 expect vyostra.com     /integrations/meta-lead-ads '.response.headers.location.value' '/integrations/meta-lead-ads/'
 expect vyostra.com     /integrations/meta-lead-ads/ '.request.uri'             '/integrations/meta-lead-ads/'
+expect vyostra.com     /industries/real-estate '.response.headers.location.value' '/industries/real-estate/'
+expect vyostra.com     /industries/real-estate/ '.request.uri'                 '/industries/real-estate/'
 # A path that merely STARTS with a prerendered prefix is not one.
 expect vyostra.com     /blogging '.request.uri'                                '/app-shell.html'
 expect vyostra.com     /featuresx '.request.uri'                               '/app-shell.html'

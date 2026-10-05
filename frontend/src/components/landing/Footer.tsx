@@ -7,6 +7,7 @@ const LINK_COLUMNS = [
     links: [
       { label: 'Features', href: '/features' },
       { label: 'Integrations', href: '/integrations' },
+      { label: 'For Real Estate', href: '/industries/real-estate' },
       { label: 'Pricing', href: '/pricing' },
       { label: 'FAQ', href: '/faq' },
       { label: 'WhatsApp Link Generator', href: '/whatsapp-link-generator' },
