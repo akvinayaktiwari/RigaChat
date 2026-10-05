@@ -20,8 +20,10 @@ function QualifyingQuestions({ qualifying }: { qualifying: IndustryContent['qual
       <h2 className={SECTION_HEADING}>{qualifying.heading}</h2>
       <ul className="space-y-4">
         {qualifying.questions.map((item) => (
-          <li key={item.question} className={CARD}>
-            <h3 className="font-bold text-on-surface text-base md:text-lg leading-snug">“{item.question}”</h3>
+          <li key={item.question} className={`${CARD} faq-card edge-glow group hover:border-primary/20 hover:shadow-lg hover:shadow-primary/10`}>
+            <h3 className="font-bold text-on-surface text-base md:text-lg leading-snug transition-colors duration-300 group-hover:text-primary">
+              “{item.question}”
+            </h3>
             <p className="mt-2 text-sm md:text-base text-on-surface-variant leading-relaxed">{item.why}</p>
           </li>
         ))}
