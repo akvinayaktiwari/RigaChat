@@ -219,8 +219,11 @@ function PostArticle({ post }: { post: BlogPost }) {
               </h2>
               <dl className="mt-6 space-y-4">
                 {meta.faq.map((item) => (
-                  <div key={item.question} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                    <dt className="text-base font-bold text-white" style={JAKARTA_FONT}>
+                  <div
+                    key={item.question}
+                    className="faq-card edge-glow group rounded-2xl border border-white/10 bg-white/[0.03] p-6 hover:border-white/20 hover:bg-white/[0.06]"
+                  >
+                    <dt className="text-base font-bold text-white transition-colors duration-300 group-hover:text-violet-300" style={JAKARTA_FONT}>
                       {item.question}
                     </dt>
                     <dd className="mt-2 text-sm leading-relaxed text-white/65">{item.answer}</dd>
