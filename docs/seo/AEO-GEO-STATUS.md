@@ -1,6 +1,6 @@
 # AEO / GEO Status — vyostra.com
 
-**The one file to read first.** What has shipped for search and answer-engine visibility, what is left, and who has to do it. Last updated: 2026-10-05. Next steps: `HANDOFF-2026-10-05.md`.
+**The one file to read first.** What has shipped for search and answer-engine visibility, what is left, and who has to do it. Last updated: 2026-10-06. Next steps: `HANDOFF-2026-10-05.md`.
 
 How to keep it current: when something ships, move its row from "To do" to "Implemented" with the date. Do not record plans here; plans live in the documents listed at the bottom.
 
@@ -19,7 +19,7 @@ Framing: Google's own guidance is that optimizing for AI search is ordinary SEO.
 | Mobile LCP (lab) | about 1.7 s | 2026-10-02 | Was 2.3 s on the homepage and 3.25 s on a post. No field data yet. |
 | Lighthouse accessibility | 100 | 2026-10-02 | On every public page audited. |
 | Real referring domains | 0 known | 2026-10-02 | Not in the Common Crawl graph; all six competitors checked are. |
-| Brand presence off-site | LinkedIn and GitHub only | 2026-10-02 | Nothing on YouTube, Reddit or Wikipedia. |
+| Brand presence off-site | LinkedIn, X and GitHub | 2026-10-06 | X account `x.com/vyostra_ai` added. Nothing on YouTube, Reddit or Wikipedia. |
 
 ---
 
@@ -74,6 +74,7 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 | Author byline, "Updated" date and four fixed categories on posts | 2026-10-02 |
 | Question H2s in posts; Meta and WhatsApp primary sources cited in the WhatsApp post | 2026-09-19 |
 | Question sub-headings in the two long sections of the WhatsApp post. The pilgrimage post needed none: its long block is a data table and its sections already carry sub-headings | 2026-10-04 |
+| Footer links the company's LinkedIn and X profiles on every public page; the Organization `sameAs` reads the same list, and every page carries `twitter:site` | 2026-10-06 |
 | Internal links: help in the footer, feature pages to related posts, latest posts on the homepage, related posts on each post | 2026-09-19 |
 | The WhatsApp real estate post links the two ad-lead posts from its lead-source table | 2026-10-05 |
 | Two posts chosen from keyword data (OpenSEO, India): `/blog/real-estate-chatbot-lead-qualification-questions/` for "real estate chatbot" (about 480 searches a month) and `/blog/what-is-a-crm-chatbot/` for "crm chatbot" (about 90) | 2026-10-05 |

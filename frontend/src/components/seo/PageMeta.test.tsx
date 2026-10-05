@@ -41,6 +41,10 @@ describe('PageMeta', () => {
     expect(attr(/property="og:url" content="([^"]+)"/)).toBe(canonical)
   })
 
+  it('attributes the share card to the company\'s X account', () => {
+    expect(attr(/name="twitter:site" content="([^"]+)"/)).toBe('@vyostra_ai')
+  })
+
   it('always sets a share image, which no page had before', () => {
     expect(attr(/property="og:image" content="([^"]+)"/).endsWith('/og-image.png')).toBe(true)
     expect(attr(/name="twitter:image" content="([^"]+)"/).endsWith('/og-image.png')).toBe(true)

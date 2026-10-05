@@ -9,6 +9,7 @@
 import { FOUNDERS, type Person } from './people'
 import type { PricingTier } from './pricingTiers'
 import { absoluteUrl } from './site'
+import { SOCIAL_PROFILES } from './social-profiles'
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
 export type JsonLd = { [key: string]: JsonValue }
@@ -20,11 +21,10 @@ export const SUPPORT_EMAIL = 'support@vyostra.com'
 
 /**
  * Profiles that are provably the same entity, which is how a search engine tells
- * "Vyostra AI" apart from Vyomastra Technologies and Vystra. Add a URL here only
- * once the profile is claimed and confirmed to be ours -- a wrong sameAs points
- * the entity graph at someone else's company.
+ * "Vyostra AI" apart from Vyomastra Technologies and Vystra. The list lives in
+ * ./social-profiles.ts, which the footer links from too.
  */
-const SAME_AS: readonly string[] = ['https://www.linkedin.com/company/vyostra-ai']
+const SAME_AS: readonly string[] = SOCIAL_PROFILES.map((profile) => profile.url)
 
 const ORGANIZATION_ID = '#organization'
 const WEBSITE_ID = '#website'
