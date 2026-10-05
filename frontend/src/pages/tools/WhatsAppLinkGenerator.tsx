@@ -50,7 +50,7 @@ export const LINK_GENERATOR_FAQ: FaqItem[] = [
   {
     question: 'What format does the phone number in a wa.me link need?',
     answer:
-      'The full international number, digits only: the country code followed by the number, with no plus sign, no leading zero, and no spaces, brackets or dashes. For an Indian number that is 91 followed by the ten digits.',
+      'The full international number, digits only: the country code followed by the number, with no plus sign, no leading zero, and no spaces, brackets or dashes. The country code is 1 for the United States and Canada, 44 for the United Kingdom, 61 for Australia, 971 for the United Arab Emirates and 91 for India. A UK mobile written 07700 900123 becomes 447700900123.',
   },
   {
     question: 'Can the pre-filled message be changed by the person who taps the link?',
@@ -148,7 +148,7 @@ export function LinkBuilder() {
         </div>
         <div>
           <label htmlFor="wa-phone" className={FIELD_LABEL}>WhatsApp number</label>
-          <input id="wa-phone" type="tel" inputMode="tel" autoComplete="off" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="98765 43210" className={FIELD_INPUT} aria-describedby="wa-phone-hint" />
+          <input id="wa-phone" type="tel" inputMode="tel" autoComplete="off" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="Number without the country code" className={FIELD_INPUT} aria-describedby="wa-phone-hint" />
           <p id="wa-phone-hint" className="mt-1.5 text-sm text-on-surface-variant">Country not listed? Type the number with its code, starting with +.</p>
         </div>
         <div>
