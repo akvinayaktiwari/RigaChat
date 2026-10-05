@@ -1,0 +1,111 @@
+{/*
+  This is a list of questions and the reasoning for each. It makes no claim
+  about answer rates, drop-off, conversion or response time: none are sourced,
+  so none appear, including the "3 to 5 questions" figures other guides state
+  without a source.
+
+  The one legal point (ask only what the purpose needs) quotes section 6(1) of
+  India's Digital Personal Data Protection Act, 2023 from the official text on
+  meity.gov.in, opened 2026-10-05. The opt-in point links Meta's own page.
+  Nothing is said about UAE regulation: we have not verified a clause.
+
+  Product claims are limited to what ships: the chat agent's lead form fields
+  (name, phone, email, property interest, budget range), the prebuilt real
+  estate journey's first WhatsApp message (budget, three ranges to tap) and its
+  site visit question. See frontend/src/content/industries/real-estate.ts.
+*/}
+
+A real estate chatbot should ask a property buyer five things first: which property they are asking about, their budget range, the configuration they want, the area they prefer, and a name and phone number. Everything else, such as timeline, financing and who else is deciding, waits until the buyer has replied and is still in the conversation.
+
+The order matters more than the list. A buyer has a reason to answer once something useful has come back, and none if the first screen looks like a form. This post gives the questions, the order, and the wording for India and the UAE.
+
+## Which questions should a real estate chatbot ask first?
+
+Ask only the questions whose answers change who calls the buyer and what they are shown. Five do that for nearly every property enquiry.
+
+| Ask | Why it comes first | What your team does with it |
+| --- | --- | --- |
+| Which property or project are you asking about? | The buyer already knows this, so it costs them nothing to answer | Routes the lead to the right project team |
+| What budget range are you working with? | It decides which units are worth showing at all | Sorts the lead into a band before the first call |
+| Which configuration are you looking for? | It narrows the inventory to a few units | Lets the salesperson open with something specific |
+| Which area or locality do you prefer? | It tells you whether this project fits, or another of yours does | Suggests an alternative instead of losing the buyer |
+| What is your name and phone number? | Without a number there is no follow-up | Creates the lead and makes a call or WhatsApp message possible |
+
+Ask for the name and number last of the five, not first. A buyer who has just been told that a 3 BHK in their budget exists has a reason to leave a number. A buyer greeted with "Please enter your phone number" has none.
+
+### How should the chatbot ask for budget?
+
+As a range the buyer can tap, never as a blank box. "What budget are you working with?" followed by three or four bands gets a usable answer, and a band is all your team needs. Asking for an exact figure invites either silence or a number the buyer has not thought about.
+
+## Which questions should it hold back until the buyer is engaged?
+
+Five more questions are worth asking, but only after the buyer has replied at least once. Each one is more personal than the first five, so each needs the buyer to have had something back first.
+
+1. **When are you planning to buy?** "This month", "in three to six months" and "just looking" are three different leads. This is the answer that decides how soon a person should call.
+2. **How will you pay?** Own funds, a home loan already approved, or a loan still to be arranged. It tells the salesperson which conversation to have.
+3. **Is this for your own use or as an investment?** An end user asks about schools and commute; an investor asks about rental demand and resale. The same project is pitched two ways.
+4. **Who else is deciding?** A spouse, parents or a business partner. It tells you who needs to be at the site visit.
+5. **Which day suits you for a site visit?** Offer two or three concrete days. This is the question the other nine exist to reach.
+
+Do not ask these as a second form. Ask one, answer whatever the buyer asks in return, then ask the next when it fits. A buyer who asks about possession dates has just told you their timeline matters; that is the moment for question one.
+
+## Which questions should a chatbot never ask?
+
+Anything it does not need in order to arrange a call or a site visit. A chatbot's job ends at a booked visit or a handoff, and the information that job needs is small.
+
+- **Identity numbers and documents.** Aadhaar, PAN, Emirates ID, passport details. They are needed at booking, with a person, not in a chat widget.
+- **Proof of income.** Salary slips, bank statements, tax returns. That is the lender's question.
+- **An exact home address.** A preferred area is enough to qualify a lead.
+- **The same thing twice.** If a lead form already collected budget, the chatbot should not ask again.
+
+There is a legal reason as well as a practical one. In India, the [Digital Personal Data Protection Act, 2023](https://www.meity.gov.in/static/uploads/2024/06/2bf1f0e9f04e6fb4f8fef35e82c42aa5.pdf) says in section 6(1) that consent to process personal data is "limited to such personal data as is necessary for such specified purpose". If the purpose you gave the buyer is "we will contact you about this property", an identity number is not necessary for it. This is a summary of one provision, not legal advice.
+
+<Callout title="A test for every question" tone="neutral">
+  Before a question goes into the chatbot, finish this sentence: "If the buyer answers X, we will do Y, and if they answer Z, we will do something different." If you cannot finish it, the answer changes nothing, and the question is only a place for the buyer to leave.
+</Callout>
+
+## How should the wording change for India and the UAE?
+
+The questions are the same in both markets. The words are not, and a buyer notices at once when a chatbot was written for somewhere else.
+
+| Question | In India | In the UAE |
+| --- | --- | --- |
+| Budget | Bands in lakh and crore | Bands in AED |
+| Configuration | 1, 2 or 3 BHK, villa, plot | Studio, 1, 2 or 3 bedroom, townhouse, villa |
+| Readiness | Ready to move or under construction | Ready or off-plan |
+| Timeline wording | "When do you want possession?" | "When do you want handover?" |
+| Payment | Own funds or home loan | Cash or mortgage |
+| Buyer's location | Which city they are in now | Whether they live in the UAE or are buying from abroad |
+
+The last row matters more in the UAE, where a buyer may be enquiring from another country and a site visit may have to be a video call. Ask it early there, because it changes what "a visit" means.
+
+If you sell in the UAE and want this set up for your projects, [talk to us](/contact): there is no self-serve checkout for the UAE yet.
+
+## Does the lead source change what the chatbot needs to ask?
+
+Yes, because some sources have already asked for you. Qualify the gap, not the whole list.
+
+| Where the lead came from | What you already know | What is left to ask |
+| --- | --- | --- |
+| Chat on your project page | The project, from the page they are on | Budget, configuration, area, then name and number |
+| A Meta lead form ad | Whatever the form asked, usually name, phone and budget | Timeline, payment and a site visit day |
+| A click-to-WhatsApp ad | Their WhatsApp number, and which ad they tapped | Everything else, starting with what they are looking for |
+| A property portal enquiry | Varies by portal | Check what the portal passes you before deciding |
+
+A lead form and a chat are different conversations to follow up. [Click-to-WhatsApp ads versus lead form ads](/blog/click-to-whatsapp-ads-vs-lead-forms-real-estate-india/) sets out how the two differ, and [how to auto-reply on WhatsApp to Facebook lead ads](/blog/facebook-lead-ads-whatsapp-auto-reply/) covers the first message to a form lead.
+
+Whichever source it is, a follow-up on WhatsApp needs the buyer's permission. Meta requires a business to [get opt-in before messaging someone](https://developers.facebook.com/documentation/business-messaging/whatsapp/getting-opt-in), so say on the form or in the chat that you will message them there. The rules that shape those messages are in [the WhatsApp guide for real estate in India](/blog/whatsapp-chatbot-for-real-estate-india/).
+
+## What should happen after the questions are answered?
+
+A person should get the answers, not a notification that a lead exists. The point of qualifying is that the salesperson's first sentence is about the buyer's budget and the unit that fits it, not "How can I help you?"
+
+Three things have to be true for that to work. The answers are stored on the lead where the team will see them. The team is told as the lead arrives. And the chatbot stops asking once it has enough, and hands over when the buyer asks for a person, a price commitment, or anything it cannot answer from what you gave it.
+
+<div className="mt-16 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+  ### How Vyostra AI asks these
+
+  The Vyostra AI chat agent answers buyers from your project details and then shows a lead form whose fields you choose, including name, phone, email, property interest and budget range. Those answers are stored on the lead in the built-in lead CRM. For a chat or Meta lead ad lead, the prebuilt real estate follow-up sends a first WhatsApp message that asks budget with three ranges to tap, then offers a site visit once the buyer replies.
+
+  It does not ask every question on this page by itself: timeline, financing and who else is deciding are yours to add or to leave to your sales team. The full flow, and what it leaves to a person, is on [the real estate page](/industries/real-estate/). See also [the chat agent](/features/chatbot) and [the lead CRM](/features/crm).
+</div>
