@@ -12,6 +12,7 @@ import { AttachmentCard, BlogSurface, PostMetaLine, PostTags } from '../componen
 import { mdxComponents } from '../components/blog/MdxComponents'
 import { JAKARTA_FONT, ScrollReveal, StatRow, StatTile } from '../components/blog/BlogPrimitives'
 import { absoluteUrl } from '../lib/site'
+import { X_HANDLE } from '../lib/social-profiles'
 import { PEOPLE } from '../lib/people'
 import { postDescription, postDocumentTitle } from '../lib/search-snippet'
 import type { BlogPost, BlogPostMeta } from '../types/blog'
@@ -136,6 +137,7 @@ function PostArticle({ post }: { post: BlogPost }) {
           <meta property="article:tag" content={tag} key={tag} />
         ))}
         <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:site" content={X_HANDLE} />
         <meta name="twitter:title" content={meta.title} />
         <meta name="twitter:description" content={meta.excerpt} />
         <meta property="og:image" content={absoluteUrl('/og-image.png')} />
