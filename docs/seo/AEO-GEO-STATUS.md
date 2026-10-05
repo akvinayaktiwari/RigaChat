@@ -1,6 +1,6 @@
 # AEO / GEO Status — vyostra.com
 
-**The one file to read first.** What has shipped for search and answer-engine visibility, what is left, and who has to do it. Last updated: 2026-10-03.
+**The one file to read first.** What has shipped for search and answer-engine visibility, what is left, and who has to do it. Last updated: 2026-10-05. Next steps: `HANDOFF-2026-10-05.md`.
 
 How to keep it current: when something ships, move its row from "To do" to "Implemented" with the date. Do not record plans here; plans live in the documents listed at the bottom.
 
@@ -15,7 +15,7 @@ Framing: Google's own guidance is that optimizing for AI search is ordinary SEO.
 | GEO readiness (estimate) | 71 / 100 | 2026-10-02 | From `GEO-ANALYSIS-2026-10-02.md`, before the feature-page rebuild. Baseline was 63 on 2026-09-19. |
 | Indexed in Google | Unknown | — | Search Console is not verified. This is the top blocker. |
 | Public pages in the sitemap | 23 | 2026-10-03 | All dated. `/features/zoho-crm/` was the 23rd. |
-| Blog posts | 5 | 2026-10-02 | 4 published in the last three weeks. |
+| Blog posts | 5 live, 2 on branch `content/whatsapp-lead-ads-posts` | 2026-10-05 | Meta lead ads auto-reply, and click-to-WhatsApp vs lead forms for real estate. Awaiting owner review. |
 | Mobile LCP (lab) | about 1.7 s | 2026-10-02 | Was 2.3 s on the homepage and 3.25 s on a post. No field data yet. |
 | Lighthouse accessibility | 100 | 2026-10-02 | On every public page audited. |
 | Real referring domains | 0 known | 2026-10-02 | Not in the Common Crawl graph; all six competitors checked are. |
