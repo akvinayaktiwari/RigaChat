@@ -58,7 +58,7 @@ function VoiceWidgetMockup() {
 
       <div className="flex flex-col gap-2.5">
         <p className="bg-primary text-white rounded-2xl rounded-tr-none p-3 text-xs ml-auto max-w-[85%]">
-          &ldquo;Is the 3BHK ready to move in?&rdquo;
+          &ldquo;Is the 3-bedroom ready to move in?&rdquo;
         </p>
         <p className="bg-surface-container-low rounded-2xl rounded-tl-none p-3 text-xs text-on-surface">
           &ldquo;Let me check that with the team for you. Shall I have someone call you back?&rdquo;

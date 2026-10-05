@@ -61,7 +61,7 @@ function ChatWidgetMockup() {
           Hi! How can I help you today? 👋
         </p>
         <p className="bg-primary text-white rounded-2xl rounded-tr-none p-3 text-xs ml-auto max-w-[85%]">
-          I'm looking for a 3BHK apartment
+          I'm looking for a 3-bedroom apartment
         </p>
         <p className="bg-surface-container-low rounded-2xl rounded-tl-none p-3 text-xs text-on-surface">
           Great! I can help with that. Could I get your name and phone number to connect you with our team?
