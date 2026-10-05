@@ -13,20 +13,23 @@ export interface ZohoDataCentre {
   apiDomain: string
 }
 
+// India: where the OAuth client is registered, and the only data centre any
+// connection made before this file existed can belong to. A stored connection
+// with no data centre recorded is therefore an India one.
+export const DEFAULT_ZOHO_DATA_CENTRE: ZohoDataCentre = {
+  accountsServer: 'https://accounts.zoho.in',
+  apiDomain: 'https://www.zohoapis.in',
+}
+
 const ZOHO_DATA_CENTRES: readonly ZohoDataCentre[] = [
+  DEFAULT_ZOHO_DATA_CENTRE,
   { accountsServer: 'https://accounts.zoho.com', apiDomain: 'https://www.zohoapis.com' },
   { accountsServer: 'https://accounts.zoho.eu', apiDomain: 'https://www.zohoapis.eu' },
-  { accountsServer: 'https://accounts.zoho.in', apiDomain: 'https://www.zohoapis.in' },
   { accountsServer: 'https://accounts.zoho.com.au', apiDomain: 'https://www.zohoapis.com.au' },
   { accountsServer: 'https://accounts.zoho.jp', apiDomain: 'https://www.zohoapis.jp' },
   { accountsServer: 'https://accounts.zoho.sa', apiDomain: 'https://www.zohoapis.sa' },
   { accountsServer: 'https://accounts.zohocloud.ca', apiDomain: 'https://www.zohoapis.ca' },
 ]
-
-// India: where the OAuth client is registered, and the only data centre any
-// connection made before this file existed can belong to. A stored connection
-// with no data centre recorded is therefore an India one.
-export const DEFAULT_ZOHO_DATA_CENTRE: ZohoDataCentre = ZOHO_DATA_CENTRES[2]
 
 function originOf(url: string): string | null {
   try {
@@ -51,7 +54,8 @@ export function findZohoDataCentre(accountsServer: string): ZohoDataCentre | nul
 export function zohoDataCentreForCallback(accountsServer: string | undefined): ZohoDataCentre {
   if (!accountsServer) return DEFAULT_ZOHO_DATA_CENTRE
   const dataCentre = findZohoDataCentre(accountsServer)
-  if (!dataCentre) throw new Error(`Unrecognised Zoho accounts server: ${accountsServer}`)
+  // Quoted and cut short: the value is caller-supplied and ends up in a log line.
+  if (!dataCentre) throw new Error(`Unrecognised Zoho accounts server: ${JSON.stringify(accountsServer.slice(0, 80))}`)
   return dataCentre
 }
 
