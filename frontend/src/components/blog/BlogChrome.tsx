@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react'
 import { FileText, Download } from 'lucide-react'
 import type { BlogAttachment, BlogPostMeta } from '../../types/blog'
+import { marketLabel } from '../../lib/blog-markets'
 import { PEOPLE } from '../../lib/people'
 import { JAKARTA_FONT } from './BlogPrimitives'
 
@@ -45,6 +46,19 @@ export function PostTags({ tags }: { tags: string[] }) {
         </li>
       ))}
     </ul>
+  )
+}
+
+/**
+ * The post's cluster and the market it is written for, e.g. "WhatsApp · India".
+ * Printed on every card and post so a reader knows whose rules and currency a
+ * post is about before reading it.
+ */
+export function PostEyebrow({ meta, className }: { meta: BlogPostMeta; className: string }) {
+  return (
+    <span className={className}>
+      {meta.category} <span aria-hidden="true">·</span> {marketLabel(meta.market)}
+    </span>
   )
 }
 
