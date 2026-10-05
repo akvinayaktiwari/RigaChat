@@ -157,6 +157,30 @@ export function blogPostingSchema(article: ArticleFields): JsonLd {
   }
 }
 
+export interface TechArticleFields {
+  title: string
+  description: string
+  publishedAt: string
+  updatedAt?: string
+  path: string
+  author: Person
+}
+
+/** A developer docs page. TechArticle rather than BlogPosting: it is reference material, not a dated post. */
+export function techArticleSchema(article: TechArticleFields): JsonLd {
+  return {
+    '@type': 'TechArticle',
+    headline: article.title,
+    description: article.description,
+    datePublished: article.publishedAt,
+    dateModified: article.updatedAt ?? article.publishedAt,
+    mainEntityOfPage: absoluteUrl(article.path),
+    image: absoluteUrl('/og-image.png'),
+    author: personSchema(article.author),
+    publisher: { '@id': absoluteUrl(`/${ORGANIZATION_ID}`) },
+  }
+}
+
 export interface Crumb {
   name: string
   /** Path exactly as served (trailing slash on prerendered routes): a crumb must never point at a 301. */

@@ -7,6 +7,7 @@ import { AnalyticsPageViews } from './src/hooks/useAnalyticsPageViews'
 import LandingPage from './src/pages/LandingPage'
 import NotFound from './src/pages/NotFound'
 import { preloadPostContent } from './src/content/blog/registry'
+import { preloadDocContent } from './src/content/docs/registry'
 import { lazyWithPreload } from './src/lib/lazy-with-preload'
 import { lazyRoute } from './src/lib/chunk-reload'
 import { RouteErrorBoundary } from './src/components/RouteErrorBoundary/RouteErrorBoundary'
@@ -30,11 +31,22 @@ import IntegrationPage from './src/pages/integrations/IntegrationPage'
 import IntegrationsIndex from './src/pages/integrations/IntegrationsIndex'
 import { META_LEAD_ADS } from './src/content/integrations/meta-lead-ads'
 import IndustryPage from './src/pages/industries/IndustryPage'
+import DocsIndex from './src/pages/docs/DocsIndex'
 import { REAL_ESTATE } from './src/content/industries/real-estate'
 // Blog routes are lazy so post bodies (and the blog's motion/table components)
 // stay out of the main bundle every other page pays for.
 const BlogIndex = lazyWithPreload(() => import('./src/pages/BlogIndex'))
 const BlogPost = lazyWithPreload(() => import('./src/pages/BlogPost'))
+
+// A docs page is lazy for the blog's reason: its MDX body stays out of the
+// bundle every other page pays for. The docs index is eager like any other
+// prerendered marketing page.
+const DocPage = lazyWithPreload(() => import('./src/pages/docs/DocPage'))
+
+/** "/docs/quickstart/" -> "quickstart"; undefined for the index and every other path. */
+function docSlug(pathname: string): string | undefined {
+  return pathname.match(/^\/docs\/([^/]+)\/?$/)?.[1]
+}
 
 /** "/blog/my-post/" -> "my-post"; undefined for the index and every other path. */
 function blogSlug(pathname: string): string | undefined {
@@ -43,12 +55,15 @@ function blogSlug(pathname: string): string | undefined {
 
 /**
  * Fetches the lazy chunks a prerendered path needs, before main.tsx hydrates it.
- * Only the blog is both prerendered and lazy; every other path resolves at once.
+ * Only blog and docs pages are both prerendered and lazy; every other path resolves at once.
  */
 export async function preloadRoute(pathname: string): Promise<void> {
   const slug = blogSlug(pathname)
+  const doc = docSlug(pathname)
   if (slug) {
     await Promise.all([BlogPost.preload(), preloadPostContent(slug)])
+  } else if (doc) {
+    await Promise.all([DocPage.preload(), preloadDocContent(doc)])
   } else if (/^\/blog\/?$/.test(pathname)) {
     await BlogIndex.preload()
   }
@@ -190,6 +205,15 @@ export function AppRoutes() {
           <Route path="/integrations" element={<IntegrationsIndex />} />
           <Route path="/integrations/meta-lead-ads" element={<IntegrationPage integration={META_LEAD_ADS} />} />
           <Route path="/industries/real-estate" element={<IndustryPage industry={REAL_ESTATE} />} />
+          <Route path="/docs" element={<DocsIndex />} />
+          <Route
+            path="/docs/:slug"
+            element={
+              <Suspense fallback={<div className="min-h-screen bg-background" />}>
+                <DocPage />
+              </Suspense>
+            }
+          />
           <Route
             path="/blog"
             element={
