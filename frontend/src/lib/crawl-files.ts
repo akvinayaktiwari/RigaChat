@@ -6,6 +6,7 @@
  * site origin (see ./site.ts) and the sitemap and llms.txt need the blog's
  * slugs, neither of which a static file can know.
  */
+import { INDUSTRIES } from '../content/industries/registry'
 import { INTEGRATIONS } from '../content/integrations/registry'
 import type { PricingTier } from './pricingTiers'
 
@@ -116,6 +117,16 @@ export const STATIC_PAGES: readonly StaticPage[] = [
       summary: integration.summary,
       section: 'Product',
       lastModified: integration.lastModified,
+    }),
+  ),
+  // One page per industry, from the same content files the pages render.
+  ...INDUSTRIES.map(
+    (industry): StaticPage => ({
+      route: `/industries/${industry.slug}`,
+      label: `Vyostra AI for ${industry.name.toLowerCase()}`,
+      summary: industry.summary,
+      section: 'Product',
+      lastModified: industry.lastModified,
     }),
   ),
   {
