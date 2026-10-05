@@ -1,0 +1,65 @@
+## How do you authenticate a request?
+
+Send the key in the `Authorization` header with the word `Bearer` in front of it. There is no other way to pass it: not a query parameter, not a cookie.
+
+```http
+GET /v1/leads HTTP/1.1
+Authorization: Bearer vy_live_your_key_here
+```
+
+```bash
+curl "$VYOSTRA_API_URL/v1/leads" \
+  -H "Authorization: Bearer $VYOSTRA_API_KEY"
+```
+
+A key identifies your whole Vyostra AI account. You never send an account id, and a key can never read another account's data.
+
+## What does an API key look like?
+
+A key is the prefix `vy_live_` followed by 48 hexadecimal characters, 56 characters in total. The prefix exists so that a leaked key is recognisable in a log or a code review.
+
+In the dashboard a key is listed by its name and its last four characters, for example `vy_live_…a91c`, so you can match a row to the secret in your password manager.
+
+## Which permissions can a key have?
+
+Each key has one or more scopes, chosen when the key is created. An endpoint rejects a key that lacks its scope with a 403 response and the code `insufficient_scope`.
+
+| Scope | Lets the key read |
+| --- | --- |
+| `leads:read` | Leads from chat, forms, Meta lead ads and voice calls |
+| `bots:read` | Chatbot configuration |
+| `forms:read` | Lead form configuration |
+| `voice_agents:read` | Voice agent configuration |
+
+Every scope today is read-only. The API cannot create, change or delete anything yet. Scopes cannot be edited after creation, so to change what a key can do, create a new key and revoke the old one.
+
+## Which plans can use the API?
+
+| Plan | API access |
+| --- | --- |
+| Free trial | No |
+| Starter | Yes |
+| Growth | Yes |
+| Agency | Yes |
+
+The plan is checked on every request, not only when the key is created.
+
+## How do you rotate a key without downtime?
+
+1. Create a second key with the same scopes.
+2. Deploy the new key to your integration.
+3. Watch the **last used** date of the old key in Settings until it stops changing.
+4. Revoke the old key.
+
+The last-used date is updated at most once every ten minutes per key, so allow that long before reading it as "no longer in use".
+
+## How do you keep a key safe?
+
+- Use a key only from a server, a serverless function or a script. The API does not accept cross-origin browser requests, so a key placed in front-end code would not work and would be public.
+- Keep keys in environment variables or a secrets manager, never in a repository.
+- Give each integration its own key with only the scopes it needs.
+- Revoke a key the moment you suspect it has leaked. Revocation takes effect on the next request.
+
+<Callout title="The chatbot widget needs no key">
+The script tag that puts the chatbot on a web page identifies your bot by its public bot id, not by an API key. See [Embed the chatbot, form and voice widgets](/docs/embed-widgets/).
+</Callout>

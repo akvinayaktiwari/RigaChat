@@ -1,0 +1,135 @@
+## What are the conventions for every request?
+
+- **Base URL.** Shown next to your keys in the dashboard under Settings. Examples here call it `$VYOSTRA_API_URL`.
+- **Authentication.** `Authorization: Bearer` followed by your key. See [API keys and authentication](/docs/authentication/).
+- **Format.** Responses are JSON with field names in camelCase. Timestamps are ISO 8601 strings in UTC.
+- **Missing values.** A field with no value is `null`. It is never left out, so every object of one type has the same keys.
+- **Errors.** A failed request returns an `error` object with a `code` and a `message`. See [Errors and rate limits](/docs/errors-and-rate-limits/).
+
+| Method and path | Returns | Scope |
+| --- | --- | --- |
+| `GET /v1/leads` | A page of leads | `leads:read` |
+| `GET /v1/leads/:id` | One lead with its transcript | `leads:read` |
+| `GET /v1/bots` | All chatbots | `bots:read` |
+| `GET /v1/bots/:botId` | One chatbot | `bots:read` |
+| `GET /v1/forms` | All lead forms | `forms:read` |
+| `GET /v1/forms/:formId` | One lead form | `forms:read` |
+| `GET /v1/voice-agents` | All voice agents | `voice_agents:read` |
+| `GET /v1/voice-agents/:agentId` | One voice agent | `voice_agents:read` |
+
+## How do you list leads?
+
+`GET /v1/leads` returns one page of the leads in your account, from every source.
+
+| Query parameter | Type | Meaning |
+| --- | --- | --- |
+| `limit` | Integer, 1 to 200 | Leads per page. Defaults to 50. |
+| `cursor` | String | The `nextCursor` value from the previous page. |
+| `includeArchived` | `true` | Also return leads archived in the dashboard. Left out by default. |
+
+```bash
+curl "$VYOSTRA_API_URL/v1/leads?limit=100" \
+  -H "Authorization: Bearer $VYOSTRA_API_KEY"
+```
+
+The response body is the page itself:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `data` | Array of leads | The leads on this page. |
+| `nextCursor` | String or null | Pass it as `cursor` to get the next page. `null` on the last page. |
+| `total` | Integer | How many leads match across all pages. |
+| `incompleteSources` | Array of strings | Present only when a lead source could not be read. This page is then missing that source's leads. |
+
+Leads come back in dashboard inbox order, which is by urgency and not by date. The list covers every chat and form lead, plus the 500 most recent Meta lead ad leads and the 500 most recent voice leads.
+
+### What fields does a lead have?
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `id` | String | The lead's id, starting with `lead_`. Treat it as opaque. |
+| `source` | String | One of `chat`, `form`, `meta`, `voice`. |
+| `sourceId` | String | The id of the chatbot, form, Facebook Page or voice agent the lead came through. |
+| `name` | String or null | The lead's name. |
+| `phone` | String or null | The lead's phone number. |
+| `email` | String or null | The lead's email address. |
+| `sourceUrl` | String or null | The page the lead was captured on. |
+| `attributes` | Object | Anything else captured with the lead, as string values keyed by field name. |
+| `status` | String | One of `new`, `contacted`, `qualified`, `closed`. |
+| `outcome` | String or null | One of `won`, `lost`, `unreachable`. Set only on a closed lead. |
+| `leadScore` | Integer or null | A score from 0 to 100, when one has been assigned. |
+| `archived` | Boolean | Whether the lead has been archived in the dashboard. |
+| `createdAt` | String | When the lead was captured. |
+
+## How do you fetch one lead?
+
+`GET /v1/leads/:id` returns a single lead wrapped in `data`. Use the `id` exactly as the list returned it.
+
+```bash
+curl "$VYOSTRA_API_URL/v1/leads/lead_WyJjaGF0IiwiOWYyYzFkN2UtYm90IiwiNWI4ZTQxYWEtbGVhZCJd" \
+  -H "Authorization: Bearer $VYOSTRA_API_KEY"
+```
+
+It has every field in the table above, with two differences:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `transcript` | String or null | The chat conversation, for a lead captured by the chatbot. `null` when there is none. |
+| `attributes` | Object | Also includes the answers submitted on a form or a Meta lead ad. |
+
+An id that does not exist, or belongs to another account, returns 404 with the code `not_found`.
+
+## How do you read chatbots?
+
+`GET /v1/bots` returns every chatbot in the account as an array in `data`. `GET /v1/bots/:botId` returns one.
+
+```bash
+curl "$VYOSTRA_API_URL/v1/bots" \
+  -H "Authorization: Bearer $VYOSTRA_API_KEY"
+```
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `botId` | String | The id used in the widget script tag. |
+| `name` | String | The chatbot's name. |
+| `websiteUrl` | String or null | The site the chatbot was trained on. |
+| `greetingMessage` | String | The first message a visitor sees. |
+| `brandColor` | String | The widget colour as a hex code. |
+| `widgetTrigger` | String | When the widget opens: `immediate`, `delay_5s`, `scroll_50` or `exit_intent`. |
+| `leadTriggerAfterMessages` | Integer | How many visitor messages before the lead form is offered. |
+| `leadFormFields` | Array | The fields of the in-chat lead form. Each has `fieldId`, `label`, `type`, `required` and, for a select, `options`. |
+| `supportEmail` | String or null | The support address shown in the widget. |
+| `createdAt`, `updatedAt` | String | When the chatbot was created and last changed. |
+
+## How do you read lead forms?
+
+`GET /v1/forms` returns every lead form as an array in `data`. `GET /v1/forms/:formId` returns one.
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `formId` | String | The id used in the form widget script tag. |
+| `name` | String | The form's name. |
+| `description` | String or null | The text shown under the name. |
+| `submitButtonText` | String | The label on the submit button. |
+| `fields` | Array | Each field has `fieldId`, `label`, `type`, `required` and optionally `placeholder` and `options`. `type` is one of `text`, `number`, `email`, `phone`, `options`. |
+| `createdAt`, `updatedAt` | String | When the form was created and last changed. |
+
+## How do you read voice agents?
+
+`GET /v1/voice-agents` returns every voice agent as an array in `data`. `GET /v1/voice-agents/:agentId` returns one.
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `agentId` | String | The id used in the voice widget script tag. |
+| `name` | String | The voice agent's name. |
+| `voice` | String | The voice it speaks with, for example `coral` or `sage`. |
+| `greetingMessage` | String | What the agent says first. |
+| `brandColor` | String | The widget colour as a hex code. |
+| `widgetPosition` | String | One of `bottom-left`, `bottom-right`, `bottom-center`. |
+| `maxSessionDuration` | Integer | The longest a session can run, in minutes: 5, 10 or 15. |
+| `enabled` | Boolean | Whether the agent is switched on. |
+| `createdAt`, `updatedAt` | String | When the agent was created and last changed. |
+
+## What is not in the API yet?
+
+The API is read-only. It has no endpoints that create or change anything, it does not send webhooks, and there is no official SDK. Fields may be added to a response over time, so write clients that ignore fields they do not recognise.

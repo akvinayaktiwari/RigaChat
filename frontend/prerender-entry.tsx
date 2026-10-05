@@ -8,6 +8,7 @@ import { AuthProvider } from './src/hooks/useAuth'
 import { StaffAuthProvider } from './src/hooks/useStaffAuth'
 import { SubscriptionProvider } from './src/hooks/useSubscription'
 import { getAllPosts, getAllSlugs } from './src/content/blog/registry'
+import { getAllDocMetas, getAllDocSlugs } from './src/content/docs/registry'
 import { PRERENDERED_STATIC_ROUTES, buildLlmsTxt, buildRobotsTxt, buildSitemapXml, sitemapEntries } from './src/lib/crawl-files'
 import { WHAT_IS_VYOSTRA } from './src/components/landing/WhatIsVyostra'
 import { PRICING_TIERS } from './src/lib/pricingTiers'
@@ -151,7 +152,12 @@ export async function renderRoute(url: string): Promise<{ html: string; head: st
  * otherwise ship content at opacity 0.
  */
 export function getRoutes(): string[] {
-  return ['/', ...PRERENDERED_STATIC_ROUTES, ...getAllSlugs().map((slug) => `/blog/${slug}`)]
+  return [
+    '/',
+    ...PRERENDERED_STATIC_ROUTES,
+    ...getAllSlugs().map((slug) => `/blog/${slug}`),
+    ...getAllDocSlugs().map((slug) => `/docs/${slug}`),
+  ]
 }
 
 /** robots.txt, sitemap.xml and llms.txt contents, keyed by the file name to write under dist/. */
@@ -159,11 +165,14 @@ export function getCrawlFiles(): Record<string, string> {
   const metas = getAllPosts().map(({ meta }) => meta)
   const posts = metas.map((meta) => ({ slug: meta.slug, publishedAt: meta.publishedAt, updatedAt: meta.updatedAt }))
   const summaries = metas.map((meta) => ({ slug: meta.slug, title: meta.title, description: postDescription(meta) }))
+  const docMetas = getAllDocMetas()
+  const docDates = docMetas.map((meta) => ({ slug: meta.slug, publishedAt: meta.publishedAt, updatedAt: meta.updatedAt }))
+  const docSummaries = docMetas.map((meta) => ({ slug: meta.slug, title: meta.title, description: meta.description }))
   return {
     'robots.txt': buildRobotsTxt(SITE_URL),
-    'sitemap.xml': buildSitemapXml(SITE_URL, sitemapEntries(posts)),
+    'sitemap.xml': buildSitemapXml(SITE_URL, sitemapEntries(posts, docDates)),
     // The definition is the homepage's own "What is Vyostra AI?" block, so the
     // file cannot describe the product differently from the page it points at.
-    'llms.txt': buildLlmsTxt(SITE_URL, { definition: WHAT_IS_VYOSTRA, tiers: PRICING_TIERS, posts: summaries, supportEmail: SUPPORT_EMAIL }),
+    'llms.txt': buildLlmsTxt(SITE_URL, { definition: WHAT_IS_VYOSTRA, tiers: PRICING_TIERS, posts: summaries, docs: docSummaries, supportEmail: SUPPORT_EMAIL }),
   }
 }

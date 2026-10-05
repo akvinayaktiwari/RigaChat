@@ -159,6 +159,28 @@ describe('buildSitemapXml', () => {
   })
 })
 
+describe('docs pages in the crawl files', () => {
+  const docs = [{ slug: 'quickstart', publishedAt: '2026-10-05', updatedAt: '2026-10-09' }]
+
+  it('lists each docs page in the sitemap at its trailing-slash URL, dated from its revision', () => {
+    const entry = sitemapEntries([], docs).find((candidate) => candidate.path === '/docs/quickstart/')
+    expect(entry?.lastModified).toBe('2026-10-09')
+  })
+
+  it('lists the docs index and each docs page under Developers in llms.txt', () => {
+    const llms = buildLlmsTxt(ORIGIN, {
+      definition: ['Vyostra AI is a lead-capture platform.'],
+      tiers: [],
+      posts: [],
+      docs: [{ slug: 'quickstart', title: 'Quickstart', description: 'Make a first request.' }],
+      supportEmail: 'support@vyostra.com',
+    })
+    const developers = llms.split('## Developers')[1]?.split('\n## ')[0] ?? ''
+    expect(developers).toContain(`](${ORIGIN}/docs/)`)
+    expect(developers).toContain(`- [Quickstart](${ORIGIN}/docs/quickstart/): Make a first request.`)
+  })
+})
+
 describe('buildLlmsTxt', () => {
   const posts = [{ slug: 'a-post', title: 'A post', description: 'What the post answers.' }]
   const tiers = [{ tier: 'starter' as const, name: 'Starter', priceUsd: 49, description: 'For one site.', features: ['1 agent', '50 CRM leads'] }]

@@ -1,0 +1,146 @@
+## How does a lead sync work?
+
+A sync is a loop that runs on a schedule:
+
+1. Request a page of leads with `limit=200`.
+2. Save each lead in your system, keyed by its `id`.
+3. If `nextCursor` is not `null`, request the next page with `cursor` set to it.
+4. Stop when `nextCursor` is `null`.
+
+Because every write is keyed on the lead `id`, running the loop again changes nothing that has not changed. That makes a failed run safe to repeat from the start.
+
+You need an API key with the `leads:read` scope. [Quickstart](/docs/quickstart/) shows how to create one.
+
+## What does the full loop look like in Node.js?
+
+This script reads every lead and hands each page to a function you write. It needs Node.js 18 or later and no packages.
+
+```js
+const BASE_URL = process.env.VYOSTRA_API_URL
+const API_KEY = process.env.VYOSTRA_API_KEY
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+async function fetchLeadPage(cursor) {
+  const url = new URL('/v1/leads', BASE_URL)
+  url.searchParams.set('limit', '200')
+  if (cursor) url.searchParams.set('cursor', cursor)
+
+  while (true) {
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${API_KEY}` } })
+    if (response.ok) return response.json()
+
+    if (response.status === 429) {
+      await sleep(Number(response.headers.get('Retry-After') ?? 60) * 1000)
+      continue
+    }
+
+    const { error } = await response.json()
+    throw new Error(`${response.status} ${error.code}: ${error.message}`)
+  }
+}
+
+async function syncLeads(saveLeads) {
+  let cursor = null
+  let saved = 0
+
+  do {
+    const page = await fetchLeadPage(cursor)
+
+    if (page.incompleteSources) {
+      throw new Error(`Leads from ${page.incompleteSources.join(', ')} could not be read. Try again later.`)
+    }
+
+    await saveLeads(page.data)
+    saved += page.data.length
+    cursor = page.nextCursor
+  } while (cursor)
+
+  return saved
+}
+
+// Replace this with an upsert into your CRM or database, keyed on lead.id.
+async function saveLeads(leads) {
+  for (const lead of leads) {
+    console.log(lead.id, lead.source, lead.name, lead.phone, lead.email)
+  }
+}
+
+console.log(`Synced ${await syncLeads(saveLeads)} leads`)
+```
+
+## What does it look like in Python?
+
+```python
+import os
+import time
+import requests
+
+BASE_URL = os.environ["VYOSTRA_API_URL"]
+HEADERS = {"Authorization": f"Bearer {os.environ['VYOSTRA_API_KEY']}"}
+
+
+def fetch_lead_page(cursor=None):
+    params = {"limit": 200}
+    if cursor:
+        params["cursor"] = cursor
+
+    while True:
+        response = requests.get(f"{BASE_URL}/v1/leads", params=params, headers=HEADERS, timeout=30)
+        if response.status_code == 429:
+            time.sleep(int(response.headers.get("Retry-After", 60)))
+            continue
+        response.raise_for_status()
+        return response.json()
+
+
+def sync_leads(save_leads):
+    cursor = None
+    saved = 0
+
+    while True:
+        page = fetch_lead_page(cursor)
+        if page.get("incompleteSources"):
+            raise RuntimeError(f"Could not read leads from {page['incompleteSources']}. Try again later.")
+
+        save_leads(page["data"])
+        saved += len(page["data"])
+        cursor = page["nextCursor"]
+        if cursor is None:
+            return saved
+
+
+def save_leads(leads):
+    # Replace with an upsert into your CRM or database, keyed on lead["id"].
+    for lead in leads:
+        print(lead["id"], lead["source"], lead["name"], lead["phone"], lead["email"])
+
+
+print("Synced", sync_leads(save_leads), "leads")
+```
+
+## Which lead fields should you map?
+
+| Vyostra AI field | Typical CRM field | Note |
+| --- | --- | --- |
+| `id` | External id | Use it as the unique key. It never changes. |
+| `name`, `phone`, `email` | Contact details | Any of them can be `null`. |
+| `source` | Lead source | `chat`, `form`, `meta` or `voice`. |
+| `sourceUrl` | Landing page | The page the lead was captured on. |
+| `attributes` | Custom fields | Extra answers, as text keyed by field name. |
+| `status`, `outcome` | Stage | The lead's stage in the Vyostra AI dashboard. |
+| `createdAt` | Created date | ISO 8601, in UTC. |
+
+To copy the chat conversation as well, call `GET /v1/leads/:id` for a lead and read `transcript`. That is one request per lead, so do it only for leads you have not stored before.
+
+## What should a sync watch out for?
+
+- **Order is by urgency, not date.** Leads come back in dashboard inbox order. Do not stop at the first lead you recognise; read to the last page.
+- **A lead can move while you read.** If a lead's status changes in the dashboard during a run, it can shift between pages. Keying on `id` means a lead seen twice is written once, and the next run picks up one that was missed.
+- **`incompleteSources` means stop.** When it is present, one lead source could not be read and its leads are missing from the page. Treat the run as failed and try again later.
+- **Meta and voice leads are capped.** The list holds the 500 most recent Meta lead ad leads and the 500 most recent voice leads. Sync regularly so older ones are already stored before they fall out of the list.
+- **The API is read-only.** Changing a lead in your CRM does not change it in Vyostra AI.
+
+## Do you need this for Zoho CRM?
+
+Not always. Vyostra AI has a built-in [Zoho CRM integration](/features/zoho-crm/) that creates leads from lead forms and Meta lead ads in Zoho automatically. Use the API when you need chat or voice leads as well, or a CRM other than Zoho.

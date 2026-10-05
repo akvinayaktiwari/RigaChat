@@ -19,6 +19,7 @@ const LINK_COLUMNS = [
       { label: 'About Us', href: '/about-us' },
       { label: 'Blog', href: '/blog' },
       { label: 'Help Center', href: '/help' },
+      { label: 'Developer Docs', href: '/docs' },
       { label: 'Careers', href: '/careers' },
       { label: 'Contact Us', href: '/contact' },
     ],

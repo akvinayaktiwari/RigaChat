@@ -1,0 +1,66 @@
+## How do you add the chatbot to a website?
+
+1. In the Vyostra AI dashboard, open your bot's settings and copy its embed code. It contains your bot id.
+2. Paste it just before the closing `</body>` tag of every page the chatbot should appear on. On a site with a shared layout or footer template, paste it there once.
+3. Reload the page. The chat bubble appears in the bottom corner.
+
+The tag looks like this, with your own bot id in place of the placeholder:
+
+<WidgetSnippet kind="chat" />
+
+The chatbot answers from the website content and knowledge base you trained it on, and captures a lead when a visitor leaves their details. When and how the widget opens, its colour and its greeting are set in the dashboard, so changing them needs no change to your page.
+
+### Which options does the chatbot tag accept?
+
+| Attribute | Required | Meaning |
+| --- | --- | --- |
+| `data-bot-id` | Yes | The id of the bot to load. |
+| `data-bottom-offset` | No | Distance of the bubble from the bottom of the screen, in pixels. Defaults to `20`. Raise it when the bubble covers a cookie banner or a sticky bar. |
+
+## How do you embed a lead form?
+
+A Vyostra AI lead form opens as a pop-up over your page when your own button asks for it.
+
+1. In the dashboard, open **Forms**, create a form and copy its embed code.
+2. Paste the script tag before the closing `</body>` tag:
+
+<WidgetSnippet kind="form" />
+
+3. Open the form from any button or link on your page:
+
+```html
+<button onclick="VyostraAI.openForm('YOUR_FORM_ID')">Get a callback</button>
+```
+
+`VyostraAI.openForm` takes the form id and shows that form. `VyostraAI.closeForm()` closes it. One script tag can open any form in your account, so a page with several buttons needs the tag only once. Submissions appear in the dashboard with your other leads.
+
+## How do you embed the voice agent?
+
+The voice agent lets a visitor talk to your site out loud, in the browser, without a phone number.
+
+1. In the dashboard, open your voice agent and copy its embed code.
+2. Paste it before the closing `</body>` tag:
+
+<WidgetSnippet kind="voice" />
+
+The visitor's browser asks for microphone permission the first time they start a conversation. A browser without the audio features the widget needs does not show it. The voice agent is an add-on to a plan.
+
+## Which id goes in which tag?
+
+| Widget | Script file | Attribute | Where the id comes from |
+| --- | --- | --- | --- |
+| Chatbot | `widget.js` | `data-bot-id` | The bot's settings in the dashboard, or `botId` from `GET /v1/bots` |
+| Lead form | `form-widget.js` | `data-form-id` | The Forms page, or `formId` from `GET /v1/forms` |
+| Voice agent | `voice-widget.js` | `data-agent-id` | The voice agent's page, or `agentId` from `GET /v1/voice-agents` |
+
+These ids are public: they are meant to sit in your page source. They are not API keys.
+
+## How do you add widgets to many sites from code?
+
+If you manage many sites, such as an agency's client sites or one page per property project, you can generate the tags instead of copying them by hand. Read the ids from the API on your server and write one script tag per site. [REST API reference](/docs/api-reference/) lists the endpoints that return them.
+
+## What should you check if the widget does not appear?
+
+- The id in the tag matches the one in the dashboard exactly.
+- The tag is in the page that is actually served. View the page source and search for the script file name.
+- The browser console shows no error about a blocked script. A strict Content Security Policy needs the widget's script host added to it.

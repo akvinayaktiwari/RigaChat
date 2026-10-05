@@ -16,7 +16,7 @@ export const SPA_MARKETING_ROUTES: readonly string[] = [
 ]
 
 /** The llms.txt heading a page is listed under. "Optional" is the spec's name for skippable links. */
-export type LlmsSection = 'Product' | 'Pricing' | 'Blog' | 'Company' | 'Optional'
+export type LlmsSection = 'Product' | 'Developers' | 'Pricing' | 'Blog' | 'Company' | 'Optional'
 
 export interface StaticPage {
   /**
@@ -140,6 +140,13 @@ export const STATIC_PAGES: readonly StaticPage[] = [
   { route: '/help', label: 'Help Center', summary: 'Setup answers: embedding the widget, the knowledge base, WhatsApp, Zoho CRM, forms, billing.', section: 'Company', lastModified: '2026-10-03' },
   { route: '/contact', label: 'Contact', summary: 'Reach sales or support; the team replies within 24 hours.', section: 'Company', lastModified: '2026-09-20' },
   { route: '/careers', label: 'Careers', summary: 'Working at Vyostra AI, a fully remote team.', section: 'Company', lastModified: '2026-09-16' },
+  {
+    route: '/docs',
+    label: 'Developer docs',
+    summary: 'The REST API for leads, chatbots, forms and voice agents, API keys, and the script tags that embed each widget.',
+    section: 'Developers',
+    lastModified: '2026-10-05',
+  },
   { route: '/blog', label: 'All articles', summary: 'The blog index, newest first.', section: 'Blog', lastModified: '2026-09-15' },
   { route: '/privacy-policy', label: 'Privacy Policy', summary: 'What data Vyostra AI collects and how it is handled.', section: 'Optional', lastModified: '2026-09-15' },
   { route: '/terms-of-service', label: 'Terms of Service', summary: 'The terms that govern use of Vyostra AI.', section: 'Optional', lastModified: '2026-09-15' },
@@ -254,15 +261,19 @@ function pageLastModified(route: string, ownDate: string, posts: readonly PostDa
   return [ownDate, ...posts.map(postLastModified)].sort().at(-1) ?? ownDate
 }
 
-/** Every public, indexable URL: SPA marketing pages, prerendered pages, blog posts. */
-export function sitemapEntries(posts: readonly PostDate[]): SitemapEntry[] {
+/** A docs page's dates, shaped like a post's. */
+export type DocDate = PostDate
+
+/** Every public, indexable URL: SPA marketing pages, prerendered pages, blog posts, docs pages. */
+export function sitemapEntries(posts: readonly PostDate[], docs: readonly DocDate[] = []): SitemapEntry[] {
   const spa = SPA_MARKETING_ROUTES.map((path) => ({ path, lastModified: pageLastModified(path, HOME_LAST_MODIFIED, posts) }))
   const prerendered = STATIC_PAGES.map((page) => ({
     path: servedPath(page.route),
     lastModified: pageLastModified(page.route, page.lastModified, posts),
   }))
   const blog = posts.map((post) => ({ path: servedPath(`/blog/${post.slug}`), lastModified: postLastModified(post) }))
-  return [...spa, ...prerendered, ...blog]
+  const docPages = docs.map((doc) => ({ path: servedPath(`/docs/${doc.slug}`), lastModified: postLastModified(doc) }))
+  return [...spa, ...prerendered, ...blog, ...docPages]
 }
 
 export interface PostSummary {
@@ -277,6 +288,8 @@ export interface LlmsTxtInput {
   definition: readonly string[]
   tiers: readonly PricingTier[]
   posts: readonly PostSummary[]
+  /** Developer docs pages, in sidebar order. */
+  docs?: readonly PostSummary[]
   supportEmail: string
 }
 
@@ -302,7 +315,7 @@ function llmsPlanLine(tier: PricingTier): string {
 /**
  * llms.txt (llmstxt.org): a markdown map of the site for language models.
  *
- * Built from STATIC_PAGES and the blog registry, so it lists exactly the URLs
+ * Built from STATIC_PAGES and the blog and docs registries, so it lists exactly the URLs
  * the sitemap does. Google has said it does not use this file; it is here for
  * the answer engines that fetch it, and costs nothing to keep true.
  */
@@ -311,11 +324,14 @@ export function buildLlmsTxt(origin: string, input: LlmsTxtInput): string {
   const product = [llmsLink(origin, '/', 'Vyostra AI', 'What the product is, how it works, and the plans.'), ...llmsPageLinks(origin, 'Product')]
   const posts = input.posts.map((post) => llmsLink(origin, servedPath(`/blog/${post.slug}`), post.title, post.description))
 
+  const docs = (input.docs ?? []).map((doc) => llmsLink(origin, servedPath(`/docs/${doc.slug}`), doc.title, doc.description))
+
   const blocks = [
     '# Vyostra AI',
     `> ${summary}`,
     ...detail,
     llmsSection('Product', product),
+    llmsSection('Developers', [...llmsPageLinks(origin, 'Developers'), ...docs]),
     llmsSection('Pricing', [...llmsPageLinks(origin, 'Pricing'), ...input.tiers.map(llmsPlanLine)]),
     llmsSection('Blog', [...llmsPageLinks(origin, 'Blog'), ...posts]),
     llmsSection('Company', [...llmsPageLinks(origin, 'Company'), `- Support: ${input.supportEmail}`]),

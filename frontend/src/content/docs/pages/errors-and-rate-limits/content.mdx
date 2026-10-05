@@ -1,0 +1,78 @@
+## What does an error response look like?
+
+Every error has the same shape: an `error` object with a machine-readable `code` and a human-readable `message`. Branch on the `code`. The wording of a `message` can change.
+
+```json
+{
+  "error": {
+    "code": "insufficient_scope",
+    "message": "This API key does not have the leads:read scope."
+  }
+}
+```
+
+## Which error codes can the API return?
+
+| Status | Code | What it means | What to do |
+| --- | --- | --- | --- |
+| 400 | `invalid_request` | A parameter is wrong, for example `limit` outside 1 to 200. | Fix the request. The message names the parameter. |
+| 401 | `missing_api_key` | No `Authorization: Bearer` header was sent. | Add the header. |
+| 401 | `invalid_api_key` | The key is unknown or has been revoked. | Check for a truncated copy, or create a new key. |
+| 403 | `api_access_disabled` | The account's plan does not include API access. | Move to Starter, Growth or Agency. |
+| 403 | `insufficient_scope` | The key lacks the scope this endpoint needs. | Create a key with that scope. |
+| 404 | `not_found` | The path or the id does not exist in your account. | Check the id. An id from another account also returns 404. |
+| 429 | `rate_limited` | The key made more than 120 requests in a minute. | Wait for the number of seconds in `Retry-After`. |
+| 500 | `internal_error` | Something failed on our side. | Retry after a short pause. |
+
+## How does the rate limit work?
+
+Each key may make **120 requests per minute**. Requests are counted in fixed one-minute windows, and the count belongs to the key, not to your account or your IP address.
+
+A request over the limit is rejected with status 429 and this header:
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 60
+```
+
+`Retry-After` is in seconds. Waiting that long always lands in a fresh window.
+
+## How should a client retry?
+
+- **On 429,** wait for `Retry-After` seconds and send the same request again.
+- **On 500,** retry with a growing pause, for example 2, 4, then 8 seconds, and give up after a few attempts.
+- **On any other 4xx,** do not retry. The request will fail the same way until you change it.
+
+This Node.js helper does all three:
+
+```js
+async function vyostraGet(path) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const response = await fetch(`${process.env.VYOSTRA_API_URL}${path}`, {
+      headers: { Authorization: `Bearer ${process.env.VYOSTRA_API_KEY}` },
+    })
+
+    if (response.ok) return response.json()
+
+    if (response.status === 429) {
+      const seconds = Number(response.headers.get('Retry-After') ?? 60)
+      await new Promise((resolve) => setTimeout(resolve, seconds * 1000))
+      continue
+    }
+
+    if (response.status >= 500) {
+      await new Promise((resolve) => setTimeout(resolve, 2000 * 2 ** attempt))
+      continue
+    }
+
+    const { error } = await response.json()
+    throw new Error(`${response.status} ${error.code}: ${error.message}`)
+  }
+
+  throw new Error(`Gave up on ${path} after 4 attempts`)
+}
+```
+
+## How do you stay under the limit?
+
+Listing leads is the call most likely to be repeated. Ask for `limit=200` so a full read takes as few requests as possible, and poll on a schedule measured in minutes, not seconds. [Sync leads to your CRM or database](/docs/sync-leads/) has a complete loop.
