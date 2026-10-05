@@ -26,7 +26,10 @@ import ZohoCrm from './src/pages/features/ZohoCrm'
 import Careers from './src/pages/Careers'
 import Pricing from './src/pages/Pricing'
 import Faq from './src/pages/Faq'
+import ToolsIndex from './src/pages/tools/ToolsIndex'
 import WhatsAppLinkGenerator from './src/pages/tools/WhatsAppLinkGenerator'
+import WhatsAppQrCodeGenerator from './src/pages/tools/WhatsAppQrCodeGenerator'
+import WhatsAppTextFormatter from './src/pages/tools/WhatsAppTextFormatter'
 import IntegrationPage from './src/pages/integrations/IntegrationPage'
 import IntegrationsIndex from './src/pages/integrations/IntegrationsIndex'
 import { META_LEAD_ADS } from './src/content/integrations/meta-lead-ads'
@@ -202,6 +205,9 @@ export function AppRoutes() {
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/faq" element={<Faq />} />
           <Route path="/whatsapp-link-generator" element={<WhatsAppLinkGenerator />} />
+          <Route path="/tools" element={<ToolsIndex />} />
+          <Route path="/tools/whatsapp-qr-code-generator" element={<WhatsAppQrCodeGenerator />} />
+          <Route path="/tools/whatsapp-text-formatter" element={<WhatsAppTextFormatter />} />
           <Route path="/integrations" element={<IntegrationsIndex />} />
           <Route path="/integrations/meta-lead-ads" element={<IntegrationPage integration={META_LEAD_ADS} />} />
           <Route path="/industries/real-estate" element={<IndustryPage industry={REAL_ESTATE} />} />

@@ -8,6 +8,7 @@
  */
 import { INDUSTRIES } from '../content/industries/registry'
 import { INTEGRATIONS } from '../content/integrations/registry'
+import { FREE_TOOLS, TOOLS_HUB } from './free-tools'
 import type { PricingTier } from './pricingTiers'
 
 /** Marketing routes rendered client-side. Served at the bare path, no trailing slash. */
@@ -129,13 +130,11 @@ export const STATIC_PAGES: readonly StaticPage[] = [
       lastModified: industry.lastModified,
     }),
   ),
-  {
-    route: '/whatsapp-link-generator',
-    label: 'WhatsApp Link Generator',
-    summary: 'A free tool that builds a wa.me click-to-chat link with a pre-filled message, in the browser.',
-    section: 'Product',
-    lastModified: '2026-10-02',
-  },
+  { route: TOOLS_HUB.route, label: TOOLS_HUB.name, summary: TOOLS_HUB.summary, section: 'Product', lastModified: TOOLS_HUB.lastModified },
+  // One page per free tool, from the same list the hub and the footer read.
+  ...FREE_TOOLS.map(
+    (tool): StaticPage => ({ route: tool.route, label: tool.name, summary: tool.summary, section: 'Product', lastModified: tool.lastModified }),
+  ),
   { route: '/about-us', label: 'About Vyostra AI', summary: 'Who builds Vyostra AI: the founders and the company.', section: 'Company', lastModified: '2026-10-01' },
   { route: '/help', label: 'Help Center', summary: 'Setup answers: embedding the widget, the knowledge base, WhatsApp, Zoho CRM, forms, billing.', section: 'Company', lastModified: '2026-10-03' },
   { route: '/contact', label: 'Contact', summary: 'Reach sales or support; the team replies within 24 hours.', section: 'Company', lastModified: '2026-09-20' },

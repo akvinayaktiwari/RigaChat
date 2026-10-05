@@ -1,32 +1,31 @@
 import { useState } from 'react'
-import { Check, ChevronDown, Copy, ExternalLink, Link2 } from 'lucide-react'
+import { ExternalLink, Link2, QrCode } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import FaqList from '../../components/landing/FaqList'
 import MarketingPageShell from '../../components/landing/MarketingPageShell'
 import PageMeta from '../../components/seo/PageMeta'
 import StructuredData from '../../components/seo/StructuredData'
+import CopyButton from '../../components/tools/CopyButton'
+import ToolCard from '../../components/tools/ToolCard'
+import WhatsAppNumberFields, {
+  emptyWhatsAppNumber,
+  numberProblemText,
+  type WhatsAppNumberValue,
+} from '../../components/tools/WhatsAppNumberFields'
+import { FIELD_LABEL, OUTPUT_BOX, SECONDARY_BUTTON, SECTION_HEADING } from '../../components/tools/tool-styles'
 import { trackEvent } from '../../lib/analytics'
-import { faqPageSchema, jsonLdGraph, organizationSchema, pageGraphNodes, type FaqItem } from '../../lib/structured-data'
-import { DIAL_CODES, buildWhatsAppLink, whatsAppLinkHtml, type WhatsAppLinkProblem } from '../../lib/whatsapp-link'
+import { faqPageSchema, jsonLdGraph, organizationSchema, toolPageNodes, type FaqItem } from '../../lib/structured-data'
+import { buildWhatsAppLink, whatsAppLinkHtml, type WhatsAppLinkProblem } from '../../lib/whatsapp-link'
 
-const PAGE = { name: 'WhatsApp Link Generator', path: '/whatsapp-link-generator/' }
+const PAGE = {
+  name: 'WhatsApp Link Generator',
+  path: '/whatsapp-link-generator/',
+  description: 'A free tool that builds a wa.me click-to-chat link with a pre-filled message. It runs in the browser.',
+}
+const QR_TOOL_ROUTE = '/tools/whatsapp-qr-code-generator'
 
 /** WhatsApp's own description of the link format; the rules on this page restate it. */
 const CLICK_TO_CHAT_DOCS = 'https://faq.whatsapp.com/5913398998672934'
-
-const SECTION_HEADING = 'text-3xl md:text-4xl font-extrabold text-on-surface tracking-tight text-center mb-10'
-const FIELD_LABEL = 'block text-sm font-bold text-on-surface mb-1.5'
-const FIELD_INPUT =
-  'w-full rounded-xl border border-outline-variant bg-white px-4 py-3 text-base text-on-surface placeholder:text-outline transition-[border-color,box-shadow] duration-200 hover:border-outline focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/15'
-const PANEL_HEADING = 'mb-5 flex items-center gap-3 text-sm font-bold uppercase tracking-wider text-on-surface-variant'
-const STEP_CHIP = 'flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-black text-white'
-const OUTPUT_BOX = 'break-all rounded-xl px-4 py-3 font-mono text-sm'
-
-const PROBLEM_TEXT: Record<WhatsAppLinkProblem, string> = {
-  empty: 'Enter a phone number to build the link.',
-  too_short: 'That number looks too short. Enter the full number, including the area or operator code.',
-  too_long: 'That number is too long. A phone number has at most 15 digits, country code included.',
-}
 
 /**
  * Rendered on the page and published as FAQPage from this one array.
@@ -71,35 +70,12 @@ const PLACES_TO_USE: readonly { title: string; body: string }[] = [
   { title: 'A button on your website', body: 'Paste the HTML snippet where you want a "Chat on WhatsApp" link, or use the link as the address of an existing button.' },
   { title: 'Your Instagram or Facebook bio', body: 'A bio takes one link. A WhatsApp link turns a profile visit into a conversation without a form in between.' },
   { title: 'Email signatures and invoices', body: 'Customers reply on the channel they already use, with the message you pre-filled telling you what it is about.' },
-  { title: 'Print, through a QR code', body: 'Paste the link into any QR code generator and put the code on a brochure, hoarding or shop counter.' },
+  { title: 'Print, through a QR code', body: 'Press "Get QR code" under your link to turn it into a code for a brochure, a signboard or a shop counter.' },
 ]
 
-function CopyButton({ text, label }: { text: string; label: string }) {
-  const [copied, setCopied] = useState(false)
-
-  async function copy(): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopied(true)
-      // No parameters: the number and message must never leave the browser.
-      trackEvent('whatsapp_link_copy')
-    } catch (error: unknown) {
-      console.error('Could not copy to the clipboard; select the text and copy it by hand.', error)
-    }
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={() => void copy()}
-      className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white shadow-sm transition-[background-color,scale] duration-200 active:scale-95 cursor-pointer ${
-        copied ? 'bg-success' : 'bg-primary hover:bg-primary-hover'
-      }`}
-    >
-      {copied ? <Check className="w-4 h-4" aria-hidden="true" /> : <Copy className="w-4 h-4" aria-hidden="true" />}
-      {copied ? 'Copied' : label}
-    </button>
-  )
+// No parameters: the number and message must never leave the browser.
+function reportCopy(): void {
+  trackEvent('whatsapp_link_copy')
 }
 
 /** The pre-filled message as it will sit in the other person's WhatsApp text box. */
@@ -116,7 +92,8 @@ function MessagePreview({ message }: { message: string }) {
   )
 }
 
-function LinkOutput({ url, message }: { url: string; message: string }) {
+function LinkOutput({ url, value }: { url: string; value: WhatsAppNumberValue }) {
+  const { message } = value
   const html = whatsAppLinkHtml(url, 'Chat on WhatsApp')
 
   return (
@@ -125,16 +102,21 @@ function LinkOutput({ url, message }: { url: string; message: string }) {
         <p className={FIELD_LABEL}>Your WhatsApp link</p>
         <p className={`${OUTPUT_BOX} border border-primary/25 bg-primary-light text-on-surface`}>{url}</p>
         <div className="mt-3 flex flex-wrap gap-3">
-          <CopyButton text={url} label="Copy link" />
+          <CopyButton text={url} label="Copy link" onCopied={reportCopy} />
           <a
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant bg-white px-4 py-3 text-sm font-bold text-on-surface hover:border-primary hover:text-primary transition-colors"
+            className={SECONDARY_BUTTON}
           >
             <ExternalLink className="w-4 h-4" aria-hidden="true" />
             Test the link
           </a>
+          {/* The number goes along as navigation state, never in the address, so it reaches no log. */}
+          <Link to={QR_TOOL_ROUTE} state={value} className={SECONDARY_BUTTON}>
+            <QrCode className="w-4 h-4" aria-hidden="true" />
+            Get QR code
+          </Link>
         </div>
       </div>
       {message.trim() ? <MessagePreview message={message} /> : null}
@@ -142,7 +124,7 @@ function LinkOutput({ url, message }: { url: string; message: string }) {
         <p className={FIELD_LABEL}>HTML for your website</p>
         <p className={`${OUTPUT_BOX} bg-on-surface text-white/90`}>{html}</p>
         <div className="mt-3">
-          <CopyButton text={html} label="Copy HTML" />
+          <CopyButton text={html} label="Copy HTML" onCopied={reportCopy} />
         </div>
       </div>
     </div>
@@ -156,73 +138,22 @@ function LinkPending({ problem }: { problem: WhatsAppLinkProblem }) {
       <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary-light text-primary" aria-hidden="true">
         <Link2 className="h-6 w-6" />
       </span>
-      <p className="text-sm text-on-surface-variant leading-relaxed">{PROBLEM_TEXT[problem]}</p>
+      <p className="text-sm text-on-surface-variant leading-relaxed">{numberProblemText(problem, 'the link')}</p>
     </div>
-  )
-}
-
-interface BuilderFieldsProps {
-  countryCode: string
-  phone: string
-  message: string
-  onCountryCode: (value: string) => void
-  onPhone: (value: string) => void
-  onMessage: (value: string) => void
-}
-
-function BuilderFields({ countryCode, phone, message, onCountryCode, onPhone, onMessage }: BuilderFieldsProps) {
-  return (
-    <form className="space-y-5" onSubmit={(event) => event.preventDefault()}>
-      <div>
-        <label htmlFor="wa-country" className={FIELD_LABEL}>Country</label>
-        <div className="relative">
-          <select id="wa-country" value={countryCode} onChange={(event) => onCountryCode(event.target.value)} className={`${FIELD_INPUT} appearance-none pr-11 cursor-pointer`}>
-            {DIAL_CODES.map((entry) => (
-              <option key={entry.country} value={entry.code}>{`${entry.country} (+${entry.code})`}</option>
-            ))}
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" aria-hidden="true" />
-        </div>
-      </div>
-      <div>
-        <label htmlFor="wa-phone" className={FIELD_LABEL}>WhatsApp number</label>
-        <input id="wa-phone" type="tel" inputMode="tel" autoComplete="off" value={phone} onChange={(event) => onPhone(event.target.value)} placeholder="Number without the country code" className={FIELD_INPUT} aria-describedby="wa-phone-hint" />
-        <p id="wa-phone-hint" className="mt-1.5 text-sm text-on-surface-variant">Country not listed? Type the number with its code, starting with +.</p>
-      </div>
-      <div>
-        <label htmlFor="wa-message" className={FIELD_LABEL}>Pre-filled message (optional)</label>
-        <textarea id="wa-message" rows={4} value={message} onChange={(event) => onMessage(event.target.value)} placeholder="Hi, I would like to know more about…" className={FIELD_INPUT} />
-      </div>
-    </form>
   )
 }
 
 export function LinkBuilder() {
-  const [countryCode, setCountryCode] = useState(DIAL_CODES[0]?.code ?? '')
-  const [phone, setPhone] = useState('')
-  const [message, setMessage] = useState('')
-  const result = buildWhatsAppLink({ countryCode, phone, message })
+  const [value, setValue] = useState(emptyWhatsAppNumber)
+  const result = buildWhatsAppLink(value)
 
   return (
-    <div className="relative grid grid-cols-1 overflow-hidden rounded-3xl border border-outline-variant/40 bg-white shadow-xl shadow-primary/5 md:grid-cols-2">
-      <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary to-primary-container" aria-hidden="true" />
-      <div className="p-6 pt-8 md:p-8 md:pt-10">
-        <h3 className={PANEL_HEADING}>
-          <span className={STEP_CHIP} aria-hidden="true">1</span>
-          Your details
-        </h3>
-        <BuilderFields countryCode={countryCode} phone={phone} message={message} onCountryCode={setCountryCode} onPhone={setPhone} onMessage={setMessage} />
-      </div>
-      <div className="flex flex-col border-t border-outline-variant/40 bg-surface-container-low p-6 md:border-l md:border-t-0 md:p-8 md:pt-10">
-        <h3 className={PANEL_HEADING}>
-          <span className={STEP_CHIP} aria-hidden="true">2</span>
-          Your link
-        </h3>
-        <div aria-live="polite" className="flex flex-1 flex-col">
-          {result.ok ? <LinkOutput url={result.url} message={message} /> : <LinkPending problem={result.problem} />}
-        </div>
-      </div>
-    </div>
+    <ToolCard
+      inputTitle="Your details"
+      outputTitle="Your link"
+      input={<WhatsAppNumberFields value={value} onChange={setValue} />}
+      output={result.ok ? <LinkOutput url={result.url} value={value} /> : <LinkPending problem={result.problem} />}
+    />
   )
 }
 
@@ -291,7 +222,7 @@ export default function WhatsAppLinkGenerator() {
         description="Create a wa.me click-to-chat link with a pre-filled message. Free, no sign-up, and the number you type never leaves your browser."
         path="/whatsapp-link-generator/"
       />
-      <StructuredData data={jsonLdGraph([organizationSchema(), ...pageGraphNodes(PAGE), faqPageSchema(LINK_GENERATOR_FAQ)])} />
+      <StructuredData data={jsonLdGraph([organizationSchema(), ...toolPageNodes(PAGE), faqPageSchema(LINK_GENERATOR_FAQ)])} />
       <MarketingPageShell
         badge="FREE TOOL"
         headline="WhatsApp link generator"

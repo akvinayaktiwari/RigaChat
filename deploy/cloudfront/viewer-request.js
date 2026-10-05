@@ -22,7 +22,7 @@
 // Keep in step with PRERENDERED_STATIC_ROUTES in frontend/src/lib/crawl-files.ts;
 // crawl-files.test.ts fails if a prerendered route is missing here.
 var PRERENDERED_PREFIXES = [
-    '/features', '/pricing', '/faq', '/whatsapp-link-generator', '/integrations', '/industries', '/about-us', '/help',
+    '/features', '/pricing', '/faq', '/whatsapp-link-generator', '/tools', '/integrations', '/industries', '/about-us', '/help',
     '/contact', '/careers', '/blog', '/docs', '/privacy-policy', '/terms-of-service'
 ];
 
