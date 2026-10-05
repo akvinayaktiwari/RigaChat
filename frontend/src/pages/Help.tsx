@@ -8,7 +8,6 @@ import {
   Search,
   Mail,
   ChevronDown,
-  ChevronUp,
   HelpCircle,
   LifeBuoy,
   X,
@@ -266,7 +265,10 @@ function CategoryGrid({
 function ArticleAccordion({ article, isExpanded, onToggle }: { article: HelpArticle; isExpanded: boolean; onToggle: () => void }) {
   return (
     <div
-      className="bg-white border border-outline-variant/30 rounded-2xl overflow-hidden shadow-xs hover:shadow-sm transition-all duration-200"
+      className={`faq-card bg-white border rounded-2xl overflow-hidden hover:shadow-lg hover:shadow-primary/10 ${
+        isExpanded ? 'border-primary/25 shadow-md shadow-primary/5' : 'border-outline-variant/30 shadow-xs'
+      }`}
+      data-open={isExpanded}
       id={`article-accordion-${article.id}`}
     >
       {/* The heading wraps the button, not the other way round: a heading inside
@@ -278,16 +280,21 @@ function ArticleAccordion({ article, isExpanded, onToggle }: { article: HelpArti
           className="w-full flex items-center justify-between p-6 text-left font-bold text-on-surface hover:text-primary transition-colors cursor-pointer"
         >
           <span className="text-base font-bold leading-snug pr-4">{article.question}</span>
-          {isExpanded ? (
-            <ChevronUp className="w-5 h-5 text-primary shrink-0" />
-          ) : (
-            <ChevronDown className="w-5 h-5 text-outline shrink-0" />
-          )}
+          <span
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors duration-300 ${
+              isExpanded ? 'bg-primary text-on-primary' : 'bg-primary-light text-primary'
+            }`}
+          >
+            <ChevronDown className={`h-4 w-4 transition-transform duration-300 motion-reduce:transition-none ${isExpanded ? 'rotate-180' : ''}`} />
+          </span>
         </button>
       </h3>
-      <div className={`transition-all duration-300 overflow-hidden ${isExpanded ? 'max-h-96 border-t border-outline-variant/20' : 'max-h-0'}`}>
-        <div className="p-6 bg-surface-container-low/40 text-on-surface-variant text-sm md:text-base leading-relaxed">
-          {article.answer}
+      {/* Collapsed, not removed: the answer stays in the HTML the FAQPage schema describes. */}
+      <div className="faq-answer" data-open={isExpanded}>
+        <div>
+          <div className="border-t border-outline-variant/20 p-6 bg-surface-container-low/40 text-on-surface-variant text-sm md:text-base leading-relaxed">
+            {article.answer}
+          </div>
         </div>
       </div>
     </div>
