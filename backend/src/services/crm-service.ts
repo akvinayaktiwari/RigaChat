@@ -48,7 +48,22 @@ async function credentialsFrom(connection: CRMConnection): Promise<CRMCredential
   if (!accessToken || !refreshToken) {
     throw new Error('Zoho connection has no stored tokens; reconnect Zoho CRM')
   }
-  return { provider: connection.provider, accessToken, refreshToken, tokenExpiry: connection.tokenExpiry }
+  return {
+    provider: connection.provider,
+    accessToken,
+    refreshToken,
+    tokenExpiry: connection.tokenExpiry,
+    ...dataCentreOf(connection),
+  }
+}
+
+// The data centre travels with the tokens in both directions: a connection
+// rewritten after a refresh must keep it, or the next refresh goes to India.
+function dataCentreOf(source: Pick<CRMCredentials, 'accountsServer' | 'apiDomain'>): Pick<CRMConnection, 'accountsServer' | 'apiDomain'> {
+  return {
+    ...(source.accountsServer ? { accountsServer: source.accountsServer } : {}),
+    ...(source.apiDomain ? { apiDomain: source.apiDomain } : {}),
+  }
 }
 
 // The connection as it is stored: encrypted tokens only. Built whole because
@@ -69,6 +84,7 @@ async function encryptedConnection(
     refreshTokenEncrypted,
     tokenExpiry: credentials.tokenExpiry,
     connectedAt: connection.connectedAt,
+    ...dataCentreOf(credentials),
   }
 }
 
@@ -183,8 +199,10 @@ export async function syncFormLeadToCRM(formLead: FormLead, formId: string, clie
   }
 }
 
-export async function connectZohoCRM(clientId: string, code: string): Promise<void> {
-  const credentials = await zohoProvider.exchangeCodeForTokens(code)
+// accountsServer is Zoho's `accounts-server` callback param, naming the data
+// centre the person signed in at. Undefined when Zoho sent none.
+export async function connectZohoCRM(clientId: string, code: string, accountsServer?: string): Promise<void> {
+  const credentials = await zohoProvider.exchangeCodeForTokens(code, accountsServer)
   const connection = { provider: 'zoho' as const, connected: true, connectedAt: new Date().toISOString() }
   await updateClient(clientId, { crmConnection: await encryptedConnection(connection, credentials) })
 }

@@ -108,7 +108,7 @@ integrationRoutes.get('/zoho/callback', async (c) => {
   const clientId = state.split(':')[0]
 
   try {
-    await connectZohoCRM(clientId, code)
+    await connectZohoCRM(clientId, code, c.req.query('accounts-server'))
     return c.redirect(`${FRONTEND_URL}/dashboard/settings?zoho=connected`)
   } catch (error) {
     console.error('Zoho connect error:', errorMessage(error))

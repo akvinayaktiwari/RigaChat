@@ -68,6 +68,18 @@ describe('connecting Zoho CRM', () => {
     expect(stored).not.toHaveProperty('accessToken')
     expect(stored).not.toHaveProperty('refreshToken')
   })
+
+  // Zoho names the account's data centre on the callback. Dropped anywhere on
+  // the way to storage, a US or EU account connects and then never syncs.
+  it('redeems the code at the callback data centre and stores it with the tokens', async () => {
+    const dataCentre = { accountsServer: 'https://accounts.zoho.eu', apiDomain: 'https://www.zohoapis.eu' }
+    exchangeCodeForTokens.mockResolvedValue({ provider: 'zoho', accessToken: 'a', refreshToken: 'r', tokenExpiry: LATER, ...dataCentre })
+
+    await connectZohoCRM('client-1', 'code', 'https://accounts.zoho.eu')
+
+    expect(exchangeCodeForTokens).toHaveBeenCalledWith('code', 'https://accounts.zoho.eu')
+    expect(updateClient.mock.calls[0]?.[1].crmConnection).toMatchObject(dataCentre)
+  })
 })
 
 describe('the connection status the dashboard receives', () => {
@@ -86,6 +98,12 @@ describe('syncing a lead', () => {
     const outcome = await syncLeadToCRMWithRetry(client(encryptedConnection), lead)
     expect(outcome.success).toBe(true)
     expect(syncLead.mock.calls[0]?.[1]).toMatchObject({ accessToken: 'access-1', refreshToken: 'refresh-1' })
+  })
+
+  it('syncs with the data centre the connection was stored with', async () => {
+    const dataCentre = { accountsServer: 'https://accounts.zoho.com', apiDomain: 'https://www.zohoapis.com' }
+    await syncLeadToCRMWithRetry(client({ ...encryptedConnection, ...dataCentre }), lead)
+    expect(syncLead.mock.calls[0]?.[1]).toMatchObject(dataCentre)
   })
 
   it('still syncs a legacy plaintext connection that has not been migrated', async () => {
