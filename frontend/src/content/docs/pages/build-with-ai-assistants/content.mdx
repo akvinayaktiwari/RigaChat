@@ -1,0 +1,103 @@
+## Why give the assistant a brief?
+
+An AI assistant that has not seen an API fills the gaps with plausible guesses: an endpoint that does not exist, a header with the wrong name, a webhook the API does not send. A short, exact description removes the guessing. The brief below is written to be read by a model and is kept in step with these docs.
+
+## What should you paste into the assistant?
+
+Copy this whole block into Claude, ChatGPT, Cursor, Copilot or any other assistant before you describe what you want built.
+
+```text
+You are writing code against the Vyostra AI REST API. Follow these facts exactly
+and do not assume anything that is not stated here.
+
+BASE URL
+- Read it from the environment variable VYOSTRA_API_URL. Never hardcode it.
+
+AUTHENTICATION
+- Every request needs the header:  Authorization: Bearer <key>
+- Read the key from the environment variable VYOSTRA_API_KEY.
+- Keys start with "vy_live_". They are secrets: server-side code only, never in
+  a web page or a mobile app. The API does not accept cross-origin browser calls.
+
+ENDPOINTS (all GET, all read-only, all return JSON)
+- GET /v1/leads                    scope leads:read
+    query: limit (1-200, default 50), cursor, includeArchived=true
+    returns: { data: Lead[], nextCursor: string|null, total: number,
+               incompleteSources?: string[] }
+- GET /v1/leads/:id                scope leads:read
+    returns: { data: Lead & { transcript: string|null } }
+- GET /v1/bots, /v1/bots/:botId                  scope bots:read
+- GET /v1/forms, /v1/forms/:formId               scope forms:read
+- GET /v1/voice-agents, /v1/voice-agents/:agentId  scope voice_agents:read
+    list endpoints return { data: [...] }, single ones return { data: {...} }
+
+LEAD
+{ id, source: "chat"|"form"|"meta"|"voice", sourceId, name, phone, email,
+  sourceUrl, attributes: object of strings,
+  status: "new"|"contacted"|"qualified"|"closed",
+  outcome: "won"|"lost"|"unreachable"|null, leadScore: number|null,
+  archived: boolean, createdAt: ISO 8601 string }
+- name, phone, email and sourceUrl can be null. Missing values are null, never
+  omitted. Treat id as an opaque string and use it as the unique key.
+
+PAGINATION
+- Leads are ordered by urgency, not by date. To read all of them, request
+  limit=200 and follow nextCursor until it is null.
+- If incompleteSources is present the page is missing leads: fail and retry later.
+
+ERRORS
+- Shape: { error: { code, message } }. Branch on code.
+- 400 invalid_request, 401 missing_api_key, 401 invalid_api_key,
+  403 api_access_disabled, 403 insufficient_scope, 404 not_found,
+  429 rate_limited, 500 internal_error.
+
+RATE LIMIT
+- 120 requests per minute per key. On 429, wait the number of seconds in the
+  Retry-After header, then retry. On 500, retry with a growing pause.
+
+NOT AVAILABLE
+- No endpoint creates, updates or deletes anything.
+- No webhooks. Use polling.
+- No SDK and no MCP server. Use plain HTTPS requests.
+
+EMBEDDING A WIDGET ON A WEB PAGE
+- Uses a <script> tag with a public id, not an API key. Ask the user to copy
+  the exact tag from their Vyostra AI dashboard and place it before </body>.
+```
+
+## What can you ask the assistant to build?
+
+Once the brief is in the conversation, ask in plain language. Requests like these work well:
+
+- "Write a Node.js script that copies every lead into a Postgres table called `leads`, using the lead id as the primary key, and can be run again safely."
+- "Write a Python job that runs every five minutes and posts each new lead to our Slack channel. Remember which lead ids it has already posted."
+- "Add a Google Sheets export of all leads with the columns name, phone, email, source and created date."
+- "Build a page in our Next.js admin that lists our chatbots with their names and bot ids. Call the API from a server route."
+
+Each of these needs only the endpoints in the brief. If an assistant proposes a webhook, a POST request or an SDK import, it has drifted from the brief; point it back to the "not available" section.
+
+## How do you ask an assistant to add the chatbot to a site?
+
+Adding the chatbot needs no API call. Copy the embed code from your bot's settings in the dashboard, then say:
+
+- "Add this script tag just before the closing body tag in our shared layout so it loads on every page."
+
+The tag has this shape, with your own bot id:
+
+<WidgetSnippet kind="chat" />
+
+[Embed the chatbot, form and voice widgets](/docs/embed-widgets/) covers the lead form and the voice agent.
+
+## How do you check what the assistant wrote?
+
+1. **The key comes from the environment.** Search the code for `vy_live_`. It should not appear.
+2. **Calls are server-side.** No request to the API from browser code.
+3. **Pagination runs to the end.** The loop stops on a `null` `nextCursor`, not on a fixed page count.
+4. **429 is handled.** The code waits for `Retry-After` instead of failing or retrying at once.
+5. **Writes are keyed on the lead id.** Running the code twice must not create duplicates.
+
+Then run it once against your account and compare the count it reports with the `total` field from `GET /v1/leads`.
+
+## Where is the machine-readable version of these docs?
+
+Every page of these docs is plain HTML with no JavaScript required, so an assistant with web access can read them directly. The site also publishes [llms.txt](/llms.txt), a short index of every page with one line on what each covers.

@@ -1,0 +1,103 @@
+## What do you need before you start?
+
+- A Vyostra AI account on the Starter, Growth or Agency plan. API access is not part of the free trial.
+- Somewhere to run code that is not a web page: a terminal, a server or a serverless function.
+
+## Step 1: How do you create an API key?
+
+1. Sign in to the Vyostra AI dashboard and open **Settings**.
+2. Find the **API keys** section.
+3. Type a name that says what the key is for, such as `CRM sync`.
+4. Leave the permissions you need ticked and click **Create key**.
+5. Copy the key straight away. It starts with `vy_live_` and is shown only once.
+
+The same section shows your **API base URL**. Every request in these docs goes to that URL followed by a path such as `/v1/leads`.
+
+<Callout title="Keep the key out of your code" tone="warning">
+Store the key in an environment variable or a secrets manager. Anyone who has it can read your leads until you revoke it.
+</Callout>
+
+## Step 2: How do you make the first request?
+
+Put the base URL and the key in two environment variables, then ask for your five most urgent leads.
+
+```bash
+export VYOSTRA_API_URL="paste the base URL from Settings"
+export VYOSTRA_API_KEY="paste your vy_live_ key"
+
+curl "$VYOSTRA_API_URL/v1/leads?limit=5" \
+  -H "Authorization: Bearer $VYOSTRA_API_KEY"
+```
+
+The same request in Node.js 18 or later:
+
+```js
+const response = await fetch(`${process.env.VYOSTRA_API_URL}/v1/leads?limit=5`, {
+  headers: { Authorization: `Bearer ${process.env.VYOSTRA_API_KEY}` },
+})
+
+if (!response.ok) {
+  const { error } = await response.json()
+  throw new Error(`${response.status} ${error.code}: ${error.message}`)
+}
+
+const page = await response.json()
+console.log(page.total, 'leads in total')
+console.log(page.data)
+```
+
+And in Python:
+
+```python
+import os
+import requests
+
+response = requests.get(
+    f"{os.environ['VYOSTRA_API_URL']}/v1/leads",
+    params={"limit": 5},
+    headers={"Authorization": f"Bearer {os.environ['VYOSTRA_API_KEY']}"},
+    timeout=30,
+)
+response.raise_for_status()
+
+page = response.json()
+print(page["total"], "leads in total")
+print(page["data"])
+```
+
+## Step 3: What does the response look like?
+
+A successful call returns HTTP 200 and a JSON page of leads. The values below are sample data.
+
+```json
+{
+  "data": [
+    {
+      "id": "lead_WyJjaGF0IiwiOWYyYzFkN2UtYm90IiwiNWI4ZTQxYWEtbGVhZCJd",
+      "source": "chat",
+      "sourceId": "9f2c1d7e-bot",
+      "name": "Asha Rao",
+      "phone": "+919800000000",
+      "email": "asha@example.com",
+      "sourceUrl": "https://example.com/projects/lakeview",
+      "attributes": { "budgetRange": "80L to 1Cr" },
+      "status": "new",
+      "outcome": null,
+      "leadScore": null,
+      "archived": false,
+      "createdAt": "2026-10-04T09:12:44.000Z"
+    }
+  ],
+  "nextCursor": "eyJyYW5rIjoxLCJzb3J0S2V5IjoxNzU5NTY5MTY0MDAwfQ",
+  "total": 42
+}
+```
+
+If you get an error instead, the body has an `error` object with a `code` you can look up in [Errors and rate limits](/docs/errors-and-rate-limits/).
+
+## What can you build next?
+
+- Read every lead, page by page: [Sync leads to your CRM or database](/docs/sync-leads/).
+- See every endpoint and field: [REST API reference](/docs/api-reference/).
+- Limit what a key can read: [API keys and authentication](/docs/authentication/).
+- Put the chatbot on a site without any API calls: [Embed the chatbot, form and voice widgets](/docs/embed-widgets/).
