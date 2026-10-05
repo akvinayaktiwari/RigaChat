@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, Copy, ExternalLink } from 'lucide-react'
+import { Check, ChevronDown, Copy, ExternalLink, Link2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import FaqList from '../../components/landing/FaqList'
 import MarketingPageShell from '../../components/landing/MarketingPageShell'
@@ -17,7 +17,10 @@ const CLICK_TO_CHAT_DOCS = 'https://faq.whatsapp.com/5913398998672934'
 const SECTION_HEADING = 'text-3xl md:text-4xl font-extrabold text-on-surface tracking-tight text-center mb-10'
 const FIELD_LABEL = 'block text-sm font-bold text-on-surface mb-1.5'
 const FIELD_INPUT =
-  'w-full rounded-xl border border-outline-variant bg-white px-4 py-3 text-base text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20'
+  'w-full rounded-xl border border-outline-variant bg-white px-4 py-3 text-base text-on-surface placeholder:text-outline transition-[border-color,box-shadow] duration-200 hover:border-outline focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/15'
+const PANEL_HEADING = 'mb-5 flex items-center gap-3 text-sm font-bold uppercase tracking-wider text-on-surface-variant'
+const STEP_CHIP = 'flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-black text-white'
+const OUTPUT_BOX = 'break-all rounded-xl px-4 py-3 font-mono text-sm'
 
 const PROBLEM_TEXT: Record<WhatsAppLinkProblem, string> = {
   empty: 'Enter a phone number to build the link.',
@@ -89,7 +92,9 @@ function CopyButton({ text, label }: { text: string; label: string }) {
     <button
       type="button"
       onClick={() => void copy()}
-      className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white hover:opacity-95 transition-opacity cursor-pointer"
+      className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white shadow-sm transition-[background-color,scale] duration-200 active:scale-95 cursor-pointer ${
+        copied ? 'bg-success' : 'bg-primary hover:bg-primary-hover'
+      }`}
     >
       {copied ? <Check className="w-4 h-4" aria-hidden="true" /> : <Copy className="w-4 h-4" aria-hidden="true" />}
       {copied ? 'Copied' : label}
@@ -97,14 +102,28 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   )
 }
 
-function LinkOutput({ url }: { url: string }) {
+/** The pre-filled message as it will sit in the other person's WhatsApp text box. */
+function MessagePreview({ message }: { message: string }) {
+  return (
+    <div>
+      <p className={FIELD_LABEL}>What they will see</p>
+      <div className="rounded-xl bg-[#efeae2] p-4">
+        <p className="ml-auto w-fit max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-tr-sm bg-[#d9fdd3] px-3.5 py-2 text-sm text-[#111b21] shadow-xs">
+          {message}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function LinkOutput({ url, message }: { url: string; message: string }) {
   const html = whatsAppLinkHtml(url, 'Chat on WhatsApp')
 
   return (
-    <div className="space-y-5">
+    <div className="tool-pop space-y-5">
       <div>
         <p className={FIELD_LABEL}>Your WhatsApp link</p>
-        <p className="break-all rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 font-mono text-sm text-on-surface">{url}</p>
+        <p className={`${OUTPUT_BOX} border border-primary/25 bg-primary-light text-on-surface`}>{url}</p>
         <div className="mt-3 flex flex-wrap gap-3">
           <CopyButton text={url} label="Copy link" />
           <a
@@ -118,14 +137,63 @@ function LinkOutput({ url }: { url: string }) {
           </a>
         </div>
       </div>
+      {message.trim() ? <MessagePreview message={message} /> : null}
       <div>
         <p className={FIELD_LABEL}>HTML for your website</p>
-        <p className="break-all rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 font-mono text-sm text-on-surface">{html}</p>
+        <p className={`${OUTPUT_BOX} bg-on-surface text-white/90`}>{html}</p>
         <div className="mt-3">
           <CopyButton text={html} label="Copy HTML" />
         </div>
       </div>
     </div>
+  )
+}
+
+/** Fills the output column until there is a link, so the card never has a blank half. */
+function LinkPending({ problem }: { problem: WhatsAppLinkProblem }) {
+  return (
+    <div className="flex min-h-56 flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-outline-variant bg-white/60 p-8 text-center">
+      <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary-light text-primary" aria-hidden="true">
+        <Link2 className="h-6 w-6" />
+      </span>
+      <p className="text-sm text-on-surface-variant leading-relaxed">{PROBLEM_TEXT[problem]}</p>
+    </div>
+  )
+}
+
+interface BuilderFieldsProps {
+  countryCode: string
+  phone: string
+  message: string
+  onCountryCode: (value: string) => void
+  onPhone: (value: string) => void
+  onMessage: (value: string) => void
+}
+
+function BuilderFields({ countryCode, phone, message, onCountryCode, onPhone, onMessage }: BuilderFieldsProps) {
+  return (
+    <form className="space-y-5" onSubmit={(event) => event.preventDefault()}>
+      <div>
+        <label htmlFor="wa-country" className={FIELD_LABEL}>Country</label>
+        <div className="relative">
+          <select id="wa-country" value={countryCode} onChange={(event) => onCountryCode(event.target.value)} className={`${FIELD_INPUT} appearance-none pr-11 cursor-pointer`}>
+            {DIAL_CODES.map((entry) => (
+              <option key={entry.country} value={entry.code}>{`${entry.country} (+${entry.code})`}</option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" aria-hidden="true" />
+        </div>
+      </div>
+      <div>
+        <label htmlFor="wa-phone" className={FIELD_LABEL}>WhatsApp number</label>
+        <input id="wa-phone" type="tel" inputMode="tel" autoComplete="off" value={phone} onChange={(event) => onPhone(event.target.value)} placeholder="Number without the country code" className={FIELD_INPUT} aria-describedby="wa-phone-hint" />
+        <p id="wa-phone-hint" className="mt-1.5 text-sm text-on-surface-variant">Country not listed? Type the number with its code, starting with +.</p>
+      </div>
+      <div>
+        <label htmlFor="wa-message" className={FIELD_LABEL}>Pre-filled message (optional)</label>
+        <textarea id="wa-message" rows={4} value={message} onChange={(event) => onMessage(event.target.value)} placeholder="Hi, I would like to know more about…" className={FIELD_INPUT} />
+      </div>
+    </form>
   )
 }
 
@@ -136,28 +204,23 @@ export function LinkBuilder() {
   const result = buildWhatsAppLink({ countryCode, phone, message })
 
   return (
-    <div className="grid grid-cols-1 gap-8 rounded-2xl border border-outline-variant/30 bg-white p-6 shadow-xs md:grid-cols-2 md:p-8">
-      <form className="space-y-5" onSubmit={(event) => event.preventDefault()}>
-        <div>
-          <label htmlFor="wa-country" className={FIELD_LABEL}>Country</label>
-          <select id="wa-country" value={countryCode} onChange={(event) => setCountryCode(event.target.value)} className={FIELD_INPUT}>
-            {DIAL_CODES.map((entry) => (
-              <option key={entry.country} value={entry.code}>{`${entry.country} (+${entry.code})`}</option>
-            ))}
-          </select>
+    <div className="relative grid grid-cols-1 overflow-hidden rounded-3xl border border-outline-variant/40 bg-white shadow-xl shadow-primary/5 md:grid-cols-2">
+      <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary to-primary-container" aria-hidden="true" />
+      <div className="p-6 pt-8 md:p-8 md:pt-10">
+        <h3 className={PANEL_HEADING}>
+          <span className={STEP_CHIP} aria-hidden="true">1</span>
+          Your details
+        </h3>
+        <BuilderFields countryCode={countryCode} phone={phone} message={message} onCountryCode={setCountryCode} onPhone={setPhone} onMessage={setMessage} />
+      </div>
+      <div className="flex flex-col border-t border-outline-variant/40 bg-surface-container-low p-6 md:border-l md:border-t-0 md:p-8 md:pt-10">
+        <h3 className={PANEL_HEADING}>
+          <span className={STEP_CHIP} aria-hidden="true">2</span>
+          Your link
+        </h3>
+        <div aria-live="polite" className="flex flex-1 flex-col">
+          {result.ok ? <LinkOutput url={result.url} message={message} /> : <LinkPending problem={result.problem} />}
         </div>
-        <div>
-          <label htmlFor="wa-phone" className={FIELD_LABEL}>WhatsApp number</label>
-          <input id="wa-phone" type="tel" inputMode="tel" autoComplete="off" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="Number without the country code" className={FIELD_INPUT} aria-describedby="wa-phone-hint" />
-          <p id="wa-phone-hint" className="mt-1.5 text-sm text-on-surface-variant">Country not listed? Type the number with its code, starting with +.</p>
-        </div>
-        <div>
-          <label htmlFor="wa-message" className={FIELD_LABEL}>Pre-filled message (optional)</label>
-          <textarea id="wa-message" rows={4} value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Hi, I would like to know more about…" className={FIELD_INPUT} />
-        </div>
-      </form>
-      <div aria-live="polite">
-        {result.ok ? <LinkOutput url={result.url} /> : <p className="rounded-xl bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">{PROBLEM_TEXT[result.problem]}</p>}
       </div>
     </div>
   )
