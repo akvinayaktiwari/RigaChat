@@ -63,6 +63,7 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 
 | What | Shipped |
 |---|---|
+| Developer docs at `/docs/`: seven prerendered pages (quickstart, API keys, REST reference, errors and rate limits, widget embeds, lead sync, building with Claude/ChatGPT/Cursor). Each opens with a 40 to 70 word answer, uses question headings, and publishes `TechArticle` + `FAQPage`. Listed in the sitemap and under "Developers" in `llms.txt`. A page is a directory under `frontend/src/content/docs/pages/`. Target query: "chatbot api" (about 260 searches a month in India, difficulty 12, measured 2026-10-05) | 2026-10-05 |
 | "What is Vyostra AI?" definition block on the homepage | 2026-09-19, restyled 2026-10-02 |
 | `/pricing/`, `/faq/`, `/features/voice-agent/` | 2026-10-02 |
 | Chat agent, WhatsApp, CRM and forms pages rebuilt: definition in the first paragraph, question H2s, five visible FAQ answers each | 2026-10-02 |
@@ -135,6 +136,8 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 
 | # | Task | Why it matters |
 |---|---|---|
+| 0a | **Publish the CloudFront function after the docs merge**: `./scripts/deploy-cloudfront-function.sh` | Until it runs, `/docs/...` is answered with the empty app shell. People see the page; crawlers and AI engines see nothing. CI does not ship the function. |
+| 0b | A stable API hostname such as `api.vyostra.com` | The API is served from a Lambda Function URL, so the docs print no host and send developers to Settings for it. With a stable host the examples can be copy-paste complete. |
 | 1 | **Verify `vyostra.com` in Google Search Console** (Domain property, DNS TXT), submit the sitemap, request indexing for the new pages | Everything below assumes the site is indexed. A web search for the brand returned the GitHub repos, not the site. |
 | 2 | Import the property into Bing Webmaster Tools | Bing feeds ChatGPT Search and Copilot. |
 | 3 | Create the Google API key and service account described in the setup notes | Lets Claude check index status per URL, real-user Core Web Vitals and search queries. |
