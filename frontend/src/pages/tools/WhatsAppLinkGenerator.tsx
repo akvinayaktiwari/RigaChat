@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ExternalLink, Link2 } from 'lucide-react'
+import { ExternalLink, Link2, QrCode } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import FaqList from '../../components/landing/FaqList'
 import MarketingPageShell from '../../components/landing/MarketingPageShell'
@@ -7,13 +7,22 @@ import PageMeta from '../../components/seo/PageMeta'
 import StructuredData from '../../components/seo/StructuredData'
 import CopyButton from '../../components/tools/CopyButton'
 import ToolCard from '../../components/tools/ToolCard'
-import WhatsAppNumberFields, { emptyWhatsAppNumber, numberProblemText } from '../../components/tools/WhatsAppNumberFields'
+import WhatsAppNumberFields, {
+  emptyWhatsAppNumber,
+  numberProblemText,
+  type WhatsAppNumberValue,
+} from '../../components/tools/WhatsAppNumberFields'
 import { FIELD_LABEL, OUTPUT_BOX, SECONDARY_BUTTON, SECTION_HEADING } from '../../components/tools/tool-styles'
 import { trackEvent } from '../../lib/analytics'
-import { faqPageSchema, jsonLdGraph, organizationSchema, pageGraphNodes, type FaqItem } from '../../lib/structured-data'
+import { faqPageSchema, jsonLdGraph, organizationSchema, toolPageNodes, type FaqItem } from '../../lib/structured-data'
 import { buildWhatsAppLink, whatsAppLinkHtml, type WhatsAppLinkProblem } from '../../lib/whatsapp-link'
 
-const PAGE = { name: 'WhatsApp Link Generator', path: '/whatsapp-link-generator/' }
+const PAGE = {
+  name: 'WhatsApp Link Generator',
+  path: '/whatsapp-link-generator/',
+  description: 'A free tool that builds a wa.me click-to-chat link with a pre-filled message. It runs in the browser.',
+}
+const QR_TOOL_ROUTE = '/tools/whatsapp-qr-code-generator'
 
 /** WhatsApp's own description of the link format; the rules on this page restate it. */
 const CLICK_TO_CHAT_DOCS = 'https://faq.whatsapp.com/5913398998672934'
@@ -61,7 +70,7 @@ const PLACES_TO_USE: readonly { title: string; body: string }[] = [
   { title: 'A button on your website', body: 'Paste the HTML snippet where you want a "Chat on WhatsApp" link, or use the link as the address of an existing button.' },
   { title: 'Your Instagram or Facebook bio', body: 'A bio takes one link. A WhatsApp link turns a profile visit into a conversation without a form in between.' },
   { title: 'Email signatures and invoices', body: 'Customers reply on the channel they already use, with the message you pre-filled telling you what it is about.' },
-  { title: 'Print, through a QR code', body: 'Paste the link into any QR code generator and put the code on a brochure, hoarding or shop counter.' },
+  { title: 'Print, through a QR code', body: 'Press "Get QR code" under your link to turn it into a code for a brochure, a signboard or a shop counter.' },
 ]
 
 // No parameters: the number and message must never leave the browser.
@@ -83,7 +92,8 @@ function MessagePreview({ message }: { message: string }) {
   )
 }
 
-function LinkOutput({ url, message }: { url: string; message: string }) {
+function LinkOutput({ url, value }: { url: string; value: WhatsAppNumberValue }) {
+  const { message } = value
   const html = whatsAppLinkHtml(url, 'Chat on WhatsApp')
 
   return (
@@ -102,6 +112,11 @@ function LinkOutput({ url, message }: { url: string; message: string }) {
             <ExternalLink className="w-4 h-4" aria-hidden="true" />
             Test the link
           </a>
+          {/* The number goes along as navigation state, never in the address, so it reaches no log. */}
+          <Link to={QR_TOOL_ROUTE} state={value} className={SECONDARY_BUTTON}>
+            <QrCode className="w-4 h-4" aria-hidden="true" />
+            Get QR code
+          </Link>
         </div>
       </div>
       {message.trim() ? <MessagePreview message={message} /> : null}
@@ -137,7 +152,7 @@ export function LinkBuilder() {
       inputTitle="Your details"
       outputTitle="Your link"
       input={<WhatsAppNumberFields value={value} onChange={setValue} />}
-      output={result.ok ? <LinkOutput url={result.url} message={value.message} /> : <LinkPending problem={result.problem} />}
+      output={result.ok ? <LinkOutput url={result.url} value={value} /> : <LinkPending problem={result.problem} />}
     />
   )
 }
@@ -207,7 +222,7 @@ export default function WhatsAppLinkGenerator() {
         description="Create a wa.me click-to-chat link with a pre-filled message. Free, no sign-up, and the number you type never leaves your browser."
         path="/whatsapp-link-generator/"
       />
-      <StructuredData data={jsonLdGraph([organizationSchema(), ...pageGraphNodes(PAGE), faqPageSchema(LINK_GENERATOR_FAQ)])} />
+      <StructuredData data={jsonLdGraph([organizationSchema(), ...toolPageNodes(PAGE), faqPageSchema(LINK_GENERATOR_FAQ)])} />
       <MarketingPageShell
         badge="FREE TOOL"
         headline="WhatsApp link generator"
