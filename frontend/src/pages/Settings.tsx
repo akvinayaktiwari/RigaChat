@@ -21,10 +21,12 @@ import {
   getIntegrationStatus,
   getMe,
   setCalComDefaultEventType,
+  updateDefaultCountryCode,
   updateNotificationPreferences,
   updateProfile,
 } from '../services/api'
 import type { CalComEventType, ClientRecord, NotificationPreferences } from '../types/index'
+import PhoneDefaultsSection from '../components/settings/PhoneDefaultsSection'
 import { useSubscription } from '../hooks/useSubscription'
 
 // Preferences moved to the CLIENT RECORD on 2026-08-27. They used to live in
@@ -232,6 +234,20 @@ export default function Settings() {
     }
   }
 
+  // Returns success so the section shows its own inline error, like the
+  // notification toggles do.
+  async function handleDefaultCountryChange(countryCode: string): Promise<boolean> {
+    try {
+      const res = await updateDefaultCountryCode(countryCode)
+      if (!res.success || !res.data) return false
+      setProfile(res.data)
+      return true
+    } catch (error) {
+      console.error('[settings] could not save the default country', error)
+      return false
+    }
+  }
+
   function handleDeleteAccount() {
     logout()
   }
@@ -258,6 +274,8 @@ export default function Settings() {
         />
 
         <SubscriptionSection subscription={subscription} onUpgradeClick={() => setShowUpgradeModal(true)} />
+
+        <PhoneDefaultsSection countryCode={profile.defaultCountryCode} onChange={handleDefaultCountryChange} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <PreferencesSection preferences={preferences} onToggle={handleTogglePreference} />

@@ -4,6 +4,8 @@ import {
   getAppBootstrap,
   getClient,
   updateClientProfile,
+  InvalidCountryCodeError,
+  updateDefaultCountryCode,
   updateNotificationPreferences,
   upgradeClientPlan,
   upsertClient,
@@ -121,6 +123,27 @@ clientRoutes.patch('/me/notification-preferences', requireAuth, async (c) => {
     const client = await updateNotificationPreferences(clientId, patch)
     return c.json<ApiResponse<ClientRecord>>({ success: true, data: client }, 200)
   } catch (error) {
+    if (error instanceof Error && error.message === 'Client not found') {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
+    }
+    return c.json<ApiResponse<null>>({ success: false, error: errorMessage(error) }, 500)
+  }
+})
+
+// The country code assumed for a lead number typed without one. Its own route
+// for the same reason as notification-preferences: PATCH /me requires `name`.
+clientRoutes.patch('/me/default-country', requireAuth, async (c) => {
+  const clientId = c.get('user').sub
+
+  try {
+    const body = await c.req.json<{ countryCode?: unknown }>().catch(() => ({ countryCode: undefined }))
+    const countryCode = typeof body.countryCode === 'string' ? body.countryCode.trim() : ''
+    const client = await updateDefaultCountryCode(clientId, countryCode)
+    return c.json<ApiResponse<ClientRecord>>({ success: true, data: client }, 200)
+  } catch (error) {
+    if (error instanceof InvalidCountryCodeError) {
+      return c.json<ApiResponse<null>>({ success: false, error: error.message }, 400)
+    }
     if (error instanceof Error && error.message === 'Client not found') {
       return c.json<ApiResponse<null>>({ success: false, error: error.message }, 404)
     }

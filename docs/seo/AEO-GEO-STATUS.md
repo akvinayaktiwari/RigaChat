@@ -14,8 +14,8 @@ Framing: Google's own guidance is that optimizing for AI search is ordinary SEO.
 |---|---|---|---|
 | GEO readiness (estimate) | 71 / 100 | 2026-10-02 | From `GEO-ANALYSIS-2026-10-02.md`, before the feature-page rebuild. Baseline was 63 on 2026-09-19. |
 | Indexed in Google | Unknown | — | Search Console is not verified. This is the top blocker. |
-| Public pages in the sitemap | 30 | 2026-10-05 | All dated. The two posts published late on 2026-10-05 were the 29th and 30th. |
-| Blog posts | 9 | 2026-10-05 | Four published 2026-10-05: Meta lead ads auto-reply, click-to-WhatsApp vs lead forms, real estate chatbot qualification questions, and what a CRM chatbot is. |
+| Public pages in the sitemap | 33 | 2026-10-06 | All dated. Three global pillar posts were added on 2026-10-06. The two posts published late on 2026-10-05 were the 29th and 30th. |
+| Blog posts | 12 | 2026-10-06 | Three global pillars published 2026-10-06 (WhatsApp CRM, real estate chatbot guide, AI receptionist vs website voice agent). Four published 2026-10-05: Meta lead ads auto-reply, click-to-WhatsApp vs lead forms, real estate chatbot qualification questions, and what a CRM chatbot is. |
 | Mobile LCP (lab) | about 1.7 s | 2026-10-02 | Was 2.3 s on the homepage and 3.25 s on a post. No field data yet. |
 | Lighthouse accessibility | 100 | 2026-10-02 | On every public page audited. |
 | Real referring domains | 0 known | 2026-10-02 | Not in the Common Crawl graph; all six competitors checked are. |
@@ -109,6 +109,9 @@ The owner's decision on 2026-10-06: Vyostra AI sells globally and quotes US doll
 | Every blog post declares a `market` (`global`, `us`, `uk`, `ca`, `au`, `ae`, `in`). The registry refuses a post without one. The label is printed beside the category, the index filters by it, and a market post publishes `spatialCoverage`. Six posts are `in`; three are `global` (the Facebook lead ads post lost "in India" from its title) | 2026-10-06 |
 | WhatsApp link generator: the format answer names the country code for each market, and the picker leads with the US, UAE, UK, Australia, India and Canada | 2026-10-06 |
 | Zoho CRM connects accounts in any Zoho data centre (US, EU, India, Australia, Japan, Saudi Arabia, Canada): the callback's `accounts-server` decides where the code is redeemed, and the data centre is stored with the tokens. **Not yet proven against a live non-India account**, so `/features/zoho-crm/` still says India only (owner task 26) | 2026-10-06 |
+| Per-account default country for phone numbers (Settings). The WhatsApp button on a lead adds the account's own calling code to a number typed without one; an account that has not chosen keeps the old India assumption | 2026-10-06 |
+| Three global pillar posts: `/blog/what-is-a-whatsapp-crm/`, `/blog/real-estate-chatbot-guide/` and `/blog/ai-receptionist-vs-website-voice-agent/`. The last one says plainly that Vyostra AI is not an AI receptionist. Each pillar links to its India posts and each India post links back | 2026-10-06 |
+| Chat widget lays out right-to-left text correctly (each message takes its direction from its own first letter). Whether the agents ANSWER well in Arabic is still untested (owner task 31) | 2026-10-06 |
 | Terms section 4 says prices are in USD (was INR). The rest of the sentence, and the Privacy page, are unchanged pending legal review (owner task 25) | 2026-10-06 |
 
 ### Performance and accessibility
@@ -172,8 +175,7 @@ The owner's decision on 2026-10-06: Vyostra AI sells globally and quotes US doll
 | 27 | Remove `RAZORPAY_PLAN_ID_STARTER_INR`, `_GROWTH_INR` and `_AGENCY_INR` from the three Lambdas, and archive the three INR plans in Razorpay | Nothing reads them any more. Removing them also frees room under the Lambda's 4 KB environment ceiling. |
 | 28 | A USD ad-spend figure for the Head of Sales bio on `/about-us/` | The "₹10L+ a month" figure was removed rather than converted. The bio now says "Has managed monthly ad spend for developers." |
 | 29 | Confirm the "Real Estate Developer, Bengaluru" testimonial is real and approved | Left as it is. It is the one India-specific line still on the homepage. |
-| 30 | Decide on a per-account default country for phone numbers | `frontend/src/lib/phone.ts` still assumes a bare 10-digit number is Indian, so a US lead typed without +1 gets a wrong WhatsApp link. No single constant is right; it needs an account setting. |
-| 31 | Test the chat and voice agents in Arabic, including right-to-left rendering in the widget | "arabic chatbot" has about 2,400 searches a month in the UAE. No Arabic claim may be published until this passes. |
+| 31 | Test the chat and voice agents in Arabic on a real bot | "arabic chatbot" has about 2,400 searches a month in the UAE. No Arabic claim may be published until this passes. |
 | 32 | Decide telephony priority | "AI receptionist" is the largest query in the set (about 49,500 a month in the US) and means phone answering. Content must not call Vyostra AI an AI receptionist until phone answering is live. |
 
 ### Claude tasks, ready now
@@ -185,7 +187,7 @@ The owner's decision on 2026-10-06: Vyostra AI sells globally and quotes US doll
 | 14 | Embed the walkthrough video once it exists, with `VideoObject` | Depends on 5. |
 | 15 | A diagram in each post, with `image` on `BlogPosting` | Needs design assets or a decision to draw them in SVG. |
 | 16 | A built-in QR code for the link generator | Needs a small library. |
-| 17 | The twelve posts in `GLOBAL-MARKET-HANDOFF.md` section B3, starting with the global pillars (WhatsApp CRM, real estate chatbot, speed to lead) | None written yet. Each needs its keyword data re-pulled and every market rule cited from a primary source. Prices in USD; the handoff's "INR available in India" lines are superseded. |
+| 17 | The remaining nine posts in `GLOBAL-MARKET-HANDOFF.md` section B3 | Three global pillars shipped 2026-10-06 (posts 1, 2 and 3). "Speed to lead" (post 4) is held: the HBR study it rests on is paywalled, so its figures could not be checked from the page and are not quoted. The market posts (UAE, US, UK, Australia, India) each cite a local rule (Trakheesi, TCPA, PECR, the Spam Act) that must be read at its primary source first. |
 | 17a | Make `/industries/real-estate/` global with market sections | Waits for the market posts it would link to: no market section without three real posts behind it. The compliance line already names RERA and Trakheesi as examples. |
 
 ### Blocked

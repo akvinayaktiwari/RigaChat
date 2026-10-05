@@ -213,6 +213,24 @@ export async function getAppBootstrap(clientId: string): Promise<AppBootstrap> {
 // Partial by design: the Settings UI toggles one channel at a time, and sending
 // the whole object back would let a stale page silently revert a change made on
 // another device.
+// ITU country calling codes are one to three digits and never start with 0.
+const COUNTRY_CODE = /^[1-9]\d{0,2}$/
+
+export class InvalidCountryCodeError extends Error {
+  constructor() {
+    super('countryCode must be a country calling code of 1 to 3 digits, without a plus sign')
+    this.name = 'InvalidCountryCodeError'
+  }
+}
+
+// The code assumed for a lead number typed without one. Stored as digits only,
+// which is the form a wa.me link needs.
+export async function updateDefaultCountryCode(clientId: string, countryCode: string): Promise<ClientRecord> {
+  if (!COUNTRY_CODE.test(countryCode)) throw new InvalidCountryCodeError()
+  await getClient(clientId)
+  return updateClient(clientId, { defaultCountryCode: countryCode })
+}
+
 export async function updateNotificationPreferences(
   clientId: string,
   patch: Partial<NotificationPreferences>

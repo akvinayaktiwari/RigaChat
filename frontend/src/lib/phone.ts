@@ -4,26 +4,43 @@
 // "09876543210" and "+91 98765 43210". Linking those straight through lands on
 // WhatsApp's "phone number shared via url is invalid" page every time.
 //
-// DEFAULT_COUNTRY_CODE is India because that is where the product started. A
-// bare 10-digit number is assumed Indian, which is WRONG for a US or Canadian
-// lead typed without its +1 -- a known gap now that the product sells
-// globally. The fix is a per-client default country, not a different constant:
-// no single country code is right for every account.
-const DEFAULT_COUNTRY_CODE = '91'
-const NATIONAL_NUMBER_LENGTH = 10
+// A lead typed without a country code needs one guessed. The guess is the
+// account's own default country (Settings), because no single code is right
+// for every customer. LEGACY_COUNTRY_CODE is what an account that has not
+// chosen keeps getting: India, where the product started, so nothing changes
+// for an existing account until it picks.
+export const LEGACY_COUNTRY_CODE = '91'
+
+// National number lengths, without the trunk zero. India and the +1 countries
+// use exactly ten digits; elsewhere the length varies by country and by line
+// type, so a range is the honest check.
+const EXACT_NATIONAL_LENGTH: Record<string, number> = { '91': 10, '1': 10 }
+const MIN_NATIONAL_LENGTH = 7
+const MAX_NATIONAL_LENGTH = 10
+/** Shortest full international number worth linking to. */
+const MIN_INTERNATIONAL_LENGTH = 10
+
+function isNationalNumber(national: string, countryCode: string): boolean {
+  const exact = EXACT_NATIONAL_LENGTH[countryCode]
+  if (exact !== undefined) return national.length === exact
+  return national.length >= MIN_NATIONAL_LENGTH && national.length <= MAX_NATIONAL_LENGTH
+}
 
 /**
  * Best-effort E.164 digits (no `+`) for a wa.me link.
  *
  * Returns null when there is nothing plausible to dial, so callers can disable
  * the action rather than offer a link that is guaranteed to fail.
+ *
+ * Known limit: a national number longer than ten digits (some German mobiles)
+ * reads as already carrying its country code and is left alone.
  */
-export function toWhatsAppNumber(raw: string | undefined): string | null {
+export function toWhatsAppNumber(raw: string | undefined, defaultCountryCode: string = LEGACY_COUNTRY_CODE): string | null {
   if (!raw) return null
 
   const trimmed = raw.trim()
   // An explicit + means the author already told us the country code. Trust it
-  // and never apply the India default over the top.
+  // and never apply the account default over the top.
   const isExplicitlyInternational = trimmed.startsWith('+') || trimmed.startsWith('00')
   const digits = trimmed.replace(/\D/g, '')
 
@@ -32,19 +49,17 @@ export function toWhatsAppNumber(raw: string | undefined): string | null {
   if (isExplicitlyInternational) {
     // "00" is the other international prefix; wa.me wants neither form.
     const withoutPrefix = trimmed.startsWith('00') ? digits.replace(/^00/, '') : digits
-    return withoutPrefix.length >= NATIONAL_NUMBER_LENGTH ? withoutPrefix : null
+    return withoutPrefix.length >= MIN_INTERNATIONAL_LENGTH ? withoutPrefix : null
   }
 
-  // Domestic trunk prefix: 0 is dialled inside India and must be dropped.
+  // Domestic trunk prefix: a leading 0 is dialled inside the country and must be dropped.
   const national = digits.replace(/^0+/, '')
 
-  if (national.length === NATIONAL_NUMBER_LENGTH) {
-    return `${DEFAULT_COUNTRY_CODE}${national}`
-  }
+  if (isNationalNumber(national, defaultCountryCode)) return `${defaultCountryCode}${national}`
 
   // Already carries a country code (91 + 10 digits, or any other plausible
   // international length). Left alone rather than second-guessed.
-  if (national.length > NATIONAL_NUMBER_LENGTH) return national
+  if (national.length > MAX_NATIONAL_LENGTH) return national
 
   // Shorter than a national number: a partial entry or junk. Nothing to dial.
   return null

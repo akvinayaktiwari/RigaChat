@@ -127,7 +127,7 @@
     'font-size:14px;line-height:1.5}' +
     '.ciq-msg-user{background:var(--brand);color:#fff;align-self:flex-end;padding:10px 14px;' +
     'border-radius:16px;border-top-right-radius:4px;max-width:85%;font-size:14px;line-height:1.5}' +
-    '.ciq-msg-text{white-space:pre-wrap;word-break:break-word}' +
+    '.ciq-msg-text{white-space:pre-wrap;word-break:break-word;text-align:start}' +
     '.ciq-msg-time{font-size:9px;text-align:right;margin-top:6px}' +
     '.ciq-msg-bot .ciq-msg-time{color:#6b7280}' +
     '.ciq-msg-user .ciq-msg-time{color:rgba(255,255,255,.6)}' +
@@ -236,7 +236,7 @@
     '<div id="ciq-messages"></div>' +
     '<div id="ciq-suggestions"></div>' +
     '<div id="ciq-input-area">' +
-    '<input id="ciq-input" type="text" placeholder="Type a message..." />' +
+    '<input id="ciq-input" type="text" dir="auto" placeholder="Type a message..." />' +
     '<button id="ciq-send" aria-label="Send message">' + SEND_ICON + '</button></div>' +
     '<div id="ciq-input-hint" class="ciq-hidden">Please fill in the details above to continue</div>' +
     '<div id="ciq-footer">Powered by <a href="https://vyostra.com">Vyostra AI</a></div>' +
@@ -556,6 +556,9 @@
     bubble.className = role === 'user' ? 'ciq-msg-user' : 'ciq-msg-bot';
     var textEl = document.createElement('div');
     textEl.className = 'ciq-msg-text';
+    // Each message takes its direction from its own first letter, so Arabic
+    // and Hebrew read right to left without the visitor or the site saying so.
+    textEl.dir = 'auto';
     textEl.textContent = text;
     var timeEl = document.createElement('div');
     timeEl.className = 'ciq-msg-time';

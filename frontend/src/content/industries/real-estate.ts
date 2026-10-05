@@ -85,6 +85,7 @@ export const REAL_ESTATE: IndustryContent = {
     },
   ],
   relatedPosts: [
+    'real-estate-chatbot-guide',
     'whatsapp-chatbot-for-real-estate-india',
     'ai-voice-agent-for-real-estate-india',
     'click-to-whatsapp-ads-vs-lead-forms-real-estate-india',
