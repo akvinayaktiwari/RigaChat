@@ -1,6 +1,6 @@
 # AEO / GEO Status — vyostra.com
 
-**The one file to read first.** What has shipped for search and answer-engine visibility, what is left, and who has to do it. Last updated: 2026-10-06. Next steps: `HANDOFF-2026-10-05.md`.
+**The one file to read first.** What has shipped for search and answer-engine visibility, what is left, and who has to do it. Last updated: 2026-10-06. Next steps: `HANDOFF-2026-10-05.md` and, for the global market move, `GLOBAL-MARKET-HANDOFF.md`.
 
 How to keep it current: when something ships, move its row from "To do" to "Implemented" with the date. Do not record plans here; plans live in the documents listed at the bottom.
 
@@ -95,6 +95,22 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 | Homepage: a chat lead "Syncs to Zoho.", the voice agent has the "same CRM sync", and the Zoho card offers "Activity logging" and "Custom field mapping" (neither exists); Help: leads sync to "other tools" besides Zoho | 2026-10-03 |
 | WhatsApp page named chat and form leads as the only ones that send an alert (Meta lead ad leads do too), and "any of your agents" read as including the voice agent, which alerts only on a handoff | 2026-10-05 |
 
+### Global market (USD only)
+
+The owner's decision on 2026-10-06: Vyostra AI sells globally and quotes US dollars only. This goes further than `GLOBAL-MARKET-HANDOFF.md`, which kept a rupee option for India; where the two disagree, this section is what shipped.
+
+| Item | Shipped |
+|---|---|
+| Prices in USD only. The India (₹) toggle, the timezone region guess, the rupee line under each plan on `/pricing/` and the "cost in India" FAQ are gone. Checkout sends no currency | 2026-10-06 |
+| `POST /api/billing/subscribe` creates USD subscriptions only. A request that still names INR (a tab opened before the change) is refused with a 400 rather than charged in dollars. A checkout abandoned on an INR plan is released, not resumed | 2026-10-06 |
+| Shared pages read as global: footer, homepage "What is Vyostra AI", About (title, description and body), `llms.txt` summaries, Careers. Bangalore stays as the headquarters fact | 2026-10-06 |
+| `Organization` schema has `areaServed: Worldwide`; `WebSite` and `BlogPosting` use `inLanguage: en` (was `en-IN`). No hreflang, on purpose: one English site | 2026-10-06 |
+| Homepage walkthrough and feature-page mockups use a dollar budget, bedrooms and numbers from several countries instead of crore, BHK, NEET and +91 | 2026-10-06 |
+| Every blog post declares a `market` (`global`, `us`, `uk`, `ca`, `au`, `ae`, `in`). The registry refuses a post without one. The label is printed beside the category, the index filters by it, and a market post publishes `spatialCoverage`. Six posts are `in`; three are `global` (the Facebook lead ads post lost "in India" from its title) | 2026-10-06 |
+| WhatsApp link generator: the format answer names the country code for each market, and the picker leads with the US, UAE, UK, Australia, India and Canada | 2026-10-06 |
+| Zoho CRM connects accounts in any Zoho data centre (US, EU, India, Australia, Japan, Saudi Arabia, Canada): the callback's `accounts-server` decides where the code is redeemed, and the data centre is stored with the tokens. **Not yet proven against a live non-India account**, so `/features/zoho-crm/` still says India only (owner task 26) | 2026-10-06 |
+| Terms section 4 says prices are in USD (was INR). The rest of the sentence, and the Privacy page, are unchanged pending legal review (owner task 25) | 2026-10-06 |
+
 ### Performance and accessibility
 
 | What | Shipped |
@@ -151,6 +167,15 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 | 10 | Run the Rich Results Test on the homepage and one post | Not run yet. |
 | 10a | Check the Priya S. testimonial on the homepage | It says leads "from the AI agent" sync to Zoho. Chat leads do not sync; only form and Meta lead ad leads do. It is a customer's own quote, so it was left unchanged: confirm with her how leads reach her Zoho, then reword with her approval or drop the sentence. |
 
+| 25 | Legal review of Terms and Privacy for international customers | Terms now says "Prices in USD, inclusive of applicable taxes"; only the currency was changed. Privacy states data is held in `ap-south-1` (Mumbai), which needs a lawful transfer basis for EU/UK customers and a check against UAE data protection law. |
+| 26 | Enable multi-data-centre on the Zoho OAuth client (Zoho API Console), then connect one zoho.com or zoho.eu account and sync one lead | The code is in place but unproven outside India. Once a non-India account syncs, the India-only sentence on `/features/zoho-crm/` can go and global content may mention Zoho. |
+| 27 | Remove `RAZORPAY_PLAN_ID_STARTER_INR`, `_GROWTH_INR` and `_AGENCY_INR` from the three Lambdas, and archive the three INR plans in Razorpay | Nothing reads them any more. Removing them also frees room under the Lambda's 4 KB environment ceiling. |
+| 28 | A USD ad-spend figure for the Head of Sales bio on `/about-us/` | The "₹10L+ a month" figure was removed rather than converted. The bio now says "Has managed monthly ad spend for developers." |
+| 29 | Confirm the "Real Estate Developer, Bengaluru" testimonial is real and approved | Left as it is. It is the one India-specific line still on the homepage. |
+| 30 | Decide on a per-account default country for phone numbers | `frontend/src/lib/phone.ts` still assumes a bare 10-digit number is Indian, so a US lead typed without +1 gets a wrong WhatsApp link. No single constant is right; it needs an account setting. |
+| 31 | Test the chat and voice agents in Arabic, including right-to-left rendering in the widget | "arabic chatbot" has about 2,400 searches a month in the UAE. No Arabic claim may be published until this passes. |
+| 32 | Decide telephony priority | "AI receptionist" is the largest query in the set (about 49,500 a month in the US) and means phone answering. Content must not call Vyostra AI an AI receptionist until phone answering is live. |
+
 ### Claude tasks, ready now
 
 | # | Task | Note |
@@ -160,6 +185,8 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 | 14 | Embed the walkthrough video once it exists, with `VideoObject` | Depends on 5. |
 | 15 | A diagram in each post, with `image` on `BlogPosting` | Needs design assets or a decision to draw them in SVG. |
 | 16 | A built-in QR code for the link generator | Needs a small library. |
+| 17 | The twelve posts in `GLOBAL-MARKET-HANDOFF.md` section B3, starting with the global pillars (WhatsApp CRM, real estate chatbot, speed to lead) | None written yet. Each needs its keyword data re-pulled and every market rule cited from a primary source. Prices in USD; the handoff's "INR available in India" lines are superseded. |
+| 17a | Make `/industries/real-estate/` global with market sections | Waits for the market posts it would link to: no market section without three real posts behind it. The compliance line already names RERA and Trakheesi as examples. |
 
 ### Blocked
 
@@ -169,7 +196,7 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 | 19 | Outside sources and first-hand evidence for the two voice posts that cite none | Real measurements or transcripts from the owner. |
 | 20 | Sources for the pilgrimage post's figures | The owner's source list. |
 | 21 | Change "Gupshup" wording in `/faq/`, `/help/`, `/features/whatsapp/` and `llms.txt` | Accurate today. Change all four together when the Meta direct route opens to clients, after WhatsApp App Review. |
-| 22 | `purchase` event | Real INR charge amounts (the currency trap in `prompt-analytics.md`). |
+| 22 | `purchase` event | A first real charge. Charges are in USD only since 2026-10-06, so the INR currency trap in `prompt-analytics.md` no longer applies to new payments. |
 | 23 | Striking-distance work and the weekly scoreboard | Search Console data (owner task 1). |
 | 24 | Three posts a week from the clusters | Keyword validation, which needs Search Console or a keyword tool. |
 
@@ -182,6 +209,7 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 | `docs/seo/GEO-ANALYSIS-2026-10-02.md` | Latest scored analysis, with per-crawler access and passage-level detail |
 | `docs/seo/GEO-AUDIT-2026-09-19.md` | The baseline audit (63/100) and its commit record |
 | `docs/seo/GEO-FIX-PLAN.md` | The original fix plan and its progress log |
+| `docs/seo/GLOBAL-MARKET-HANDOFF.md` | The global market handoff: markets, keyword data and the first twelve posts. Its INR guidance is superseded by the USD-only decision above |
 | `docs/SEO_AEO_HANDOFF.md` | The handoff this round of work started from, with a status section |
 | `docs/SEO_GROWTH_PLAN.md` | The 6-month growth plan: clusters, programmatic pages, authority |
 | `docs/seo/drafts/compare-pages.md` | Comparison page drafts, unpublished |
