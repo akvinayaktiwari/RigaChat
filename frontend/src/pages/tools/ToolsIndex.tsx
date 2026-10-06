@@ -27,8 +27,8 @@ export default function ToolsIndex() {
   return (
     <>
       <PageMeta
-        title="Free WhatsApp Tools for Business — Vyostra AI"
-        description="Free WhatsApp tools from Vyostra AI: a QR code generator, a text formatter and a link generator. No sign-up, and nothing you type leaves your browser."
+        title="Free WhatsApp and Real Estate Tools — Vyostra AI"
+        description="Free tools from Vyostra AI: WhatsApp QR codes, text formatting, links and a commission calculator. No sign-up, and nothing you type leaves your browser."
         path="/tools/"
       />
       <StructuredData
@@ -36,8 +36,8 @@ export default function ToolsIndex() {
       />
       <MarketingPageShell
         badge="FREE TOOLS"
-        headline="Free WhatsApp tools"
-        lead="Vyostra AI's free tools help a business get more out of WhatsApp: make a QR code that opens a chat with your number, format a message with bold text and lists, or build a click-to-chat link with a pre-filled message. Every tool is free, needs no sign-up, and runs entirely in your browser."
+        headline="Free WhatsApp and real estate tools"
+        lead="Vyostra AI's free tools help a business get more out of WhatsApp: make a QR code that opens a chat with your number, format a message with bold text and lists, build a click-to-chat link with a pre-filled message, or work out an agent's commission on a sale. Every tool is free, needs no sign-up, and runs entirely in your browser."
       >
         <section className="mx-auto mb-20 max-w-5xl">
           <h2 className={SECTION_HEADING}>Which tool do you need?</h2>
@@ -51,7 +51,7 @@ export default function ToolsIndex() {
           <h2 className={SECTION_HEADING}>What happens to what you type?</h2>
           <div className={PROSE}>
             <p>
-              Nothing leaves your browser. Each tool does its work on your own device, so the phone numbers and messages you type are never sent to Vyostra AI
+              Nothing leaves your browser. Each tool does its work on your own device, so the numbers and messages you type are never sent to Vyostra AI
               and are gone when you close the page. No account is needed, and there is no limit on how often you use a tool.
             </p>
             <p>
