@@ -110,24 +110,28 @@
         optionsHtml += '<option value="' + escapeHtml(options[i]) + '">' + escapeHtml(options[i]) + '</option>';
       }
       return (
-        '<select id="bb-input-' + field.fieldId + '" data-field-id="' + field.fieldId + '"' + requiredAttr + '>' +
+        '<select id="bb-input-' + escapeHtml(field.fieldId) + '" data-field-id="' + escapeHtml(field.fieldId) + '"' + requiredAttr + '>' +
         optionsHtml +
         '</select>'
       );
     }
     var inputType = field.type === 'email' ? 'email' : field.type === 'phone' ? 'tel' : field.type === 'number' ? 'number' : 'text';
     return (
-      '<input id="bb-input-' + field.fieldId + '" data-field-id="' + field.fieldId + '" type="' + inputType + '"' +
+      '<input id="bb-input-' + escapeHtml(field.fieldId) + '" data-field-id="' + escapeHtml(field.fieldId) + '" type="' + inputType + '"' +
       (field.placeholder ? ' placeholder="' + escapeHtml(field.placeholder) + '"' : '') +
       requiredAttr +
       ' />'
     );
   }
 
+  // Quotes are escaped too, not only < > &. The textContent round-trip leaves
+  // them alone, and these strings are also written into attribute values
+  // (placeholder, option value, element ids), where a bare " ends the attribute
+  // and whatever follows becomes markup on the host site.
   function escapeHtml(value) {
     var div = document.createElement('div');
-    div.textContent = value;
-    return div.innerHTML;
+    div.textContent = value == null ? '' : String(value);
+    return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   function buildFieldsHtml(fields) {
@@ -136,12 +140,12 @@
       var field = fields[i];
       html +=
         '<div class="bb-field">' +
-        '<label for="bb-input-' + field.fieldId + '">' +
+        '<label for="bb-input-' + escapeHtml(field.fieldId) + '">' +
         escapeHtml(field.label) +
         (field.required ? '<span class="bb-required">*</span>' : '') +
         '</label>' +
         fieldInputHtml(field) +
-        '<div class="bb-field-error" id="bb-error-' + field.fieldId + '">This field is required</div>' +
+        '<div class="bb-field-error" id="bb-error-' + escapeHtml(field.fieldId) + '">This field is required</div>' +
         '</div>';
     }
     return html;
