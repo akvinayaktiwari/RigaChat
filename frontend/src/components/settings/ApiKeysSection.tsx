@@ -6,7 +6,7 @@ import type { ApiKeySummary, ApiScope, CreatedApiKey } from '../../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
-// The docs deliberately print no API host; this is where a developer gets it.
+// The address developers call. The docs print the same one (https://vyostra.com).
 //
 // Its own variable, not VITE_API_URL: that one is where the dashboard sends its
 // own requests, and repointing the whole dashboard through a second CloudFront

@@ -11,7 +11,7 @@
 4. Leave the permissions you need ticked and click **Create key**.
 5. Copy the key straight away. It starts with `vy_live_` and is shown only once.
 
-The same section shows your **API base URL**. Every request in these docs goes to that URL followed by a path such as `/v1/leads`.
+The same section shows your **API base URL**, which is `https://vyostra.com`. Every request in these docs goes to that URL followed by a path such as `/v1/leads`.
 
 <Callout title="Keep the key out of your code" tone="warning">
 Store the key in an environment variable or a secrets manager. Anyone who has it can read your leads until you revoke it.
@@ -22,7 +22,7 @@ Store the key in an environment variable or a secrets manager. Anyone who has it
 Put the base URL and the key in two environment variables, then ask for your five most urgent leads.
 
 ```bash
-export VYOSTRA_API_URL="paste the base URL from Settings"
+export VYOSTRA_API_URL="https://vyostra.com"
 export VYOSTRA_API_KEY="paste your vy_live_ key"
 
 curl "$VYOSTRA_API_URL/v1/leads?limit=5" \
