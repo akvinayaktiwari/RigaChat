@@ -5,6 +5,7 @@ import {
   getApiKeysForClient,
   putApiKey,
   touchApiKeyLastUsed,
+  updateApiKeyScopes,
 } from '../repositories/api-key-repository.js'
 import { incrementApiKeyRate } from '../repositories/redis-repository.js'
 import { EntitlementError, resolveApiAccess } from './entitlement-service.js'
@@ -76,16 +77,22 @@ export function parseCreateApiKeyInput(raw: unknown): CreateApiKeyInput {
   return { name, scopes: parseScopes(body.scopes) }
 }
 
-export async function createApiKeyForClient(clientId: string, input: CreateApiKeyInput): Promise<CreatedApiKey> {
+// The plan gate shared by creating a key and editing one, so there is no way to
+// end up holding a scope the plan would have refused at creation.
+async function assertPlanAllows(clientId: string, scopes: ApiScope[]): Promise<void> {
   const access = await resolveApiAccess(clientId)
   if (access === null) {
     throw new EntitlementError('FEATURE_DISABLED', 'api')
   }
-  if (access !== 'full' && input.scopes.some(isWriteScope)) {
+  if (access !== 'full' && scopes.some(isWriteScope)) {
     throw new ApiKeyValidationError(
       'Your plan includes read-only API access. Remove the write scopes, or upgrade to a plan with full API access.'
     )
   }
+}
+
+export async function createApiKeyForClient(clientId: string, input: CreateApiKeyInput): Promise<CreatedApiKey> {
+  await assertPlanAllows(clientId, input.scopes)
 
   const existing = await getApiKeysForClient(clientId)
   if (existing.length >= API_KEY_MAX_PER_ACCOUNT) {
@@ -121,6 +128,33 @@ export async function revokeApiKeyForClient(clientId: string, keyId: string): Pr
   if (!record || !(await deleteApiKey(record.keyHash, clientId))) {
     throw new ApiKeyNotFoundError('API key not found')
   }
+}
+
+// Replaces a key's scopes and leaves the secret alone, so an integration gains
+// (or loses) an ability without anyone redeploying it with a new key. The new
+// set applies from the next request: authentication reads the row with a
+// consistent read every time and caches nothing.
+//
+// Reachable only through the Cognito-authenticated dashboard route. A key can
+// never edit a key, itself included -- otherwise a leaked read-only key could
+// promote itself.
+export async function updateApiKeyScopesForClient(
+  clientId: string,
+  keyId: string,
+  raw: unknown
+): Promise<ApiKeySummary> {
+  const body = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>
+  const scopes = parseScopes(body.scopes)
+  await assertPlanAllows(clientId, scopes)
+
+  const records = await getApiKeysForClient(clientId)
+  const record = records.find((candidate) => candidate.keyId === keyId)
+  const updated = record
+    ? await updateApiKeyScopes(record.keyHash, clientId, scopes, new Date().toISOString())
+    : null
+  // Missing and not-yours are the same answer, so a keyId cannot be probed.
+  if (!updated) throw new ApiKeyNotFoundError('API key not found')
+  return toSummary(updated)
 }
 
 export type ApiKeyAuthResult =
