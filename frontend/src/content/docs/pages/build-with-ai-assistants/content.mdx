@@ -19,7 +19,7 @@ AUTHENTICATION
 - Keys start with "vy_live_". They are secrets: server-side code only, never in
   a web page or a mobile app. The API does not accept cross-origin browser calls.
 
-ENDPOINTS (all GET, all read-only, all return JSON)
+ENDPOINTS (all return JSON; every one is a read-only GET except POST /v1/forms)
 - GET /v1/leads                    scope leads:read
     query: limit (1-200, default 50), cursor, includeArchived=true
     returns: { data: Lead[], nextCursor: string|null, total: number,
@@ -28,6 +28,16 @@ ENDPOINTS (all GET, all read-only, all return JSON)
     returns: { data: Lead & { transcript: string|null } }
 - GET /v1/bots, /v1/bots/:botId                  scope bots:read
 - GET /v1/forms, /v1/forms/:formId               scope forms:read
+- POST /v1/forms                   scope forms:write (Growth or Agency plan)
+    body: { name, description?, submitButtonText?, fields: Field[] (1-30) }
+    Field: { label, type: "text"|"number"|"email"|"phone"|"options",
+             required?: boolean, placeholder?, options?: string[] (1-50) }
+    options is required when type is "options" and forbidden otherwise.
+    Unknown properties are rejected with 400.
+    returns: { data: Form } with data.formId. 201 when created; 200 with the
+    existing form when the same name and definition already exist.
+    SETUP ONLY: call it once from a script and store formId. Never call it
+    from a page or when a visitor submits. The page only needs formId.
 - GET /v1/voice-agents, /v1/voice-agents/:agentId  scope voice_agents:read
     list endpoints return { data: [...] }, single ones return { data: {...} }
 
@@ -48,7 +58,8 @@ PAGINATION
 ERRORS
 - Shape: { error: { code, message } }. Branch on code.
 - 400 invalid_request, 401 missing_api_key, 401 invalid_api_key,
-  403 api_access_disabled, 403 insufficient_scope, 404 not_found,
+  403 api_access_disabled, 403 insufficient_scope, 403 write_access_disabled,
+  404 not_found, 409 form_name_taken, 409 form_limit_reached,
   429 rate_limited, 500 internal_error.
 
 RATE LIMIT
@@ -56,7 +67,8 @@ RATE LIMIT
   Retry-After header, then retry. On 500, retry with a growing pause.
 
 NOT AVAILABLE
-- No endpoint creates, updates or deletes anything.
+- Creating a lead form is the only write. Nothing updates or deletes a form,
+  and nothing creates, updates or deletes leads, chatbots or voice agents.
 - No webhooks. Use polling.
 - No SDK and no MCP server. Use plain HTTPS requests.
 

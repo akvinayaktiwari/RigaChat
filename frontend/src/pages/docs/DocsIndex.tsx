@@ -12,7 +12,7 @@ export const DOCS_INDEX_TITLE = 'Vyostra AI developer docs'
  * keeps this page honest read the same sentence.
  */
 export const DOCS_INDEX_LEAD =
-  'The Vyostra AI API is a REST API that lets your own code read the leads, chatbots, forms and voice agents in your Vyostra AI account. You authenticate with an API key, call HTTPS endpoints under /v1, and get JSON back. These docs cover the API and the script tags that embed each widget.'
+  'The Vyostra AI API is a REST API that lets your own code read the leads, chatbots, forms and voice agents in your Vyostra AI account, and create lead forms. You authenticate with an API key, call HTTPS endpoints under /v1, and get JSON back. These docs cover the API and the script tags that embed each widget.'
 
 export default function DocsIndex() {
   return (

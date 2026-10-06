@@ -21,7 +21,7 @@ const meta: DocMeta = {
     },
     {
       question: 'Should I retry a 500 error from the Vyostra AI API?',
-      answer: 'Yes, with a pause. A 500 with the code internal_error means the request failed on Vyostra AI servers and was not your fault. All endpoints are read-only, so repeating a request is always safe. Wait a few seconds, double the wait on each attempt, and stop after a handful of tries.',
+      answer: 'Yes, with a pause. A 500 with the code internal_error means the request failed on Vyostra AI servers and was not your fault. Repeating a request is always safe: reads change nothing, and POST /v1/forms returns the existing form when the same request is sent again. Wait a few seconds, double the wait on each attempt, and stop after a handful of tries.',
     },
   ],
 }

@@ -14,6 +14,7 @@
 | `GET /v1/bots/:botId` | One chatbot | `bots:read` |
 | `GET /v1/forms` | All lead forms | `forms:read` |
 | `GET /v1/forms/:formId` | One lead form | `forms:read` |
+| `POST /v1/forms` | The lead form it created | `forms:write` |
 | `GET /v1/voice-agents` | All voice agents | `voice_agents:read` |
 | `GET /v1/voice-agents/:agentId` | One voice agent | `voice_agents:read` |
 
@@ -114,6 +115,53 @@ curl "$VYOSTRA_API_URL/v1/bots" \
 | `fields` | Array | Each field has `fieldId`, `label`, `type`, `required` and optionally `placeholder` and `options`. `type` is one of `text`, `number`, `email`, `phone`, `options`. |
 | `createdAt`, `updatedAt` | String | When the form was created and last changed. |
 
+## How do you create a lead form?
+
+`POST /v1/forms` creates a lead form and returns it in `data`, including the `formId` your page needs. It takes a key with the `forms:write` scope, on a plan with full API access.
+
+Creating a form is a setup step. Call it once from a script or a deploy job, store the `formId`, and use that id on your site. Do not call it when a visitor submits: a submission only sends the `formId`, and it never needs your API key.
+
+```bash
+curl -X POST "$VYOSTRA_API_URL/v1/forms" \
+  -H "Authorization: Bearer $VYOSTRA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Site visit",
+    "submitButtonText": "Book a visit",
+    "fields": [
+      { "label": "Name", "type": "text", "required": true },
+      { "label": "Phone", "type": "phone", "required": true },
+      { "label": "Email", "type": "email" },
+      { "label": "Interested in", "type": "options", "options": ["2 bedroom", "3 bedroom"] }
+    ]
+  }'
+```
+
+| Body property | Type | Meaning |
+| --- | --- | --- |
+| `name` | String, required | The form's name, up to 120 characters. |
+| `description` | String | The text shown under the name, up to 500 characters. |
+| `submitButtonText` | String | The label on the submit button. Defaults to `Submit`. |
+| `fields` | Array, required | 1 to 30 fields, shown in this order. |
+
+Each field takes these properties:
+
+| Field property | Type | Meaning |
+| --- | --- | --- |
+| `label` | String, required | The label shown above the input. |
+| `type` | String, required | One of `text`, `number`, `email`, `phone`, `options`. |
+| `required` | Boolean | Whether the visitor must fill it in. Defaults to `false`. |
+| `placeholder` | String | Hint text inside the input. |
+| `options` | Array of strings | The choices, 1 to 50 of them. Required when `type` is `options`, and not allowed otherwise. |
+
+A property that is not in these tables is rejected with 400 `invalid_request`, so a misspelt name is caught instead of ignored. The message names the property.
+
+### What happens if you send the same request twice?
+
+You get the same form back. A request whose `name` and definition match a form that already exists returns that form with status 200, instead of creating a second one with 201. A setup script can therefore run on every deploy and still own exactly one form.
+
+A request that reuses a `name` with different fields returns 409 with the code `form_name_taken`. The API does not change an existing form, so pick another name. An account can hold 200 forms; past that the code is `form_limit_reached`.
+
 ## How do you read voice agents?
 
 `GET /v1/voice-agents` returns every voice agent as an array in `data`. `GET /v1/voice-agents/:agentId` returns one.
@@ -132,4 +180,4 @@ curl "$VYOSTRA_API_URL/v1/bots" \
 
 ## What is not in the API yet?
 
-The API is read-only. It has no endpoints that create or change anything, it does not send webhooks, and there is no official SDK. Fields may be added to a response over time, so write clients that ignore fields they do not recognise.
+Creating a lead form is the only write. The API cannot change or delete a form, cannot create or change leads, chatbots or voice agents, does not send webhooks, and has no official SDK. Fields may be added to a response over time, so write clients that ignore fields they do not recognise.

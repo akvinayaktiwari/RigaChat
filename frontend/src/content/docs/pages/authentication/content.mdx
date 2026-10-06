@@ -24,25 +24,26 @@ In the dashboard a key is listed by its name and its last four characters, for e
 
 Each key has one or more scopes, chosen when the key is created. An endpoint rejects a key that lacks its scope with a 403 response and the code `insufficient_scope`.
 
-| Scope | Lets the key read |
+| Scope | Lets the key |
 | --- | --- |
-| `leads:read` | Leads from chat, forms, Meta lead ads and voice calls |
-| `bots:read` | Chatbot configuration |
-| `forms:read` | Lead form configuration |
-| `voice_agents:read` | Voice agent configuration |
+| `leads:read` | Read leads from chat, forms, Meta lead ads and voice calls |
+| `bots:read` | Read chatbot configuration |
+| `forms:read` | Read lead form configuration |
+| `forms:write` | Create lead forms |
+| `voice_agents:read` | Read voice agent configuration |
 
-Every scope today is read-only. The API cannot create, change or delete anything yet. Scopes cannot be edited after creation, so to change what a key can do, create a new key and revoke the old one.
+`forms:write` is the only scope that changes anything, and it is left unticked when you create a key. Tick it only for a key that sets up forms. Scopes cannot be edited after creation, so to change what a key can do, create a new key and revoke the old one.
 
 ## Which plans can use the API?
 
-| Plan | API access |
-| --- | --- |
-| Free trial | No |
-| Starter | Yes |
-| Growth | Yes |
-| Agency | Yes |
+| Plan | Read | Write (`forms:write`) |
+| --- | --- | --- |
+| Free trial | No | No |
+| Starter | Yes | No |
+| Growth | Yes | Yes |
+| Agency | Yes | Yes |
 
-The plan is checked on every request, not only when the key is created.
+The plan is checked on every request, not only when the key is created. On Starter, a key cannot be created with a write scope, and a write request returns 403 with the code `write_access_disabled`.
 
 ## How do you rotate a key without downtime?
 
