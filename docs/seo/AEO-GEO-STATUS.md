@@ -34,6 +34,7 @@ Framing: Google's own guidance is that optimizing for AI search is ordinary SEO.
 | `sitemap.xml` generated from one page list, real `lastmod` on all 22 URLs, blog index and homepage dated from the newest post | 2026-10-02 |
 | `llms.txt`, generated from the same list as the sitemap | 2026-10-02 |
 | CloudFront function: bare URLs 301 to the trailing-slash form; `www` 301s to the apex | 2026-10-02 |
+| CloudFront function republished to live with the free tools' routes: `/tools/...` and `/docs/...` now redirect to their trailing-slash form and are served as prerendered pages. All routing cases passed against CloudFront's own runtime first, and the three newest tools redirect correctly on the live site. CI does not ship the function, so run `./scripts/deploy-cloudfront-function.sh` again whenever `viewer-request.js` or its prerendered prefixes change | 2026-10-07 |
 | Titles at 60 characters or fewer, descriptions within limits, with a guard test | 2026-09-19 |
 | App shell title (`index.html`, shown on login, signup and the dashboard) matches the homepage title; it still said "AI Chatbot with Native CRM" | 2026-10-05 |
 | A missing file or a missing URL under a prerendered path returns 404 with the site's own not-found page (`noindex`), not the homepage | 2026-10-02 |
@@ -161,7 +162,6 @@ The owner's decision on 2026-10-06: Vyostra AI sells globally and leads with US 
 
 | # | Task | Why it matters |
 |---|---|---|
-| 0a | **Publish the CloudFront function**: `./scripts/deploy-cloudfront-function.sh` | Needed again for the free tools (2026-10-06): until it runs, `/tools/...` and `/docs/...` are answered with the empty app shell. People see the page; crawlers and AI engines see nothing. CI does not ship the function. |
 | 0b | A stable API hostname such as `api.vyostra.com` | The API is served from a Lambda Function URL, so the docs print no host and send developers to Settings for it. With a stable host the examples can be copy-paste complete. |
 | 1 | **Verify `vyostra.com` in Google Search Console** (Domain property, DNS TXT), submit the sitemap, request indexing for the new pages | Everything below assumes the site is indexed. A web search for the brand returned the GitHub repos, not the site. |
 | 2 | Import the property into Bing Webmaster Tools | Bing feeds ChatGPT Search and Copilot. |
