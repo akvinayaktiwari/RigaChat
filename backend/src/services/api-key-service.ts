@@ -25,9 +25,17 @@ const SCOPE_REGISTRY: Record<ApiScope, true> = {
   'leads:read': true,
   'bots:read': true,
   'forms:read': true,
+  'forms:write': true,
   'voice_agents:read': true,
 }
 export const API_SCOPES = Object.keys(SCOPE_REGISTRY) as ApiScope[]
+
+// Starter's API tier is 'read'. A write scope on such a plan is refused both
+// when the key is created (so nobody is handed a key that cannot work) and on
+// every request (so a downgrade does not leave a working write key behind).
+export function isWriteScope(scope: ApiScope): boolean {
+  return scope.endsWith(':write')
+}
 
 const MAX_NAME_LENGTH = 60
 
@@ -69,8 +77,14 @@ export function parseCreateApiKeyInput(raw: unknown): CreateApiKeyInput {
 }
 
 export async function createApiKeyForClient(clientId: string, input: CreateApiKeyInput): Promise<CreatedApiKey> {
-  if ((await resolveApiAccess(clientId)) === null) {
+  const access = await resolveApiAccess(clientId)
+  if (access === null) {
     throw new EntitlementError('FEATURE_DISABLED', 'api')
+  }
+  if (access !== 'full' && input.scopes.some(isWriteScope)) {
+    throw new ApiKeyValidationError(
+      'Your plan includes read-only API access. Remove the write scopes, or upgrade to a plan with full API access.'
+    )
   }
 
   const existing = await getApiKeysForClient(clientId)
@@ -140,7 +154,8 @@ export async function authenticateApiKey(key: string): Promise<ApiKeyAuthResult>
   const record = await getApiKeyByHash(hashApiKey(key))
   if (!record) return { ok: false, reason: 'invalid' }
 
-  if ((await resolveApiAccess(record.clientId)) === null) return { ok: false, reason: 'plan' }
+  const access = await resolveApiAccess(record.clientId)
+  if (access === null) return { ok: false, reason: 'plan' }
 
   // null means Redis could not be read, which is allowed through -- see
   // lib/rate-limit.ts for why a cache outage must not become an API outage.
@@ -151,5 +166,5 @@ export async function authenticateApiKey(key: string): Promise<ApiKeyAuthResult>
   }
 
   await recordUse(record, Date.now())
-  return { ok: true, principal: { clientId: record.clientId, keyId: record.keyId, scopes: record.scopes } }
+  return { ok: true, principal: { clientId: record.clientId, keyId: record.keyId, scopes: record.scopes, access } }
 }

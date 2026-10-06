@@ -33,7 +33,7 @@ vi.mock('../lib/api-key-auth.js', async () => {
     requireApiKey: (scope: ApiScope) =>
       createMiddleware(async (c, next) => {
         requiredScopes.push(`${c.req.path} ${scope}`)
-        c.set('apiPrincipal', { clientId: 'client-1', keyId: 'key-1', scopes: [scope] })
+        c.set('apiPrincipal', { clientId: 'client-1', keyId: 'key-1', scopes: [scope], access: 'full' })
         await next()
       }),
   }
