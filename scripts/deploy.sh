@@ -138,6 +138,9 @@ VITE_STAFF_COGNITO_REGION="$(resolve_var VITE_STAFF_COGNITO_REGION)"
 # existed. A missing stream URL should cost word-by-word rendering, never a
 # deploy.
 VITE_STREAM_URL="$(resolve_var VITE_STREAM_URL)"
+# The hostname shown to developers in Settings (https://api.vyostra.com). NOT in
+# the required list: unset, the page shows VITE_API_URL as it always did.
+VITE_PUBLIC_API_URL="$(resolve_var VITE_PUBLIC_API_URL)"
 # GA4 Measurement ID for the marketing site. Also deliberately NOT in the
 # required list: an unset value makes src/lib/analytics.ts a no-op, and losing a
 # week of traffic numbers is never worth blocking a production deploy over.
@@ -323,6 +326,7 @@ VITE_CDN_URL=${VITE_CDN_URL}
 VITE_STAFF_COGNITO_CLIENT_ID=${VITE_STAFF_COGNITO_CLIENT_ID}
 VITE_STAFF_COGNITO_REGION=${VITE_STAFF_COGNITO_REGION}
 VITE_STREAM_URL=${VITE_STREAM_URL}
+VITE_PUBLIC_API_URL=${VITE_PUBLIC_API_URL}
 VITE_GA_MEASUREMENT_ID=${VITE_GA_MEASUREMENT_ID}
 EOF
 

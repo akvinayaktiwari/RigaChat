@@ -7,7 +7,13 @@ import type { ApiKeySummary, ApiScope, CreatedApiKey } from '../../types/index'
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
 // The docs deliberately print no API host; this is where a developer gets it.
-const API_BASE_URL: string = import.meta.env.VITE_API_URL ?? ''
+//
+// Its own variable, not VITE_API_URL: that one is where the dashboard sends its
+// own requests, and repointing the whole dashboard through a second CloudFront
+// distribution just to change a label would be a much bigger change than it
+// looks. Unset, or set to an empty string by a CI variable that does not exist
+// yet, it falls back -- hence || and not ??.
+const API_BASE_URL: string = import.meta.env.VITE_PUBLIC_API_URL || import.meta.env.VITE_API_URL || ''
 
 const SCOPE_LABELS: Record<ApiScope, string> = {
   'leads:read': 'Read leads',
