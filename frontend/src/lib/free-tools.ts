@@ -55,6 +55,13 @@ export const FREE_TOOLS: readonly FreeTool[] = [
     lastModified: '2026-10-06',
   },
   {
+    route: '/tools/open-house-sign-in-sheet',
+    name: 'Open House Sign-In Sheet',
+    summary: 'A free printable sign-in sheet with your name, address, logo and chosen columns, and an optional QR code that opens your WhatsApp, made in the browser.',
+    action: 'Make a sheet',
+    lastModified: '2026-10-06',
+  },
+  {
     route: '/whatsapp-link-generator',
     name: 'WhatsApp Link Generator',
     summary: 'A free tool that builds a wa.me click-to-chat link with a pre-filled message, in the browser.',

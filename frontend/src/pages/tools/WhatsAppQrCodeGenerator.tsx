@@ -12,6 +12,7 @@ import WhatsAppNumberFields, {
   type WhatsAppNumberValue,
 } from '../../components/tools/WhatsAppNumberFields'
 import { FIELD_HINT, FIELD_INPUT, FIELD_LABEL, PRIMARY_BUTTON, PROSE, SECONDARY_BUTTON, SECTION_HEADING, TEXT_LINK } from '../../components/tools/tool-styles'
+import { useQrEncoder, type QrEncoder } from '../../hooks/useQrEncoder'
 import { trackEvent } from '../../lib/analytics'
 import {
   DEFAULT_QR_BACKGROUND,
@@ -48,8 +49,6 @@ const PAGE = {
 const TOOL_ID = 'whatsapp_qr_code_generator'
 /** How wide the on-page preview is drawn. Downloads use the size the visitor picks. */
 const PREVIEW_SIZE = 512
-
-type QrEncoder = (text: string, errorLevel: QrErrorLevel) => boolean[][]
 
 interface QrSettings extends QrStyle {
   errorLevel: QrErrorLevel
@@ -123,32 +122,6 @@ const PLACES_TO_USE: readonly { title: string; body: string }[] = [
   { title: 'Packaging, receipts and menus', body: 'Customers who already bought from you can reach you about an order without searching for your contact details.' },
   { title: 'Signboards and event stands', body: 'Print it large and choose a higher error correction level, so it still scans from a distance or after some wear.' },
 ]
-
-/**
- * Loads the encoder after the page is on screen. It is the only part of this
- * tool with a library behind it, and this keeps it out of every other page.
- */
-function useQrEncoder(): { encode: QrEncoder | null; failed: boolean } {
-  const [encode, setEncode] = useState<QrEncoder | null>(null)
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    let active = true
-    import('../../lib/qr-encode')
-      .then((module) => {
-        if (active) setEncode(() => module.qrModules)
-      })
-      .catch((error: unknown) => {
-        console.error('The QR code encoder did not load.', error)
-        if (active) setFailed(true)
-      })
-    return () => {
-      active = false
-    }
-  }, [])
-
-  return { encode, failed }
-}
 
 function isNumberValue(state: unknown): state is WhatsAppNumberValue {
   if (typeof state !== 'object' || state === null) return false

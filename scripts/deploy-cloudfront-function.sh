@@ -98,6 +98,7 @@ expect vyostra.com     /tools/whatsapp-qr-code-generator '.response.headers.loca
 expect vyostra.com     /tools/whatsapp-text-formatter/ '.request.uri'          '/tools/whatsapp-text-formatter/'
 expect vyostra.com     /tools/whatsapp-fonts '.response.headers.location.value' '/tools/whatsapp-fonts/'
 expect vyostra.com     /tools/real-estate-commission-calculator '.response.headers.location.value' '/tools/real-estate-commission-calculator/'
+expect vyostra.com     /tools/open-house-sign-in-sheet '.response.headers.location.value' '/tools/open-house-sign-in-sheet/'
 expect vyostra.com     /toolsx  '.request.uri'                                 '/app-shell.html'
 expect vyostra.com     /integrations '.response.headers.location.value'        '/integrations/'
 expect vyostra.com     /integrations/meta-lead-ads '.response.headers.location.value' '/integrations/meta-lead-ads/'
