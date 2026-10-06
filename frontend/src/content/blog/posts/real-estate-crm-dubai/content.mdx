@@ -1,0 +1,139 @@
+{/*
+  UAE market post (handoff B3, post 5). Target: "real estate crm dubai"
+  (UAE 140/mo, KD 4, OpenSEO pull of 2026-10-06; a re-pull at writing time
+  failed because the OpenSEO account was out of credits).
+
+  Sources opened on 2026-10-06, and what each was used for:
+  - Dubai Land Department, Real Estate Ad Permit service page: that DLD issues
+    advertising permits, that the types include electronic and SMS ads, and
+    that a broker needs a marketing contract with the owner for most types.
+    Fees are on that page and deliberately NOT quoted here: they change.
+  - Dubai Land Department news, 18 April 2023 (Madmoun): the QR code on ads,
+    required from 24 April 2023, activated through Trakheesi. A search summary
+    claimed an AED 50,000 fine; the DLD page does not state one, so no fine is
+    quoted.
+  - u.ae "Data protection laws": Federal Decree-Law No. 45 of 2021, in force
+    2 January 2022, no processing without consent bar exceptions, DIFC has its
+    own law. ADGM is not mentioned on that page and is not claimed here.
+  - Property Finder blog, 2 February 2023: seekers contact agents by email,
+    phone or WhatsApp. Property Finder's support article on its WhatsApp
+    Enterprise Integration returned 403 and was NOT read, so nothing is said
+    about how portal WhatsApp leads reach a CRM.
+  - Property Finder Partner Hub, "WhatsApp for Agents, Part 1": cited only as
+    Property Finder's guidance. It names TDRA rules; TDRA's own text was not
+    read, so the post attributes that point to Property Finder.
+  - Meta developer docs (opt-in, send-messages, templates overview).
+  Nothing was read on Bayut or Dubizzle; they are named as portals and no
+  claim is made about how either delivers enquiries.
+
+  No market sizes, response times, conversion rates or prices. Not legal advice.
+
+  Product claims match Crm.tsx and WhatsApp.tsx. Per CONTENT-STRATEGY.md the
+  UAE page ends in "talk to us", stays in English, and does not promise the
+  on-page voice agent (no UAE network test yet). Zoho sync is left out: it
+  covers form and Meta lead ad leads only, and this post is not about Zoho.
+*/}
+
+A real estate CRM for a Dubai brokerage is a shared list of every buyer and tenant enquiry, wherever it came from: a property portal, WhatsApp, your own website or an ad. Each record holds the person's details, the listing they asked about, the conversation so far and the next step, so any agent can pick it up and no enquiry is answered twice or not at all.
+
+That is the job. The products sold as a "real estate CRM" in Dubai do different parts of it. This post covers where enquiries come from, the three kinds of product, the local rules that touch them, and what to check before you choose.
+
+## Where do a Dubai broker's enquiries come from?
+
+From several places at once, which is the whole problem a CRM exists to solve.
+
+| Source | How the enquiry arrives | What gets lost without a CRM |
+| --- | --- | --- |
+| Property portals (Property Finder, Bayut, Dubizzle) | Email, phone call or WhatsApp, depending on what the seeker taps | Which listing it was about, and who replied |
+| WhatsApp directly | A message to an agent's number | The whole conversation, when that agent is busy or leaves |
+| Your own website | A form, or a chat on the page | Enquiries that arrive at night |
+| Paid ads (Meta lead ads, click-to-WhatsApp) | A lead form submission, or a WhatsApp chat | The link between the lead and the ad that paid for it |
+| Referrals and walk-ins | A phone call or a visit | Everything, unless someone types it in |
+
+Property Finder, for example, [lets a seeker contact an agent by email, by phone or on WhatsApp](https://www.propertyfinder.ae/blog/enquire-about-a-property-with-an-agent-via-whatsapp/). One listing can therefore produce enquiries in three places. Check how each portal you pay for delivers its enquiries, because that decides what a CRM can capture from it.
+
+## What kinds of product are sold as a real estate CRM in Dubai?
+
+Three. They overlap, but each is built around a different problem.
+
+| Kind | Built around | Fits when | Usually does not do |
+| --- | --- | --- | --- |
+| A brokerage CRM | Listings, portal feeds, deals and commissions | Most of your enquiries come from portals and you manage many listings | Answer a website visitor at midnight |
+| A general CRM with a real estate setup | Pipelines and reporting you configure yourself | You already run it across the company | Portal lead capture without an add-on |
+| A lead capture and follow-up tool | Getting the first reply out, and qualifying | Your own website and ads produce leads nobody answers in time | Listings, portal feeds, deal stages |
+
+Many brokerages end up with two: a brokerage CRM for listings and portal leads, and a capture tool in front of their own website and ads. Decide which problem costs you more before you compare feature lists.
+
+## What does a CRM have to record for each lead?
+
+Five things. If one is missing, an agent rebuilds it by asking the buyer again.
+
+1. **The contact.** Name, phone number and email.
+2. **The property or project.** The listing reference, or the community and unit type.
+3. **The conversation.** What was asked and answered, in order, on the record.
+4. **The source.** Which portal, ad, page or agent it came through.
+5. **A status and an owner.** Who is following up, and whether it has been done.
+
+A brokerage that sells off-plan will also want the buyer's budget, timeline and whether they are buying to live in or to invest. The [questions a real estate chatbot should ask](/blog/real-estate-chatbot-lead-qualification-questions/) covers how many of those to ask at once, and in what order.
+
+## Which Dubai rules touch a real estate CRM?
+
+Three sets of rules. None of them is a product setting, and no software removes them. This section points to the sources; it is not legal advice.
+
+<div className="mt-6 grid gap-4 md:grid-cols-2">
+  <FactCard label="Advertising permits (Trakheesi)">
+    The Dubai Land Department issues [real estate advertising permits](https://dubailand.gov.ae/en/eservices/real-estate-ad-permit/), and its list of permit types includes electronic and SMS advertisements. A broker needs a marketing contract with the owner for most of them.
+  </FactCard>
+  <FactCard label="The QR code on ads">
+    Since 24 April 2023, approved advertisements must [carry a QR code](https://dubailand.gov.ae/en/news-media/dubai-land-department-provides-madmoun-service-to-verify-validity-of-real-estate-ads-via-qr-codes), activated through the Trakheesi system, so a customer can check the ad is valid.
+  </FactCard>
+  <FactCard label="Personal data (PDPL)">
+    The UAE's [Federal Decree-Law No. 45 of 2021](https://u.ae/en/about-the-uae/digital-uae/data/data-protection-laws) came into force on 2 January 2022 and prohibits processing personal data without the owner's consent, with limited exceptions. The DIFC has its own data protection law.
+  </FactCard>
+  <FactCard label="WhatsApp's own rules">
+    A business needs [opt-in before it messages someone](https://developers.facebook.com/documentation/business-messaging/whatsapp/getting-opt-in), and can reply freely only within [24 hours of the person's last message](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages).
+  </FactCard>
+</div>
+
+What this means for a CRM in practice:
+
+- **It should store the consent, not only the number.** Property Finder's [guidance for agents](https://www.propertyfinder.ae/partnerhub/whatsapp-for-agents-part-1-compliant-opt-in-funnels-that-convert/) is to keep the consent wording, the time, the channel and the stated purpose with each contact. The same guidance says UAE telecom rules require prior consent and a working opt-out for marketing messages; read the regulator's own text before you rely on that.
+- **It should repeat only approved wording.** A CRM or a chatbot does not obtain a permit. If it sends listing details, it should send the text and permit details you have already had approved.
+- **It should handle a closed WhatsApp window.** Once 24 hours have passed, only a [message template Meta has approved](https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/overview) can be sent. A follow-up on day three needs one.
+
+The WhatsApp rules are Meta's and are the same in every country. [What is a WhatsApp CRM?](/blog/what-is-a-whatsapp-crm/) explains them in full.
+
+## What should a Dubai brokerage check before choosing a CRM?
+
+Seven questions. Ask each vendor all seven and write the answers side by side.
+
+1. **Which portals does it capture leads from, and which kinds?** Email, call and WhatsApp enquiries are three separate integrations. "Property Finder integration" can mean only one of them.
+2. **Whose WhatsApp Business account is the number in?** Yours, or the vendor's. You want to keep the number if you leave.
+3. **What happens outside the 24-hour window?** It should send an approved template, and tell you when a template is rejected or paused.
+4. **Does follow-up wait for a reply?** A sequence that fires on a timer keeps messaging a buyer who has already answered.
+5. **Where is consent stored?** You should be able to show when and how a contact agreed to be messaged.
+6. **Where is the data hosted?** Ask for the country and the provider, and check it against your own obligations under the PDPL.
+7. **What does it not do?** A vendor who cannot say where the product stops has not thought about it.
+
+## Do you need a brokerage CRM or a lead capture tool?
+
+It depends on where your enquiries come from and where they are lost.
+
+| Your situation | What you need first |
+| --- | --- |
+| Most enquiries come from portals, and agents share listings | A brokerage CRM with portal lead capture |
+| Your website and ads bring enquiries that wait hours for a reply | A lead capture and follow-up tool |
+| Both | Both, with the capture tool handing leads to the CRM |
+| One agent, a handful of enquiries a week | The portal's own app and a disciplined spreadsheet may be enough |
+
+A [real estate chatbot](/blog/real-estate-chatbot-guide/) belongs to the second row: it answers and qualifies a visitor on your own site, then passes a lead to whatever your team works from.
+
+<div className="mt-16 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+  ### Where Vyostra AI sits
+
+  Vyostra AI is a lead capture and follow-up tool, not a brokerage CRM. A chat agent on your website answers buyers from your own project content and collects their details, lead forms and Meta lead ads feed the same list, and each lead arrives with its transcript or submitted answers. The list is a follow-up queue with four statuses (New, Contacted, Qualified, Closed) and notes. For a new lead from chat or a Meta lead ad, a follow-up journey sends a WhatsApp message through your own WhatsApp Business API account with Gupshup, waits for a real reply, and hands the lead to your team when it needs a person.
+
+  What it does not do: it does not import enquiries from Property Finder, Bayut or Dubizzle, it does not manage listings, deals or commissions, and it works in English. Your developers can read leads out of it with the [REST API](/docs/api-reference/) to pass them to a brokerage CRM. More on [the lead CRM](/features/crm) and [WhatsApp in Vyostra AI](/features/whatsapp).
+
+  If you run a brokerage in the UAE and want this set up for your website and ads, [talk to us](/contact).
+</div>
