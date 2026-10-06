@@ -131,6 +131,10 @@ POST /api/api-keys          -> create a developer API key. The response is the O
                                   10-key ceiling (auth required -- Cognito only, a key can never mint a key)
 GET  /api/api-keys          -> the caller's keys: name, last4, scopes, createdAt, lastUsedAt. Never the hash
                                   (auth required)
+PATCH /api/api-keys/:keyId  -> replace a key's SCOPES, keeping the secret, so an integration gains a new
+                                  ability without a new key. Body {scopes}. Same plan gate as creation. Cognito
+                                  only: a key can never edit a key, or a leaked read key could promote itself.
+                                  Stamps scopesUpdatedAt. 404 for a key that is not the caller's (auth required)
 DELETE /api/api-keys/:keyId -> revoke. The row is deleted, so the next request with that key is a 401
                                   (auth required)
 GET  /v1/leads              -> DEVELOPER API. Paginated lead list (limit 1-200, default 50; cursor;

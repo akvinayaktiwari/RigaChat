@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 // frontend vitest runs without globals, so @testing-library's auto-cleanup never
 // registers and renders stack in one document.
@@ -8,11 +8,13 @@ afterEach(cleanup)
 const getApiKeys = vi.fn()
 const createApiKey = vi.fn()
 const revokeApiKey = vi.fn()
+const updateApiKeyScopes = vi.fn()
 
 vi.mock('../../services/api', () => ({
   getApiKeys: (...a: unknown[]) => getApiKeys(...a),
   createApiKey: (...a: unknown[]) => createApiKey(...a),
   revokeApiKey: (...a: unknown[]) => revokeApiKey(...a),
+  updateApiKeyScopes: (...a: unknown[]) => updateApiKeyScopes(...a),
 }))
 
 const ApiKeysSection = (await import('./ApiKeysSection')).default
@@ -70,6 +72,45 @@ describe('ApiKeysSection', () => {
 
     await screen.findByText('vy_live_secretwxyz')
     expect(createApiKey.mock.calls[0][1]).toContain('forms:write')
+  })
+
+  it('adds a permission to an existing key and keeps the same key', async () => {
+    updateApiKeyScopes.mockResolvedValue({
+      success: true,
+      data: { ...EXISTING, scopes: ['leads:read', 'forms:write'], scopesUpdatedAt: '2026-10-06T00:00:00.000Z' },
+    })
+    render(<ApiKeysSection apiEnabled onUpgradeClick={vi.fn()} />)
+    await screen.findByText('CRM sync')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit permissions' }))
+    const editor = within(screen.getByRole('group', { name: 'Permissions for CRM sync' }))
+    expect((editor.getByLabelText('Read leads') as HTMLInputElement).checked).toBe(true)
+    fireEvent.click(editor.getByLabelText('Create forms'))
+    fireEvent.click(editor.getByRole('button', { name: 'Save permissions' }))
+
+    await waitFor(() => expect(updateApiKeyScopes).toHaveBeenCalledWith('key-1', ['leads:read', 'forms:write']))
+    expect(await screen.findByText(/Read leads, Create forms/)).toBeTruthy()
+    expect(screen.getByText('vy_live_…abcd')).toBeTruthy()
+    expect(screen.queryByRole('group', { name: 'Permissions for CRM sync' })).toBeNull()
+  })
+
+  it('keeps the editor open and says why when the change is refused', async () => {
+    updateApiKeyScopes.mockResolvedValue({ success: false, error: 'Your plan includes read-only API access.' })
+    render(<ApiKeysSection apiEnabled onUpgradeClick={vi.fn()} />)
+    await screen.findByText('CRM sync')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit permissions' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save permissions' }))
+
+    expect(await screen.findByText('Your plan includes read-only API access.')).toBeTruthy()
+    expect(screen.getByRole('group', { name: 'Permissions for CRM sync' })).toBeTruthy()
+  })
+
+  it('offers no permission editing when the plan has no API access', async () => {
+    render(<ApiKeysSection apiEnabled={false} onUpgradeClick={vi.fn()} />)
+    await screen.findByText('CRM sync')
+
+    expect(screen.queryByRole('button', { name: 'Edit permissions' })).toBeNull()
   })
 
   it('removes a revoked key from the list', async () => {

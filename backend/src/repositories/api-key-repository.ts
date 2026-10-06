@@ -90,6 +90,34 @@ export async function deleteApiKey(keyHash: string, clientId: string): Promise<b
   }
 }
 
+// Changes what a key may do without changing the key. Returns null when the row
+// is missing or belongs to another client: as in deleteApiKey the ownership
+// check is the condition itself, and a missing row fails it too, so this can
+// never create a row for a key that was revoked a moment ago.
+export async function updateApiKeyScopes(
+  keyHash: string,
+  clientId: string,
+  scopes: ApiKeyRecord['scopes'],
+  updatedAt: string
+): Promise<ApiKeyRecord | null> {
+  try {
+    const result = await dynamoClient.send(
+      new UpdateCommand({
+        TableName: TABLE_NAME(),
+        Key: { keyHash },
+        UpdateExpression: 'SET scopes = :scopes, scopesUpdatedAt = :updatedAt',
+        ConditionExpression: 'clientId = :clientId',
+        ExpressionAttributeValues: { ':scopes': scopes, ':updatedAt': updatedAt, ':clientId': clientId },
+        ReturnValues: 'ALL_NEW',
+      })
+    )
+    return (result.Attributes as ApiKeyRecord | undefined) ?? null
+  } catch (error) {
+    if (isConditionalCheckFailure(error)) return null
+    throw new Error(`Failed to update API key scopes for ${clientId}: ${describe(error)}`)
+  }
+}
+
 // attribute_exists is load-bearing. UpdateItem CREATES a missing item, so
 // without the condition a request that raced a revocation would write back a
 // row holding only keyHash and lastUsedAt -- a revoked key resurrected with no

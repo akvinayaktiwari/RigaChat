@@ -2172,6 +2172,10 @@ export interface ApiKeyRecord {
   scopes: ApiScope[]
   createdAt: string
   lastUsedAt?: string
+  // Set when the scopes are edited after creation; absent on a key whose
+  // scopes are the ones it was made with. Shown in the dashboard so a change
+  // of what a key can do leaves a visible trace.
+  scopesUpdatedAt?: string
 }
 
 export type ApiKeySummary = Omit<ApiKeyRecord, 'keyHash' | 'clientId'>

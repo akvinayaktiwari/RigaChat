@@ -5,12 +5,14 @@ const getApiKeyByHash = vi.fn()
 const getApiKeysForClient = vi.fn()
 const deleteApiKey = vi.fn()
 const touchApiKeyLastUsed = vi.fn()
+const updateApiKeyScopes = vi.fn()
 vi.mock('../repositories/api-key-repository.js', () => ({
   putApiKey,
   getApiKeyByHash,
   getApiKeysForClient,
   deleteApiKey,
   touchApiKeyLastUsed,
+  updateApiKeyScopes,
 }))
 
 const incrementApiKeyRate = vi.fn()
@@ -38,6 +40,7 @@ const {
   listApiKeysForClient,
   parseCreateApiKeyInput,
   revokeApiKeyForClient,
+  updateApiKeyScopesForClient,
 } = await import('./api-key-service.js')
 
 const KEY = `${API_KEY_PREFIX}${'a'.repeat(48)}`
@@ -156,6 +159,65 @@ describe('revokeApiKeyForClient', () => {
   it('answers not-found for a keyId the caller does not own', async () => {
     await expect(revokeApiKeyForClient('client-1', 'someone-elses')).rejects.toBeInstanceOf(ApiKeyNotFoundError)
     expect(deleteApiKey).not.toHaveBeenCalled()
+  })
+})
+
+describe('updateApiKeyScopesForClient', () => {
+  beforeEach(() => {
+    getApiKeysForClient.mockResolvedValue([RECORD])
+    updateApiKeyScopes.mockImplementation(async (_hash, _client, scopes, at) => ({ ...RECORD, scopes, scopesUpdatedAt: at }))
+  })
+
+  it('changes what the key can do without touching the secret', async () => {
+    const updated = await updateApiKeyScopesForClient('client-1', 'key-1', { scopes: ['leads:read', 'forms:write'] })
+
+    expect(updateApiKeyScopes).toHaveBeenCalledWith(RECORD.keyHash, 'client-1', ['leads:read', 'forms:write'], expect.any(String))
+    expect(putApiKey).not.toHaveBeenCalled()
+    expect(updated.scopes).toEqual(['leads:read', 'forms:write'])
+    expect(updated.last4).toBe('aaaa')
+    expect(updated).not.toHaveProperty('keyHash')
+  })
+
+  it('is honoured by the very next request with the same key', async () => {
+    await updateApiKeyScopesForClient('client-1', 'key-1', { scopes: ['forms:write'] })
+    getApiKeyByHash.mockResolvedValue({ ...RECORD, scopes: ['forms:write'] })
+
+    const result = await authenticateApiKey(KEY)
+
+    expect(result.ok && result.principal.scopes).toEqual(['forms:write'])
+  })
+
+  it.each([
+    ['no scopes at all', { scopes: [] }],
+    ['a scope that does not exist', { scopes: ['leads:delete'] }],
+    ['a body with no scopes', {}],
+  ])('refuses %s and leaves the key as it was', async (_case, body) => {
+    await expect(updateApiKeyScopesForClient('client-1', 'key-1', body)).rejects.toBeInstanceOf(ApiKeyValidationError)
+    expect(updateApiKeyScopes).not.toHaveBeenCalled()
+  })
+
+  it('refuses to add a write scope on a read-only plan', async () => {
+    resolveApiAccess.mockResolvedValue('read')
+
+    await expect(
+      updateApiKeyScopesForClient('client-1', 'key-1', { scopes: ['forms:write'] })
+    ).rejects.toBeInstanceOf(ApiKeyValidationError)
+    expect(updateApiKeyScopes).not.toHaveBeenCalled()
+  })
+
+  it('answers not-found for a keyId the caller does not own', async () => {
+    await expect(
+      updateApiKeyScopesForClient('client-1', 'someone-elses-key', { scopes: ['leads:read'] })
+    ).rejects.toBeInstanceOf(ApiKeyNotFoundError)
+    expect(updateApiKeyScopes).not.toHaveBeenCalled()
+  })
+
+  it('answers not-found when the key was revoked while the edit was in flight', async () => {
+    updateApiKeyScopes.mockResolvedValue(null)
+
+    await expect(
+      updateApiKeyScopesForClient('client-1', 'key-1', { scopes: ['leads:read'] })
+    ).rejects.toBeInstanceOf(ApiKeyNotFoundError)
   })
 })
 

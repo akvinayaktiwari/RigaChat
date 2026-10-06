@@ -4,10 +4,11 @@ import { Hono } from 'hono'
 const createApiKeyForClient = vi.fn()
 const listApiKeysForClient = vi.fn()
 const revokeApiKeyForClient = vi.fn()
+const updateApiKeyScopesForClient = vi.fn()
 
 vi.mock('../services/api-key-service.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../services/api-key-service.js')>()
-  return { ...actual, createApiKeyForClient, listApiKeysForClient, revokeApiKeyForClient }
+  return { ...actual, createApiKeyForClient, listApiKeysForClient, revokeApiKeyForClient, updateApiKeyScopesForClient }
 })
 vi.mock('../repositories/api-key-repository.js', () => ({}))
 vi.mock('../repositories/redis-repository.js', () => ({}))
@@ -26,7 +27,7 @@ vi.mock('../lib/cognito.js', async () => {
   }
 })
 
-const { ApiKeyLimitError, ApiKeyNotFoundError } = await import('../services/api-key-service.js')
+const { ApiKeyLimitError, ApiKeyNotFoundError, ApiKeyValidationError } = await import('../services/api-key-service.js')
 const { apiKeyRoutes } = await import('./api-key-routes.js')
 
 const app = new Hono().route('/api/api-keys', apiKeyRoutes)
@@ -93,6 +94,45 @@ describe('GET /', () => {
 
     expect(res.status).toBe(200)
     expect(listApiKeysForClient).toHaveBeenCalledWith('client-1')
+  })
+})
+
+describe('PATCH /:keyId', () => {
+  function patch(body: unknown) {
+    return app.request('/api/api-keys/key-1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  }
+
+  it('updates the caller\'s key and returns it without a secret', async () => {
+    const { key: _secret, ...summary } = CREATED
+    updateApiKeyScopesForClient.mockResolvedValue({ ...summary, scopes: ['forms:write'] })
+
+    const res = await patch({ scopes: ['forms:write'] })
+
+    expect(res.status).toBe(200)
+    expect((await res.json()).data).toEqual({ ...summary, scopes: ['forms:write'] })
+    expect(updateApiKeyScopesForClient).toHaveBeenCalledWith('client-1', 'key-1', { scopes: ['forms:write'] })
+  })
+
+  it('400s a refused scope set', async () => {
+    updateApiKeyScopesForClient.mockRejectedValue(new ApiKeyValidationError('scopes must be a non-empty array'))
+
+    expect((await patch({ scopes: [] })).status).toBe(400)
+  })
+
+  it('404s a key that is not the caller\'s', async () => {
+    updateApiKeyScopesForClient.mockRejectedValue(new ApiKeyNotFoundError('API key not found'))
+
+    expect((await patch({ scopes: ['leads:read'] })).status).toBe(404)
+  })
+
+  it('hands a plan refusal to the app-level handler', async () => {
+    updateApiKeyScopesForClient.mockRejectedValue(new EntitlementError('FEATURE_DISABLED'))
+
+    expect(await (await patch({ scopes: ['leads:read'] })).json()).toEqual({ thrown: 'EntitlementError' })
   })
 })
 

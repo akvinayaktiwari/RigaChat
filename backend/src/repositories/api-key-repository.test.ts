@@ -6,7 +6,7 @@ vi.mock('./dynamo-client.js', () => ({
   getTableName: () => 'test-api_keys',
 }))
 
-const { putApiKey, getApiKeyByHash, getApiKeysForClient, deleteApiKey, touchApiKeyLastUsed } = await import(
+const { putApiKey, getApiKeyByHash, getApiKeysForClient, deleteApiKey, touchApiKeyLastUsed, updateApiKeyScopes } = await import(
   './api-key-repository.js'
 )
 
@@ -104,5 +104,26 @@ describe('touchApiKeyLastUsed', () => {
     send.mockRejectedValueOnce(conditionalCheckFailed())
 
     await expect(touchApiKeyLastUsed('hash-1', '2026-10-05T01:00:00.000Z')).resolves.toBeUndefined()
+  })
+})
+
+describe('updateApiKeyScopes', () => {
+  it('rewrites the scopes of the caller\'s own key and nothing else on the row', async () => {
+    send.mockResolvedValue({ Attributes: { ...RECORD, scopes: ['forms:write'] } })
+
+    const updated = await updateApiKeyScopes('hash-1', 'client-1', ['forms:write'], '2026-10-06T00:00:00.000Z')
+
+    const input = send.mock.calls[0][0].input
+    expect(input.Key).toEqual({ keyHash: 'hash-1' })
+    expect(input.UpdateExpression).toBe('SET scopes = :scopes, scopesUpdatedAt = :updatedAt')
+    expect(input.ConditionExpression).toBe('clientId = :clientId')
+    expect(input.ExpressionAttributeValues[':clientId']).toBe('client-1')
+    expect(updated?.scopes).toEqual(['forms:write'])
+  })
+
+  it('returns null, and creates nothing, for a key that is someone else\'s or already revoked', async () => {
+    send.mockRejectedValue(conditionalCheckFailed())
+
+    expect(await updateApiKeyScopes('hash-1', 'client-2', ['forms:write'], '2026-10-06T00:00:00.000Z')).toBeNull()
   })
 })

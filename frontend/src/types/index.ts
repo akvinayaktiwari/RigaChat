@@ -543,6 +543,8 @@ export interface ApiKeySummary {
   scopes: ApiScope[]
   createdAt: string
   lastUsedAt?: string
+  // Present only once the permissions have been edited after creation.
+  scopesUpdatedAt?: string
 }
 
 export interface CreatedApiKey extends ApiKeySummary {

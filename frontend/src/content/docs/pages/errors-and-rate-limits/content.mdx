@@ -19,7 +19,7 @@ Every error has the same shape: an `error` object with a machine-readable `code`
 | 401 | `missing_api_key` | No `Authorization: Bearer` header was sent. | Add the header. |
 | 401 | `invalid_api_key` | The key is unknown or has been revoked. | Check for a truncated copy, or create a new key. |
 | 403 | `api_access_disabled` | The account's plan does not include API access. | Move to Starter, Growth or Agency. |
-| 403 | `insufficient_scope` | The key lacks the scope this endpoint needs. | Create a key with that scope. |
+| 403 | `insufficient_scope` | The key lacks the scope this endpoint needs. | Add the scope to the key in Settings, under Edit permissions. The key stays the same. |
 | 403 | `write_access_disabled` | The key has a write scope, but the account's plan allows reading only. | Move to Growth or Agency. |
 | 404 | `not_found` | The path or the id does not exist in your account. | Check the id. An id from another account also returns 404. |
 | 409 | `form_name_taken` | A form with that name exists and its fields differ from the request. | Use another name. The API does not change an existing form. |
