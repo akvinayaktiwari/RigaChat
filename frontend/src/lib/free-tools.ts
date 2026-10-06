@@ -21,7 +21,7 @@ export interface FreeTool {
 export const TOOLS_HUB = {
   route: '/tools',
   name: 'Free tools',
-  summary: 'Free WhatsApp tools from Vyostra AI that run in your browser, with no sign-up.',
+  summary: 'Free WhatsApp and real estate tools from Vyostra AI that run in your browser, with no sign-up.',
   lastModified: '2026-10-06',
 }
 
@@ -38,6 +38,13 @@ export const FREE_TOOLS: readonly FreeTool[] = [
     name: 'WhatsApp Text Formatter',
     summary: 'A free tool that adds WhatsApp formatting to a message (bold, italic, strikethrough, monospace, lists and quotes) with a preview, in the browser.',
     action: 'Format a message',
+    lastModified: '2026-10-06',
+  },
+  {
+    route: '/tools/open-house-sign-in-sheet',
+    name: 'Open House Sign-In Sheet',
+    summary: 'A free printable sign-in sheet with your name, address, logo and chosen columns, and an optional QR code that opens your WhatsApp, made in the browser.',
+    action: 'Make a sheet',
     lastModified: '2026-10-06',
   },
   {
