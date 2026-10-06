@@ -341,7 +341,8 @@ function asObject(raw: unknown, what: string, allowedKeys: string[]): Record<str
   }
   const unknown = Object.keys(raw).filter((key) => !allowedKeys.includes(key))
   if (unknown.length > 0) {
-    throw new PublicValidationError(`${what} has unknown property: ${unknown.join(', ')}`)
+    // Capped: the names are the caller's own input, echoed back.
+    throw new PublicValidationError(`${what} has unknown property: ${unknown.slice(0, 5).join(', ').slice(0, 200)}`)
   }
   return raw as Record<string, unknown>
 }
