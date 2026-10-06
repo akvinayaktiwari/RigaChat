@@ -2,6 +2,9 @@ import { createClient, getClientById, updateClient } from '../repositories/clien
 import { create as createSubscription, getByAccountId } from '../repositories/subscription-repository.js'
 import { TRIAL } from '../config/entitlements-config.js'
 import { countBotsForClient } from '../repositories/bot-repository.js'
+import { listPagesForClient } from '../repositories/meta-lead-repository.js'
+import { getFormsByClientId } from '../repositories/form-repository.js'
+import { getVoiceAgentsByClient } from '../repositories/voice-repository.js'
 import { resolveNotificationPreferences } from '../types/index.js'
 import type { AppBootstrap, Capability, ClientRecord, NotificationPreferences, Subscription } from '../types/index.js'
 
@@ -193,17 +196,28 @@ export async function upgradeClientPlan(
 
 // Everything the mobile app needs on launch, in one call.
 //
-// Readiness is bot count > 0 (decision D1). Not derived from an empty lead
-// list: "you have not set up a bot yet" and "you are set up and no leads have
-// arrived" look identical from the inbox, and they need opposite screens.
+// Ready means the client has a lead SOURCE, not specifically a bot: a chat bot,
+// a connected Meta Page, a lead form or a voice agent. The unified inbox merges
+// all four, so gating on bots alone sent a client who only runs Meta Lead Ads
+// or a form to "Almost there" with leads waiting. Readiness still is not derived
+// from an empty lead list: "nothing set up" and "set up, no leads yet" look
+// identical from the inbox and need opposite screens.
+//
+// The reason stays 'no_bot' on the wire: phones in the field switch on it and
+// cannot be force-updated.
 //
 // Capabilities are empty when not ready. An app behind the setup gate can do
 // nothing, and returning a list it cannot act on invites a UI that renders
 // buttons the user cannot reach.
-export async function getAppBootstrap(clientId: string): Promise<AppBootstrap> {
-  const botCount = await countBotsForClient(clientId)
+async function hasAnyLeadSource(clientId: string): Promise<boolean> {
+  if ((await countBotsForClient(clientId)) > 0) return true
+  if ((await listPagesForClient(clientId)).length > 0) return true
+  if ((await getFormsByClientId(clientId)).length > 0) return true
+  return (await getVoiceAgentsByClient(clientId)).length > 0
+}
 
-  if (botCount === 0) {
+export async function getAppBootstrap(clientId: string): Promise<AppBootstrap> {
+  if (!(await hasAnyLeadSource(clientId))) {
     return { ready: false, reason: 'no_bot', capabilities: [] }
   }
 
