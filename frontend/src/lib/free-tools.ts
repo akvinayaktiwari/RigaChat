@@ -41,6 +41,13 @@ export const FREE_TOOLS: readonly FreeTool[] = [
     lastModified: '2026-10-06',
   },
   {
+    route: '/tools/whatsapp-fonts',
+    name: 'WhatsApp Fonts',
+    summary: 'A free tool that turns text into 16 look-alike font styles to copy into WhatsApp, with a plain account of their limits, in the browser.',
+    action: 'Style some text',
+    lastModified: '2026-10-06',
+  },
+  {
     route: '/whatsapp-link-generator',
     name: 'WhatsApp Link Generator',
     summary: 'A free tool that builds a wa.me click-to-chat link with a pre-filled message, in the browser.',

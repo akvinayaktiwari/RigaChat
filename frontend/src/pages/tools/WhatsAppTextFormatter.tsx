@@ -349,7 +349,8 @@ function WaysToUse() {
       </div>
       <p className="mx-auto mt-8 max-w-3xl text-center text-base text-on-surface-variant">
         Need people to reach you first? Make a <Link to="/tools/whatsapp-qr-code-generator" className={TEXT_LINK}>WhatsApp QR code</Link> or a{' '}
-        <Link to="/whatsapp-link-generator" className={TEXT_LINK}>click-to-chat link</Link>.
+        <Link to="/whatsapp-link-generator" className={TEXT_LINK}>click-to-chat link</Link>. Want a decorative word instead? Try the{' '}
+        <Link to="/tools/whatsapp-fonts" className={TEXT_LINK}>WhatsApp fonts tool</Link>.
       </p>
     </section>
   )
