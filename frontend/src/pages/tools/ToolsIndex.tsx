@@ -28,7 +28,7 @@ export default function ToolsIndex() {
     <>
       <PageMeta
         title="Free WhatsApp Tools for Business — Vyostra AI"
-        description="Free WhatsApp tools from Vyostra AI: a QR code generator, a text formatter and a link generator. No sign-up, and nothing you type leaves your browser."
+        description="Free WhatsApp tools from Vyostra AI: a QR code generator, text formatter, fonts tool and link generator. No sign-up, and nothing you type leaves your browser."
         path="/tools/"
       />
       <StructuredData
@@ -37,11 +37,11 @@ export default function ToolsIndex() {
       <MarketingPageShell
         badge="FREE TOOLS"
         headline="Free WhatsApp tools"
-        lead="Vyostra AI's free tools help a business get more out of WhatsApp: make a QR code that opens a chat with your number, format a message with bold text and lists, or build a click-to-chat link with a pre-filled message. Every tool is free, needs no sign-up, and runs entirely in your browser."
+        lead="Vyostra AI's free tools help a business get more out of WhatsApp: make a QR code that opens a chat with your number, format a message with bold text and lists, style a word in a fancy font, or build a click-to-chat link with a pre-filled message. Every tool is free, needs no sign-up, and runs entirely in your browser."
       >
         <section className="mx-auto mb-20 max-w-5xl">
           <h2 className={SECTION_HEADING}>Which tool do you need?</h2>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {FREE_TOOLS.map((tool) => (
               <ToolCardLink key={tool.route} tool={tool} />
             ))}
