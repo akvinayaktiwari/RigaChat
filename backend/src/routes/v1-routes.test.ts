@@ -11,7 +11,7 @@ const createForm = vi.fn()
 vi.mock('../services/public-api-service.js', () => {
   class PublicResourceNotFoundError extends Error {}
   class PublicValidationError extends Error {}
-  class PublicLimitError extends Error {
+  class PublicConflictError extends Error {
     constructor(
       public code: string,
       message: string
@@ -22,7 +22,7 @@ vi.mock('../services/public-api-service.js', () => {
   return {
     PublicResourceNotFoundError,
     PublicValidationError,
-    PublicLimitError,
+    PublicConflictError,
     createForm,
     MAX_LEAD_PAGE_SIZE: 200,
     listLeads,
@@ -52,7 +52,7 @@ vi.mock('../lib/api-key-auth.js', async () => {
   }
 })
 
-const { PublicLimitError, PublicResourceNotFoundError, PublicValidationError } = await import(
+const { PublicConflictError, PublicResourceNotFoundError, PublicValidationError } = await import(
   '../services/public-api-service.js'
 )
 const { v1Routes } = await import('./v1-routes.js')
@@ -137,7 +137,7 @@ describe('POST /v1/forms', () => {
   }
 
   it('creates the form for the key\'s account and answers 201 with it', async () => {
-    createForm.mockResolvedValue({ formId: 'form-1', name: 'Site visit' })
+    createForm.mockResolvedValue({ form: { formId: 'form-1', name: 'Site visit' }, created: true })
 
     const res = await post(JSON.stringify(BODY))
 
@@ -146,8 +146,17 @@ describe('POST /v1/forms', () => {
     expect(createForm).toHaveBeenCalledWith('client-1', BODY)
   })
 
+  it('answers 200, not 201, when the identical form already existed', async () => {
+    createForm.mockResolvedValue({ form: { formId: 'form-1', name: 'Site visit' }, created: false })
+
+    const res = await post(JSON.stringify(BODY))
+
+    expect(res.status).toBe(200)
+    expect((await res.json()).data.formId).toBe('form-1')
+  })
+
   it('is guarded by the write scope, so a read-only key cannot create', async () => {
-    createForm.mockResolvedValue({})
+    createForm.mockResolvedValue({ form: {}, created: true })
 
     await post(JSON.stringify(BODY))
 
@@ -174,7 +183,7 @@ describe('POST /v1/forms', () => {
   })
 
   it('409s at the form ceiling with its own code', async () => {
-    createForm.mockRejectedValue(new PublicLimitError('form_limit_reached', 'Too many forms.'))
+    createForm.mockRejectedValue(new PublicConflictError('form_limit_reached', 'Too many forms.'))
 
     const res = await post(JSON.stringify(BODY))
 

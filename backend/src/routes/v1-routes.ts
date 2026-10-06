@@ -13,7 +13,7 @@ import type { Context } from 'hono'
 import { requireApiKey } from '../lib/api-key-auth.js'
 import {
   MAX_LEAD_PAGE_SIZE,
-  PublicLimitError,
+  PublicConflictError,
   PublicResourceNotFoundError,
   PublicValidationError,
   createForm,
@@ -39,7 +39,7 @@ function fail(c: Context, status: 400 | 404 | 409 | 500, code: string, message: 
 function failFrom(c: Context, error: unknown): Response {
   if (error instanceof PublicResourceNotFoundError) return fail(c, 404, 'not_found', error.message)
   if (error instanceof PublicValidationError) return fail(c, 400, 'invalid_request', error.message)
-  if (error instanceof PublicLimitError) return fail(c, 409, error.code, error.message)
+  if (error instanceof PublicConflictError) return fail(c, 409, error.code, error.message)
   console.error(`[v1] ${c.req.method} ${c.req.path} failed:`, error)
   return fail(c, 500, 'internal_error', 'Something went wrong on our side.')
 }
@@ -90,8 +90,10 @@ v1Routes.get('/bots/:botId', requireApiKey('bots:read'), (c) =>
 
 v1Routes.get('/forms', requireApiKey('forms:read'), (c) => respond(c, listForms))
 
-// 201 with the whole form, so the caller has its formId -- the public id the
-// embed and the submit endpoint take -- without a second request.
+// Answers with the whole form, so the caller has its formId -- the public id
+// the embed and the submit endpoint take -- without a second request. 201 when
+// it was created, 200 when an identical form already existed and came back
+// instead, so a setup script can run any number of times and own one form.
 v1Routes.post('/forms', requireApiKey('forms:write'), async (c) => {
   let body: unknown
   try {
@@ -101,7 +103,8 @@ v1Routes.post('/forms', requireApiKey('forms:write'), async (c) => {
   }
 
   try {
-    return c.json({ data: await createForm(c.get('apiPrincipal').clientId, body) }, 201)
+    const { form, created } = await createForm(c.get('apiPrincipal').clientId, body)
+    return c.json({ data: form }, created ? 201 : 200)
   } catch (error) {
     return failFrom(c, error)
   }

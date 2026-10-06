@@ -33,7 +33,7 @@ export class PublicResourceNotFoundError extends Error {}
 // The message is returned to the caller, so it names the offending field and
 // nothing internal.
 export class PublicValidationError extends Error {}
-export class PublicLimitError extends Error {
+export class PublicConflictError extends Error {
   constructor(
     public readonly code: string,
     message: string
@@ -417,19 +417,61 @@ export function parseCreateFormInput(raw: unknown): NewForm {
   }
 }
 
-// Validates before counting, so a malformed request costs no read.
-export async function createForm(clientId: string, raw: unknown): Promise<PublicForm> {
+// Everything a caller can set, and nothing they cannot (fieldId, timestamps),
+// so a stored form compares equal to the request that made it.
+function definitionOf(form: NewForm | FormConfig): string {
+  return JSON.stringify({
+    description: form.description || null,
+    submitButtonText: form.submitButtonText,
+    fields: form.fields.map((field) => [
+      field.label,
+      field.type,
+      field.required,
+      field.placeholder || null,
+      field.options ?? null,
+    ]),
+  })
+}
+
+export interface CreateFormResult {
+  form: PublicForm
+  // False when an identical form already existed and was returned instead.
+  created: boolean
+}
+
+// Creating is a setup step, done once; a form is never made per submission.
+// Nothing stops a setup script running twice, though -- a redeploy, a retry
+// after a timeout -- so the call is safe to repeat: the same name with the
+// same definition returns the form that is already there instead of a second
+// one. The same name with a DIFFERENT definition is refused rather than
+// guessed at, since either answer (a silent duplicate, or a silent edit of a
+// live form) would be wrong for somebody.
+//
+// Not a transaction: two identical requests in the same instant can both
+// create. A setup script does not do that, and the cost is one spare form.
+//
+// Validates before reading, so a malformed request costs no read.
+export async function createForm(clientId: string, raw: unknown): Promise<CreateFormResult> {
   const input = parseCreateFormInput(raw)
 
   const existing = await getClientForms(clientId)
+  const sameName = existing.filter((form) => form.name === input.name)
+  const identical = sameName.find((form) => definitionOf(form) === definitionOf(input))
+  if (identical) return { form: toPublicForm(identical), created: false }
+  if (sameName.length > 0) {
+    throw new PublicConflictError(
+      'form_name_taken',
+      `A form named "${input.name}" already exists with different fields. Use another name, or read the existing one from GET /v1/forms.`
+    )
+  }
   if (existing.length >= MAX_FORMS_PER_ACCOUNT) {
-    throw new PublicLimitError(
+    throw new PublicConflictError(
       'form_limit_reached',
       `This account already has ${MAX_FORMS_PER_ACCOUNT} forms. Delete one you no longer use before creating another.`
     )
   }
 
-  return toPublicForm(await createNewForm({ clientId, ...input }))
+  return { form: toPublicForm(await createNewForm({ clientId, ...input })), created: true }
 }
 
 export async function listVoiceAgents(clientId: string): Promise<PublicVoiceAgent[]> {

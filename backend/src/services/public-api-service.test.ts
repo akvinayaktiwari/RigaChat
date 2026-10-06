@@ -16,7 +16,7 @@ vi.mock('./voice-service.js', () => ({ getVoiceAgents: vi.fn(), getVoiceAgentByI
 const {
   MAX_FORMS_PER_ACCOUNT,
   MAX_FORM_FIELDS,
-  PublicLimitError,
+  PublicConflictError,
   PublicResourceNotFoundError,
   PublicValidationError,
   createForm,
@@ -196,7 +196,7 @@ describe('createForm', () => {
   })
 
   it('creates under the key\'s account and publishes the form without clientId', async () => {
-    const form = await createForm('client-1', { name: '  Site visit ', fields: [NAME] })
+    const { form, created } = await createForm('client-1', { name: '  Site visit ', fields: [NAME] })
 
     expect(createNewForm).toHaveBeenCalledWith({
       clientId: 'client-1',
@@ -204,6 +204,7 @@ describe('createForm', () => {
       submitButtonText: 'Submit',
       fields: [NAME],
     })
+    expect(created).toBe(true)
     expect(form.formId).toBe('form-1')
     expect(form.description).toBeNull()
     expect(form).not.toHaveProperty('clientId')
@@ -259,10 +260,39 @@ describe('createForm', () => {
     expect(createNewForm).not.toHaveBeenCalled()
   })
 
+  it('returns the existing form instead of a duplicate when the same request is sent again', async () => {
+    getClientForms.mockResolvedValue([STORED])
+
+    const { form, created } = await createForm('client-1', { name: 'Site visit', fields: [NAME] })
+
+    expect(created).toBe(false)
+    expect(form.formId).toBe('form-1')
+    expect(createNewForm).not.toHaveBeenCalled()
+  })
+
+  it('treats a form the dashboard saved with an empty placeholder as the same form', async () => {
+    getClientForms.mockResolvedValue([{ ...STORED, description: '', fields: [{ ...NAME, fieldId: 'f', placeholder: '' }] }])
+
+    expect((await createForm('client-1', { name: 'Site visit', fields: [NAME] })).created).toBe(false)
+  })
+
+  it.each([
+    ['a field became optional', { fields: [{ ...NAME, required: false }] }],
+    ['a field was added', { fields: [NAME, { label: 'Phone', type: 'phone' }] }],
+    ['the button text changed', { fields: [NAME], submitButtonText: 'Book' }],
+  ])('refuses a taken name when %s, rather than duplicating or editing the live form', async (_case, change) => {
+    getClientForms.mockResolvedValue([STORED])
+
+    const attempt = createForm('client-1', { name: 'Site visit', ...change })
+
+    await expect(attempt).rejects.toMatchObject({ code: 'form_name_taken' })
+    expect(createNewForm).not.toHaveBeenCalled()
+  })
+
   it('refuses a form past the account ceiling', async () => {
     getClientForms.mockResolvedValue(Array.from({ length: MAX_FORMS_PER_ACCOUNT }, () => STORED))
 
-    await expect(createForm('client-1', { name: 'x', fields: [NAME] })).rejects.toBeInstanceOf(PublicLimitError)
+    await expect(createForm('client-1', { name: 'x', fields: [NAME] })).rejects.toBeInstanceOf(PublicConflictError)
     expect(createNewForm).not.toHaveBeenCalled()
   })
 })
