@@ -15,7 +15,7 @@ Framing: Google's own guidance is that optimizing for AI search is ordinary SEO.
 | GEO readiness (estimate) | 71 / 100 | 2026-10-02 | From `GEO-ANALYSIS-2026-10-02.md`, before the feature-page rebuild. Baseline was 63 on 2026-09-19. |
 | Indexed in Google | Unknown | — | Search Console is not verified. This is the top blocker. |
 | Public pages in the sitemap | 44 | 2026-10-06 | Counted from the built `sitemap.xml`. The free tools hub and two new tools were added on 2026-10-06. |
-| Blog posts | 12 | 2026-10-06 | Three global pillars published 2026-10-06 (WhatsApp CRM, real estate chatbot guide, AI receptionist vs website voice agent). Four published 2026-10-05: Meta lead ads auto-reply, click-to-WhatsApp vs lead forms, real estate chatbot qualification questions, and what a CRM chatbot is. |
+| Blog posts | 15 | 2026-10-06 | Three more on 2026-10-06 (posts 11, 5 and 6 of the global handoff): AI sales agent, real estate CRM for Dubai brokers, Trakheesi permit. The Trakheesi post states only what the DLD service page says; validity and penalty are deliberately left out. Earlier: | Three global pillars published 2026-10-06 (WhatsApp CRM, real estate chatbot guide, AI receptionist vs website voice agent). Four published 2026-10-05: Meta lead ads auto-reply, click-to-WhatsApp vs lead forms, real estate chatbot qualification questions, and what a CRM chatbot is. |
 | Mobile LCP (lab) | about 1.7 s | 2026-10-02 | Was 2.3 s on the homepage and 3.25 s on a post. No field data yet. |
 | Lighthouse accessibility | 100 | 2026-10-02 | On every public page audited. |
 | Real referring domains | 0 known | 2026-10-02 | Not in the Common Crawl graph; all six competitors checked are. |
