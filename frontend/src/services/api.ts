@@ -401,6 +401,11 @@ export function createApiKey(name: string, scopes: ApiScope[]): Promise<ApiRespo
   return apiClient<CreatedApiKey>('/api/api-keys', 'POST', { name, scopes })
 }
 
+// Changes what an existing key may do. The key itself is not replaced.
+export function updateApiKeyScopes(keyId: string, scopes: ApiScope[]): Promise<ApiResponse<ApiKeySummary>> {
+  return apiClient<ApiKeySummary>(`/api/api-keys/${encodeURIComponent(keyId)}`, 'PATCH', { scopes })
+}
+
 export function revokeApiKey(keyId: string): Promise<ApiResponse<null>> {
   return apiClient<null>(`/api/api-keys/${encodeURIComponent(keyId)}`, 'DELETE')
 }

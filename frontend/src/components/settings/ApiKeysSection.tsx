@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Check, Copy, KeyRound, Trash2 } from 'lucide-react'
-import { createApiKey, getApiKeys, revokeApiKey } from '../../services/api'
+import { Check, Copy, KeyRound, Pencil, Trash2 } from 'lucide-react'
+import { createApiKey, getApiKeys, revokeApiKey, updateApiKeyScopes } from '../../services/api'
 import type { ApiKeySummary, ApiScope, CreatedApiKey } from '../../types/index'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -131,35 +131,122 @@ function CreateKeyForm({ onCreated, onError }: CreateKeyFormProps) {
   )
 }
 
+interface ScopeEditorProps {
+  apiKey: ApiKeySummary
+  onSaved: (updated: ApiKeySummary) => void
+  onCancel: () => void
+  onError: (message: string) => void
+}
+
+// Changes what a key may do and keeps the key: whatever is using it carries on
+// with the new permissions from its next request, with nothing to redeploy.
+function ScopeEditor({ apiKey, onSaved, onCancel, onError }: ScopeEditorProps) {
+  const [scopes, setScopes] = useState<ApiScope[]>(apiKey.scopes)
+  const [saving, setSaving] = useState(false)
+
+  function toggleScope(scope: ApiScope) {
+    setScopes((current) => (current.includes(scope) ? current.filter((s) => s !== scope) : [...current, scope]))
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    const result = await updateApiKeyScopes(apiKey.keyId, scopes)
+    if (result.success && result.data) {
+      onSaved(result.data)
+    } else {
+      onError(result.error ?? 'Could not change the permissions of that key.')
+    }
+    setSaving(false)
+  }
+
+  return (
+    <fieldset aria-label={`Permissions for ${apiKey.name}`} className="mt-3 border-t border-gray-100 pt-3">
+      <div className="flex flex-wrap gap-x-4 gap-y-2">
+        {ALL_SCOPES.map((scope) => (
+          <label key={scope} className="flex items-center gap-2 text-xs text-gray-700">
+            <input type="checkbox" checked={scopes.includes(scope)} onChange={() => toggleScope(scope)} />
+            {SCOPE_LABELS[scope]}
+          </label>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-gray-500">
+        The key stays the same. Anything using it gets these permissions from its next request.
+      </p>
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          onClick={() => void handleSave()}
+          disabled={saving || scopes.length === 0}
+          className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+        >
+          {saving ? 'Saving…' : 'Save permissions'}
+        </button>
+        <button type="button" onClick={onCancel} className="rounded-lg px-3 py-1.5 text-xs font-medium text-gray-600">
+          Cancel
+        </button>
+      </div>
+    </fieldset>
+  )
+}
+
 interface KeyRowProps {
   apiKey: ApiKeySummary
   disabled: boolean
   revoking: boolean
+  // False when the plan has no API access: there is nothing useful to grant.
+  canEdit: boolean
   onRevoke: () => void
+  onUpdated: (updated: ApiKeySummary) => void
+  onError: (message: string) => void
 }
 
-function KeyRow({ apiKey, disabled, revoking, onRevoke }: KeyRowProps) {
+function KeyRow({ apiKey, disabled, revoking, canEdit, onRevoke, onUpdated, onError }: KeyRowProps) {
+  const [editing, setEditing] = useState(false)
+
+  function handleSaved(updated: ApiKeySummary) {
+    onUpdated(updated)
+    setEditing(false)
+  }
+
   return (
-    <div className="flex items-center justify-between gap-4 rounded-xl border border-gray-100 p-3">
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-gray-900">
-          {apiKey.name} <span className="font-mono text-xs text-gray-500">vy_live_…{apiKey.last4}</span>
-        </p>
-        <p className="mt-0.5 text-xs text-gray-500">
-          {apiKey.scopes.map((scope) => SCOPE_LABELS[scope] ?? scope).join(', ')} · created{' '}
-          {formatDate(apiKey.createdAt)} · last used {formatDate(apiKey.lastUsedAt)}
-        </p>
+    <div className="rounded-xl border border-gray-100 p-3">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-gray-900">
+            {apiKey.name} <span className="font-mono text-xs text-gray-500">vy_live_…{apiKey.last4}</span>
+          </p>
+          <p className="mt-0.5 text-xs text-gray-500">
+            {apiKey.scopes.map((scope) => SCOPE_LABELS[scope] ?? scope).join(', ')} · created{' '}
+            {formatDate(apiKey.createdAt)} · last used {formatDate(apiKey.lastUsedAt)}
+            {apiKey.scopesUpdatedAt ? ` · permissions changed ${formatDate(apiKey.scopesUpdatedAt)}` : ''}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          {canEdit && !editing ? (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Edit permissions
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={onRevoke}
+            disabled={disabled}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+            title="Anything using this key stops working immediately"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            {revoking ? 'Revoking…' : 'Revoke'}
+          </button>
+        </div>
       </div>
-      <button
-        type="button"
-        onClick={onRevoke}
-        disabled={disabled}
-        className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
-        title="Anything using this key stops working immediately"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-        {revoking ? 'Revoking…' : 'Revoke'}
-      </button>
+      {editing ? (
+        <ScopeEditor apiKey={apiKey} onSaved={handleSaved} onCancel={() => setEditing(false)} onError={onError} />
+      ) : null}
     </div>
   )
 }
@@ -194,6 +281,11 @@ export default function ApiKeysSection({ apiEnabled, onUpgradeClick }: ApiKeysSe
     // eventually consistent index and may not include the new key yet.
     const { key: _secret, ...summary } = key
     setKeys((current) => [summary, ...(current ?? [])])
+  }
+
+  function handleUpdated(updated: ApiKeySummary) {
+    setError(null)
+    setKeys((current) => current?.map((k) => (k.keyId === updated.keyId ? updated : k)) ?? null)
   }
 
   async function handleRevoke(keyId: string) {
@@ -234,7 +326,10 @@ export default function ApiKeysSection({ apiEnabled, onUpgradeClick }: ApiKeysSe
             apiKey={apiKey}
             disabled={revoking !== null}
             revoking={revoking === apiKey.keyId}
+            canEdit={apiEnabled}
             onRevoke={() => void handleRevoke(apiKey.keyId)}
+            onUpdated={handleUpdated}
+            onError={setError}
           />
         ))}
       </div>
