@@ -32,7 +32,7 @@ Each key has one or more scopes, chosen when the key is created. An endpoint rej
 | `forms:write` | Create lead forms |
 | `voice_agents:read` | Read voice agent configuration |
 
-`forms:write` is the only scope that changes anything, and it is left unticked when you create a key. Tick it only for a key that sets up forms. Scopes cannot be edited after creation, so to change what a key can do, create a new key and revoke the old one.
+`forms:write` is the only scope that changes anything, and it is left unticked when you create a key. Tick it only for a key that sets up forms. You can change a key's scopes at any time: in Settings, choose **Edit permissions** on the key, tick or untick, and save. The key itself does not change, so nothing using it needs to be updated, and the new permissions apply from its next request. Only someone signed in to the dashboard can do this. A key cannot change its own permissions or any other key's.
 
 ## Which plans can use the API?
 
