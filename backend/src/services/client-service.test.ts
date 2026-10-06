@@ -21,6 +21,19 @@ vi.mock('../repositories/bot-repository.js', () => ({
   countBotsForClient: (...a: unknown[]) => countBotsForClient(...a),
 }))
 
+const listPagesForClient = vi.fn()
+vi.mock('../repositories/meta-lead-repository.js', () => ({
+  listPagesForClient: (...a: unknown[]) => listPagesForClient(...a),
+}))
+const getFormsByClientId = vi.fn()
+vi.mock('../repositories/form-repository.js', () => ({
+  getFormsByClientId: (...a: unknown[]) => getFormsByClientId(...a),
+}))
+const getVoiceAgentsByClient = vi.fn()
+vi.mock('../repositories/voice-repository.js', () => ({
+  getVoiceAgentsByClient: (...a: unknown[]) => getVoiceAgentsByClient(...a),
+}))
+
 const { upsertClient, ensureTrialSubscription, getAppBootstrap, updateNotificationPreferences, updateDefaultCountryCode, InvalidCountryCodeError } =
   await import('./client-service.js')
 
@@ -177,6 +190,20 @@ describe('ensureTrialSubscription', () => {
 describe('getAppBootstrap', () => {
   beforeEach(() => {
     countBotsForClient.mockReset()
+    listPagesForClient.mockReset().mockResolvedValue([])
+    getFormsByClientId.mockReset().mockResolvedValue([])
+    getVoiceAgentsByClient.mockReset().mockResolvedValue([])
+  })
+
+  it.each([
+    ['a connected Meta Page', () => listPagesForClient.mockResolvedValue([{ pageId: 'p1' }])],
+    ['a lead form', () => getFormsByClientId.mockResolvedValue([{ formId: 'f1' }])],
+    ['a voice agent', () => getVoiceAgentsByClient.mockResolvedValue([{ agentId: 'v1' }])],
+  ])('unlocks a client whose only lead source is %s', async (_name, arrange) => {
+    countBotsForClient.mockResolvedValue(0)
+    arrange()
+
+    await expect(getAppBootstrap('client-1')).resolves.toMatchObject({ ready: true })
   })
 
   it('gates a client with no bots and hands back no capabilities', async () => {
