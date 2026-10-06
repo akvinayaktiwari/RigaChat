@@ -1,0 +1,133 @@
+{/*
+  India market post (handoff B3, post 9). Target: "whatsapp automation"
+  (India 3,600/mo, KD 11, OpenSEO pull of 2026-10-06; a re-pull at writing time
+  failed because the OpenSEO account was out of credits).
+
+  Sources opened on 2026-10-06, and what each was used for:
+  - whatsappbusiness.com, "small business use WhatsApp Business app": the app is
+    free to download and has automated greeting and away messages, quick
+    replies, labels and a catalog. That page says nothing about linked devices
+    or how many people can use one account, so this post does not either.
+  - whatsapp.com/legal/messaging-guidelines: users must not use "unofficial
+    clients, bulk messaging, auto-messaging, auto-dialing, or automation to harm
+    WhatsApp or our users", and WhatsApp may suspend an account temporarily or
+    permanently. (The help-centre article on the same subject could not be read
+    by a fetch, so it is not the citation.)
+  - Meta developer docs: getting-opt-in, send-messages (the 24-hour customer
+    service window) and templates overview (three categories, APPROVED status,
+    quality rating, pausing).
+  - Digital Personal Data Protection Act, 2023, section 6(1), on MeitY's site.
+    The PIB page for the DPDP Rules, 2025 returned 403 and was NOT read, so no
+    commencement date or rule detail is stated.
+
+  No prices: Meta's template rates and each provider's fees change, so the post
+  says what is charged for, never how much. No adoption, open-rate, response or
+  conversion figures: none are sourced.
+
+  Product claims match pages/features/WhatsApp.tsx: WhatsApp runs through the
+  client's own Gupshup account; journeys start for chat and Meta lead ad leads,
+  not form leads; alerts go to the owner's number.
+*/}
+
+WhatsApp automation is any WhatsApp message a business sends or answers without a person typing it at that moment: an instant first reply, an answer to a common question, a reminder, a follow-up. A small business in India can set it up three ways, from the free WhatsApp Business app to a tool built on the WhatsApp Business Platform, and each automates a different amount of the work.
+
+This post compares the three, explains the rules that decide what you may send, and suggests what to automate first.
+
+## What can a small business automate on WhatsApp?
+
+Six jobs cover most of it. They are listed in the order most businesses need them.
+
+| Job | What it replaces | Needs |
+| --- | --- | --- |
+| The first reply | A customer waiting until someone picks up the phone | The free app is enough |
+| Answers to common questions | Typing the price list, address and timings again | The free app (by shortcut), or a chatbot (on its own) |
+| Collecting details | Asking name, requirement and budget by hand | A chatbot on the WhatsApp Business Platform |
+| Follow-up | Remembering to message a lead who went quiet | Approved templates on the Platform |
+| Reminders and updates | Calling to confirm an appointment or delivery | Approved templates on the Platform |
+| Telling your team | Checking the phone for new enquiries | A tool that alerts you when a lead arrives |
+
+## What are the three ways to automate WhatsApp?
+
+The free app, a ready-made tool on the WhatsApp Business Platform, or software you build on the Platform yourself.
+
+| | WhatsApp Business app | A tool on the Business Platform | Your own build on the Platform |
+| --- | --- | --- | --- |
+| What it is | The free app from WhatsApp | A product that connects to the API for you | Code your developers write against the API |
+| Automates | Greeting message, away message, quick replies you pick by shortcut | Chatbot replies, lead capture, follow-up sequences, alerts | Whatever you build |
+| Follows up on its own | No | Yes, with approved templates | Yes, with approved templates |
+| Connects to ads, forms and your website | No | Usually | If you build it |
+| What you pay for | Nothing | The tool, and Meta's charges for template messages | Developers, hosting, and Meta's charges |
+| Fits | One person answering customers from their phone | A team with more enquiries than it can answer in time | A business with developers and unusual needs |
+
+The free app's features are WhatsApp's own description: [automated greeting and away messages, quick replies, labels and a catalog](https://whatsappbusiness.com/resources/resource-library/small-business-use-whatsapp-business-app/). A quick reply still needs a person to choose it. Nothing in the app decides what to say next.
+
+<Callout title="Bulk sender apps are not a fourth option" tone="warning">
+  Tools that send the same message to a list of numbers from an ordinary WhatsApp account are not automation you can rely on. WhatsApp's [Messaging Guidelines](https://www.whatsapp.com/legal/messaging-guidelines) tell users not to use unofficial clients, bulk messaging or auto-messaging, and say an account that breaks them can be suspended temporarily or permanently. A suspended number is the number your customers already have.
+</Callout>
+
+## What rules decide what you can send?
+
+WhatsApp's own rules, which are the same in every country, and Indian consent law.
+
+<div className="mt-6 grid gap-4 md:grid-cols-2">
+  <FactCard label="Opt-in comes first">
+    A business must have a person's [opt-in before it messages them](https://developers.facebook.com/documentation/business-messaging/whatsapp/getting-opt-in), and must say clearly what they are opting in to and from which business.
+  </FactCard>
+  <FactCard label="The 24-hour window">
+    When a customer messages you, a [24-hour customer service window](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages) opens. Inside it you can reply freely. It resets each time they message again.
+  </FactCard>
+  <FactCard label="Templates outside the window">
+    After the window closes you can send only a [message template that Meta has approved](https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/overview). Templates are marketing, utility or authentication.
+  </FactCard>
+  <FactCard label="Quality is measured">
+    Each template has a quality rating based on usage and customer feedback, and a template with poor feedback can be paused automatically.
+  </FactCard>
+</div>
+
+On consent, India's [Digital Personal Data Protection Act, 2023](https://www.meity.gov.in/static/uploads/2024/06/2bf1f0e9f04e6fb4f8fef35e82c42aa5.pdf) says in section 6(1) that consent must be "free, specific, informed, unconditional and unambiguous with a clear affirmative action", and that it is agreement to processing for the purpose the person was told about. A number collected for a delivery update is not consent to receive offers. This is general information, not legal advice.
+
+In practice the rules produce one test for any automated message: did this person ask to hear from you about this, and are you inside the window or using an approved template? If either answer is no, do not send it. [What is a WhatsApp CRM?](/blog/what-is-a-whatsapp-crm/) explains the WhatsApp rules in more detail.
+
+## What should you automate first?
+
+Start with what costs you customers today, and stop when the problem is solved.
+
+1. **The first reply.** Set a greeting message in the WhatsApp Business app that says who you are and when a person will answer. It is free and takes a few minutes.
+2. **The away message.** Tell people who write after hours when you open. A late enquiry that gets silence until morning may not still be waiting.
+3. **Common answers.** Save your price list, address, timings and payment details as quick replies.
+4. **Lead capture.** When enquiries outnumber the people answering, move to a chatbot that asks the same few questions every time and records the answers.
+5. **Follow-up.** Have one template approved for leads who went quiet, and send it once. Then stop.
+6. **Alerts to your team.** Make sure a new lead reaches a person straight away, wherever it came from.
+
+Steps 1 to 3 need only the free app. Steps 4 to 6 need the WhatsApp Business Platform.
+
+## What should you not automate?
+
+Some messages are worse automated than late.
+
+- **Complaints and refunds.** A person who is upset wants a person. Automate the acknowledgement, not the answer.
+- **Negotiation.** A price is a conversation. A bot that discounts on a script trains customers to ask it.
+- **Anything you cannot keep accurate.** Stock, availability and prices that change daily should come from a person or a live system, never from a saved reply.
+- **Repeated nudges.** One follow-up is service. Five is the reason your template gets reported and paused.
+
+## When is the free WhatsApp Business app enough?
+
+Often, for a small shop. Move to the Platform when one of these becomes true.
+
+| Sign | What it means |
+| --- | --- |
+| Enquiries wait hours for a first real answer | You need replies that do not depend on someone being free |
+| Two or more people answer customers | You need a shared record of who replied to whom |
+| Leads come from ads or your website as well | You need them in the same list as your WhatsApp chats |
+| You want to message people after 24 hours | You need approved templates, which the app does not send |
+| You cannot say how many enquiries became customers | You need a status on every lead |
+
+If none of these is true yet, stay on the free app. For property businesses specifically, [WhatsApp chatbots for real estate in India](/blog/whatsapp-chatbot-for-real-estate-india/) and [click-to-WhatsApp ads versus lead form ads](/blog/click-to-whatsapp-ads-vs-lead-forms-real-estate-india/) go further.
+
+<div className="mt-16 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+  ### Where Vyostra AI sits
+
+  Vyostra AI is the second kind: a tool on the WhatsApp Business Platform. It covers lead capture, follow-up and alerts. Leads from your website chat agent, your lead forms and your Meta lead ads land in one list with four statuses. For a new lead from chat or a Meta lead ad, a follow-up journey sends a WhatsApp message, waits for a real reply rather than firing on a timer, nudges once if the lead goes quiet, and hands the lead to your team when it needs a person. With lead notifications switched on, every new lead also sends a WhatsApp alert to your own number.
+
+  Messages go through your own WhatsApp Business API account with Gupshup, so the number stays yours and Meta's template rules apply to you as they would with any tool. It does not replace the WhatsApp Business app for chatting with customers one to one, and it does not send bulk broadcasts. More on [WhatsApp in Vyostra AI](/features/whatsapp) and [the lead CRM](/features/crm).
+</div>
