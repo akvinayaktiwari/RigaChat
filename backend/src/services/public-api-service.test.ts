@@ -8,11 +8,25 @@ const getClientBots = vi.fn()
 const getBotConfig = vi.fn()
 vi.mock('./bot-service.js', () => ({ getClientBots, getBotConfig }))
 
-vi.mock('./form-service.js', () => ({ getClientForms: vi.fn(), getFormConfig: vi.fn() }))
+const getClientForms = vi.fn()
+const createNewForm = vi.fn()
+vi.mock('./form-service.js', () => ({ getClientForms, createNewForm, getFormConfig: vi.fn() }))
 vi.mock('./voice-service.js', () => ({ getVoiceAgents: vi.fn(), getVoiceAgentById: vi.fn() }))
 
-const { PublicResourceNotFoundError, decodeLeadId, encodeLeadId, getBot, getLead, listBots, listLeads } =
-  await import('./public-api-service.js')
+const {
+  MAX_FORMS_PER_ACCOUNT,
+  MAX_FORM_FIELDS,
+  PublicLimitError,
+  PublicResourceNotFoundError,
+  PublicValidationError,
+  createForm,
+  decodeLeadId,
+  encodeLeadId,
+  getBot,
+  getLead,
+  listBots,
+  listLeads,
+} = await import('./public-api-service.js')
 
 const CHAT_REF = { source: 'chat' as const, botId: 'bot-1', leadId: 'lead-1' }
 const UNIFIED = {
@@ -161,5 +175,94 @@ describe('bots', () => {
     getBotConfig.mockRejectedValue(new Error('Failed to get bot: throttled'))
 
     await expect(getBot('client-1', 'bot-1')).rejects.not.toBeInstanceOf(PublicResourceNotFoundError)
+  })
+})
+
+describe('createForm', () => {
+  const NAME = { label: 'Name', type: 'text', required: true }
+  const STORED = {
+    formId: 'form-1',
+    clientId: 'client-1',
+    name: 'Site visit',
+    submitButtonText: 'Submit',
+    fields: [{ ...NAME, fieldId: 'field-1' }],
+    createdAt: '2026-10-06T00:00:00.000Z',
+    updatedAt: '2026-10-06T00:00:00.000Z',
+  }
+
+  beforeEach(() => {
+    getClientForms.mockResolvedValue([])
+    createNewForm.mockResolvedValue(STORED)
+  })
+
+  it('creates under the key\'s account and publishes the form without clientId', async () => {
+    const form = await createForm('client-1', { name: '  Site visit ', fields: [NAME] })
+
+    expect(createNewForm).toHaveBeenCalledWith({
+      clientId: 'client-1',
+      name: 'Site visit',
+      submitButtonText: 'Submit',
+      fields: [NAME],
+    })
+    expect(form.formId).toBe('form-1')
+    expect(form.description).toBeNull()
+    expect(form).not.toHaveProperty('clientId')
+  })
+
+  it('keeps the choices of an options field and defaults required to false', async () => {
+    const layout = { label: 'Interested in', type: 'options', options: ['Type A', 'Type B'] }
+
+    await createForm('client-1', { name: 'Site visit', submitButtonText: 'Book a visit', fields: [layout] })
+
+    expect(createNewForm.mock.calls[0][0]).toMatchObject({
+      submitButtonText: 'Book a visit',
+      fields: [{ ...layout, required: false }],
+    })
+  })
+
+  it('cannot be pointed at another account from the body', async () => {
+    await expect(createForm('client-1', { name: 'x', clientId: 'client-2', fields: [NAME] })).rejects.toThrow(
+      'unknown property: clientId'
+    )
+  })
+
+  it.each([
+    ['a body that is not an object', ['not', 'an', 'object'], 'must be a JSON object'],
+    ['a missing name', { fields: [NAME] }, 'name is required'],
+    ['no fields', { name: 'x', fields: [] }, 'fields must be an array'],
+    [
+      'too many fields',
+      { name: 'x', fields: Array.from({ length: MAX_FORM_FIELDS + 1 }, () => NAME) },
+      'fields must be an array',
+    ],
+    ['an unknown field type', { name: 'x', fields: [{ label: 'File', type: 'file' }] }, 'fields[0].type must be one of'],
+    ['a field with no label', { name: 'x', fields: [NAME, { type: 'text' }] }, 'fields[1].label is required'],
+    ['a non-boolean required', { name: 'x', fields: [{ ...NAME, required: 'yes' }] }, 'fields[0].required'],
+    ['an options field with no choices', { name: 'x', fields: [{ label: 'L', type: 'options' }] }, 'fields[0].options'],
+    [
+      'a repeated choice',
+      { name: 'x', fields: [{ label: 'L', type: 'options', options: ['A', 'A'] }] },
+      'must not repeat a choice',
+    ],
+    [
+      'choices on a field that is not options',
+      { name: 'x', fields: [{ ...NAME, options: ['A'] }] },
+      'only allowed when type is "options"',
+    ],
+    ['a misspelt property', { name: 'x', submitText: 'Go', fields: [NAME] }, 'unknown property: submitText'],
+  ])('refuses %s, without a read or a write', async (_case, body, message) => {
+    const attempt = createForm('client-1', body)
+
+    await expect(attempt).rejects.toBeInstanceOf(PublicValidationError)
+    await expect(attempt).rejects.toThrow(message)
+    expect(getClientForms).not.toHaveBeenCalled()
+    expect(createNewForm).not.toHaveBeenCalled()
+  })
+
+  it('refuses a form past the account ceiling', async () => {
+    getClientForms.mockResolvedValue(Array.from({ length: MAX_FORMS_PER_ACCOUNT }, () => STORED))
+
+    await expect(createForm('client-1', { name: 'x', fields: [NAME] })).rejects.toBeInstanceOf(PublicLimitError)
+    expect(createNewForm).not.toHaveBeenCalled()
   })
 })

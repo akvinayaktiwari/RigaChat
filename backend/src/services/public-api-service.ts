@@ -11,11 +11,12 @@
 // shape per resource.
 
 import { getBotConfig, getClientBots } from './bot-service.js'
-import { getClientForms, getFormConfig } from './form-service.js'
+import { createNewForm, getClientForms, getFormConfig } from './form-service.js'
 import { getUnifiedInbox, getUnifiedLeadDetail } from './lead-inbox-service.js'
 import { getVoiceAgentById, getVoiceAgents } from './voice-service.js'
 import type {
   BotConfig,
+  CreateFormInput,
   FormConfig,
   FormField,
   LeadFormField,
@@ -29,6 +30,17 @@ import type {
 } from '../types/index.js'
 
 export class PublicResourceNotFoundError extends Error {}
+// The message is returned to the caller, so it names the offending field and
+// nothing internal.
+export class PublicValidationError extends Error {}
+export class PublicLimitError extends Error {
+  constructor(
+    public readonly code: string,
+    message: string
+  ) {
+    super(message)
+  }
+}
 
 export const DEFAULT_LEAD_PAGE_SIZE = 50
 export const MAX_LEAD_PAGE_SIZE = 200
@@ -288,6 +300,136 @@ export async function listForms(clientId: string): Promise<PublicForm[]> {
 
 export async function getForm(clientId: string, formId: string): Promise<PublicForm> {
   return toPublicForm(await orNotFound(getFormConfig(formId, clientId)))
+}
+
+// ---------------------------------------------------------------------------
+// Writes. Input is validated as strictly as output is allowlisted: an unknown
+// key is refused rather than ignored, because a misspelt `submitButtonText`
+// that silently falls back to the default is a bug the caller finds in
+// production. Refusing can be relaxed later; accepting cannot be taken back.
+// ---------------------------------------------------------------------------
+
+// A ceiling, not a plan limit. One key can make 120 requests a minute, and
+// without this a looping script fills the account with forms.
+export const MAX_FORMS_PER_ACCOUNT = 200
+export const MAX_FORM_FIELDS = 30
+export const MAX_FIELD_OPTIONS = 50
+const MAX_FORM_NAME_LENGTH = 120
+const MAX_FORM_DESCRIPTION_LENGTH = 500
+const MAX_LABEL_LENGTH = 120
+
+// Record rather than an array so a type added to FormField without being
+// listed here is a compile error.
+const FIELD_TYPE_REGISTRY: Record<FormField['type'], true> = {
+  text: true,
+  number: true,
+  email: true,
+  phone: true,
+  options: true,
+}
+const FIELD_TYPES = Object.keys(FIELD_TYPE_REGISTRY) as FormField['type'][]
+
+const FORM_KEYS = ['name', 'description', 'submitButtonText', 'fields']
+const FIELD_KEYS = ['label', 'type', 'required', 'placeholder', 'options']
+
+type NewFormField = Omit<FormField, 'fieldId'>
+type NewForm = Omit<CreateFormInput, 'clientId'>
+
+function asObject(raw: unknown, what: string, allowedKeys: string[]): Record<string, unknown> {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    throw new PublicValidationError(`${what} must be a JSON object`)
+  }
+  const unknown = Object.keys(raw).filter((key) => !allowedKeys.includes(key))
+  if (unknown.length > 0) {
+    throw new PublicValidationError(`${what} has unknown property: ${unknown.join(', ')}`)
+  }
+  return raw as Record<string, unknown>
+}
+
+function requiredText(value: unknown, name: string, maxLength: number): string {
+  const text = typeof value === 'string' ? value.trim() : ''
+  if (text.length === 0 || text.length > maxLength) {
+    throw new PublicValidationError(`${name} is required and must be at most ${maxLength} characters`)
+  }
+  return text
+}
+
+function optionalText(value: unknown, name: string, maxLength: number): string | undefined {
+  if (value === undefined || value === null) return undefined
+  if (typeof value !== 'string' || value.length > maxLength) {
+    throw new PublicValidationError(`${name} must be a string of at most ${maxLength} characters`)
+  }
+  return value.trim() || undefined
+}
+
+function parseOptions(raw: unknown, name: string): string[] {
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_FIELD_OPTIONS) {
+    throw new PublicValidationError(`${name} must be an array of 1 to ${MAX_FIELD_OPTIONS} choices`)
+  }
+  const options = raw.map((option, index) => requiredText(option, `${name}[${index}]`, MAX_LABEL_LENGTH))
+  // Two identical choices would be indistinguishable in the submitted answer.
+  if (new Set(options).size !== options.length) {
+    throw new PublicValidationError(`${name} must not repeat a choice`)
+  }
+  return options
+}
+
+function parseFieldType(raw: unknown, name: string): FormField['type'] {
+  if (!FIELD_TYPES.includes(raw as FormField['type'])) {
+    throw new PublicValidationError(`${name} must be one of: ${FIELD_TYPES.join(', ')}`)
+  }
+  return raw as FormField['type']
+}
+
+function parseField(raw: unknown, index: number): NewFormField {
+  const at = `fields[${index}]`
+  const body = asObject(raw, at, FIELD_KEYS)
+  const type = parseFieldType(body.type, `${at}.type`)
+  if (body.required !== undefined && typeof body.required !== 'boolean') {
+    throw new PublicValidationError(`${at}.required must be true or false`)
+  }
+  if (type !== 'options' && body.options !== undefined) {
+    throw new PublicValidationError(`${at}.options is only allowed when type is "options"`)
+  }
+  const placeholder = optionalText(body.placeholder, `${at}.placeholder`, MAX_LABEL_LENGTH)
+
+  return {
+    label: requiredText(body.label, `${at}.label`, MAX_LABEL_LENGTH),
+    type,
+    required: body.required === true,
+    ...(placeholder !== undefined ? { placeholder } : {}),
+    ...(type === 'options' ? { options: parseOptions(body.options, `${at}.options`) } : {}),
+  }
+}
+
+export function parseCreateFormInput(raw: unknown): NewForm {
+  const body = asObject(raw, 'The request body', FORM_KEYS)
+  if (!Array.isArray(body.fields) || body.fields.length === 0 || body.fields.length > MAX_FORM_FIELDS) {
+    throw new PublicValidationError(`fields must be an array of 1 to ${MAX_FORM_FIELDS} fields`)
+  }
+  const description = optionalText(body.description, 'description', MAX_FORM_DESCRIPTION_LENGTH)
+
+  return {
+    name: requiredText(body.name, 'name', MAX_FORM_NAME_LENGTH),
+    ...(description !== undefined ? { description } : {}),
+    submitButtonText: optionalText(body.submitButtonText, 'submitButtonText', MAX_LABEL_LENGTH) ?? 'Submit',
+    fields: body.fields.map(parseField),
+  }
+}
+
+// Validates before counting, so a malformed request costs no read.
+export async function createForm(clientId: string, raw: unknown): Promise<PublicForm> {
+  const input = parseCreateFormInput(raw)
+
+  const existing = await getClientForms(clientId)
+  if (existing.length >= MAX_FORMS_PER_ACCOUNT) {
+    throw new PublicLimitError(
+      'form_limit_reached',
+      `This account already has ${MAX_FORMS_PER_ACCOUNT} forms. Delete one you no longer use before creating another.`
+    )
+  }
+
+  return toPublicForm(await createNewForm({ clientId, ...input }))
 }
 
 export async function listVoiceAgents(clientId: string): Promise<PublicVoiceAgent[]> {
