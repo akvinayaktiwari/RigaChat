@@ -11,7 +11,7 @@
 
 import { createMiddleware } from 'hono/factory'
 import type { Context } from 'hono'
-import { authenticateApiKey, type ApiKeyAuthResult } from '../services/api-key-service.js'
+import { authenticateApiKey, isWriteScope, type ApiKeyAuthResult } from '../services/api-key-service.js'
 import type { ApiPrincipal, ApiScope, PublicApiError } from '../types/index.js'
 
 declare module 'hono' {
@@ -60,6 +60,20 @@ export function requireApiKey(scope: ApiScope) {
     if (!result.principal.scopes.includes(scope)) {
       return c.json<PublicApiError>(
         { error: { code: 'insufficient_scope', message: `This API key does not have the ${scope} scope.` } },
+        403
+      )
+    }
+
+    // After the scope check on purpose: a key without the scope is told so,
+    // rather than being told to upgrade for a scope it would still lack.
+    if (isWriteScope(scope) && result.principal.access !== 'full') {
+      return c.json<PublicApiError>(
+        {
+          error: {
+            code: 'write_access_disabled',
+            message: 'This account\'s plan includes read-only API access. Creating or changing data needs full API access.',
+          },
+        },
         403
       )
     }

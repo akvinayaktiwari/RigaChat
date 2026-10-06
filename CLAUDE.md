@@ -141,6 +141,14 @@ GET  /v1/leads/:id          -> one lead with transcript and submitted answers. `
                                   (API key, leads:read)
 GET  /v1/bots, /v1/bots/:botId                 -> (API key, bots:read)
 GET  /v1/forms, /v1/forms/:formId              -> (API key, forms:read)
+POST /v1/forms              -> create a lead form; 201 with the form, whose formId is the public id the
+                                  embed and POST /api/forms/leads take. A SETUP call, made once, never per
+                                  submission -- and safe to repeat: the same name + same definition answers 200
+                                  with the existing form, the same name + different fields is 409
+                                  form_name_taken. The first /v1 WRITE. Scope forms:write,
+                                  and a `:write` scope works only on a plan whose API tier is 'full' (403
+                                  write_access_disabled on Starter, checked per request so a downgrade bites).
+                                  Unknown body keys are a 400, not ignored. 409 form_limit_reached at 200 forms
 GET  /v1/voice-agents, /v1/voice-agents/:agentId -> (API key, voice_agents:read)
                                   Every /v1 route: `Authorization: Bearer vy_live_...`, NOT Cognito. Success is
                                   {data}, failure is {error:{code,message}} -- not the dashboard's ApiResponse.

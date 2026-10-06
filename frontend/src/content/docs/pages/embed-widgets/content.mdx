@@ -21,7 +21,7 @@ The chatbot answers from the website content and knowledge base you trained it o
 
 A Vyostra AI lead form opens as a pop-up over your page when your own button asks for it.
 
-1. In the dashboard, open **Forms**, create a form and copy its embed code.
+1. In the dashboard, open **Forms**, create a form and copy its embed code. To create the form from code instead, call `POST /v1/forms` once and keep the `formId` it returns.
 2. Paste the script tag before the closing `</body>` tag:
 
 <WidgetSnippet kind="form" />
@@ -50,14 +50,14 @@ The visitor's browser asks for microphone permission the first time they start a
 | Widget | Script file | Attribute | Where the id comes from |
 | --- | --- | --- | --- |
 | Chatbot | `widget.js` | `data-bot-id` | The bot's settings in the dashboard, or `botId` from `GET /v1/bots` |
-| Lead form | `form-widget.js` | `data-form-id` | The Forms page, or `formId` from `GET /v1/forms` |
+| Lead form | `form-widget.js` | `data-form-id` | The Forms page, or `formId` from `GET /v1/forms` or `POST /v1/forms` |
 | Voice agent | `voice-widget.js` | `data-agent-id` | The voice agent's page, or `agentId` from `GET /v1/voice-agents` |
 
 These ids are public: they are meant to sit in your page source. They are not API keys.
 
 ## How do you add widgets to many sites from code?
 
-If you manage many sites, such as an agency's client sites or one page per property project, you can generate the tags instead of copying them by hand. Read the ids from the API on your server and write one script tag per site. [REST API reference](/docs/api-reference/) lists the endpoints that return them.
+If you manage many sites, such as an agency's client sites or one page per property project, you can generate the tags instead of copying them by hand. Read the ids from the API on your server and write one script tag per site. A lead form can be created the same way: `POST /v1/forms` makes it and returns its id, so a new site needs no dashboard step. [REST API reference](/docs/api-reference/) lists the endpoints that return them.
 
 ## What should you check if the widget does not appear?
 

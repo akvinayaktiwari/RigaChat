@@ -4,7 +4,7 @@ const meta: DocMeta = {
   slug: 'authentication',
   title: 'API keys and authentication',
   metaTitle: 'API Key Authentication: Keys, Scopes and Rotation',
-  description: 'How Vyostra AI API keys work: creating and revoking keys, the Bearer header, the four permission scopes, plan requirements, and how to rotate a key safely.',
+  description: 'How Vyostra AI API keys work: creating and revoking keys, the Bearer header, the five permission scopes, plan requirements, and how to rotate a key safely.',
   lead: 'The Vyostra AI API authenticates every request with an API key sent in the Authorization header as a Bearer token. Keys are created in the dashboard under Settings, start with vy_live_, carry only the permissions you tick, and can be revoked at any moment. A revoked key is rejected on the very next request.',
   section: 'Get started',
   order: 2,

@@ -532,7 +532,7 @@ export interface NotificationPreferences {
   email: boolean
 }
 
-export type ApiScope = 'leads:read' | 'bots:read' | 'forms:read' | 'voice_agents:read'
+export type ApiScope = 'leads:read' | 'bots:read' | 'forms:read' | 'forms:write' | 'voice_agents:read'
 
 // A developer API key as the dashboard sees it. The secret is not here: it is
 // returned once, on creation, and never again.

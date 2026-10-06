@@ -2,19 +2,27 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Hono } from 'hono'
 
 const authenticateApiKey = vi.fn()
-vi.mock('../services/api-key-service.js', () => ({ authenticateApiKey }))
+vi.mock('../services/api-key-service.js', () => ({
+  authenticateApiKey,
+  isWriteScope: (scope: string) => scope.endsWith(':write'),
+}))
 
 const { requireApiKey } = await import('./api-key-auth.js')
 
-const app = new Hono().get('/leads', requireApiKey('leads:read'), (c) =>
-  c.json({ data: c.get('apiPrincipal').clientId })
-)
+const app = new Hono()
+  .get('/leads', requireApiKey('leads:read'), (c) => c.json({ data: c.get('apiPrincipal').clientId }))
+  .post('/forms', requireApiKey('forms:write'), (c) => c.json({ data: c.get('apiPrincipal').clientId }, 201))
 
 function get(headers: Record<string, string> = {}) {
   return app.request('/leads', { headers })
 }
 
-const PRINCIPAL = { clientId: 'client-1', keyId: 'key-1', scopes: ['leads:read'] }
+const PRINCIPAL = { clientId: 'client-1', keyId: 'key-1', scopes: ['leads:read'], access: 'full' }
+const WRITER = { ...PRINCIPAL, scopes: ['forms:write'] }
+
+function postForm() {
+  return app.request('/forms', { method: 'POST', headers: { Authorization: 'Bearer vy_live_abc' } })
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -63,6 +71,33 @@ describe('requireApiKey', () => {
 
     expect(res.status).toBe(403)
     expect((await res.json()).error.code).toBe('insufficient_scope')
+  })
+
+  it('serves a write on a plan with full API access', async () => {
+    authenticateApiKey.mockResolvedValue({ ok: true, principal: WRITER })
+
+    expect((await postForm()).status).toBe(201)
+  })
+
+  it('403s a write on a read-only plan even though the key holds the scope', async () => {
+    authenticateApiKey.mockResolvedValue({ ok: true, principal: { ...WRITER, access: 'read' } })
+
+    const res = await postForm()
+
+    expect(res.status).toBe(403)
+    expect((await res.json()).error.code).toBe('write_access_disabled')
+  })
+
+  it('still serves reads on a read-only plan', async () => {
+    authenticateApiKey.mockResolvedValue({ ok: true, principal: { ...PRINCIPAL, access: 'read' } })
+
+    expect((await get({ Authorization: 'Bearer vy_live_abc' })).status).toBe(200)
+  })
+
+  it('names the missing scope, not the plan, when a read-only plan\'s key also lacks the scope', async () => {
+    authenticateApiKey.mockResolvedValue({ ok: true, principal: { ...PRINCIPAL, access: 'read' } })
+
+    expect((await (await postForm()).json()).error.code).toBe('insufficient_scope')
   })
 
   it('429s with Retry-After when the key is over its limit', async () => {

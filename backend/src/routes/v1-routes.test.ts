@@ -6,11 +6,24 @@ const listLeads = vi.fn()
 const getLead = vi.fn()
 const listBots = vi.fn()
 const getBot = vi.fn()
+const createForm = vi.fn()
 
 vi.mock('../services/public-api-service.js', () => {
   class PublicResourceNotFoundError extends Error {}
+  class PublicValidationError extends Error {}
+  class PublicConflictError extends Error {
+    constructor(
+      public code: string,
+      message: string
+    ) {
+      super(message)
+    }
+  }
   return {
     PublicResourceNotFoundError,
+    PublicValidationError,
+    PublicConflictError,
+    createForm,
     MAX_LEAD_PAGE_SIZE: 200,
     listLeads,
     getLead,
@@ -33,13 +46,15 @@ vi.mock('../lib/api-key-auth.js', async () => {
     requireApiKey: (scope: ApiScope) =>
       createMiddleware(async (c, next) => {
         requiredScopes.push(`${c.req.path} ${scope}`)
-        c.set('apiPrincipal', { clientId: 'client-1', keyId: 'key-1', scopes: [scope] })
+        c.set('apiPrincipal', { clientId: 'client-1', keyId: 'key-1', scopes: [scope], access: 'full' })
         await next()
       }),
   }
 })
 
-const { PublicResourceNotFoundError } = await import('../services/public-api-service.js')
+const { PublicConflictError, PublicResourceNotFoundError, PublicValidationError } = await import(
+  '../services/public-api-service.js'
+)
 const { v1Routes } = await import('./v1-routes.js')
 
 const app = new Hono().route('/v1', v1Routes)
@@ -111,6 +126,69 @@ describe('bots', () => {
 
     expect(res.status).toBe(500)
     expect(JSON.stringify(await res.json())).not.toContain('AccessDenied')
+  })
+})
+
+describe('POST /v1/forms', () => {
+  const BODY = { name: 'Site visit', fields: [{ label: 'Name', type: 'text', required: true }] }
+
+  function post(body: string) {
+    return app.request('/v1/forms', { method: 'POST', body, headers: { 'Content-Type': 'application/json' } })
+  }
+
+  it('creates the form for the key\'s account and answers 201 with it', async () => {
+    createForm.mockResolvedValue({ form: { formId: 'form-1', name: 'Site visit' }, created: true })
+
+    const res = await post(JSON.stringify(BODY))
+
+    expect(res.status).toBe(201)
+    expect(await res.json()).toEqual({ data: { formId: 'form-1', name: 'Site visit' } })
+    expect(createForm).toHaveBeenCalledWith('client-1', BODY)
+  })
+
+  it('answers 200, not 201, when the identical form already existed', async () => {
+    createForm.mockResolvedValue({ form: { formId: 'form-1', name: 'Site visit' }, created: false })
+
+    const res = await post(JSON.stringify(BODY))
+
+    expect(res.status).toBe(200)
+    expect((await res.json()).data.formId).toBe('form-1')
+  })
+
+  it('is guarded by the write scope, so a read-only key cannot create', async () => {
+    createForm.mockResolvedValue({ form: {}, created: true })
+
+    await post(JSON.stringify(BODY))
+
+    expect(requiredScopes).toEqual(['/v1/forms forms:write'])
+  })
+
+  it('400s a body that is not JSON without calling the service', async () => {
+    const res = await post('{name:')
+
+    expect(res.status).toBe(400)
+    expect((await res.json()).error.code).toBe('invalid_request')
+    expect(createForm).not.toHaveBeenCalled()
+  })
+
+  it('400s a validation failure with the message that names the field', async () => {
+    createForm.mockRejectedValue(new PublicValidationError('fields[0].type must be one of: text'))
+
+    const res = await post(JSON.stringify(BODY))
+
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({
+      error: { code: 'invalid_request', message: 'fields[0].type must be one of: text' },
+    })
+  })
+
+  it('409s at the form ceiling with its own code', async () => {
+    createForm.mockRejectedValue(new PublicConflictError('form_limit_reached', 'Too many forms.'))
+
+    const res = await post(JSON.stringify(BODY))
+
+    expect(res.status).toBe(409)
+    expect((await res.json()).error.code).toBe('form_limit_reached')
   })
 })
 

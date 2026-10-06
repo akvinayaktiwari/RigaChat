@@ -2147,7 +2147,11 @@ export type ApiAccess = 'read' | 'full'
 
 // A union rather than string[] so a typo in a route's required scope is a
 // compile error, not an endpoint nobody can ever be granted.
-export type ApiScope = 'leads:read' | 'bots:read' | 'forms:read' | 'voice_agents:read'
+//
+// A `:write` scope is honoured only on a plan whose ApiAccess is 'full'. That
+// is decided per request, not when the key is created, so a downgrade takes
+// write access away from keys that already exist.
+export type ApiScope = 'leads:read' | 'bots:read' | 'forms:read' | 'forms:write' | 'voice_agents:read'
 
 // One row per key, in the api_keys table (PK keyHash, GSI
 // clientId-createdAt-index). The row IS the key: revoking deletes it.
@@ -2183,6 +2187,8 @@ export interface ApiPrincipal {
   clientId: string
   keyId: string
   scopes: ApiScope[]
+  // The plan's API tier at the moment of this request, never a stored value.
+  access: ApiAccess
 }
 
 // The /v1 error envelope. Deliberately not ApiResponse: /v1 is a contract with

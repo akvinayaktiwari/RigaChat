@@ -139,7 +139,7 @@ To copy the chat conversation as well, call `GET /v1/leads/:id` for a lead and r
 - **A lead can move while you read.** If a lead's status changes in the dashboard during a run, it can shift between pages. Keying on `id` means a lead seen twice is written once, and the next run picks up one that was missed.
 - **`incompleteSources` means stop.** When it is present, one lead source could not be read and its leads are missing from the page. Treat the run as failed and try again later.
 - **Meta and voice leads are capped.** The list holds the 500 most recent Meta lead ad leads and the 500 most recent voice leads. Sync regularly so older ones are already stored before they fall out of the list.
-- **The API is read-only.** Changing a lead in your CRM does not change it in Vyostra AI.
+- **The API cannot change leads.** Changing a lead in your CRM does not change it in Vyostra AI.
 
 ## Do you need this for Zoho CRM?
 

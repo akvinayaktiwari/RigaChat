@@ -102,6 +102,23 @@ describe('createApiKeyForClient', () => {
     expect(putApiKey).not.toHaveBeenCalled()
   })
 
+  it('refuses a write scope on a read-only plan rather than minting a key that cannot work', async () => {
+    resolveApiAccess.mockResolvedValue('read')
+
+    await expect(
+      createApiKeyForClient('client-1', { name: 'Sync', scopes: ['forms:read', 'forms:write'] })
+    ).rejects.toBeInstanceOf(ApiKeyValidationError)
+    expect(putApiKey).not.toHaveBeenCalled()
+  })
+
+  it('still mints a read-only key on a read-only plan', async () => {
+    resolveApiAccess.mockResolvedValue('read')
+
+    await createApiKeyForClient('client-1', { name: 'Sync', scopes: ['forms:read'] })
+
+    expect(putApiKey).toHaveBeenCalledTimes(1)
+  })
+
   it('refuses an eleventh key', async () => {
     getApiKeysForClient.mockResolvedValue(Array.from({ length: 10 }, () => RECORD))
 
@@ -146,9 +163,17 @@ describe('authenticateApiKey', () => {
   it('resolves a valid key to its owner and scopes', async () => {
     expect(await authenticateApiKey(KEY)).toEqual({
       ok: true,
-      principal: { clientId: 'client-1', keyId: 'key-1', scopes: ['leads:read'] },
+      principal: { clientId: 'client-1', keyId: 'key-1', scopes: ['leads:read'], access: 'full' },
     })
     expect(getApiKeyByHash).toHaveBeenCalledWith(hashApiKey(KEY))
+  })
+
+  it('reports the plan tier as it is now, so a downgrade reaches keys that already exist', async () => {
+    resolveApiAccess.mockResolvedValue('read')
+
+    const result = await authenticateApiKey(KEY)
+
+    expect(result.ok && result.principal.access).toBe('read')
   })
 
   it('rejects anything without the prefix before touching the database', async () => {
