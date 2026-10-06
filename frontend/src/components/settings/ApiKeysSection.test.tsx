@@ -56,6 +56,22 @@ describe('ApiKeysSection', () => {
     expect(screen.getByText('vy_live_…wxyz')).toBeTruthy()
   })
 
+  it('leaves the write permission off until it is ticked', async () => {
+    createApiKey.mockResolvedValue({ success: true, data: { ...EXISTING, keyId: 'key-2', key: 'vy_live_secretwxyz' } })
+    render(<ApiKeysSection apiEnabled onUpgradeClick={vi.fn()} />)
+    await screen.findByText('CRM sync')
+
+    const createForms = screen.getByLabelText('Create forms') as HTMLInputElement
+    expect(createForms.checked).toBe(false)
+
+    fireEvent.click(createForms)
+    fireEvent.change(screen.getByLabelText('Key name'), { target: { value: 'Site builder' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create key' }))
+
+    await screen.findByText('vy_live_secretwxyz')
+    expect(createApiKey.mock.calls[0][1]).toContain('forms:write')
+  })
+
   it('removes a revoked key from the list', async () => {
     revokeApiKey.mockResolvedValue({ success: true, data: null })
     render(<ApiKeysSection apiEnabled onUpgradeClick={vi.fn()} />)

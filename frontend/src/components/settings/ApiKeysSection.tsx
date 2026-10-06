@@ -13,9 +13,13 @@ const SCOPE_LABELS: Record<ApiScope, string> = {
   'leads:read': 'Read leads',
   'bots:read': 'Read chatbots',
   'forms:read': 'Read forms',
+  'forms:write': 'Create forms',
   'voice_agents:read': 'Read voice agents',
 }
 const ALL_SCOPES = Object.keys(SCOPE_LABELS) as ApiScope[]
+// A new key starts able to read everything and change nothing: a permission
+// that writes is one somebody ticks on purpose.
+const DEFAULT_SCOPES = ALL_SCOPES.filter((scope) => !scope.endsWith(':write'))
 
 function formatDate(iso: string | undefined): string {
   if (!iso) return 'never'
@@ -75,7 +79,7 @@ interface CreateKeyFormProps {
 
 function CreateKeyForm({ onCreated, onError }: CreateKeyFormProps) {
   const [name, setName] = useState('')
-  const [scopes, setScopes] = useState<ApiScope[]>(ALL_SCOPES)
+  const [scopes, setScopes] = useState<ApiScope[]>(DEFAULT_SCOPES)
   const [saving, setSaving] = useState(false)
 
   function toggleScope(scope: ApiScope) {
