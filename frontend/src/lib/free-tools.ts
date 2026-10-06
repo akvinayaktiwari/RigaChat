@@ -21,7 +21,7 @@ export interface FreeTool {
 export const TOOLS_HUB = {
   route: '/tools',
   name: 'Free tools',
-  summary: 'Free WhatsApp tools from Vyostra AI that run in your browser, with no sign-up.',
+  summary: 'Free WhatsApp and real estate tools from Vyostra AI that run in your browser, with no sign-up.',
   lastModified: '2026-10-06',
 }
 
@@ -45,6 +45,13 @@ export const FREE_TOOLS: readonly FreeTool[] = [
     name: 'WhatsApp Fonts',
     summary: 'A free tool that turns text into 16 look-alike font styles to copy into WhatsApp, with a plain account of their limits, in the browser.',
     action: 'Style some text',
+    lastModified: '2026-10-06',
+  },
+  {
+    route: '/tools/real-estate-commission-calculator',
+    name: 'Real Estate Commission Calculator',
+    summary: 'A free calculator that turns a sale price, commission, side split, referral fee, brokerage split and tax into an itemised take-home figure, in the browser.',
+    action: 'Calculate commission',
     lastModified: '2026-10-06',
   },
   {

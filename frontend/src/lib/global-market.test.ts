@@ -36,7 +36,9 @@ describe('the site outside the blog', () => {
   })
 
   // The India payment option, end to end: the price list, its copy, the toggle,
-  // checkout, the payment history, and the terms that describe billing.
+  // checkout, the payment history, and the terms that describe billing. The
+  // commission calculator is here too, for a different reason: INR is one of
+  // the six currencies its visitor can pick, with USD selected by default.
   const RUPEE_OPTION_FILES = [
     '../components/billing/UpgradeModal.tsx',
     '../components/landing/PricingSection.tsx',
@@ -45,6 +47,7 @@ describe('the site outside the blog', () => {
     '../pages/Pricing.tsx',
     '../pages/Terms.tsx',
     '../services/api.ts',
+    './commission-calculator.ts',
     './crawl-files.ts',
     './pricing-copy.ts',
     './pricingTiers.ts',
