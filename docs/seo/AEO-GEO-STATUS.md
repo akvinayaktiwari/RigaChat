@@ -18,7 +18,7 @@ Framing: Google's own guidance is that optimizing for AI search is ordinary SEO.
 | Blog posts | 16 | 2026-10-07 | Two global posts added 2026-10-06 (AI sales agent: what it can and cannot do; Trakheesi permit for property ads, limited to what the Dubai Land Department's service page states). Two market posts written 2026-10-06 (real estate CRM for Dubai brokers; WhatsApp automation for small business in India). Three global pillars published 2026-10-06 (WhatsApp CRM, real estate chatbot guide, AI receptionist vs website voice agent). Four published 2026-10-05: Meta lead ads auto-reply, click-to-WhatsApp vs lead forms, real estate chatbot qualification questions, and what a CRM chatbot is. |
 | Mobile LCP (lab) | about 1.7 s | 2026-10-02 | Was 2.3 s on the homepage and 3.25 s on a post. No field data yet. |
 | Lighthouse accessibility | 100 | 2026-10-02 | On every public page audited. |
-| Real referring domains | 0 known | 2026-10-02 | Not in the Common Crawl graph; all six competitors checked are. |
+| Real referring domains | 2 verified, both our own (qdnco.com homepage, followed; GitHub profile, nofollow) | 2026-10-08 | Not in the Common Crawl graph; all six competitors checked are. No third-party link found. Full counts need Moz/Bing keys or OpenSEO credits. |
 | Brand presence off-site | LinkedIn, X and GitHub | 2026-10-06 | X account `x.com/vyostra_ai` added. Nothing on YouTube, Reddit or Wikipedia. |
 
 ---
