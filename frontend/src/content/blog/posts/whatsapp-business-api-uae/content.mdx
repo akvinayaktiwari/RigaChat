@@ -1,0 +1,112 @@
+{/*
+  UAE market post. Target: "whatsapp business api" (UAE 720/mo, KD 50, handoff
+  OpenSEO pull of 2026-10-06; not re-pulled, account out of credits on 2026-10-08).
+  KD 50 is hard: this post competes on being exact and cited, not on volume.
+
+  Sources opened on 2026-10-08:
+  - Meta developer docs, WhatsApp Business Platform pricing: per-message billing
+    from 1 July 2025; charged only when a template is delivered; non-template
+    messages free inside a customer service window; utility templates free inside
+    the window; 72-hour free entry point window after a reply to a click-to-WhatsApp
+    ad enquiry (Android/iOS app only); rate set by recipient country calling code,
+    template category and volume tiers (volume tiers apply to utility and
+    authentication per the secondary summary only, so not stated here).
+  - Meta opt-in, send-messages and templates docs (read 2026-10-06 and 2026-09-19).
+  - u.ae data protection page (read 2026-10-06).
+  NOT verified, therefore not stated: Meta's list of business verification
+  documents (Meta's help page returned no body), UAE-specific document lists, any
+  TDRA text, any rate in USD or AED, review times, any provider's fees.
+
+  No invented numbers. Not legal advice.
+*/}
+
+The WhatsApp Business API is the version of WhatsApp that software can drive. Meta calls it the WhatsApp Business Platform. A chatbot, a CRM or an automated follow-up connects to it to send and receive messages for a business, which the free WhatsApp Business app cannot do.
+
+For a UAE business the practical questions are how to get access, what Meta charges for messages to +971 numbers, and which rules decide what you may send. This post answers those three and says where it stops.
+
+## What is the difference between the WhatsApp Business app and the API?
+
+The app is for a person; the API is for software.
+
+| | WhatsApp Business app | WhatsApp Business API |
+| --- | --- | --- |
+| Who replies | A person on a phone | A person, software, or both |
+| Automatic reply to a form or ad lead | No | Yes |
+| Follow-up outside 24 hours | Manual | Approved templates, sent by software |
+| Writes into a CRM | No | Yes, through whatever you connect |
+| Cost from Meta | None | Per delivered template message |
+
+If one person answers a handful of chats by hand, the app is enough. Once you want a reply to go out the moment a lead arrives, you need the API.
+
+## How does a UAE business get access?
+
+Three routes. In each, make sure the account and phone number are registered to your business, because those are what you would have to move if you changed provider.
+
+| Route | What it means | Suits | Watch for |
+| --- | --- | --- | --- |
+| Build on Meta's Cloud API | Your developers integrate directly | Teams with engineers and an unusual process | Templates, the 24-hour window, retries and opt-in records are all yours to build |
+| A business solution provider | A company that gives you access and a dashboard | Teams that want a managed inbox and broadcasts | Per-seat and per-message fees on top of Meta's |
+| A platform that connects it for you | A chatbot or CRM that sets up the API as part of its product | Teams that want the follow-up flow, not the plumbing | Ask whose account the number sits in, and whether you keep it if you leave |
+
+All three require a Meta business account, and Meta runs a business verification process. Meta's own help pages set out what it asks for; check them, because the requirements are Meta's and change.
+
+## How much does it cost?
+
+Meta's [pricing page](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing) says that since 1 July 2025 you are charged per delivered template message. The rate depends on the template category (marketing, utility or authentication) and on the recipient's country calling code, so a message to a +971 number is priced from the UAE entry on Meta's rate card. No rate is quoted here, because Meta revises them.
+
+What is free, according to the same page:
+
+- messages a person sends to your business;
+- non-template messages, inside an open 24-hour customer service window;
+- utility templates sent inside that window;
+- every message, templates included, during a 72-hour window that opens when you reply to a click-to-WhatsApp ad enquiry within 24 hours. That window applies to people using the Android or iOS app, not WhatsApp Web or desktop.
+
+So the cost depends on how you use it. A business that mostly replies to people who message first pays little to Meta. A business that sends marketing templates to a list pays per delivered message. A provider or platform charges its own fee on top; ask for the total, not just Meta's part.
+
+## What rules decide what you may send?
+
+Two sets: WhatsApp's, which are the same in every country, and the UAE's.
+
+<div className="mt-6 grid gap-4 md:grid-cols-2">
+  <FactCard label="Opt-in first">
+    A business needs [permission before it messages someone](https://developers.facebook.com/documentation/business-messaging/whatsapp/getting-opt-in), taken where the person can see what they are agreeing to.
+  </FactCard>
+  <FactCard label="The 24-hour window">
+    Free-form messages are allowed only within [24 hours of the person's last message](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages). After that you can send only a template.
+  </FactCard>
+  <FactCard label="Templates are reviewed">
+    Templates are submitted to Meta and [approved, rejected or paused](https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/overview), and the category affects what you may write and what it costs.
+  </FactCard>
+  <FactCard label="UAE personal data law">
+    [Federal Decree-Law No. 45 of 2021](https://u.ae/en/about-the-uae/digital-uae/data/data-protection-laws) prohibits processing personal data without the owner's consent, with limited exceptions. The DIFC has its own data protection law.
+  </FactCard>
+</div>
+
+Marketing messages to UAE numbers are also regulated by the telecom regulator. This post does not summarise that text, because summaries disagree on details and the regulator's own pages should be read directly. Ask your legal adviser what applies to the messages you plan to send.
+
+<Callout title="The mistake the window causes" tone="warning">
+  A follow-up written as "message on day 1, day 3, day 7" assumes you can send anything at any time. Day 3 and day 7 fall outside the window for anyone who has gone quiet, so they need approved templates. If nobody submitted them, the sequence fails and the dashboard may still show the step as sent.
+</Callout>
+
+## What should you ask a provider before you sign?
+
+<CheckList
+  items={[
+    <><Emphasis>Whose account is the number in?</Emphasis> Yours, or the provider's. You want to keep the number if you leave.</>,
+    <><Emphasis>What is the total monthly cost?</Emphasis> Meta's per-message charge plus the provider's fee, for the volume you expect.</>,
+    <><Emphasis>What happens after 24 hours?</Emphasis> It should send an approved template and tell you when one is rejected or paused.</>,
+    <><Emphasis>Does follow-up wait for a reply?</Emphasis> A sequence on a timer keeps messaging a person who has already answered.</>,
+    <><Emphasis>Where is consent recorded?</Emphasis> You should be able to show when and how a contact agreed to be messaged.</>,
+    <><Emphasis>Where is the data hosted?</Emphasis> Ask for the country and provider, and check it against your own obligations.</>,
+  ]}
+/>
+
+<div className="mt-16 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+  ### Where Vyostra AI sits
+
+  Vyostra AI is the third route: a lead capture and follow-up tool that sends WhatsApp messages through your own WhatsApp Business API account. A follow-up journey messages a new lead from chat or a Meta lead ad, waits for a real reply, ends when the person asks it to stop, and hands over to your team when the conversation needs a person. It works in English; Arabic has not been tested, so we do not claim it. It is not a broadcast tool or a shared inbox for a large support team.
+
+  More on [WhatsApp in Vyostra AI](/features/whatsapp). If you are a UAE business and want this connected to your website and ads, [talk to us](/contact).
+</div>
+
+For the rules in more depth see [what a WhatsApp CRM is](/blog/what-is-a-whatsapp-crm/). For a property example, see [WhatsApp chatbot for real estate in Dubai](/blog/whatsapp-chatbot-for-real-estate-dubai/) and [real estate CRM for Dubai brokers](/blog/real-estate-crm-dubai/).
