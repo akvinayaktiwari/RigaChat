@@ -1,0 +1,123 @@
+{/*
+  UAE market post. Targets "whatsapp chatbot" (UAE 210/mo, KD 21), "whatsapp crm"
+  (UAE 140/mo, KD 15) and "whatsapp automation" (UAE 170/mo, KD 17), figures from
+  the handoff's OpenSEO pull of 2026-10-06; the OpenSEO account was out of credits
+  on 2026-10-08, so they were not re-pulled.
+
+  Sources opened on 2026-10-08:
+  - Meta developer docs, WhatsApp Business Platform pricing: per-message billing
+    from 1 July 2025, charged only when a template is delivered; non-template
+    messages free inside a customer service window; free entry point window of 72
+    hours after a reply to a Click to WhatsApp ad enquiry; rate depends on the
+    recipient's country calling code. No rate is quoted here: it changes.
+  - Earlier posts' sources (DLD permit service page and QR code news, u.ae data
+    protection page, Meta opt-in / send-messages / templates docs) were read on
+    2026-10-06 for real-estate-crm-dubai and are reused at the same level of claim.
+  - TDRA's own text on marketing messages was NOT read (the TDRA page returned 404,
+    and secondary summaries disagree on dates, hours and fines). So no hour limit,
+    fine or policy number is stated; the point is attributed to Property Finder's
+    guidance as in the CRM post.
+  Nothing on Bayut or Dubizzle was read.
+
+  No market sizes, response times, conversion rates or AED prices. Not legal advice.
+  Product claims match features/WhatsApp.tsx and features/Crm.tsx as quoted in the
+  Dubai CRM post. English only; no on-page voice promise (no UAE network test).
+*/}
+
+A WhatsApp chatbot for a Dubai brokerage is an automated agent on a WhatsApp Business number. It answers a buyer's enquiry as soon as it arrives, asks the few questions a viewing depends on, records the answers on the lead, and either proposes a viewing or hands the chat to an agent with the conversation attached.
+
+It works only inside WhatsApp's rules and Dubai's advertising and data rules, and it cannot capture enquiries that never reach WhatsApp. This guide covers what the chatbot should do, which Dubai details change the design, and where it stops.
+
+> The competitor is not another chatbot. It is the agent who answers in two minutes, and the enquiry that waited until morning.
+
+## Why does a Dubai brokerage put the chatbot on WhatsApp?
+
+Because the conversation tends to move there. A buyer finds a listing, a launch ad or your website, and then wants to carry on in the app they already use, with a thread they can scroll back through when they compare projects. Property Finder, for one, [lets a seeker contact an agent on WhatsApp](https://www.propertyfinder.ae/blog/enquire-about-a-property-with-an-agent-via-whatsapp/) as well as by email or phone.
+
+That also marks the limit. A WhatsApp chatbot sees the enquiries that arrive on WhatsApp. Email and phone enquiries from the same listing do not pass through it, so check how each portal you pay for delivers its leads before you plan around a bot. The wider question of getting every source into one list is covered in [real estate CRM for Dubai brokers](/blog/real-estate-crm-dubai/).
+
+## What rules limit what the chatbot may send?
+
+Three sets, and they apply together.
+
+<div className="mt-6 grid gap-4 md:grid-cols-3">
+  <FactCard label="WhatsApp">
+    A business needs [opt-in before it messages someone](https://developers.facebook.com/documentation/business-messaging/whatsapp/getting-opt-in). It can send free-form messages only within [24 hours of the person's last message](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages); after that, only a [template Meta has approved](https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/overview).
+  </FactCard>
+  <FactCard label="Dubai advertising">
+    The Dubai Land Department issues [real estate advertising permits](https://dubailand.gov.ae/en/eservices/real-estate-ad-permit/) through Trakheesi, covering electronic and SMS ads among other types. Approved ads must also carry a [QR code](https://dubailand.gov.ae/en/news-media/dld-introduces-the-madmoun-service-to-ensure-the-validity-of-real-estate-ads-via-qr-codes) so a customer can verify them. Details in the [Trakheesi guide](/blog/trakheesi-permit-dubai-property-ads/).
+  </FactCard>
+  <FactCard label="Personal data">
+    The UAE's [Federal Decree-Law No. 45 of 2021](https://u.ae/en/about-the-uae/digital-uae/data/data-protection-laws) prohibits processing personal data without the owner's consent, with limited exceptions. The DIFC has its own law.
+  </FactCard>
+</div>
+
+Property Finder's [guidance for agents](https://www.propertyfinder.ae/partnerhub/whatsapp-for-agents-part-1-compliant-opt-in-funnels-that-convert/) adds that UAE telecom rules expect prior consent and a working opt-out for marketing messages. It attributes that to the telecom regulator; read the regulator's own text before relying on it, and ask your legal adviser what applies to your brokerage.
+
+## What does a good Dubai property chat look like?
+
+Short. It qualifies, then gets out of the way. Five moves, in this order.
+
+<PhaseTimeline
+  phases={[
+    { phase: 'Reply', timeline: 'Seconds', action: 'Name the property or project the buyer asked about. A generic "thanks for your interest" tells them they are in a queue.' },
+    { phase: 'Qualify', timeline: '3 to 5 questions', action: 'Budget, preferred area, ready or off-plan, when they want to move, and cash or mortgage. Ask nothing you will not act on.' },
+    { phase: 'Answer', timeline: 'On demand', action: 'Answer from your own project and listing content: payment plan, handover, service charges, distance to what they asked about. If it is not in the content, say so and bring in an agent.' },
+    { phase: 'Propose a viewing', timeline: 'Same chat', action: 'Offer two or three slots rather than "someone will call you".' },
+    { phase: 'Hand off', timeline: 'On any real signal', action: 'Negotiation, an objection or an unusual request goes to a person with the transcript, and the buyer is told a person is joining.' },
+  ]}
+/>
+
+Three Dubai details change the wording of that flow:
+
+- **Off-plan and ready are different conversations.** A launch enquiry is about payment plan and handover; a resale enquiry is about the unit, the tenancy and the mortgage. Asking "ready or off-plan?" early lets the bot choose the right questions.
+- **Buyers write from many countries.** Do not assume a phone number or a language. Capture numbers in international format, with the country code, at the point of entry, so WhatsApp can deliver to them.
+- **Never let the bot write property claims.** Price, availability, ROI or "guaranteed" anything should come only from content you have approved, with the permit details your ad already carries. A bot that improvises about a unit is an advertising problem, not a technical one.
+
+## How does the lead source change the first message?
+
+The source decides whether the 24-hour window is already open.
+
+| Source | Who messages first | Your first message |
+| --- | --- | --- |
+| Click-to-WhatsApp ad | The buyer, from the ad | Free-form. Reply fast and qualify. |
+| Chat on your own website | The buyer, on your site | Depends on the opt-in you captured. Say plainly that you will continue on WhatsApp. |
+| Meta lead ad form | Nobody; you receive a form | An approved template, sent within seconds of the submission. |
+| Portal enquiry on WhatsApp | The buyer, on the portal's WhatsApp link | Check how the portal passes it to you. Do not assume it reaches your bot. |
+| Email or phone enquiry | Not WhatsApp at all | The chatbot is not involved. |
+
+[Click-to-WhatsApp ads versus lead forms](/blog/click-to-whatsapp-ads-vs-lead-forms-real-estate-india/) compares the two ad paths, and [auto-replying to Facebook lead ads](/blog/facebook-lead-ads-whatsapp-auto-reply/) covers the template path.
+
+## What does it cost to run?
+
+Two things: the chatbot platform, and Meta's charge for template messages. Meta's [pricing page](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing) says that since 1 July 2025 you are charged per delivered template message, at a rate that depends on the template category and on the recipient's country calling code. It also says:
+
+- replies inside an open 24-hour window are free;
+- a utility template sent inside that window is free;
+- when a buyer messages you through a click-to-WhatsApp ad, a reply within 24 hours opens a 72-hour window in which every message, templates included, is free.
+
+Meta changes rates and rules, so read the current rate card before you budget. No figure is quoted here for that reason.
+
+## What should you do before launch?
+
+<CheckList
+  items={[
+    <><Emphasis>Get a real opt-in and keep the record.</Emphasis> Say on the form or ad that you will message on WhatsApp, and store when and how the person agreed.</>,
+    <><Emphasis>Submit your follow-up templates first.</Emphasis> A day-three follow-up falls outside the window for anyone who went quiet, so it needs an approved template or it will not arrive.</>,
+    <><Emphasis>Load only approved content.</Emphasis> The bot's answers should come from text you have already cleared, including any permit details.</>,
+    <><Emphasis>Decide who takes the handoff, and when.</Emphasis> A bot that escalates into an empty inbox at night is worse than one that says the team replies in the morning.</>,
+    <><Emphasis>Make STOP work at once.</Emphasis> If someone asks to stop, the sequence ends there, not after one more scheduled message.</>,
+  ]}
+/>
+
+<div className="mt-16 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+  ### Where Vyostra AI sits
+
+  Vyostra AI is a lead capture and follow-up tool. A chat agent on your website answers buyers from your own project content and collects their details, and lead forms and Meta lead ads feed the same list. For a new lead from chat or a Meta lead ad, a follow-up journey sends a WhatsApp message through your own WhatsApp Business API account, waits for a real reply, and hands the lead to your team when it needs a person. Leads sit in a follow-up queue with four statuses and notes.
+
+  What it does not do: it does not import enquiries from Property Finder, Bayut or Dubizzle, it does not manage listings or deals, and it works in English only. Arabic has not been tested, so we do not claim it. More on [WhatsApp in Vyostra AI](/features/whatsapp) and [the lead CRM](/features/crm).
+
+  If you run a brokerage in the UAE and want this set up for your website and ads, [talk to us](/contact).
+</div>
+
+The WhatsApp rules above are the same in every country; [what a WhatsApp CRM is](/blog/what-is-a-whatsapp-crm/) explains them in full, and [the real estate chatbot guide](/blog/real-estate-chatbot-guide/) covers the chatbot itself. For the India version of this guide, see [WhatsApp chatbot for real estate in India](/blog/whatsapp-chatbot-for-real-estate-india/).
