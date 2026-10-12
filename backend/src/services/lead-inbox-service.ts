@@ -17,7 +17,7 @@ import {
   normalizeVoiceLead,
   readJourneyLead,
 } from './lead-resolution-service.js'
-import type { FormField, LeadRef, LeadSource, LeadState, UnifiedLead, UnifiedLeadDetail,
+import type { FormField, LeadRef, LeadSource, LeadState, LeadStatus, UnifiedLead, UnifiedLeadDetail,
   LeadEvent,
   UrgencyTier,
   UnifiedInboxPage,
@@ -60,7 +60,19 @@ export interface InboxQuery {
   // should not reappear in it. On, it is the same queue with the dismissed ones
   // shown, which is how you find something you archived by mistake.
   includeArchived?: boolean
+  // 'urgency' is the default work-queue order. 'latest' is plain newest-first,
+  // for the person who just wants to see what arrived. Both are paginated by the
+  // same kind of cursor; a cursor from one sort is ignored by the other.
+  sort?: InboxSort
+  // Narrow the inbox BEFORE counting and paging, so `total` and `hasMore` describe
+  // the filtered list. Filtering a loaded page on the client cannot do that.
+  status?: LeadStatus
+  source?: LeadSource
 }
+
+export type InboxSort = 'urgency' | 'latest'
+
+export const INBOX_SORTS: readonly InboxSort[] = ['urgency', 'latest']
 
 // A cursor is the sort POSITION of the last lead on the previous page, not an
 // offset. An offset silently skips or repeats a lead when the list changes
@@ -68,16 +80,21 @@ export interface InboxQuery {
 //
 // Opaque to callers on purpose: the encoding is an implementation detail and a
 // client that parses it will break when the sort changes.
-function encodeCursor(position: InboxPosition): string {
-  return Buffer.from(JSON.stringify(position)).toString('base64url')
+function encodeCursor(position: InboxPosition, sort: InboxSort): string {
+  return Buffer.from(JSON.stringify({ ...position, sort })).toString('base64url')
 }
 
-function decodeCursor(cursor: string): InboxPosition | null {
+// A cursor minted under a different sort means nothing here -- its rank and
+// sortKey are on another scale -- so it is treated as unreadable and the caller
+// starts from the top. A cursor with no `sort` field predates this and was
+// always urgency.
+function decodeCursor(cursor: string, sort: InboxSort): InboxPosition | null {
   try {
     const parsed: unknown = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'))
     if (typeof parsed !== 'object' || parsed === null) return null
-    const { rank, sortKey, leadId } = parsed as Record<string, unknown>
+    const { rank, sortKey, leadId, sort: cursorSort } = parsed as Record<string, unknown>
     if (typeof rank !== 'number' || typeof sortKey !== 'number' || typeof leadId !== 'string') return null
+    if ((cursorSort ?? 'urgency') !== sort) return null
     return { rank, sortKey, leadId }
   } catch {
     return null
@@ -172,16 +189,26 @@ export async function getUnifiedInbox(clientId: string, query: InboxQuery = {}):
   // stable total order: a lead whose nextActionAt straddles the current instant
   // can compare inconsistently between two calls within the same sort.
   const now = Date.now()
+  const sort: InboxSort = query.sort ?? 'urgency'
+  const position = (lead: SortableLead): InboxPosition =>
+    sort === 'latest' ? latestPositionOf(lead) : positionOf(lead, now)
+
+  // A lead with no state row has never been opened, which is 'new'.
+  const matches = (lead: SortableLead): boolean =>
+    (query.status === undefined || (lead.state?.status ?? 'new') === query.status) &&
+    (query.source === undefined || lead.leadRef.source === query.source)
+
   const sorted: UnifiedLead[] = unified
-    .sort((a, b) => compareByUrgency(a, b, now))
+    .filter(matches)
+    .sort((a, b) => comparePositions(position(a), position(b)))
     // Stamped AFTER the sort, so the value a client renders is provably the
     // same one that decided the row's position.
     .map((lead) => ({ ...lead, urgencyTier: urgencyTierOf(lead, now) }))
 
-  const after = query.cursor ? decodeCursor(query.cursor) : null
+  const after = query.cursor ? decodeCursor(query.cursor, sort) : null
   // An unreadable cursor starts from the top rather than erroring. A client
   // holding a stale cursor after a deploy should see their inbox, not a 400.
-  const start = after ? sorted.findIndex((lead) => comparePositions(positionOf(lead, now), after) > 0) : 0
+  const start = after ? sorted.findIndex((lead) => comparePositions(position(lead), after) > 0) : 0
   const from = start === -1 ? sorted.length : start
 
   const limit = query.limit === undefined ? sorted.length : Math.min(Math.max(query.limit, 1), MAX_PAGE_SIZE)
@@ -192,7 +219,7 @@ export async function getUnifiedInbox(clientId: string, query: InboxQuery = {}):
   return {
     leads: page,
     total: sorted.length,
-    ...(hasMore && last ? { nextCursor: encodeCursor(positionOf(last, now)) } : {}),
+    ...(hasMore && last ? { nextCursor: encodeCursor(position(last), sort) } : {}),
     // Omitted when nothing failed, so the field's presence is the signal.
     ...(degradedSources.length > 0 ? { degradedSources } : {}),
   }
@@ -274,14 +301,17 @@ export function positionOf(lead: SortableLead, now: number): InboxPosition {
   return { rank: TIER_RANK[tier], sortKey: sortKeyOf(lead, tier), leadId: lead.leadId }
 }
 
+// Newest first, as one ascending number so the cursor stays a single comparable
+// position: the timestamp is negated. Rank is constant, there are no tiers here.
+// An unparseable date sorts LAST, for the same total-order reason as sortKeyOf.
+export function latestPositionOf(lead: SortableLead): InboxPosition {
+  return { rank: 0, sortKey: finite(-Date.parse(lead.createdAt), Number.MAX_SAFE_INTEGER), leadId: lead.leadId }
+}
+
 function comparePositions(a: InboxPosition, b: InboxPosition): number {
   if (a.rank !== b.rank) return a.rank - b.rank
   if (a.sortKey !== b.sortKey) return a.sortKey - b.sortKey
   return a.leadId < b.leadId ? -1 : a.leadId > b.leadId ? 1 : 0
-}
-
-function compareByUrgency(a: SortableLead, b: SortableLead, now: number): number {
-  return comparePositions(positionOf(a, now), positionOf(b, now))
 }
 
 // A malformed customFields blob must not 404 the lead -- the same posture

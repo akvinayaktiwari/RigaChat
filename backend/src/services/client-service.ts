@@ -18,7 +18,9 @@ import type { AppBootstrap, Capability, ClientRecord, NotificationPreferences, S
 // 'lead.timeline' added 2026-08-27 with the mobile timeline view. Safe to
 // advertise before every install has it: an older build does not recognise the
 // string and simply renders no timeline section.
-const READY_CAPABILITIES: Capability[] = ['lead.read', 'lead.state', 'lead.note', 'lead.timeline']
+//
+// 'lead.inbox.filter' added 2026-10-13: the inbox accepts sort/status/source.
+const READY_CAPABILITIES: Capability[] = ['lead.read', 'lead.state', 'lead.note', 'lead.timeline', 'lead.inbox.filter']
 
 interface UpsertClientInput {
   clientId: string

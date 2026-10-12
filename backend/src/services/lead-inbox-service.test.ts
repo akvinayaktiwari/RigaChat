@@ -855,3 +855,134 @@ describe('archiving a lead', () => {
     expect(upsertLeadState.mock.calls[0][2]).not.toHaveProperty('lastTouchedAt')
   })
 })
+
+describe('inbox sort and filters', () => {
+  function walk(query: Parameters<typeof getUnifiedInbox>[1]) {
+    return async () => {
+      const seen: string[] = []
+      let cursor: string | undefined
+      let guard = 0
+      do {
+        const page = await getUnifiedInbox(CLIENT, { limit: 2, ...query, ...(cursor ? { cursor } : {}) })
+        seen.push(...page.leads.map((lead) => lead.leadId))
+        cursor = page.nextCursor
+        guard += 1
+      } while (cursor && guard < 20)
+      return seen
+    }
+  }
+
+  it('sorts newest first when asked, across sources', async () => {
+    getLeadsByClientId.mockResolvedValue([chatLead('chat-old', '2026-08-01T00:00:00.000Z')])
+    getFormLeadsByClientId.mockResolvedValue([formLead('form-new', '2026-08-06T00:00:00.000Z')])
+    getMetaLeadsByClientId.mockResolvedValue([metaLead('meta-mid', '2026-08-03T00:00:00.000Z')])
+
+    const page = await getUnifiedInbox(CLIENT, { sort: 'latest' })
+
+    expect(page.leads.map((lead) => lead.leadId)).toEqual(['form-new', 'meta-mid', 'chat-old'])
+  })
+
+  // The whole reason "latest" exists: urgency would bury this lead under the overdue one.
+  it('puts a brand-new lead above an overdue follow-up under latest, but not under urgency', async () => {
+    getLeadsByClientId.mockResolvedValue([
+      chatLead('overdue', '2026-08-01T00:00:00.000Z'),
+      chatLead('fresh', '2026-08-07T11:59:00.000Z'),
+    ])
+    getLeadStatesForClient.mockResolvedValue([state('overdue', { nextActionAt: '2026-08-05T09:00:00.000Z' })])
+
+    const urgency = await getUnifiedInbox(CLIENT, { sort: 'urgency' })
+    const latest = await getUnifiedInbox(CLIENT, { sort: 'latest' })
+
+    expect(urgency.leads.map((lead) => lead.leadId)).toEqual(['overdue', 'fresh'])
+    expect(latest.leads.map((lead) => lead.leadId)).toEqual(['fresh', 'overdue'])
+  })
+
+  it('defaults to urgency when no sort is given', async () => {
+    getLeadsByClientId.mockResolvedValue([
+      chatLead('overdue', '2026-08-01T00:00:00.000Z'),
+      chatLead('fresh', '2026-08-07T11:59:00.000Z'),
+    ])
+    getLeadStatesForClient.mockResolvedValue([state('overdue', { nextActionAt: '2026-08-05T09:00:00.000Z' })])
+
+    expect((await getUnifiedInbox(CLIENT)).leads[0]?.leadId).toBe('overdue')
+  })
+
+  it('still stamps urgencyTier under latest, so the row can explain itself', async () => {
+    getLeadsByClientId.mockResolvedValue([chatLead('a', '2026-08-06T00:00:00.000Z')])
+
+    expect((await getUnifiedInbox(CLIENT, { sort: 'latest' })).leads[0]?.urgencyTier).toBe('untouched')
+  })
+
+  it('walks every lead exactly once, newest first, across pages', async () => {
+    getLeadsByClientId.mockResolvedValue(
+      ['a', 'b', 'c', 'd', 'e'].map((id, i) => chatLead(id, new Date(Date.parse('2026-08-01T00:00:00.000Z') + i * 1000).toISOString()))
+    )
+
+    expect(await walk({ sort: 'latest' })()).toEqual(['e', 'd', 'c', 'b', 'a'])
+  })
+
+  it('breaks a timestamp tie by leadId, so paging never repeats or skips', async () => {
+    const same = '2026-08-06T00:00:00.000Z'
+    getLeadsByClientId.mockResolvedValue([chatLead('b', same), chatLead('a', same), chatLead('c', same)])
+
+    const seen = await walk({ sort: 'latest' })()
+
+    expect(seen).toHaveLength(3)
+    expect(new Set(seen).size).toBe(3)
+  })
+
+  it('ignores a cursor minted under the other sort and starts from the top', async () => {
+    getLeadsByClientId.mockResolvedValue(
+      ['a', 'b', 'c', 'd'].map((id, i) => chatLead(id, new Date(Date.parse('2026-08-01T00:00:00.000Z') + i * 1000).toISOString()))
+    )
+    const urgencyCursor = (await getUnifiedInbox(CLIENT, { limit: 2, sort: 'urgency' })).nextCursor
+
+    const page = await getUnifiedInbox(CLIENT, { limit: 2, sort: 'latest', ...(urgencyCursor ? { cursor: urgencyCursor } : {}) })
+
+    expect(page.leads.map((lead) => lead.leadId)).toEqual(['d', 'c'])
+  })
+
+  it('filters by status, treating a lead with no state row as new', async () => {
+    getLeadsByClientId.mockResolvedValue([
+      chatLead('untouched', '2026-08-01T00:00:00.000Z'),
+      chatLead('called', '2026-08-02T00:00:00.000Z'),
+      chatLead('won', '2026-08-03T00:00:00.000Z'),
+    ])
+    getLeadStatesForClient.mockResolvedValue([state('called', { status: 'contacted' }), state('won', { status: 'closed' })])
+
+    const fresh = await getUnifiedInbox(CLIENT, { status: 'new' })
+    const contacted = await getUnifiedInbox(CLIENT, { status: 'contacted' })
+
+    expect(fresh.leads.map((lead) => lead.leadId)).toEqual(['untouched'])
+    expect(contacted.leads.map((lead) => lead.leadId)).toEqual(['called'])
+  })
+
+  it('filters by source', async () => {
+    getLeadsByClientId.mockResolvedValue([chatLead('c', '2026-08-01T00:00:00.000Z')])
+    getFormLeadsByClientId.mockResolvedValue([formLead('f', '2026-08-02T00:00:00.000Z')])
+    getVoiceLeadsByClientId.mockResolvedValue([voiceLead('v', '2026-08-03T00:00:00.000Z')])
+
+    expect((await getUnifiedInbox(CLIENT, { source: 'form' })).leads.map((lead) => lead.leadId)).toEqual(['f'])
+    expect((await getUnifiedInbox(CLIENT, { source: 'voice' })).leads.map((lead) => lead.leadId)).toEqual(['v'])
+  })
+
+  it('reports the filtered total, so "3 leads" never means the unfiltered count', async () => {
+    getLeadsByClientId.mockResolvedValue([chatLead('c', '2026-08-01T00:00:00.000Z')])
+    getFormLeadsByClientId.mockResolvedValue([formLead('f1', '2026-08-02T00:00:00.000Z'), formLead('f2', '2026-08-03T00:00:00.000Z')])
+
+    const page = await getUnifiedInbox(CLIENT, { source: 'form', limit: 1 })
+
+    expect(page.total).toBe(2)
+    expect(page.leads).toHaveLength(1)
+    expect(page.nextCursor).toBeDefined()
+  })
+
+  it('combines status, source and sort', async () => {
+    getLeadsByClientId.mockResolvedValue([chatLead('c-new', '2026-08-01T00:00:00.000Z')])
+    getFormLeadsByClientId.mockResolvedValue([formLead('f-old', '2026-08-02T00:00:00.000Z'), formLead('f-new', '2026-08-05T00:00:00.000Z')])
+
+    const page = await getUnifiedInbox(CLIENT, { source: 'form', status: 'new', sort: 'latest' })
+
+    expect(page.leads.map((lead) => lead.leadId)).toEqual(['f-new', 'f-old'])
+  })
+})

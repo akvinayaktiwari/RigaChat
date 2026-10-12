@@ -15,7 +15,9 @@ import {
   getUnifiedLeadDetail,
   updateLeadStateForClient,
   setLeadArchivedForClient,
+  INBOX_SORTS,
 } from '../services/lead-inbox-service.js'
+import type { InboxSort } from '../services/lead-inbox-service.js'
 import {
   LeadStateValidationError,
   parseLeadRef,
@@ -28,7 +30,9 @@ import type {
   Lead,
   LeadEvent,
   LeadRef,
+  LeadSource,
   LeadState,
+  LeadStatus,
   UnifiedLead,
   UnifiedLeadDetail,
   UnifiedInboxPage,
@@ -126,6 +130,9 @@ function stateErrorResponse(error: unknown): { message: string; status: 400 | 40
   return { message: errorMessage(error), status: 500 }
 }
 
+const LEAD_STATUSES: readonly LeadStatus[] = ['new', 'contacted', 'qualified', 'closed']
+const LEAD_SOURCES: readonly LeadSource[] = ['chat', 'form', 'meta', 'voice']
+
 // Returns a PAGE, not a bare array. The shape changed on 2026-08-27 when this
 // endpoint was paginated -- see lead-inbox-service.ts for what that fixes (the
 // multi-megabyte response over mobile data) and what it does not (the read
@@ -142,8 +149,26 @@ leadRoutes.get('/inbox', requireAuth, async (c) => {
     return c.json<ApiResponse<null>>({ success: false, error: 'limit must be a positive integer' }, 400)
   }
 
+  // Unknown values are a 400, not a silent fallback: a typo'd filter that quietly
+  // returned the whole inbox would look like "the filter found everything".
+  const sort = c.req.query('sort')
+  if (sort !== undefined && !INBOX_SORTS.includes(sort as InboxSort)) {
+    return c.json<ApiResponse<null>>({ success: false, error: `sort must be one of: ${INBOX_SORTS.join(', ')}` }, 400)
+  }
+  const status = c.req.query('status')
+  if (status !== undefined && !LEAD_STATUSES.includes(status as LeadStatus)) {
+    return c.json<ApiResponse<null>>({ success: false, error: `status must be one of: ${LEAD_STATUSES.join(', ')}` }, 400)
+  }
+  const source = c.req.query('source')
+  if (source !== undefined && !LEAD_SOURCES.includes(source as LeadSource)) {
+    return c.json<ApiResponse<null>>({ success: false, error: `source must be one of: ${LEAD_SOURCES.join(', ')}` }, 400)
+  }
+
   try {
     const page = await getUnifiedInbox(clientId, {
+      ...(sort !== undefined ? { sort: sort as InboxSort } : {}),
+      ...(status !== undefined ? { status: status as LeadStatus } : {}),
+      ...(source !== undefined ? { source: source as LeadSource } : {}),
       ...(limit !== undefined ? { limit } : {}),
       ...(c.req.query('cursor') ? { cursor: c.req.query('cursor') as string } : {}),
       ...(c.req.query('includeArchived') === 'true' ? { includeArchived: true } : {}),
