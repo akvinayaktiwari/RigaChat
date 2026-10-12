@@ -221,7 +221,7 @@ describe('getAppBootstrap', () => {
 
     await expect(getAppBootstrap('client-1')).resolves.toEqual({
       ready: true,
-      capabilities: ['lead.read', 'lead.state', 'lead.note', 'lead.timeline', 'lead.inbox.filter'],
+      capabilities: ['lead.read', 'lead.state', 'lead.note', 'lead.timeline', 'lead.inbox.filter', 'lead.inbox.date'],
     })
   })
 
@@ -235,6 +235,7 @@ describe('getAppBootstrap', () => {
 
     expect(bootstrap.capabilities).toContain('lead.timeline')
     expect(bootstrap.capabilities).toContain('lead.inbox.filter')
+    expect(bootstrap.capabilities).toContain('lead.inbox.date')
   })
 
   it('reads bot count scoped to the caller, never across clients', async () => {

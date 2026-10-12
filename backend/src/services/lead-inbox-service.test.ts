@@ -986,3 +986,98 @@ describe('inbox sort and filters', () => {
     expect(page.leads.map((lead) => lead.leadId)).toEqual(['f-new', 'f-old'])
   })
 })
+
+describe('inbox oldest sort and date window', () => {
+  it('sorts oldest first when asked', async () => {
+    getLeadsByClientId.mockResolvedValue([
+      chatLead('mid', '2026-08-03T00:00:00.000Z'),
+      chatLead('new', '2026-08-06T00:00:00.000Z'),
+      chatLead('old', '2026-08-01T00:00:00.000Z'),
+    ])
+
+    const page = await getUnifiedInbox(CLIENT, { sort: 'oldest' })
+
+    expect(page.leads.map((lead) => lead.leadId)).toEqual(['old', 'mid', 'new'])
+  })
+
+  it('walks every lead exactly once under oldest, across pages', async () => {
+    getLeadsByClientId.mockResolvedValue(
+      ['a', 'b', 'c', 'd', 'e'].map((id, i) => chatLead(id, new Date(Date.parse('2026-08-01T00:00:00.000Z') + i * 1000).toISOString()))
+    )
+    const seen: string[] = []
+    let cursor: string | undefined
+    let guard = 0
+    do {
+      const page = await getUnifiedInbox(CLIENT, { sort: 'oldest', limit: 2, ...(cursor ? { cursor } : {}) })
+      seen.push(...page.leads.map((lead) => lead.leadId))
+      cursor = page.nextCursor
+      guard += 1
+    } while (cursor && guard < 20)
+
+    expect(seen).toEqual(['a', 'b', 'c', 'd', 'e'])
+  })
+
+  const dated = () =>
+    getLeadsByClientId.mockResolvedValue([
+      chatLead('before', '2026-08-04T23:59:59.000Z'),
+      chatLead('at-start', '2026-08-05T00:00:00.000Z'),
+      chatLead('inside', '2026-08-05T12:00:00.000Z'),
+      chatLead('at-end', '2026-08-06T00:00:00.000Z'),
+    ])
+
+  it('includes createdFrom and excludes createdTo', async () => {
+    dated()
+
+    const page = await getUnifiedInbox(CLIENT, {
+      sort: 'oldest',
+      createdFrom: '2026-08-05T00:00:00.000Z',
+      createdTo: '2026-08-06T00:00:00.000Z',
+    })
+
+    expect(page.leads.map((lead) => lead.leadId)).toEqual(['at-start', 'inside'])
+  })
+
+  it('accepts a window with only one end', async () => {
+    dated()
+
+    const from = await getUnifiedInbox(CLIENT, { sort: 'oldest', createdFrom: '2026-08-05T12:00:00.000Z' })
+    const to = await getUnifiedInbox(CLIENT, { sort: 'oldest', createdTo: '2026-08-05T00:00:00.000Z' })
+
+    expect(from.leads.map((lead) => lead.leadId)).toEqual(['inside', 'at-end'])
+    expect(to.leads.map((lead) => lead.leadId)).toEqual(['before'])
+  })
+
+  it('reports the windowed total and pages inside the window', async () => {
+    dated()
+
+    const page = await getUnifiedInbox(CLIENT, { limit: 1, createdFrom: '2026-08-05T00:00:00.000Z' })
+
+    expect(page.total).toBe(3)
+    expect(page.leads).toHaveLength(1)
+    expect(page.nextCursor).toBeDefined()
+  })
+
+  it('combines a date window with status, source and sort', async () => {
+    getLeadsByClientId.mockResolvedValue([chatLead('chat-in', '2026-08-05T10:00:00.000Z')])
+    getFormLeadsByClientId.mockResolvedValue([
+      formLead('form-in-1', '2026-08-05T08:00:00.000Z'),
+      formLead('form-in-2', '2026-08-05T09:00:00.000Z'),
+      formLead('form-out', '2026-07-01T09:00:00.000Z'),
+    ])
+
+    const page = await getUnifiedInbox(CLIENT, {
+      source: 'form',
+      status: 'new',
+      sort: 'latest',
+      createdFrom: '2026-08-05T00:00:00.000Z',
+    })
+
+    expect(page.leads.map((lead) => lead.leadId)).toEqual(['form-in-2', 'form-in-1'])
+  })
+
+  it('returns everything when no window is given', async () => {
+    dated()
+
+    expect((await getUnifiedInbox(CLIENT)).total).toBe(4)
+  })
+})

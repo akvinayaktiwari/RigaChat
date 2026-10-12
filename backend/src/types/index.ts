@@ -1642,6 +1642,7 @@ export type Capability =
   | 'lead.note'      // POST /api/leads/notes
   | 'lead.timeline'  // GET /api/leads/events   (phase 2)
   | 'lead.inbox.filter' // GET /api/leads/inbox honours ?sort=latest|urgency, ?status=, ?source=
+  | 'lead.inbox.date'   // ... and ?sort=oldest, ?createdFrom=, ?createdTo= (ISO timestamps)
 
 // Everything the app needs on launch, in one call: whether to show the inbox or
 // the "finish setting up on the web" gate, and what it may do once inside.

@@ -68,11 +68,17 @@ export interface InboxQuery {
   // the filtered list. Filtering a loaded page on the client cannot do that.
   status?: LeadStatus
   source?: LeadSource
+  // Created-at window, ISO timestamps. `createdFrom` is inclusive, `createdTo` is
+  // exclusive, so "today" is [midnight, next midnight) with no double-counted instant.
+  // The CLIENT turns "Today" or "Last 7 days" into these in its own timezone; the
+  // server has no idea what a user's "today" is.
+  createdFrom?: string
+  createdTo?: string
 }
 
-export type InboxSort = 'urgency' | 'latest'
+export type InboxSort = 'urgency' | 'latest' | 'oldest'
 
-export const INBOX_SORTS: readonly InboxSort[] = ['urgency', 'latest']
+export const INBOX_SORTS: readonly InboxSort[] = ['urgency', 'latest', 'oldest']
 
 // A cursor is the sort POSITION of the last lead on the previous page, not an
 // offset. An offset silently skips or repeats a lead when the list changes
@@ -191,12 +197,24 @@ export async function getUnifiedInbox(clientId: string, query: InboxQuery = {}):
   const now = Date.now()
   const sort: InboxSort = query.sort ?? 'urgency'
   const position = (lead: SortableLead): InboxPosition =>
-    sort === 'latest' ? latestPositionOf(lead) : positionOf(lead, now)
+    sort === 'latest' ? latestPositionOf(lead) : sort === 'oldest' ? oldestPositionOf(lead) : positionOf(lead, now)
+
+  const fromMs = query.createdFrom === undefined ? null : Date.parse(query.createdFrom)
+  const toMs = query.createdTo === undefined ? null : Date.parse(query.createdTo)
+  // A lead with an unparseable createdAt cannot be placed in a window, so a date
+  // filter excludes it rather than guessing.
+  const inWindow = (lead: SortableLead): boolean => {
+    if (fromMs === null && toMs === null) return true
+    const created = Date.parse(lead.createdAt)
+    if (!Number.isFinite(created)) return false
+    return (fromMs === null || created >= fromMs) && (toMs === null || created < toMs)
+  }
 
   // A lead with no state row has never been opened, which is 'new'.
   const matches = (lead: SortableLead): boolean =>
     (query.status === undefined || (lead.state?.status ?? 'new') === query.status) &&
-    (query.source === undefined || lead.leadRef.source === query.source)
+    (query.source === undefined || lead.leadRef.source === query.source) &&
+    inWindow(lead)
 
   const sorted: UnifiedLead[] = unified
     .filter(matches)
@@ -299,6 +317,11 @@ export interface InboxPosition {
 export function positionOf(lead: SortableLead, now: number): InboxPosition {
   const tier = urgencyTierOf(lead, now)
   return { rank: TIER_RANK[tier], sortKey: sortKeyOf(lead, tier), leadId: lead.leadId }
+}
+
+// Oldest first: the plain timestamp, ascending. Unparseable dates still sort last.
+export function oldestPositionOf(lead: SortableLead): InboxPosition {
+  return { rank: 0, sortKey: finite(Date.parse(lead.createdAt), Number.MAX_SAFE_INTEGER), leadId: lead.leadId }
 }
 
 // Newest first, as one ascending number so the cursor stays a single comparable

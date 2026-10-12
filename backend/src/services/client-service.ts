@@ -20,7 +20,18 @@ import type { AppBootstrap, Capability, ClientRecord, NotificationPreferences, S
 // string and simply renders no timeline section.
 //
 // 'lead.inbox.filter' added 2026-10-13: the inbox accepts sort/status/source.
-const READY_CAPABILITIES: Capability[] = ['lead.read', 'lead.state', 'lead.note', 'lead.timeline', 'lead.inbox.filter']
+//
+// 'lead.inbox.date' added 2026-10-13, SEPARATE from 'lead.inbox.filter' on purpose: a
+// server that has the first but not the second would silently ignore a date range, and
+// a list that says "Last 7 days" while showing everything is worse than no date filter.
+const READY_CAPABILITIES: Capability[] = [
+  'lead.read',
+  'lead.state',
+  'lead.note',
+  'lead.timeline',
+  'lead.inbox.filter',
+  'lead.inbox.date',
+]
 
 interface UpsertClientInput {
   clientId: string

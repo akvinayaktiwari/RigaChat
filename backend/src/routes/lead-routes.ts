@@ -155,6 +155,15 @@ leadRoutes.get('/inbox', requireAuth, async (c) => {
   if (sort !== undefined && !INBOX_SORTS.includes(sort as InboxSort)) {
     return c.json<ApiResponse<null>>({ success: false, error: `sort must be one of: ${INBOX_SORTS.join(', ')}` }, 400)
   }
+  // Dates must parse. An unparseable bound that was quietly dropped would return the
+  // whole inbox under a heading that says it is filtered.
+  const createdFrom = c.req.query('createdFrom')
+  const createdTo = c.req.query('createdTo')
+  for (const [name, value] of [['createdFrom', createdFrom], ['createdTo', createdTo]] as const) {
+    if (value !== undefined && !Number.isFinite(Date.parse(value))) {
+      return c.json<ApiResponse<null>>({ success: false, error: `${name} must be an ISO timestamp` }, 400)
+    }
+  }
   const status = c.req.query('status')
   if (status !== undefined && !LEAD_STATUSES.includes(status as LeadStatus)) {
     return c.json<ApiResponse<null>>({ success: false, error: `status must be one of: ${LEAD_STATUSES.join(', ')}` }, 400)
@@ -169,6 +178,8 @@ leadRoutes.get('/inbox', requireAuth, async (c) => {
       ...(sort !== undefined ? { sort: sort as InboxSort } : {}),
       ...(status !== undefined ? { status: status as LeadStatus } : {}),
       ...(source !== undefined ? { source: source as LeadSource } : {}),
+      ...(createdFrom !== undefined ? { createdFrom } : {}),
+      ...(createdTo !== undefined ? { createdTo } : {}),
       ...(limit !== undefined ? { limit } : {}),
       ...(c.req.query('cursor') ? { cursor: c.req.query('cursor') as string } : {}),
       ...(c.req.query('includeArchived') === 'true' ? { includeArchived: true } : {}),
