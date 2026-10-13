@@ -439,6 +439,15 @@ jobs:
             --distribution-id ${{ secrets.CLOUDFRONT_WIDGET_DISTRIBUTION_ID }} \
             --paths "/*"
 
+      # IndexNow tells Bing (and so ChatGPT Search and Copilot) about pages that
+      # changed in the last 7 days, instead of waiting weeks for a crawl. It
+      # runs last, after the key file is in S3, and must never fail a deploy:
+      # a missed push only means Bing finds the page on its own schedule.
+      - name: Submit changed URLs to IndexNow
+        continue-on-error: true
+        working-directory: frontend
+        run: node scripts/submit-indexnow.mjs
+
       - name: Deployment success
         run: echo "Frontend and widget deployed successfully at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
