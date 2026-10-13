@@ -334,7 +334,10 @@ export function buildLlmsTxt(origin: string, input: LlmsTxtInput): string {
     llmsSection('Pricing', [...llmsPageLinks(origin, 'Pricing'), ...input.tiers.map(llmsPlanLine)]),
     llmsSection('Blog', [...llmsPageLinks(origin, 'Blog'), ...posts]),
     llmsSection('Company', [...llmsPageLinks(origin, 'Company'), `- Support: ${input.supportEmail}`]),
-    llmsSection('Optional', llmsPageLinks(origin, 'Optional')),
+    llmsSection('Optional', [
+      ...llmsPageLinks(origin, 'Optional'),
+      llmsLink(origin, '/llms-full.txt', 'Full text', 'The body text of every page above in one file, for tools that prefer one fetch to many.'),
+    ]),
   ]
   return `${blocks.join('\n\n')}\n`
 }
