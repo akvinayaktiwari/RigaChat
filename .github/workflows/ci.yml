@@ -344,14 +344,15 @@ jobs:
             --exclude "robots.txt" \
             --exclude "sitemap.xml" \
             --exclude "llms.txt" \
+            --exclude "llms-full.txt" \
             --cache-control "public, max-age=31536000, immutable" \
             --delete \
             --region ${{ secrets.AWS_REGION }}
 
-      # robots.txt, sitemap.xml and llms.txt are regenerated every build (new
-      # blog posts change the last two) but have no content hash in their names,
+      # robots.txt, sitemap.xml, llms.txt and llms-full.txt are regenerated every
+      # build (new blog posts change the last three) but have no content hash in their names,
       # so the immutable one-year header above would pin crawlers to a stale copy.
-      - name: Upload robots.txt, sitemap.xml and llms.txt with a short cache
+      - name: Upload robots.txt, sitemap.xml, llms.txt and llms-full.txt with a short cache
         run: |
           aws s3 cp frontend/dist/robots.txt \
             s3://${{ secrets.S3_BUCKET_FRONTEND }}/robots.txt \
@@ -365,6 +366,11 @@ jobs:
             --region ${{ secrets.AWS_REGION }}
           aws s3 cp frontend/dist/llms.txt \
             s3://${{ secrets.S3_BUCKET_FRONTEND }}/llms.txt \
+            --content-type "text/plain; charset=utf-8" \
+            --cache-control "public, max-age=3600" \
+            --region ${{ secrets.AWS_REGION }}
+          aws s3 cp frontend/dist/llms-full.txt \
+            s3://${{ secrets.S3_BUCKET_FRONTEND }}/llms-full.txt \
             --content-type "text/plain; charset=utf-8" \
             --cache-control "public, max-age=3600" \
             --region ${{ secrets.AWS_REGION }}

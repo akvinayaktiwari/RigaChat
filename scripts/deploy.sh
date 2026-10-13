@@ -424,11 +424,12 @@ aws s3 sync frontend/dist/ s3://"$S3_BUCKET_FRONTEND" \
   --exclude "robots.txt" \
   --exclude "sitemap.xml" \
   --exclude "llms.txt" \
+  --exclude "llms-full.txt" \
   --cache-control "public, max-age=31536000, immutable" \
   --delete \
   --region "$AWS_REGION"
 
-# robots.txt, sitemap.xml and llms.txt change every build but carry no content
+# robots.txt, sitemap.xml, llms.txt and llms-full.txt change every build but carry no content
 # hash, so they must not get the immutable header above. Mirrors ci.yml.
 aws s3 cp frontend/dist/robots.txt s3://"$S3_BUCKET_FRONTEND"/robots.txt \
   --content-type "text/plain; charset=utf-8" \
@@ -439,6 +440,10 @@ aws s3 cp frontend/dist/sitemap.xml s3://"$S3_BUCKET_FRONTEND"/sitemap.xml \
   --cache-control "public, max-age=3600" \
   --region "$AWS_REGION"
 aws s3 cp frontend/dist/llms.txt s3://"$S3_BUCKET_FRONTEND"/llms.txt \
+  --content-type "text/plain; charset=utf-8" \
+  --cache-control "public, max-age=3600" \
+  --region "$AWS_REGION"
+aws s3 cp frontend/dist/llms-full.txt s3://"$S3_BUCKET_FRONTEND"/llms-full.txt \
   --content-type "text/plain; charset=utf-8" \
   --cache-control "public, max-age=3600" \
   --region "$AWS_REGION"
