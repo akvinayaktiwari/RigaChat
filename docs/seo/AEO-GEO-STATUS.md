@@ -1,6 +1,6 @@
 # AEO / GEO Status — vyostra.com
 
-**The one file to read first.** What has shipped for search and answer-engine visibility, what is left, and who has to do it. Last updated: 2026-10-06. Next steps: `HANDOFF-2026-10-05.md` and, for the global market move, `GLOBAL-MARKET-HANDOFF.md`.
+**The one file to read first.** What has shipped for search and answer-engine visibility, what is left, and who has to do it. Last updated: 2026-10-13. Next steps: `HANDOFF-2026-10-05.md` and, for the global market move, `GLOBAL-MARKET-HANDOFF.md`.
 
 How to keep it current: when something ships, move its row from "To do" to "Implemented" with the date. Do not record plans here; plans live in the documents listed at the bottom.
 
@@ -193,6 +193,12 @@ The owner's decision on 2026-10-06: Vyostra AI sells globally and leads with US 
 | 16 | The next free tools in `FREE-TOOLS-HANDOFF.md` (UAE mortgage calculator next; it needs the Central Bank loan-to-value caps read at the primary source first) | The hub, QR code generator, text formatter, WhatsApp fonts, real estate commission calculator and open house sign-in sheet shipped 2026-10-06 and merged 2026-10-07. Their keyword difficulty could not be re-checked before building because OpenSEO was out of credits, so the handoff's figures were used; re-check when credits return. |
 | 17 | The remaining five posts in `GLOBAL-MARKET-HANDOFF.md` section B3 | Posts 5 (Dubai CRM), 6 (Trakheesi), 9 (India WhatsApp automation) and 11 (AI sales agent) written 2026-10-06; a second Dubai CRM post written in parallel was dropped as a duplicate; keyword data for them could not be re-pulled because the OpenSEO account was out of credits. Three global pillars shipped 2026-10-06 (posts 1, 2 and 3). "Speed to lead" (post 4) is held: the HBR study it rests on is paywalled, so its figures could not be checked from the page and are not quoted. The market posts (UAE, US, UK, Australia, India) each cite a local rule (Trakheesi, TCPA, PECR, the Spam Act) that must be read at its primary source first. |
 | 17a | Make `/industries/real-estate/` global with market sections | Waits for the market posts it would link to: no market section without three real posts behind it. The compliance line already names RERA and Trakheesi as examples. |
+| 33 | IndexNow push to Bing after each deploy | **Built on branch `chore/indexnow`, not merged.** Key file, `frontend/scripts/submit-indexnow.mjs`, test, and a non-blocking CI step. Moves to Implemented once merged and `https://vyostra.com/ef98956b6ada147b5c95a404f0c8509c.txt` returns 200. |
+| 34 | `llms-full.txt`: **built on branch `feat/llms-full`, not merged** (about 310 kB, from the `<article>`/`<main>` of every prerendered page; `llms.txt` links it). Still to do: an identity and pricing block in `llms.txt` | From `QDNCO-LEARNINGS.md` item 5. |
+| 35 | Category-level comparison pages that need no competitor facts (chatbot vs live chat, WhatsApp Business app vs API, form vs chatbot) | `QDNCO-LEARNINGS.md` item 6. Does not wait on owner task 7. |
+| 36 | `/answers/` hub, one question per URL, from keyword data | `QDNCO-LEARNINGS.md` item 1. Needs a keyword pull first (OpenSEO). |
+| 37 | `/glossary/` with `DefinedTerm` schema | `QDNCO-LEARNINGS.md` item 7. |
+| 38 | A required "Limits" field in the blog template, enforced by the registry test | `QDNCO-LEARNINGS.md` item 8. |
 
 ### Blocked
 
@@ -212,6 +218,8 @@ The owner's decision on 2026-10-06: Vyostra AI sells globally and leads with US 
 
 | File | What it is |
 |---|---|
+| `docs/seo/QDNCO-LEARNINGS.md` | What qdnco.com does that this site should borrow, and what not to copy |
+| `docs/seo/COWORK-HANDOFF-2026-10-13.md` | Owner-side tasks (Search Console, Bing, profiles) written for Cowork, with the report-back format |
 | `docs/seo/GEO-ANALYSIS-2026-10-02.md` | Latest scored analysis, with per-crawler access and passage-level detail |
 | `docs/seo/GEO-AUDIT-2026-09-19.md` | The baseline audit (63/100) and its commit record |
 | `docs/seo/GEO-FIX-PLAN.md` | The original fix plan and its progress log |
