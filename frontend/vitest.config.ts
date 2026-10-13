@@ -38,6 +38,6 @@ export default defineConfig({
     env: {
       VITE_API_URL: 'http://localhost:3000',
     },
-    include: ['src/**/*.test.{ts,tsx}'],
+    include: ['src/**/*.test.{ts,tsx}', 'scripts/**/*.test.mjs'],
   },
 })
