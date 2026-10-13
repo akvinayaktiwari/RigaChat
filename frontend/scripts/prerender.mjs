@@ -109,7 +109,7 @@ async function main() {
   })
 
   const entryPath = path.join(ssrOutDir, 'prerender-entry.mjs')
-  const { renderRoute, getRoutes, getCrawlFiles, SITE_URL, NOT_FOUND_RENDER_PATH } = await import(
+  const { renderRoute, getRoutes, getCrawlFiles, buildLlmsFull, SITE_URL, NOT_FOUND_RENDER_PATH } = await import(
     pathToFileURL(entryPath).href
   )
   assertPublicOrigin(SITE_URL)
@@ -133,9 +133,11 @@ async function main() {
     return
   }
 
+  const renderedPages = []
   for (const route of routes) {
     const rendered = await renderRoute(route)
     const page = composePage(template, rendered)
+    renderedPages.push({ route, html: page })
 
     // "/blog" -> dist/blog/index.html, "/blog/x" -> dist/blog/x/index.html
     const outDir = path.join(distDir, route)
@@ -145,6 +147,10 @@ async function main() {
     const kb = (Buffer.byteLength(page, 'utf8') / 1024).toFixed(1)
     console.log(`[prerender] ${route} -> ${path.relative(root, path.join(outDir, 'index.html'))} (${kb} kB)`)
   }
+
+  // After the loop: it needs every page's HTML.
+  await writeFile(path.join(distDir, 'llms-full.txt'), buildLlmsFull(renderedPages), 'utf-8')
+  console.log('[prerender] llms-full.txt -> dist/llms-full.txt')
 
   await rm(ssrOutDir, { recursive: true, force: true })
   console.log(`[prerender] done — ${routes.length} route(s)`)

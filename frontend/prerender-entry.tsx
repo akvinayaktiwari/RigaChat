@@ -9,7 +9,8 @@ import { StaffAuthProvider } from './src/hooks/useStaffAuth'
 import { SubscriptionProvider } from './src/hooks/useSubscription'
 import { getAllPosts, getAllSlugs } from './src/content/blog/registry'
 import { getAllDocMetas, getAllDocSlugs } from './src/content/docs/registry'
-import { PRERENDERED_STATIC_ROUTES, buildLlmsTxt, buildRobotsTxt, buildSitemapXml, sitemapEntries } from './src/lib/crawl-files'
+import { PRERENDERED_STATIC_ROUTES, buildLlmsTxt, buildRobotsTxt, buildSitemapXml, servedPath, sitemapEntries } from './src/lib/crawl-files'
+import { buildLlmsFullTxt } from './src/lib/llms-full'
 import { WHAT_IS_VYOSTRA } from './src/components/landing/WhatIsVyostra'
 import { PRICING_TIERS } from './src/lib/pricingTiers'
 import { postDescription } from './src/lib/search-snippet'
@@ -175,4 +176,17 @@ export function getCrawlFiles(): Record<string, string> {
     // file cannot describe the product differently from the page it points at.
     'llms.txt': buildLlmsTxt(SITE_URL, { definition: WHAT_IS_VYOSTRA, tiers: PRICING_TIERS, posts: summaries, docs: docSummaries, supportEmail: SUPPORT_EMAIL }),
   }
+}
+
+/**
+ * llms-full.txt, built from the pages the prerender has just rendered. It cannot
+ * come from getCrawlFiles() because it needs their HTML, which only exists once
+ * every route has been rendered.
+ */
+export function buildLlmsFull(pages: readonly { route: string; html: string }[]): string {
+  return buildLlmsFullTxt({
+    origin: SITE_URL,
+    definition: WHAT_IS_VYOSTRA[0] ?? '',
+    pages: pages.map(({ route, html }) => ({ url: `${SITE_URL}${servedPath(route)}`, html })),
+  })
 }
