@@ -13,7 +13,7 @@ const meta: BlogPostMeta = {
   readingMinutes: 4,
   seoTitle: 'Real Estate Chatbot Knowledge Base: What to Add',
   seoDescription:
-    'What a real estate team should put in a chatbot knowledge base besides its website: project facts, viewing process, policies and the questions agents answer daily.',
+    'What a real estate team should put in a chatbot knowledge base besides its website: project facts, viewing process, policies and daily agent questions.',
   relatedFeatures: ['/features/crm'],
   faq: [
     {

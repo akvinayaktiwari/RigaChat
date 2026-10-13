@@ -13,7 +13,7 @@ const meta: BlogPostMeta = {
   readingMinutes: 5,
   seoTitle: 'AI Assistant for Real Estate Agents in the US',
   seoDescription:
-    'What an AI assistant can handle for a US real estate agent: first replies, qualifying questions and handoff. Plus the TCPA consent rule for texts. Not legal advice.',
+    'What an AI assistant can handle for a US real estate agent: first replies, qualifying questions, handoff and the TCPA text-consent rule. Not legal advice.',
   relatedFeatures: ['/features/crm'],
   faq: [
     {
