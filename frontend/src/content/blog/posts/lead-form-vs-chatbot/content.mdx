@@ -1,0 +1,100 @@
+{/*
+  A category comparison (AEO-GEO-STATUS to-do 35): it names no competitor, so
+  it waits on no competitor facts. No conversion rates, completion rates or
+  abandonment figures: none are sourced, so none appear.
+
+  Product claims match frontend/src/pages/features/Forms.tsx (FORM_BUILDER_FAQ)
+  and frontend/src/pages/features/Chatbot.tsx (CHAT_AGENT_FAQ) as they are:
+  five form field types; forms work without a chat agent; the chat agent shows
+  a lead form after a number of messages you set; it answers only from the
+  site and knowledge base; form, chat and Meta lead ad leads share one list.
+*/}
+
+A lead form asks every visitor the same few questions and saves the answers. A chatbot answers the visitor's questions first, then asks for their details once they are interested, and saves the conversation with them. Use a form for visitors who already know what they want; use a chatbot for visitors who arrive with a question. Most sites have both.
+
+This post compares the two on what they capture, where each one fails, and how to decide which pages get which.
+
+## What is the difference between a lead form and a chatbot?
+
+A form is one-way: you decide the questions, the visitor fills them in. A chatbot is two-way: the visitor asks too, and the details come at the end of an exchange rather than at the start.
+
+| | Lead form | Chatbot |
+| --- | --- | --- |
+| Who asks the questions | You, in advance | Both sides |
+| What you get | The answers to your fields | Your fields, plus the conversation |
+| Works for a visitor who | Knows what they want | Has a question first |
+| Every lead looks | The same: same fields, same order | Different: each transcript is its own |
+| Setup | Choose fields and embed | Give it content to answer from, then embed |
+| What breaks it | Too many fields, or the wrong ones | Answers it cannot back up |
+
+## When is a lead form the better choice?
+
+When intent is already clear and the details you need are fixed. A visitor on a "Book a viewing" page, a pricing page or an event page has made up their mind; a conversation only slows them down.
+
+Forms do well for:
+
+- **Callback and quote requests.** Name, phone, what it is about. Nothing to discuss first.
+- **Bookings and sign-ups.** The visitor is acting, not asking.
+- **Ad landing pages.** The ad already made the pitch; the page collects the response.
+- **Anything your team needs in a consistent shape.** Every lead arrives with the same fields, which makes them easy to sort and compare.
+
+A form also needs nothing behind it. It does not have to know your business, so it cannot get an answer wrong.
+
+### Where does a lead form fail?
+
+On the visitor who is not ready. A form gives them two choices: hand over their details now, or leave. If their question was "do you deliver to my area?" or "is this available next month?", the form has nowhere to put it, and many visitors with an unanswered question simply leave.
+
+Long forms fail too. Each field you add is a question the visitor must care enough to answer before they get anything back. Ask only for what the first follow-up actually needs.
+
+## When is a chatbot the better choice?
+
+When visitors arrive with questions. Product pages, service pages, location pages and anything with options or conditions tend to produce questions before they produce leads.
+
+A chatbot does well for:
+
+- **Visitors who are still deciding.** It answers the question that would otherwise have sent them away.
+- **Out-of-hours visits.** It answers at 2 a.m. when no one on your team will.
+- **Leads your team needs context on.** The transcript shows what the person asked, so the first call starts from their question, not from "how can I help?".
+
+### Where does a chatbot fail?
+
+When it answers from guesswork. A chatbot that invents a price or a policy creates a lead your team then has to correct, and a visitor who now trusts you less. It should answer only from your own content and say plainly when it does not know.
+
+It also fails when it asks for details too early. A chatbot that demands a phone number before answering anything is a form with extra steps, and visitors treat it like one.
+
+<Callout title="The quick test" tone="neutral">
+  Look at the last twenty enquiries your team handled. If most began with a question ("Do you…?", "Can I…?", "How much…?"), your visitors want a chatbot. If most were simply "please call me", a short form is doing the job.
+</Callout>
+
+## Should you run both on the same website?
+
+Usually, yes. They catch different visitors, so running both is not doubling up.
+
+| Page | What fits | Why |
+| --- | --- | --- |
+| Pricing, booking, "contact us" | Lead form | The visitor has decided; get out of the way |
+| Ad landing page | Lead form | The ad did the explaining |
+| Product, service and location pages | Chatbot | Questions come before commitment |
+| Help and FAQ pages | Chatbot | The visitor is already asking |
+| Homepage | Either, or both | Mixed visitors; a chatbot can sit alongside a short form |
+
+The one thing that matters when you run both: **leads from both should land in the same list.** If form leads go to an email inbox and chat leads stay in a chat tool, your team follows up from two places, and the lead that was in neither gets no call. Read [what a CRM chatbot should store about each lead](/blog/what-is-a-crm-chatbot/) for the fields that list needs.
+
+## What should you check before choosing a tool?
+
+Four things, whichever way you go.
+
+1. **Where do the leads go?** Form, chat and ad leads should arrive in one list with their source marked.
+2. **What does the chatbot answer from?** It should be your website and your own notes, and it should say when the answer is not there.
+3. **When does the chatbot ask for details?** You should be able to set it, so it answers first and asks later.
+4. **Can the form run without the chatbot?** Some pages need only a form. You should not have to load a chat widget to get one.
+
+<div className="mt-16 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+  ### How Vyostra AI handles both
+
+  Vyostra AI has both, and they work independently. [Lead forms](/features/forms) are built in the dashboard from five field types (text, number, email, phone and options) and embedded with a copied code snippet on WordPress, Webflow or custom HTML sites; a form does not need a chat agent.
+
+  The [chat agent](/features/chatbot) answers only from your website and your knowledge base entries, and says so when the answer is not there. After a number of messages you set, it shows a short lead form with the fields you chose, and the lead is saved with the conversation transcript.
+
+  Leads from forms, chat agents and Meta lead ads land in one [lead CRM](/features/crm), each with its answers or transcript, so your team follows up from one list.
+</div>
