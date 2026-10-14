@@ -1,6 +1,6 @@
 # AEO / GEO Status — vyostra.com
 
-**The one file to read first.** What has shipped for search and answer-engine visibility, what is left, and who has to do it. Last updated: 2026-10-13. Next steps: `HANDOFF-2026-10-05.md` and, for the global market move, `GLOBAL-MARKET-HANDOFF.md`.
+**The one file to read first.** What has shipped for search and answer-engine visibility, what is left, and who has to do it. Last updated: 2026-10-14. Next steps: `HANDOFF-2026-10-05.md` and, for the global market move, `GLOBAL-MARKET-HANDOFF.md`.
 
 How to keep it current: when something ships, move its row from "To do" to "Implemented" with the date. Do not record plans here; plans live in the documents listed at the bottom.
 
@@ -82,6 +82,7 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 | Footer links the company's LinkedIn and X profiles on every public page; the Organization `sameAs` reads the same list, and every page carries `twitter:site` | 2026-10-06 |
 | Internal links: help in the footer, feature pages to related posts, latest posts on the homepage, related posts on each post | 2026-09-19 |
 | The WhatsApp real estate post links the two ad-lead posts from its lead-source table | 2026-10-05 |
+| Category comparison post `/blog/lead-form-vs-chatbot/` (to-do 35, global): names no competitor, so it does not wait on owner task 7. No sourced conversion figures exist, so none are quoted; product claims match the live Forms and Chatbot feature pages | 2026-10-14 |
 | Two posts chosen from keyword data (OpenSEO, India): `/blog/real-estate-chatbot-lead-qualification-questions/` for "real estate chatbot" (about 480 searches a month) and `/blog/what-is-a-crm-chatbot/` for "crm chatbot" (about 90) | 2026-10-05 |
 | Real estate industry page: `/industries/real-estate/`, linked from the footer. Written against the prebuilt real estate journey and its WhatsApp templates | 2026-10-05 |
 | Help FAQs grouped under question headings | 2026-09-19 |
@@ -195,7 +196,7 @@ The owner's decision on 2026-10-06: Vyostra AI sells globally and leads with US 
 | 17a | Make `/industries/real-estate/` global with market sections | Waits for the market posts it would link to: no market section without three real posts behind it. The compliance line already names RERA and Trakheesi as examples. |
 | 33 | IndexNow push to Bing after each deploy | **Built on branch `chore/indexnow`, not merged.** Key file, `frontend/scripts/submit-indexnow.mjs`, test, and a non-blocking CI step. Moves to Implemented once merged and `https://vyostra.com/ef98956b6ada147b5c95a404f0c8509c.txt` returns 200. |
 | 34 | `llms-full.txt`: **built on branch `feat/llms-full`, not merged** (about 310 kB, from the `<article>`/`<main>` of every prerendered page; `llms.txt` links it). Still to do: an identity and pricing block in `llms.txt` | From `QDNCO-LEARNINGS.md` item 5. |
-| 35 | Category-level comparison pages that need no competitor facts (chatbot vs live chat, WhatsApp Business app vs API, form vs chatbot) | `QDNCO-LEARNINGS.md` item 6. Does not wait on owner task 7. |
+| 35 | Category-level comparison pages that need no competitor facts: chatbot vs live chat, and WhatsApp Business app vs API (whose Meta pricing and limits must be read at Meta's own pages first) | `QDNCO-LEARNINGS.md` item 6. Does not wait on owner task 7. Form vs chatbot shipped 2026-10-14 as `/blog/lead-form-vs-chatbot/`. |
 | 36 | `/answers/` hub, one question per URL, from keyword data | `QDNCO-LEARNINGS.md` item 1. Needs a keyword pull first (OpenSEO). |
 | 37 | `/glossary/` with `DefinedTerm` schema | `QDNCO-LEARNINGS.md` item 7. |
 | 38 | A required "Limits" field in the blog template, enforced by the registry test | `QDNCO-LEARNINGS.md` item 8. |
