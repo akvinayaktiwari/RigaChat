@@ -15,6 +15,7 @@
 | `GET /v1/forms` | All lead forms | `forms:read` |
 | `GET /v1/forms/:formId` | One lead form | `forms:read` |
 | `POST /v1/forms` | The lead form it created | `forms:write` |
+| `POST /v1/forms/:formId/leads` | The id of the lead it created | `leads:write` |
 | `GET /v1/voice-agents` | All voice agents | `voice_agents:read` |
 | `GET /v1/voice-agents/:agentId` | One voice agent | `voice_agents:read` |
 
@@ -162,6 +163,40 @@ You get the same form back. A request whose `name` and definition match a form t
 
 A request that reuses a `name` with different fields returns 409 with the code `form_name_taken`. The API does not change an existing form, so pick another name. An account can hold 200 forms; past that the code is `form_limit_reached`.
 
+## How do you create a lead?
+
+`POST /v1/forms/:formId/leads` creates a lead in one of your lead forms, exactly as if a visitor had submitted that form. Use it when your site runs its own form or calculator and you want the result in your Vyostra AI inbox. The lead gets the same WhatsApp alert and CRM sync as a widget submission, and it lists with the source `form`. It takes a key with the `leads:write` scope, on a plan with full API access.
+
+Call it from your server, never from the page: the API key must stay secret.
+
+```bash
+curl -X POST "$VYOSTRA_API_URL/v1/forms/$FORM_ID/leads" \
+  -H "Authorization: Bearer $VYOSTRA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "answers": {
+      "Name": "Asha Rao",
+      "Phone": "+91 98765 43210",
+      "Interested in": "3 bedroom",
+      "Quoted price": "1.4 Cr"
+    },
+    "sourceUrl": "https://example.com/pricing/"
+  }'
+```
+
+| Body property | Type | Meaning |
+| --- | --- | --- |
+| `answers` | Object, required | 1 to 50 answers as string values, up to 2,000 characters each. Key each one by the field's label (matched ignoring case) or by its `fieldId`. |
+| `sourceUrl` | String | The page the lead came from, as an `http` or `https` URL. |
+
+A key that names no field on the form is kept, and the answer appears in the lead's `attributes` under that key. That is how you attach anything the form does not ask for, such as a quote or a plan your page worked out. Empty answers are dropped.
+
+The answers are checked the way the form checks a visitor: a missing required field, or a choice an `options` field does not offer, returns 400 `invalid_request` with a message that names the field. A `formId` that is not in your account returns 404 `not_found`.
+
+The response is 201 with `data` holding the lead's `id` and `createdAt`. Fetch the whole lead with `GET /v1/leads/:id`.
+
+The request is not idempotent. If it times out and you retry, you can create a second lead, so check on your side before you retry.
+
 ## How do you read voice agents?
 
 `GET /v1/voice-agents` returns every voice agent as an array in `data`. `GET /v1/voice-agents/:agentId` returns one.
@@ -180,4 +215,4 @@ A request that reuses a `name` with different fields returns 409 with the code `
 
 ## What is not in the API yet?
 
-Creating a lead form is the only write. The API cannot change or delete a form, cannot create or change leads, chatbots or voice agents, does not send webhooks, and has no official SDK. Fields may be added to a response over time, so write clients that ignore fields they do not recognise.
+Creating a lead form and creating a lead are the only writes. The API cannot change or delete a form, cannot change or delete a lead, cannot create or change chatbots or voice agents, does not send webhooks, and has no official SDK. Fields may be added to a response over time, so write clients that ignore fields they do not recognise.

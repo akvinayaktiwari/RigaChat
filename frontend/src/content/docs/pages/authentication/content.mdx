@@ -27,16 +27,17 @@ Each key has one or more scopes, chosen when the key is created. An endpoint rej
 | Scope | Lets the key |
 | --- | --- |
 | `leads:read` | Read leads from chat, forms, Meta lead ads and voice calls |
+| `leads:write` | Create leads in your lead forms |
 | `bots:read` | Read chatbot configuration |
 | `forms:read` | Read lead form configuration |
 | `forms:write` | Create lead forms |
 | `voice_agents:read` | Read voice agent configuration |
 
-`forms:write` is the only scope that changes anything, and it is left unticked when you create a key. Tick it only for a key that sets up forms. You can change a key's scopes at any time: in Settings, choose **Edit permissions** on the key, tick or untick, and save. The key itself does not change, so nothing using it needs to be updated, and the new permissions apply from its next request. Only someone signed in to the dashboard can do this. A key cannot change its own permissions or any other key's.
+`forms:write` and `leads:write` are the only scopes that change anything, and both are left unticked when you create a key. Tick one only for a key that needs it: `forms:write` for a key that sets up forms, `leads:write` for a server that sends in leads. You can change a key's scopes at any time: in Settings, choose **Edit permissions** on the key, tick or untick, and save. The key itself does not change, so nothing using it needs to be updated, and the new permissions apply from its next request. Only someone signed in to the dashboard can do this. A key cannot change its own permissions or any other key's.
 
 ## Which plans can use the API?
 
-| Plan | Read | Write (`forms:write`) |
+| Plan | Read | Write (`forms:write`, `leads:write`) |
 | --- | --- | --- |
 | Free trial | No | No |
 | Starter | Yes | No |

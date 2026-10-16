@@ -20,7 +20,7 @@ AUTHENTICATION
 - Keys start with "vy_live_". They are secrets: server-side code only, never in
   a web page or a mobile app. The API does not accept cross-origin browser calls.
 
-ENDPOINTS (all return JSON; every one is a read-only GET except POST /v1/forms)
+ENDPOINTS (all return JSON; every one is a read-only GET except the two POSTs)
 - GET /v1/leads                    scope leads:read
     query: limit (1-200, default 50), cursor, includeArchived=true
     returns: { data: Lead[], nextCursor: string|null, total: number,
@@ -39,6 +39,10 @@ ENDPOINTS (all return JSON; every one is a read-only GET except POST /v1/forms)
     existing form when the same name and definition already exist.
     SETUP ONLY: call it once from a script and store formId. Never call it
     from a page or when a visitor submits. The page only needs formId.
+- POST /v1/forms/:formId/leads     scope leads:write (Growth or Agency plan)
+    body: { answers: { <label or fieldId>: string }, sourceUrl? }.
+    Keys that name no field are kept as attributes. Server-side only.
+    returns: { data: { id, createdAt } } with 201. Not idempotent.
 - GET /v1/voice-agents, /v1/voice-agents/:agentId  scope voice_agents:read
     list endpoints return { data: [...] }, single ones return { data: {...} }
 
@@ -68,8 +72,9 @@ RATE LIMIT
   Retry-After header, then retry. On 500, retry with a growing pause.
 
 NOT AVAILABLE
-- Creating a lead form is the only write. Nothing updates or deletes a form,
-  and nothing creates, updates or deletes leads, chatbots or voice agents.
+- Creating a lead form and creating a lead are the only writes. Nothing
+  updates or deletes a form or a lead, and nothing creates, updates or
+  deletes chatbots or voice agents.
 - No webhooks. Use polling.
 - No SDK and no MCP server. Use plain HTTPS requests.
 

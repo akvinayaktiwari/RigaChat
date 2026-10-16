@@ -17,6 +17,7 @@ const API_BASE_URL: string = import.meta.env.VITE_PUBLIC_API_URL || import.meta.
 
 const SCOPE_LABELS: Record<ApiScope, string> = {
   'leads:read': 'Read leads',
+  'leads:write': 'Create leads',
   'bots:read': 'Read chatbots',
   'forms:read': 'Read forms',
   'forms:write': 'Create forms',
