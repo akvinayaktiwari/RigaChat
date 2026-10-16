@@ -24,6 +24,7 @@ export const API_KEY_PREFIX = 'vy_live_'
 // here is a compile error.
 const SCOPE_REGISTRY: Record<ApiScope, true> = {
   'leads:read': true,
+  'leads:write': true,
   'bots:read': true,
   'forms:read': true,
   'forms:write': true,

@@ -10,7 +10,10 @@ vi.mock('./bot-service.js', () => ({ getClientBots, getBotConfig }))
 
 const getClientForms = vi.fn()
 const createNewForm = vi.fn()
-vi.mock('./form-service.js', () => ({ getClientForms, createNewForm, getFormConfig: vi.fn() }))
+const getFormConfig = vi.fn()
+vi.mock('./form-service.js', () => ({ getClientForms, createNewForm, getFormConfig }))
+const captureFormLead = vi.fn()
+vi.mock('./form-lead-service.js', () => ({ captureFormLead }))
 vi.mock('./voice-service.js', () => ({ getVoiceAgents: vi.fn(), getVoiceAgentById: vi.fn() }))
 
 const {
@@ -20,6 +23,7 @@ const {
   PublicResourceNotFoundError,
   PublicValidationError,
   createForm,
+  createLead,
   decodeLeadId,
   encodeLeadId,
   getBot,
@@ -294,5 +298,76 @@ describe('createForm', () => {
 
     await expect(createForm('client-1', { name: 'x', fields: [NAME] })).rejects.toBeInstanceOf(PublicConflictError)
     expect(createNewForm).not.toHaveBeenCalled()
+  })
+})
+
+describe('createLead', () => {
+  const FORM = {
+    formId: 'form-1',
+    clientId: 'client-1',
+    name: 'Website',
+    submitButtonText: 'Submit',
+    fields: [
+      { fieldId: 'f-name', label: 'Name', type: 'text', required: true },
+      { fieldId: 'f-phone', label: 'Phone', type: 'phone', required: true },
+      { fieldId: 'f-market', label: 'Market', type: 'options', required: false, options: ['India', 'Dubai'] },
+    ],
+    createdAt: '2026-10-16T00:00:00.000Z',
+    updatedAt: '2026-10-16T00:00:00.000Z',
+  }
+
+  beforeEach(() => {
+    getFormConfig.mockResolvedValue(FORM)
+    captureFormLead.mockResolvedValue({ leadId: 'lead-9', createdAt: '2026-10-16T01:00:00.000Z' })
+  })
+
+  it('keys answers by fieldId whether sent by label or id, and keeps extra keys as attributes', async () => {
+    const created = await createLead('client-1', 'form-1', {
+      answers: { name: ' Asha ', 'f-phone': '+919876543210', 'Quoted fee': '₹45,000', Notes: '' },
+      sourceUrl: 'https://qdnco.com/pricing/',
+    })
+
+    expect(getFormConfig).toHaveBeenCalledWith('form-1', 'client-1')
+    expect(captureFormLead).toHaveBeenCalledWith({
+      formId: 'form-1',
+      clientId: 'client-1',
+      customFields: { 'f-name': 'Asha', 'f-phone': '+919876543210', 'Quoted fee': '₹45,000' },
+      sourceUrl: 'https://qdnco.com/pricing/',
+    })
+    expect(created).toEqual({
+      id: encodeLeadId({ source: 'form', formId: 'form-1', leadId: 'lead-9' }),
+      createdAt: '2026-10-16T01:00:00.000Z',
+    })
+  })
+
+  it('refuses a lead missing a required answer, naming the field', async () => {
+    await expect(createLead('client-1', 'form-1', { answers: { Name: 'Asha' } })).rejects.toThrow(
+      'Missing required answer: Phone'
+    )
+    expect(captureFormLead).not.toHaveBeenCalled()
+  })
+
+  it('refuses a choice the options field does not offer', async () => {
+    const answers = { Name: 'Asha', Phone: '+919876543210', Market: 'London' }
+    await expect(createLead('client-1', 'form-1', { answers })).rejects.toBeInstanceOf(PublicValidationError)
+  })
+
+  it('refuses unknown body keys, non-string answers and non-http source URLs before any read', async () => {
+    const answers = { Name: 'Asha', Phone: '1' }
+    await expect(createLead('client-1', 'form-1', { answers, extra: 1 })).rejects.toBeInstanceOf(PublicValidationError)
+    await expect(createLead('client-1', 'form-1', { answers: { Name: 5 } })).rejects.toBeInstanceOf(PublicValidationError)
+    await expect(createLead('client-1', 'form-1', { answers: {} })).rejects.toBeInstanceOf(PublicValidationError)
+    await expect(
+      createLead('client-1', 'form-1', { answers, sourceUrl: 'javascript:alert(1)' })
+    ).rejects.toBeInstanceOf(PublicValidationError)
+    expect(getFormConfig).not.toHaveBeenCalled()
+  })
+
+  it('reads another account\'s form as not found', async () => {
+    getFormConfig.mockRejectedValue(new Error('Form not found'))
+
+    await expect(
+      createLead('client-2', 'form-1', { answers: { Name: 'Asha', Phone: '1' } })
+    ).rejects.toBeInstanceOf(PublicResourceNotFoundError)
   })
 })

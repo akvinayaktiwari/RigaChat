@@ -2,8 +2,8 @@
 //
 // Versioned and separate from /api/* because this is a contract with code we
 // do not control: a response shape here cannot change the way a dashboard
-// route's can. Read-only apart from POST /forms, the first write: a write
-// route takes a `:write` scope, which only a full-access plan can use.
+// route's can. Read-only apart from POST /forms and POST /forms/:formId/leads:
+// a write route takes a `:write` scope, which only a full-access plan can use.
 //
 // Responses are `{ data }` on success and `{ error: { code, message } }` on
 // failure -- not the dashboard's ApiResponse envelope.
@@ -17,6 +17,7 @@ import {
   PublicResourceNotFoundError,
   PublicValidationError,
   createForm,
+  createLead,
   getBot,
   getForm,
   getLead,
@@ -105,6 +106,25 @@ v1Routes.post('/forms', requireApiKey('forms:write'), async (c) => {
   try {
     const { form, created } = await createForm(c.get('apiPrincipal').clientId, body)
     return c.json({ data: form }, created ? 201 : 200)
+  } catch (error) {
+    return failFrom(c, error)
+  }
+})
+
+// Creates a lead in one of the account's forms, as if a visitor had submitted
+// it. For a site that runs its own form or calculator and wants the result in
+// the Vyostra AI inbox. Answers with { id, createdAt } and 201.
+v1Routes.post('/forms/:formId/leads', requireApiKey('leads:write'), async (c) => {
+  let body: unknown
+  try {
+    body = await c.req.json()
+  } catch {
+    return fail(c, 400, 'invalid_request', 'The request body must be valid JSON.')
+  }
+
+  try {
+    const lead = await createLead(c.get('apiPrincipal').clientId, c.req.param('formId'), body)
+    return c.json({ data: lead }, 201)
   } catch (error) {
     return failFrom(c, error)
   }

@@ -11,6 +11,7 @@
 // shape per resource.
 
 import { getBotConfig, getClientBots } from './bot-service.js'
+import { captureFormLead } from './form-lead-service.js'
 import { createNewForm, getClientForms, getFormConfig } from './form-service.js'
 import { getUnifiedInbox, getUnifiedLeadDetail } from './lead-inbox-service.js'
 import { getVoiceAgentById, getVoiceAgents } from './voice-service.js'
@@ -473,6 +474,123 @@ export async function createForm(clientId: string, raw: unknown): Promise<Create
   }
 
   return { form: toPublicForm(await createNewForm({ clientId, ...input })), created: true }
+}
+
+// ---------------------------------------------------------------------------
+// Lead writes. A lead is created INTO a form the account owns, so it goes
+// through exactly what a widget submission goes through -- CRM sync, the
+// WhatsApp alert, the inbox -- and lists as source "form" like any other.
+// ---------------------------------------------------------------------------
+
+export const MAX_LEAD_ANSWERS = 50
+const MAX_ANSWER_KEY_LENGTH = 120
+const MAX_ANSWER_LENGTH = 2000
+const MAX_SOURCE_URL_LENGTH = 2000
+const LEAD_KEYS = ['answers', 'sourceUrl']
+
+export interface NewLead {
+  answers: Record<string, string>
+  sourceUrl: string
+}
+
+// Deliberately small: the id the caller stores, and when. Everything else is
+// one GET /v1/leads/:id away, and a field left out now can still be added.
+export interface CreatedPublicLead {
+  id: string
+  createdAt: string
+}
+
+function parseAnswerEntry([rawKey, rawValue]: [string, unknown]): [string, string] {
+  const key = rawKey.trim()
+  if (key.length === 0 || key.length > MAX_ANSWER_KEY_LENGTH) {
+    throw new PublicValidationError(`Each answers key must be 1 to ${MAX_ANSWER_KEY_LENGTH} characters`)
+  }
+  if (typeof rawValue !== 'string' || rawValue.length > MAX_ANSWER_LENGTH) {
+    throw new PublicValidationError(
+      `answers["${key.slice(0, 40)}"] must be a string of at most ${MAX_ANSWER_LENGTH} characters`
+    )
+  }
+  return [key, rawValue.trim()]
+}
+
+function parseAnswers(raw: unknown): Record<string, string> {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    throw new PublicValidationError('answers must be a JSON object of string values')
+  }
+  const entries = Object.entries(raw)
+  if (entries.length === 0 || entries.length > MAX_LEAD_ANSWERS) {
+    throw new PublicValidationError(`answers must have 1 to ${MAX_LEAD_ANSWERS} entries`)
+  }
+  // An empty answer is an unanswered field, not an answer.
+  return Object.fromEntries(entries.map(parseAnswerEntry).filter(([, value]) => value !== ''))
+}
+
+function parseSourceUrl(raw: unknown): string {
+  const text = optionalText(raw, 'sourceUrl', MAX_SOURCE_URL_LENGTH)
+  if (text === undefined) return ''
+  let protocol = ''
+  try {
+    protocol = new URL(text).protocol
+  } catch {
+    // Not a URL at all; refused below with the same message as a bad scheme.
+  }
+  if (protocol !== 'http:' && protocol !== 'https:') {
+    throw new PublicValidationError('sourceUrl must be an http or https URL')
+  }
+  return text
+}
+
+export function parseCreateLeadInput(raw: unknown): NewLead {
+  const body = asObject(raw, 'The request body', LEAD_KEYS)
+  return { answers: parseAnswers(body.answers), sourceUrl: parseSourceUrl(body.sourceUrl) }
+}
+
+// The widget keys an answer by fieldId; a caller may use the field's label
+// instead, which is what they can read in the dashboard. Re-keyed here so a
+// lead looks the same in storage whichever way it came in. A key that names
+// no field is kept as-is and shows up as an extra attribute.
+export function keyAnswersByField(form: FormConfig, answers: Record<string, string>): Record<string, string> {
+  const fieldIdByKey = new Map<string, string>()
+  for (const field of form.fields) {
+    fieldIdByKey.set(field.label.trim().toLowerCase(), field.fieldId)
+    fieldIdByKey.set(field.fieldId, field.fieldId)
+  }
+  const keyed: Record<string, string> = {}
+  for (const [key, value] of Object.entries(answers)) {
+    const fieldId = fieldIdByKey.get(key) ?? fieldIdByKey.get(key.toLowerCase())
+    keyed[fieldId ?? key] = value
+  }
+  return keyed
+}
+
+// The checks the widget makes before it lets a visitor submit, so an API lead
+// cannot be one the form itself would have refused.
+export function assertAnswersFitForm(form: FormConfig, keyed: Record<string, string>): void {
+  const missing = form.fields.filter((field) => field.required && !keyed[field.fieldId])
+  if (missing.length > 0) {
+    throw new PublicValidationError(`Missing required answer: ${missing.map((field) => field.label).join(', ')}`)
+  }
+  const badChoice = form.fields.find(
+    (field) => field.type === 'options' && keyed[field.fieldId] && !field.options?.includes(keyed[field.fieldId])
+  )
+  if (badChoice) {
+    throw new PublicValidationError(`"${badChoice.label}" must be one of: ${(badChoice.options ?? []).join(', ')}`)
+  }
+}
+
+// Not idempotent: a retry after a timeout can create a second lead. A caller
+// that retries should dedupe on its own side first.
+//
+// Validates before reading, so a malformed request costs no read.
+export async function createLead(clientId: string, formId: string, raw: unknown): Promise<CreatedPublicLead> {
+  const input = parseCreateLeadInput(raw)
+  // Scoped by clientId: another account's formId reads as not found.
+  const form = await orNotFound(getFormConfig(formId, clientId))
+  const customFields = keyAnswersByField(form, input.answers)
+  assertAnswersFitForm(form, customFields)
+
+  const lead = await captureFormLead({ formId, clientId, customFields, sourceUrl: input.sourceUrl })
+  return { id: encodeLeadId({ source: 'form', formId, leadId: lead.leadId }), createdAt: lead.createdAt }
 }
 
 export async function listVoiceAgents(clientId: string): Promise<PublicVoiceAgent[]> {

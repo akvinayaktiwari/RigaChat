@@ -2153,7 +2153,7 @@ export type ApiAccess = 'read' | 'full'
 // A `:write` scope is honoured only on a plan whose ApiAccess is 'full'. That
 // is decided per request, not when the key is created, so a downgrade takes
 // write access away from keys that already exist.
-export type ApiScope = 'leads:read' | 'bots:read' | 'forms:read' | 'forms:write' | 'voice_agents:read'
+export type ApiScope = 'leads:read' | 'leads:write' | 'bots:read' | 'forms:read' | 'forms:write' | 'voice_agents:read'
 
 // One row per key, in the api_keys table (PK keyHash, GSI
 // clientId-createdAt-index). The row IS the key: revoking deletes it.

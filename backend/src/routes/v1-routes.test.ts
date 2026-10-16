@@ -7,6 +7,7 @@ const getLead = vi.fn()
 const listBots = vi.fn()
 const getBot = vi.fn()
 const createForm = vi.fn()
+const createLead = vi.fn()
 
 vi.mock('../services/public-api-service.js', () => {
   class PublicResourceNotFoundError extends Error {}
@@ -24,6 +25,7 @@ vi.mock('../services/public-api-service.js', () => {
     PublicValidationError,
     PublicConflictError,
     createForm,
+    createLead,
     MAX_LEAD_PAGE_SIZE: 200,
     listLeads,
     getLead,
@@ -189,6 +191,61 @@ describe('POST /v1/forms', () => {
 
     expect(res.status).toBe(409)
     expect((await res.json()).error.code).toBe('form_limit_reached')
+  })
+})
+
+describe('POST /v1/forms/:formId/leads', () => {
+  const BODY = { answers: { Name: 'Asha', Phone: '+919876543210' }, sourceUrl: 'https://example.com/pricing' }
+
+  function post(body: string) {
+    return app.request('/v1/forms/form-1/leads', {
+      method: 'POST',
+      body,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  it('creates the lead in the key\'s account and answers 201 with its id', async () => {
+    createLead.mockResolvedValue({ id: 'lead_abc', createdAt: '2026-10-16T00:00:00.000Z' })
+
+    const res = await post(JSON.stringify(BODY))
+
+    expect(res.status).toBe(201)
+    expect(await res.json()).toEqual({ data: { id: 'lead_abc', createdAt: '2026-10-16T00:00:00.000Z' } })
+    expect(createLead).toHaveBeenCalledWith('client-1', 'form-1', BODY)
+  })
+
+  it('is guarded by leads:write, not by a read scope', async () => {
+    createLead.mockResolvedValue({ id: 'lead_abc', createdAt: '' })
+
+    await post(JSON.stringify(BODY))
+
+    expect(requiredScopes).toEqual(['/v1/forms/form-1/leads leads:write'])
+  })
+
+  it('400s a body that is not JSON without calling the service', async () => {
+    const res = await post('{answers:')
+
+    expect(res.status).toBe(400)
+    expect(createLead).not.toHaveBeenCalled()
+  })
+
+  it('400s a validation failure with its message', async () => {
+    createLead.mockRejectedValue(new PublicValidationError('Missing required answer: Phone'))
+
+    const res = await post(JSON.stringify(BODY))
+
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: { code: 'invalid_request', message: 'Missing required answer: Phone' } })
+  })
+
+  it('404s a form the account does not own', async () => {
+    createLead.mockRejectedValue(new PublicResourceNotFoundError('Form not found'))
+
+    const res = await post(JSON.stringify(BODY))
+
+    expect(res.status).toBe(404)
+    expect((await res.json()).error.code).toBe('not_found')
   })
 })
 
