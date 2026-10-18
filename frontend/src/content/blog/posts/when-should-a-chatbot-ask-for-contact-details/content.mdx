@@ -1,0 +1,80 @@
+{/*
+  A how-to post. No completion, abandonment or conversion figures: none are
+  sourced, so none appear, and the "one or two exchanges" advice is framed as
+  a starting point to test, not a measured optimum.
+
+  Product claims match frontend/src/pages/features/Chatbot.tsx (CHAT_AGENT_FAQ)
+  and frontend/src/pages/features/Forms.tsx (FORM_BUILDER_FAQ) as they are:
+  the agent shows its lead form after a number of messages you set, with the
+  fields you choose; four widget triggers; five form field types.
+*/}
+
+A chatbot should ask for contact details after it has given the visitor a useful answer and before the visitor is likely to leave. On most pages that means after the first exchange or two. The exception is a visitor who asks for something only a person can give, such as a callback, a quote or a booking: ask them at once, because that is what they came for.
+
+Get the timing wrong in either direction and you lose the lead. This post covers how to time the question, which details to ask for, and how to set it page by page.
+
+## Why does the timing matter?
+
+Because the visitor is trading. They give their details in exchange for something: an answer, a callback, a quote. Ask before you have given them anything and the trade is one-sided.
+
+| When the chatbot asks | What the visitor experiences | What usually happens |
+| --- | --- | --- |
+| Before answering anything | A form with extra steps | Visitors with a question leave without asking it |
+| After one or two useful answers | A fair exchange | The visitor has a reason to stay in touch |
+| Never, or only at the very end | A helpful chat that goes nowhere | The visitor gets their answer and leaves; you learn nothing |
+| The moment they ask for a person | Being taken seriously | The lead arrives already asking for follow-up |
+
+## When should the chatbot ask straight away?
+
+When the visitor has already said what they want from you. Requests like these are a signal to collect details at once, not to keep chatting:
+
+- **"Can someone call me?"** The visitor has asked for a person. Ask for the number.
+- **"How much would it cost for…?"** If the price depends on details, a quote is the answer, and a quote needs a way to send it.
+- **"Can I book a viewing / visit / appointment?"** A booking needs a name and a contact.
+- **Anything the chatbot cannot answer.** Instead of a dead end, offer to have someone reply, and ask how to reach them.
+
+## Which contact details should a chatbot ask for?
+
+The ones your first follow-up needs, and no more.
+
+| Your first follow-up is | Ask for |
+| --- | --- |
+| A call or a message | Name and phone number |
+| Sending a quote, a brochure or a document | Name and email |
+| A booking | Name, phone number and the preferred time |
+| Not yet decided | One contact method only: the one your team answers fastest |
+
+On top of the contact details, add one or two questions that change how your team follows up, such as the budget range or the product they are asking about. Leave everything else for the conversation with a person. The chatbot already saved what they asked, so the salesperson does not need a long form to know where to start.
+
+<Callout title="Every field is a question" tone="neutral">
+  Before adding a field, ask what your team would do differently with the answer. If the answer is "nothing", leave the field out.
+</Callout>
+
+## How should the timing change by page?
+
+Different pages bring visitors with different intent, so the same rule should not run everywhere.
+
+| Page | Visitor's intent | When to ask |
+| --- | --- | --- |
+| Contact, callback or booking page | Ready to act | At once, or use a [lead form](/blog/lead-form-vs-chatbot/) instead |
+| Pricing page | Comparing | After answering the first pricing question |
+| Product or service page | Exploring | After one or two answers |
+| Blog post or guide | Learning | Late, or only if they ask a question about your product |
+| Help or FAQ page | Solving a problem | Only if the answer needs a person |
+
+## How do you find the right moment for your site?
+
+Start with "after the first exchange or two", then look at real leads and conversations for a few weeks.
+
+1. **Read the transcripts that did not end in a lead.** If visitors leave right after the chatbot asks for details, it is asking too early or for too much.
+2. **Read the ones that went on for a long time with no details given.** The chatbot may be asking too late, or not at all.
+3. **Check what your team does with each field.** Remove any field nobody uses.
+4. **Change one thing at a time.** Move the ask, or drop a field, then compare the next few weeks against the last.
+
+<div className="mt-16 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+  ### How Vyostra AI handles it
+
+  In Vyostra AI you set the moment yourself. The [chat agent](/features/chatbot) shows a short lead form after the number of messages you choose, with the fields you choose, and the visitor's details are saved as a lead with the conversation transcript.
+
+  You also choose when the chat widget appears: as soon as the page loads, after 5 seconds, after the visitor scrolls halfway down the page, or when they move to leave. For pages where visitors only need to leave their details, a [lead form](/features/forms) built from five field types (text, number, email, phone and options) works without a chat agent, and its leads land in the same list.
+</div>
