@@ -192,7 +192,64 @@ disappears from the bundle.
 
 **Depends on:** None. Worth doing before the relay gains any more reach into the backend.
 
+## Managed "Vyostra number" add-on (reshapes the DID-provisioning item below)
+
+**What:** Offer a number Vyostra rents and manages, as a paid add-on, for clients who will not
+open their own carrier account. Since 2026-10-19 the default is the opposite: clients bring
+their own carrier account (`docs/designs/voice-byo-carrier-v2.md`), so per-client DID
+provisioning under our KYC is no longer on the launch path.
+
+**Why:** The owner deferred this until clients decline the product because of carrier setup.
+The 2026-10-20 outside review (OV3) flagged the same onboarding cost.
+
+**Pros:** removes the biggest setup step for SMB clients. **Cons:** Vyostra becomes a number
+reseller in that country (licence and KYC questions, India and UAE especially), and owns the
+telephony bill and its abuse risk.
+
+**Context:** Under the SIP path (D17 in the v2 design) a managed number is one more SIP source
+pointing at the same OpenAI project, so it adds no new call path. The pool notes below still
+apply if it is built.
+
+**Depends on:** Change 1 of the v2 design live; several clients declining over carrier setup
+(the owner's trigger); a legal check that we may hold numbers in the chosen country.
+
+## Outbound calls from journeys
+
+**What:** A journey step where the agent phones a lead, such as a new Meta lead or a missed
+caller.
+
+**Why:** Item 4 of the owner's 2026-10-19 order ("later: outbound calls"). Journeys already
+send WhatsApp; phone is the missing speed-to-lead channel.
+
+**Pros:** the same agent reaches leads by phone. **Cons:** telemarketing rules differ by
+country (UAE Cabinet Resolution 56 of 2024: prior approval, a local number registered to the
+business, calls only 9 AM to 6 PM), consent must be recorded, and OpenAI Realtime SIP outbound
+support is unverified.
+
+**Context:** Under SIP the client's carrier originates the call into our SIP address. Start
+with a per-country rules table before any code.
+
+**Depends on:** Phase 0 and Change 1 of `docs/designs/voice-byo-carrier-v2.md` live.
+
+## Voice relay: second instance
+
+**What:** Run the relay on more than one box, so a crash or restart does not drop every live
+call.
+
+**Why:** Under SIP the audio moves to OpenAI, but the sideband WebSocket that answers RAG
+tool calls and writes the call log stays open for the whole call on the relay. Change 1 adds a
+health check and alert (D22); redundancy is this item.
+
+**Pros:** one box failing no longer cuts every client's agent off from its knowledge base.
+**Cons:** the per-client concurrency cap (D4) is in-process today, so a second instance needs
+shared state for it.
+
+**Depends on:** Change 1, and its health check, live.
+
 ## Per-client DID provisioning is onboarding friction that repeats
+
+**Superseded as the default by bring-your-own-carrier (2026-10-19)**; kept for the managed-number
+add-on above.
 
 **What:** Voice telephony rents one Plivo DID per client (see
 `docs/designs/voice-agent-telephony-v1.md` — the webhook reports which of our numbers was
