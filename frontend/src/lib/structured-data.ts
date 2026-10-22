@@ -401,6 +401,44 @@ export function toolsIndexNodes(tools: readonly FeaturePageFields[]): JsonLd[] {
   return [hub, breadcrumbSchema(TOOLS_CRUMBS)]
 }
 
+export interface GlossaryEntry {
+  /** Fragment id the term's definition sits under on the page. */
+  id: string
+  term: string
+  definition: string
+}
+
+/**
+ * The glossary: a DefinedTermSet holding one DefinedTerm per term the page
+ * shows, each addressable at its own fragment, plus its Home > Glossary trail.
+ */
+export function glossaryPageNodes(page: FeaturePageFields, entries: readonly GlossaryEntry[]): JsonLd[] {
+  const url = absoluteUrl(page.path)
+  const termSet: JsonLd = {
+    '@type': 'DefinedTermSet',
+    '@id': `${url}#terms`,
+    name: `${ORGANIZATION_NAME} ${page.name}`,
+    url,
+    hasDefinedTerm: entries.map((entry) => ({
+      '@type': 'DefinedTerm',
+      '@id': `${url}#${entry.id}`,
+      name: entry.term,
+      description: entry.definition,
+      url: `${url}#${entry.id}`,
+      inDefinedTermSet: { '@id': `${url}#terms` },
+    })),
+  }
+  const webPage: JsonLd = {
+    '@type': 'WebPage',
+    '@id': url,
+    url,
+    name: page.name,
+    isPartOf: { '@id': absoluteUrl(`/${WEBSITE_ID}`) },
+    mainEntity: { '@id': `${url}#terms` },
+  }
+  return [termSet, webPage, breadcrumbSchema([{ name: 'Home', path: '/' }, { name: page.name, path: page.path }])]
+}
+
 /** Wraps nodes in one @graph so @id references resolve across them. */
 export function jsonLdGraph(nodes: readonly JsonLd[]): JsonLd {
   return { '@context': 'https://schema.org', '@graph': [...nodes] }

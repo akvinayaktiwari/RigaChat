@@ -12,6 +12,7 @@ const LINK_COLUMNS = [
       { label: 'For Real Estate', href: '/industries/real-estate' },
       { label: 'Pricing', href: '/pricing' },
       { label: 'FAQ', href: '/faq' },
+      { label: 'Glossary', href: '/glossary' },
     ],
   },
   {
