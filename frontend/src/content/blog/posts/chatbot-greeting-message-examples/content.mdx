@@ -1,0 +1,112 @@
+{/*
+  Global how-to behind two chat agent settings: the greeting message and the
+  widget trigger. No open-rate or reply-rate figures: none are sourced, so none
+  appear.
+
+  The four trigger options are exactly the ones frontend/public/widget.js
+  implements (applyTrigger): immediate, 5-second delay, 50% scroll, and exit
+  intent. Exit intent fires on the mouse reaching the top 20px of the window,
+  so it needs a mouse; the post says it is a desktop trigger for that reason.
+*/}
+
+A chatbot’s greeting is the one message every visitor sees, and most decide from it whether to type anything at all. A good greeting says who is answering, what it can help with, and gives the visitor an easy first thing to ask, in one or two sentences. The second decision is when the chat bubble appears, which matters as much as the words.
+
+## What makes a good chatbot greeting?
+
+It answers the three questions a visitor has before they type.
+
+| The visitor wonders | The greeting should say |
+| --- | --- |
+| Is this a person or a bot? | That it is an assistant, plainly |
+| What can it actually help with? | Two or three specific things |
+| What do I type? | A question they can answer in a word, or an example to copy |
+
+Compare two greetings on the same website:
+
+- **Weak:** "Hi! How can I help you today?"
+- **Better:** "Hi, I’m the assistant for Harbour Dental. I can answer questions about treatments, prices and opening hours. What would you like to know?"
+
+The first is polite and empty: the visitor has to guess what the chatbot knows. The second tells them, so they ask something it can answer.
+
+## Chatbot greeting message examples
+
+Adapt these to your own business. Each names what the assistant knows and ends on a question that is easy to answer.
+
+### Real estate
+
+> Hi, I’m the assistant for Northgate Homes. I can tell you about our listings, prices and viewing times. Are you looking to buy or to rent?
+
+### Clinics and healthcare
+
+> Hello, I’m Harbour Dental’s assistant. I can answer questions about treatments, prices and opening hours, and help you request an appointment. What can I help with?
+
+Keep medical advice out of a clinic’s greeting and its content: the chatbot should point to a person for anything clinical.
+
+### Coaching and education
+
+> Hi, I can answer questions about our courses, batch timings and fees. Which course are you interested in?
+
+### Home services
+
+> Hi, I’m the assistant for Brightline Plumbing. I can help with services, rough prices and booking a visit. What do you need fixed?
+
+### Software and SaaS
+
+> Hi, I can answer questions about features, pricing and setup. Are you evaluating us for a team, or just for yourself?
+
+### Agencies and consultancies
+
+> Hi, I can tell you about our services, how we work and what a project usually involves. What are you hoping to get done?
+
+<Callout title="Match the greeting to the page" tone="neutral">
+  A greeting on a pricing page can open with prices; one on a blog post can open with the post’s topic. If your chatbot sits on every page with one greeting, write it for your most-visited page, not your homepage.
+</Callout>
+
+## Which greetings make visitors close the window?
+
+Most bad greetings fail in one of four ways.
+
+| Greeting | Why it fails |
+| --- | --- |
+| "Hi! How can I help?" | Says nothing about what the chatbot knows |
+| "Please enter your name and email to start." | A form wearing a chat window: the visitor gives before getting anything |
+| A paragraph about the company | Reads like a notice, so it is skipped |
+| A greeting that pretends to be a person | Feels misleading once the visitor realises |
+
+On asking for details: answer first and ask later. A visitor who has had a useful answer is more willing to leave a phone number than one asked before they have had anything. Read [when a chatbot should ask for contact details](/blog/when-should-a-chatbot-ask-for-contact-details/) for how to time that question.
+
+## Should a chatbot greeting say it is a bot?
+
+Yes. The cost is a few words; the benefit is that visitors ask the kind of questions a chatbot answers well, and do not feel misled. "I’m the assistant for…" does the job without sounding robotic.
+
+A chatbot should also say when it does not know something, rather than guess. A greeting that promises answers sets that expectation up; the chatbot has to keep it. If you are writing its content, see [what to put in a chatbot knowledge base](/blog/what-to-put-in-a-real-estate-chatbot-knowledge-base/).
+
+## When should the chat bubble appear?
+
+Choose by what the visitor is doing on the page. These are the four common triggers.
+
+| Trigger | When the bubble appears | Suits |
+| --- | --- | --- |
+| Immediately | As soon as the page loads | Pricing, contact and booking pages, where visitors came to ask |
+| After a short delay | A few seconds after load | Most pages: the visitor sees the page first |
+| After scrolling half the page | Once the visitor has read halfway | Long articles and guides, where scrolling shows interest |
+| Exit intent | When the mouse moves toward the top of the window, as if to leave | A last chance on desktop pages with high-value visitors |
+
+Exit intent watches the mouse, so it only works on a computer. If most of your visitors are on phones, choose one of the other three.
+
+## How do you know if your greeting works?
+
+Read the conversations. Two signs are easy to spot without any tools:
+
+- **Visitors ask what the greeting suggested.** If the greeting mentions prices and visitors ask about prices, it is doing its job.
+- **First messages are short and specific.** "Do you have 2-bedroom flats?" means the visitor knew what to ask. "hello?" means they did not.
+
+If many conversations stop after the greeting, change one thing at a time, the wording or the trigger, so you know which change helped.
+
+<div className="mt-16 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+  ### Where Vyostra AI sits
+
+  In Vyostra AI’s [chat agent](/features/chatbot), the greeting message and the trigger are both settings on the agent, and you can change them at any time without touching your website. The four triggers above are the four the widget offers: immediately, after 5 seconds, after scrolling 50% of the page, and exit intent.
+
+  The agent answers only from your website and knowledge base entries, and asks for the visitor’s details after the number of messages you choose.
+</div>
