@@ -8,6 +8,7 @@
  */
 import { INDUSTRIES } from '../content/industries/registry'
 import { INTEGRATIONS } from '../content/integrations/registry'
+import { GLOSSARY_LAST_MODIFIED } from '../content/glossary'
 import { FREE_TOOLS, TOOLS_HUB } from './free-tools'
 import type { PricingTier } from './pricingTiers'
 
@@ -102,6 +103,13 @@ export const STATIC_PAGES: readonly StaticPage[] = [
     summary: 'Short answers on what Vyostra AI is, setup, where leads go, WhatsApp follow-up and cost.',
     section: 'Product',
     lastModified: '2026-10-03',
+  },
+  {
+    route: '/glossary',
+    label: 'Glossary',
+    summary: 'Plain definitions of AI chatbot, voice agent, WhatsApp Business and lead management terms, from RAG to template messages.',
+    section: 'Product',
+    lastModified: GLOSSARY_LAST_MODIFIED,
   },
   {
     route: '/integrations',

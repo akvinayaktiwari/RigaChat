@@ -109,7 +109,9 @@ interface FormData {
 const INITIAL_FORM_DATA: FormData = {
   name: '',
   websiteUrl: '',
-  greetingMessage: "Hi! I'm here to help. What can I assist you with today?",
+  // Says it is an assistant, what it answers, and asks something easy to reply
+  // to. "How can I help?" alone leaves the visitor guessing what to type.
+  greetingMessage: "Hi, I'm the assistant for this website. I can answer questions about what we offer and how to get in touch. What would you like to know?",
   brandColor: '#6366f1',
   widgetTrigger: 'delay_5s',
   leadTriggerAfterMessages: 2,
@@ -510,7 +512,7 @@ export default function NewBotPage() {
                     onChange={(e) => update('greetingMessage', e.target.value)}
                     className={inputClasses}
                   />
-                  <p className={hintClasses}>First message visitors will see</p>
+                  <p className={hintClasses}>First message visitors will see. Name your business and two or three things the agent can answer.</p>
                 </div>
               </div>
             )}

@@ -26,6 +26,7 @@ import ZohoCrm from './src/pages/features/ZohoCrm'
 import Careers from './src/pages/Careers'
 import Pricing from './src/pages/Pricing'
 import Faq from './src/pages/Faq'
+import Glossary from './src/pages/Glossary'
 import ToolsIndex from './src/pages/tools/ToolsIndex'
 import WhatsAppLinkGenerator from './src/pages/tools/WhatsAppLinkGenerator'
 import WhatsAppQrCodeGenerator from './src/pages/tools/WhatsAppQrCodeGenerator'
@@ -207,6 +208,7 @@ export function AppRoutes() {
           <Route path="/careers" element={<Careers />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/faq" element={<Faq />} />
+          <Route path="/glossary" element={<Glossary />} />
           <Route path="/whatsapp-link-generator" element={<WhatsAppLinkGenerator />} />
           <Route path="/tools" element={<ToolsIndex />} />
           <Route path="/tools/whatsapp-qr-code-generator" element={<WhatsAppQrCodeGenerator />} />

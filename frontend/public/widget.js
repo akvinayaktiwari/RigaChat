@@ -408,6 +408,13 @@
       return;
     }
     if (trigger === 'exit_intent') {
+      // Exit intent is read from the mouse. A touch-only device has none, so
+      // without this the bubble never appeared on phones at all.
+      var canHover = window.matchMedia && window.matchMedia('(hover: hover)').matches;
+      if (!canHover) {
+        setTimeout(showBubble, 5000);
+        return;
+      }
       var onMouseMove = function (e) {
         if (e.clientY <= 20) {
           showBubble();
