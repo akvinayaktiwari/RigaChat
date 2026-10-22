@@ -1,0 +1,121 @@
+{/*
+  The last category comparison in AEO-GEO-STATUS to-do 35: names no competitor,
+  so it waits on no competitor facts.
+
+  Every platform figure (per-message pricing, the October 2026 service-message
+  change, the 1,000 free tier, the customer service window, the free entry
+  point, the messaging-limit tiers) is from Meta's developer docs, read in
+  October 2026:
+    https://developers.facebook.com/docs/whatsapp/pricing
+    https://developers.facebook.com/docs/whatsapp/messaging-limits
+
+  Deliberately NOT stated: a linked-device count or a broadcast-list size for
+  the Business app. WhatsApp's own help pages render client-side and could not
+  be read, and the third-party figures disagree with each other. Same for
+  "coexistence" (one number on both the app and the API): no primary page
+  could be read, so it is not mentioned.
+
+  Product claims match frontend/src/pages/features/WhatsApp.tsx as it is:
+  alerts and follow-ups go through the client's own Gupshup account.
+*/}
+
+The WhatsApp Business app is a phone app: a person on your team opens it and types. The WhatsApp Business Platform, which most people call the WhatsApp Business API, has no app at all. It is a connection your software sends and receives messages through. The app is free and quick to start; the API costs money per message and needs a provider, but it is the only way to automate replies or put WhatsApp conversations into a CRM.
+
+This post compares the two, sets out how Meta charges for the API since October 2026, and lists the signs that a business has outgrown the app.
+
+## What is the difference between the WhatsApp Business app and the API?
+
+Who sends the message: a person, or software.
+
+| | WhatsApp Business app | WhatsApp Business Platform (API) |
+| --- | --- | --- |
+| What it is | An app on a phone, with linked devices | A connection, with no app of its own |
+| Who replies | A person typing | Your software or a provider’s, with people stepping in |
+| Automation | Greeting and away messages, set in the app | Any reply logic your software runs |
+| Messaging first | To anyone you choose, by hand | Only with a template Meta has approved |
+| CRM | Conversations stay in the app | Messages can be stored against each lead |
+| Cost | The app itself is a free download | Per delivered message, by category and country |
+| Getting started | Install it and verify your number | Through Meta’s Cloud API or a provider |
+
+## What can the WhatsApp Business app do?
+
+Enough for a business where one or two people handle every conversation. Meta’s own page for the app describes greeting people the moment they start a conversation, replying when you are away, and showing what your business offers with prices.
+
+Its limits all come from the same fact: it is built for a person holding a phone.
+
+- **Every reply is typed by someone.** Beyond the greeting and away messages, nothing answers on its own.
+- **It does not connect to your other tools.** A lead who messages you lives in the chat list, not in your CRM, and is easy to lose once the chat scrolls away.
+- **Many hands, one inbox.** Several people can share an account across linked devices, but there is no assignment: two people can answer the same customer, or both can assume the other did.
+
+## What can the WhatsApp Business API do?
+
+Anything your software can be built to do, within Meta’s rules. Because messages pass through a connection rather than an app, a business can:
+
+- send an automatic first reply to every new lead, at any hour;
+- store each message against the lead it belongs to, so the whole team sees the history;
+- send updates, such as booking reminders or order notices, to many customers at once;
+- hand a conversation to a person when it needs one.
+
+Two rules shape all of it.
+
+### What is the 24-hour customer service window?
+
+When a user messages or calls your business, Meta opens a 24-hour customer service window, and each new message from them restarts it. Inside the window you can send ordinary messages. Outside it, you can only send **template messages**: wording you submit to Meta in advance, which Meta reviews before you can use it.
+
+In practice: you can reply freely to someone who has just written to you, but the first message to a new lead from a form, or a reminder a week later, has to be an approved template.
+
+### How many people can you message through the API?
+
+Meta caps how many unique users you can message outside a customer service window in a moving 24-hour period. The cap is set per business portfolio, shared by all its phone numbers.
+
+| Messaging limit | How you reach it |
+| --- | --- |
+| 250 | Where every new business portfolio starts |
+| 2,000 | Verify your business, or deliver 2,000 high-quality template messages to unique users in 30 days |
+| 10,000, then 100,000, then unlimited | Automatic, one step at a time, while message quality stays high and you use at least half your current limit over 7 days |
+
+Replies inside an open customer service window do not count against this limit. Source: Meta’s [messaging limits documentation](https://developers.facebook.com/docs/whatsapp/messaging-limits).
+
+## How much does the WhatsApp Business API cost?
+
+Meta charges per delivered message from a business to a user. Messages from users to you are free. The rate depends on the message’s category and the recipient’s country calling code. Meta replaced the older per-conversation pricing with per-message pricing on 1 July 2025.
+
+| Category | What it is for | Charged? |
+| --- | --- | --- |
+| Marketing | Offers, announcements, re-engaging past leads | Yes, every delivered message |
+| Utility | Updates about something the user asked for, such as a booking | Yes, including replies inside an open window since 1 October 2026 |
+| Authentication | One-time passcodes | Yes |
+| Service | Ordinary replies inside the 24-hour window | Yes since 1 October 2026, after 1,000 free per business phone number per month |
+
+Two details change the arithmetic:
+
+- **The service-message change.** Until October 2026, ordinary replies inside the window were free. Meta now charges for them beyond the free tier of 1,000 delivered service messages per business phone number per month, which does not roll over. Meta asked businesses to add a payment method by 30 September 2026 so service messages would not be interrupted.
+- **The free entry point.** When someone messages you from a Click to WhatsApp ad, and you reply within the customer service window, a free entry point window opens for up to 7 days. Inside it, Meta does not charge for marketing, utility, authentication or service messages.
+
+Your provider may add its own fee on top of Meta’s. Source: Meta’s [pricing documentation](https://developers.facebook.com/docs/whatsapp/pricing). Rates change, so read Meta’s current rate card for your customers’ countries before you budget.
+
+<Callout title="Budget for replies, not just campaigns" tone="neutral">
+  Before October 2026, a business that only answered customers could run on the API almost free. That is no longer true past 1,000 replies a month per number. Count how many replies your team sends now, not just how many campaigns you plan.
+</Callout>
+
+## When should you move from the app to the API?
+
+When the work no longer fits one phone. The common signs:
+
+| Sign | Why the app stops working |
+| --- | --- |
+| Leads wait hours for a first reply | Only a person can reply, and people sleep |
+| More than one person answers customers | No assignment, so replies collide or go missing |
+| You want leads and chats in a CRM | The app keeps conversations to itself |
+| You send the same update to many customers | Each message goes out by hand |
+| You run Click to WhatsApp ads | Ad leads arrive in bursts, and the free entry point only helps if someone replies inside the window |
+
+If none of these is true, the app is the better choice: it is free, and nothing is lost by staying on it. If several are, the API will cost money per message and save more in hours and missed leads. For the wider picture, read [what a WhatsApp CRM is](/blog/what-is-a-whatsapp-crm/) and [how to auto-reply to Facebook lead ads on WhatsApp](/blog/facebook-lead-ads-whatsapp-auto-reply/).
+
+<div className="mt-16 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+  ### Where Vyostra AI sits
+
+  Vyostra AI uses the WhatsApp Business API, not the app, through your own account with Gupshup, a WhatsApp Business API provider. Meta’s per-message charges apply to those messages as described above.
+
+  With [WhatsApp lead notifications](/features/whatsapp) switched on, every new lead from a chat agent, a lead form or a connected Meta lead ad arrives on your own WhatsApp number as it is captured. A follow-up journey can message a new lead on WhatsApp, wait for a real reply, and hand the lead to your team when it needs a person.
+</div>
