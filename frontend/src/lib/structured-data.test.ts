@@ -41,7 +41,12 @@ describe('softwareApplicationSchema', () => {
   })
 
   it('prices per month, which is what the page says', () => {
-    expect(asRecord(offers[0]?.priceSpecification).unitCode).toBe('MON')
+    expect(offers.map((offer) => offer.description)).toEqual(PRICING_TIERS.map((tier) => `${tier.description} $${tier.priceUsd} per month.`))
+  })
+
+  // Valid schema.org, but Google's Software App validator reports it as an invalid object type.
+  it('carries no priceSpecification', () => {
+    expect(offers.filter((offer) => 'priceSpecification' in offer)).toEqual([])
   })
 
   // No third-party reviews exist; a self-authored rating is a spam-policy violation.
@@ -79,7 +84,7 @@ describe('blogPostingSchema', () => {
   })
 
   it('dates a post never revised by its publication', () => {
-    expect(blogPostingSchema(fields).dateModified).toBe('2026-08-01')
+    expect(blogPostingSchema(fields).dateModified).toBe('2026-08-01T00:00:00+05:30')
   })
 
   // One English site: the market is a claim about coverage, not a locale.
@@ -91,7 +96,7 @@ describe('blogPostingSchema', () => {
 
   it('dates a revised post by the revision', () => {
     const revised = blogPostingSchema({ ...fields, updatedAt: '2026-09-20' })
-    expect([revised.datePublished, revised.dateModified]).toEqual(['2026-08-01', '2026-09-20'])
+    expect([revised.datePublished, revised.dateModified]).toEqual(['2026-08-01T00:00:00+05:30', '2026-09-20T00:00:00+05:30'])
   })
 })
 
