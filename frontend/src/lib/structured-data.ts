@@ -85,21 +85,21 @@ export function websiteSchema(): JsonLd {
   }
 }
 
-/** USD: one global price list, and the currency every card is charged in. */
+/**
+ * USD: one global price list, and the currency every card is charged in.
+ *
+ * The monthly term is stated in the description, not in a
+ * UnitPriceSpecification: that is valid schema.org, but Google's Software App
+ * validator flags it as an invalid object type, and price + priceCurrency is
+ * all Google reads from an Offer.
+ */
 function planOffer(tier: PricingTier): JsonLd {
   return {
     '@type': 'Offer',
     name: tier.name,
-    description: tier.description,
+    description: `${tier.description} $${tier.priceUsd} per month.`,
     price: String(tier.priceUsd),
     priceCurrency: 'USD',
-    priceSpecification: {
-      '@type': 'UnitPriceSpecification',
-      price: String(tier.priceUsd),
-      priceCurrency: 'USD',
-      unitCode: 'MON',
-      referenceQuantity: { '@type': 'QuantitativeValue', value: 1, unitCode: 'MON' },
-    },
     url: absoluteUrl('/pricing/'),
   }
 }
@@ -136,6 +136,15 @@ export function faqPageSchema(items: readonly FaqItem[]): JsonLd {
   }
 }
 
+/**
+ * A YYYY-MM-DD content date as a full ISO 8601 datetime. Google's validator
+ * flags a bare date on datePublished/dateModified as missing a timezone. Posts
+ * are dated in Bangalore, so midnight IST.
+ */
+export function schemaDateTime(date: string): string {
+  return `${date}T00:00:00+05:30`
+}
+
 export interface ArticleFields {
   title: string
   excerpt: string
@@ -161,8 +170,8 @@ export function blogPostingSchema(article: ArticleFields): JsonLd {
     '@type': 'BlogPosting',
     headline: article.title,
     description: article.excerpt,
-    datePublished: article.publishedAt,
-    dateModified: article.updatedAt ?? article.publishedAt,
+    datePublished: schemaDateTime(article.publishedAt),
+    dateModified: schemaDateTime(article.updatedAt ?? article.publishedAt),
     mainEntityOfPage: absoluteUrl(article.path),
     image: absoluteUrl('/og-image.png'),
     keywords: article.tags.join(', '),
@@ -190,8 +199,8 @@ export function techArticleSchema(article: TechArticleFields): JsonLd {
     '@type': 'TechArticle',
     headline: article.title,
     description: article.description,
-    datePublished: article.publishedAt,
-    dateModified: article.updatedAt ?? article.publishedAt,
+    datePublished: schemaDateTime(article.publishedAt),
+    dateModified: schemaDateTime(article.updatedAt ?? article.publishedAt),
     mainEntityOfPage: absoluteUrl(article.path),
     image: absoluteUrl('/og-image.png'),
     author: personSchema(article.author),

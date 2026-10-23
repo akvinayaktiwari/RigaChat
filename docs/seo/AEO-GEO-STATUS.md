@@ -1,6 +1,6 @@
 # AEO / GEO Status — vyostra.com
 
-**The one file to read first.** What has shipped for search and answer-engine visibility, what is left, and who has to do it. Last updated: 2026-10-22. Next steps: `HANDOFF-2026-10-05.md` and, for the global market move, `GLOBAL-MARKET-HANDOFF.md`.
+**The one file to read first.** What has shipped for search and answer-engine visibility, what is left, and who has to do it. Last updated: 2026-10-23. Next steps: `HANDOFF-2026-10-05.md` and, for the global market move, `GLOBAL-MARKET-HANDOFF.md`.
 
 How to keep it current: when something ships, move its row from "To do" to "Implemented" with the date. Do not record plans here; plans live in the documents listed at the bottom.
 
@@ -13,7 +13,7 @@ Framing: Google's own guidance is that optimizing for AI search is ordinary SEO.
 | Measure | Value | Date | Note |
 |---|---|---|---|
 | GEO readiness (estimate) | 71 / 100 | 2026-10-02 | From `GEO-ANALYSIS-2026-10-02.md`, before the feature-page rebuild. Baseline was 63 on 2026-09-19. |
-| Indexed in Google | Unknown | — | Search Console is not verified. This is the top blocker. |
+| Indexed in Google | 7 of 8 key pages | 2026-10-23 | Search Console verified (Domain property, since 2026-10-05). Sitemap read 2026-10-11, 53 pages discovered. `/features/whatsapp/` was "Discovered - currently not indexed"; indexing requested 2026-10-13. Source: `COWORK-REPORT-2026-10-23.md`. |
 | Public pages in the sitemap | 63 | 2026-10-22 | Counted from the built `sitemap.xml`. Adds `/glossary/` and the posts written since 2026-10-07. |
 | Blog posts | 27 | 2026-10-22 | Two global posts added 2026-10-22 (WhatsApp Business app vs API; chatbot greeting messages). Two global posts added 2026-10-06 (AI sales agent: what it can and cannot do; Trakheesi permit for property ads, limited to what the Dubai Land Department's service page states). Two market posts written 2026-10-06 (real estate CRM for Dubai brokers; WhatsApp automation for small business in India). Three global pillars published 2026-10-06 (WhatsApp CRM, real estate chatbot guide, AI receptionist vs website voice agent). Four published 2026-10-05: Meta lead ads auto-reply, click-to-WhatsApp vs lead forms, real estate chatbot qualification questions, and what a CRM chatbot is. |
 | Mobile LCP (lab) | about 1.7 s | 2026-10-02 | Was 2.3 s on the homepage and 3.25 s on a post. No field data yet. |
@@ -82,10 +82,11 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 | Footer links the company's LinkedIn and X profiles on every public page; the Organization `sameAs` reads the same list, and every page carries `twitter:site` | 2026-10-06 |
 | Internal links: help in the footer, feature pages to related posts, latest posts on the homepage, related posts on each post | 2026-09-19 |
 | The WhatsApp real estate post links the two ad-lead posts from its lead-source table | 2026-10-05 |
-| `/glossary/` (to-do 37): 26 terms, each under its own fragment, published as a `DefinedTermSet` of `DefinedTerm`s read from the same list the page renders (`frontend/src/content/glossary.ts`). Definitions describe the category, not Vyostra AI. Linked from the footer, in the sitemap and `llms.txt`. `Glossary.test.tsx` fails on a term the page does not show or a link to a route the site does not serve. **Run `./scripts/deploy-cloudfront-function.sh` after merge** so bare `/glossary` 301s; `/glossary/` works without it | 2026-10-22 |
+| `/glossary/` (to-do 37): 26 terms, each under its own fragment, published as a `DefinedTermSet` of `DefinedTerm`s read from the same list the page renders (`frontend/src/content/glossary.ts`). Definitions describe the category, not Vyostra AI. Linked from the footer, in the sitemap and `llms.txt`. `Glossary.test.tsx` fails on a term the page does not show or a link to a route the site does not serve. The CloudFront function was republished the same day; bare `/glossary` 301s to `/glossary/` | 2026-10-22 |
 | `/blog/whatsapp-business-app-vs-api/` (to-do 35, global, the last competitor-free comparison). Every platform figure read at Meta's developer docs in October 2026, including the 1 October 2026 change that made service replies chargeable past 1,000 a month per number. The app's linked-device count and broadcast-list size are left out: WhatsApp's help pages render client-side and could not be read, and third-party figures disagree | 2026-10-22 |
 | `/blog/chatbot-greeting-message-examples/` (global how-to behind the greeting and widget trigger settings). The four triggers are exactly the four `widget.js` implements; says exit intent is desktop-only because it fires on mouse position | 2026-10-22 |
 | IndexNow push to Bing after each frontend deploy (to-do 33). The key file returns 200 on the live site | 2026-10-13 |
+| Rich Results Test warnings cleared: post and docs dates are full ISO 8601 with a timezone, and the homepage plan offers no longer carry the `priceSpecification` Google's Software App validator rejected. The test (owner task 10, run by Cowork 2026-10-23) found no errors on the homepage or a post; the remaining warnings are `aggregateRating` (kept out: no real reviews) and a street address (only if the owner wants one public) | 2026-10-23 |
 | `llms-full.txt`, the body text of every prerendered page, linked from `llms.txt` (to-do 34). Returns 200 on the live site. Still open: an identity and pricing block in `llms.txt` itself | 2026-10-13 |
 | `/blog/chatbot-vs-live-chat/` (to-do 35, global; says the chat agent hands off a lead, not a live chat window, since no takeover exists) and `/blog/when-should-a-chatbot-ask-for-contact-details/` (global how-to behind the agent's "after N messages" setting). No sourced figures, so none quoted | 2026-10-18 |
 | Category comparison post `/blog/lead-form-vs-chatbot/` (to-do 35, global): names no competitor, so it does not wait on owner task 7. No sourced conversion figures exist, so none are quoted; product claims match the live Forms and Chatbot feature pages | 2026-10-14 |
@@ -170,8 +171,8 @@ The owner's decision on 2026-10-06: Vyostra AI sells globally and leads with US 
 | # | Task | Why it matters |
 |---|---|---|
 | 0b | A stable API hostname such as `api.vyostra.com` | The API is served from a Lambda Function URL, so the docs print no host and send developers to Settings for it. With a stable host the examples can be copy-paste complete. |
-| 1 | **Verify `vyostra.com` in Google Search Console** (Domain property, DNS TXT), submit the sitemap, request indexing for the new pages | Everything below assumes the site is indexed. A web search for the brand returned the GitHub repos, not the site. |
-| 2 | Import the property into Bing Webmaster Tools | Bing feeds ChatGPT Search and Copilot. |
+| 1 | Confirm `/features/whatsapp/` is indexed in Search Console | Indexing was requested 2026-10-13; it was the one key page not on Google. |
+| 2 | Import the property into Bing Webmaster Tools (sign in with the Google account that owns Search Console, then "Import from Google Search Console") | Bing feeds ChatGPT Search and Copilot. Still blocked on the owner's sign-in as of 2026-10-23. |
 | 3 | Create the Google API key and service account described in the setup notes | Lets Claude check index status per URL, real-user Core Web Vitals and search queries. |
 | 4 | Rewrite the two public GitHub repo descriptions to match the site, or make the interview repo private | They rank first for the brand and say "solo founder" and "for Indian SMBs". |
 | 5 | Record one product walkthrough for YouTube | No page has a video or an image; YouTube is the strongest measured correlate of AI visibility. |
@@ -179,7 +180,6 @@ The owner's decision on 2026-10-06: Vyostra AI sells globally and leads with US 
 | 7 | Verify competitor facts for the comparison pages | Draft at `drafts/compare-pages.md`; every competitor cell is `TODO: verify`. |
 | 8 | Register `message_index` as a GA4 custom metric | Collected but unreportable until then. |
 | 9 | A client case study with real numbers | Needs a client's approval. |
-| 10 | Run the Rich Results Test on the homepage and one post | Not run yet. |
 | 10a | Check the Priya S. testimonial on the homepage | It says leads "from the AI agent" sync to Zoho. Chat leads do not sync; only form and Meta lead ad leads do. It is a customer's own quote, so it was left unchanged: confirm with her how leads reach her Zoho, then reword with her approval or drop the sentence. |
 
 | 25 | Legal review of Terms and Privacy for international customers | Terms now says prices are in USD and that customers in India can choose to pay in INR; nothing else in it was changed. Privacy states data is held in `ap-south-1` (Mumbai), which needs a lawful transfer basis for EU/UK customers and a check against UAE data protection law. |
@@ -223,6 +223,7 @@ The owner's decision on 2026-10-06: Vyostra AI sells globally and leads with US 
 | File | What it is |
 |---|---|
 | `docs/seo/QDNCO-LEARNINGS.md` | What qdnco.com does that this site should borrow, and what not to copy |
+| `docs/seo/COWORK-REPORT-2026-10-23.md` | Cowork's report back on that handoff: Search Console, IndexNow, Rich Results, and which owner tasks are blocked on a login |
 | `docs/seo/COWORK-HANDOFF-2026-10-13.md` | Owner-side tasks (Search Console, Bing, profiles) written for Cowork, with the report-back format |
 | `docs/seo/GEO-ANALYSIS-2026-10-02.md` | Latest scored analysis, with per-crawler access and passage-level detail |
 | `docs/seo/GEO-AUDIT-2026-09-19.md` | The baseline audit (63/100) and its commit record |
