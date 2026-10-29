@@ -1,0 +1,98 @@
+{/*
+  A checklist post. No pass-rate or accuracy thresholds: none are sourced,
+  and a made-up "aim for 90%" would read as a standard. The bar given is
+  qualitative: every money, policy and availability answer right, and every
+  unanswerable question admitted.
+
+  Product claims match frontend/src/pages/features/Chatbot.tsx and
+  BotDetailPage.tsx as they are: answers only from website and knowledge
+  base, says so when it does not know, four widget triggers, lead form after
+  N messages, re-crawl rebuilds the knowledge from scratch.
+*/}
+
+To test a chatbot before launch, ask it the questions your customers really ask, worded the way they would word them, and read every answer against what is true today. Then try to break it: ask for things you do not offer, mix two products up, and see whether it admits what it does not know. Finish by walking through the whole visitor journey on a phone, from the bubble appearing to a lead arriving with your team.
+
+An hour of this catches most of the problems that would otherwise reach customers first. Here is the checklist.
+
+## What should you test before a chatbot goes live?
+
+Five areas, in this order:
+
+| Area | The question it answers |
+| --- | --- |
+| Real customer questions | Does it answer what people actually ask? |
+| Questions it cannot answer | Does it admit gaps instead of inventing? |
+| Tricky wording | Does it cope with typos, slang and vague questions? |
+| The lead hand-off | Do the visitor's details reach your team? |
+| The widget on your site | Does it appear when and where it should? |
+
+## How do you test real customer questions?
+
+Collect twenty or thirty questions from where customers already ask them: your inbox, phone notes, WhatsApp, the questions your sales team hears every week. Use their wording, not yours. Customers say "how much for a small one?", not "what is the pricing for the entry-level tier?"
+
+For each answer, check three things:
+
+- **Is it right today?** Prices, offers, hours and policies are where out-of-date pages show up.
+- **Is it complete enough to act on?** An answer that is true but leaves the visitor still asking is half a fix.
+- **Is it about the right thing?** Chatbots most often confuse things with similar names: two plans, two branches, two products.
+
+Every wrong answer has a cause in the source text: an old page, a page that was not read, or an answer never written down. Fix the source, not the symptom; [how to train a chatbot on your website](/blog/how-to-train-a-chatbot-on-your-website/) covers each.
+
+## How do you check a chatbot does not make things up?
+
+Ask it things you know your website does not answer:
+
+- A price for a product you do not sell.
+- A service in a city you do not cover.
+- A discount or promotion that does not exist.
+- A policy you have never written down, such as "can I pay in instalments?"
+
+The right answer to each is some version of "I don't have that information" and an offer to pass the question on. If it gives a confident number or a yes, it is inventing answers. [Why chatbots make things up](/blog/why-do-chatbots-make-things-up/) explains what to change.
+
+<Callout title="Test with new wording each time" tone="warning">
+  After you fix a source and retrain, ask the question again in different words, not the exact sentence you used before. A chatbot that only answers the phrasing you tested has not really learned the fix.
+</Callout>
+
+## How do you test tricky wording?
+
+Real visitors do not type clean questions. Try:
+
+- **Typos and short forms:** "wats the price", "hrs on sat?"
+- **Vague openers:** "hi", "info please", "is this available"
+- **Two questions at once:** "do you deliver and how much is it"
+- **Follow-ups that depend on the last answer:** "and the bigger one?"
+- **Other languages,** if your visitors use them. Do not promise a language on your site until you have tested it.
+
+The chatbot does not need a perfect answer to each. It needs a sensible one, or a short question back that moves the visitor forward.
+
+## How do you test the lead hand-off?
+
+Be the visitor, start to finish, and then be your own sales team:
+
+1. Chat until the chatbot asks for your details, and check it asks at the moment you intended. See [when a chatbot should ask for contact details](/blog/when-should-a-chatbot-ask-for-contact-details/).
+2. Fill the form with a real phone number and email you can check.
+3. Find the lead where your team will find it. Is the conversation attached? Is the number in a format your team can call?
+4. Follow it up as your team would, using [the follow-up checklist](/blog/how-to-follow-up-with-a-chatbot-lead/). Did you have everything you needed without asking again?
+
+Then delete or archive the test lead so it does not sit in your real list.
+
+## How do you test the chatbot on your website?
+
+On the live site, not only the preview, and on a phone as well as a laptop:
+
+- **It appears.** On the pages you meant, and not on the ones you did not. If not, see [how to add a chatbot to your website](/blog/how-to-add-a-chatbot-to-your-website/).
+- **It appears at the right moment.** If it waits for a delay or a scroll, wait or scroll.
+- **It does not cover anything.** Cookie banners, sticky "call now" bars and checkout buttons are the usual collisions.
+- **The greeting reads well on a small screen.** One or two short sentences; see [greeting message examples](/blog/chatbot-greeting-message-examples/).
+
+## When is a chatbot ready to launch?
+
+When every answer about money, policies and availability is right, every question it cannot answer is admitted rather than guessed, and a test lead reaches your team with the conversation attached. Smaller gaps, such as an awkward phrasing or a missing detail, can be fixed after launch: read the first week's conversations, and add what visitors asked that the chatbot could not answer.
+
+<div className="mt-16 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+  ### How Vyostra AI handles it
+
+  The Vyostra AI [chat agent](/features/chatbot) answers only from your website content and knowledge base, and says so when the answer is not there, which is what the "make it fail" tests above check for. From the bot's settings you can open its widget on a test page and chat with it before you paste the code on your own site.
+
+  When a test shows a gap, add a knowledge base entry, or update your website and re-crawl it from the bot's settings; the knowledge is rebuilt from scratch, so an old answer cannot linger. You choose when the widget appears and after how many messages it shows the lead form, and every test lead lands in the [lead CRM](/features/crm) with its conversation, where it can be archived afterwards.
+</div>
