@@ -1,0 +1,96 @@
+{/*
+  A how-to post. No accuracy or deflection figures: none are sourced, so none
+  appear.
+
+  Product claims match backend/src/services/crawler-service.ts as it is: the
+  crawl starts from the URL you enter, finds pages from the sitemap and the
+  homepage's links, reads up to 50 of them, prefers about/pricing/FAQ-type
+  pages, skips /blog/, /news/ and similar paths, and fetches plain HTML (no
+  script rendering). Re-crawl rebuilds from scratch (BotDetailPage.tsx).
+  Manual knowledge base entries are a title and content (KnowledgeBaseEntry).
+*/}
+
+To train a chatbot on your website, you point it at your site, let it read your pages, and then fill the gaps by hand. The chatbot does not learn the way a person does. It keeps your pages as searchable text, finds the passages that match each question, and writes its answer from them. So what it can answer is exactly what your pages say, and nothing more.
+
+That makes training mostly an editing job. This post covers what a chatbot reads from your site, what it misses, what to add by hand, and how to keep it current.
+
+## How does a chatbot learn from a website?
+
+In three steps, done for you once you enter your website address:
+
+1. **It finds your pages.** It reads your sitemap and the links on your homepage to build a list of pages.
+2. **It reads the text.** For each page it keeps the words a visitor would read and drops the menus, footers, cookie banners and pop-ups.
+3. **It splits the text into passages and indexes them.** Each passage is stored so it can be found by meaning, not only by exact words. A visitor who asks "do you deliver on Sundays?" can be matched to a passage that says "we deliver seven days a week".
+
+When a visitor asks a question, the chatbot looks up the few passages closest in meaning and answers from them. This is called retrieval: the chatbot retrieves your text rather than remembering it. It is why a well-built chatbot can say "I don't know" instead of inventing an answer.
+
+## Which pages should a chatbot read?
+
+The pages that answer what visitors ask before they buy. Most sites have more pages than a chatbot needs, and some pages help less than they seem to.
+
+| Page type | Worth reading? | Why |
+| --- | --- | --- |
+| Pricing, plans, packages | Yes | The most common question on almost any site |
+| Services or products | Yes | What you sell and who it is for |
+| FAQ | Yes | Already written as questions and answers |
+| About, contact, locations | Yes | Opening hours, areas served, how to reach you |
+| Policies (delivery, returns, cancellation) | Yes | Questions visitors are shy to ask a person |
+| Blog posts and news | Usually not | Old posts contradict current prices and offers |
+| Tag, category and author pages | No | Lists of links with no answers in them |
+
+Leaving the blog out surprises people. The problem is age: a post from two years ago that mentions an old price is still on the site, and a chatbot that reads it may quote it.
+
+## What does a chatbot miss on a website?
+
+Four things, and each one is fixable.
+
+- **Text inside images.** A price list saved as a picture, a menu as a photo, a banner with the offer written on it. The chatbot reads text, not pixels.
+- **Text loaded by scripts after the page opens.** Some sites build their content in the browser after the page loads. A crawler that reads the page as sent from the server sees an empty shell. If your site is built this way, check what the chatbot learned before you launch.
+- **Files.** PDFs, brochures and spreadsheets linked from a page are not read as part of the page.
+- **Things nobody wrote down.** The answer your team gives on the phone every day, but that appears on no page: whether you take card payments, how long setup takes, whether you work with clients abroad.
+
+The last one is the biggest gap on most sites, and the only one no crawler can fix.
+
+## What should you add to the knowledge base by hand?
+
+Whatever your team answers often and your website does not say. A good way to find it is to ask whoever answers your phone or inbox for the ten questions they hear most, then check each one against the site.
+
+Write each entry the way you would answer a customer:
+
+- **One topic per entry.** "Delivery areas" and "Delivery charges" as two entries, not one long note about delivery.
+- **A plain title.** The title helps the right entry be found. "Do you deliver outside the city?" works better than "Logistics note 3".
+- **The answer first, then the conditions.** "Yes, to these areas. Orders outside them take two extra days."
+- **No internal shorthand.** Product codes and team nicknames mean nothing to a visitor and match nothing they type.
+
+<Callout title="One source of truth" tone="neutral">
+  If an answer is on your website and in a hand-written entry, and the two disagree, the chatbot may quote either. When something changes, change it in both places, or keep it in one.
+</Callout>
+
+## How do you know what the chatbot learned?
+
+Ask it. Before the chatbot goes on your site, put the questions your customers really ask, worded the way they would word them, and read every answer:
+
+- Is the answer right, and current?
+- Did it say it did not know when the site has no answer? It should.
+- Did it mix up two products, two plans or two locations?
+
+Wrong answers usually trace back to one of three causes: the page says something out of date, the page was not read, or the answer was never written down. For a worked example in one industry, see [what to put in a real estate chatbot’s knowledge base](/blog/what-to-put-in-a-real-estate-chatbot-knowledge-base/).
+
+## How often should you retrain a chatbot?
+
+Whenever the facts it answers from change. A chatbot answers from the text it read on the day it read it, so a new price or a new service is invisible to it until it reads the site again.
+
+| What changed | What to do |
+| --- | --- |
+| Prices, plans or offers | Re-read the site the same day |
+| A new product, service or location page | Re-read the site |
+| A one-off fact (holiday hours, a temporary offer) | A hand-written entry, removed when it ends |
+| Wording only, no new facts | Nothing |
+
+<div className="mt-16 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+  ### How Vyostra AI handles it
+
+  You enter your website address and the [chat agent](/features/chatbot) reads up to 50 pages, found from your sitemap and your homepage's links. It reads pricing, product, FAQ and about pages first, and skips blog, news, tag and category pages. You can add your own knowledge base entries for anything the site does not cover, each with a title and the answer.
+
+  When your site changes, re-crawl it from the bot's settings: the chat agent's knowledge is rebuilt from scratch, so nothing from the old pages is left behind. It answers only from your website and knowledge base, and when the answer is not there it says so instead of guessing.
+</div>

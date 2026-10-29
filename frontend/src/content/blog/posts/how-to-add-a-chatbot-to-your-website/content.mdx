@@ -1,0 +1,83 @@
+{/*
+  A how-to post. Platform menu paths are the general location each builder
+  gives for site-wide footer code; menus are renamed often, so the post says
+  so and tells the reader what to look for rather than promising exact labels.
+
+  Product claims match frontend/src/content/docs/pages/embed-widgets as it is:
+  one script tag with data-bot-id before </body>, an optional
+  data-bottom-offset (default 20), settings changed in the dashboard need no
+  page change, and the troubleshooting list. The "works on" list is the one
+  frontend/src/pages/features/Chatbot.tsx already states: WordPress, Webflow
+  and custom HTML.
+*/}
+
+To add a chatbot to your website, you copy a short piece of code from your chatbot provider and paste it into your site once, usually just before the closing `</body>` tag of a template every page shares. Almost every website builder has a place for this, often called "custom code", "footer code" or "code injection". It takes a few minutes and no programming.
+
+This post walks through what the code does, where it goes on the common website builders, and what to check when the chat bubble does not appear.
+
+## What is a chatbot embed code?
+
+A single script tag. It looks something like this:
+
+```html
+<script src="https://example.com/widget.js" data-bot-id="your-bot-id"></script>
+```
+
+When a visitor opens your page, the tag loads the chat bubble and tells it which chatbot to show. Everything else, such as the greeting, the colour and the answers, lives with your chatbot provider. That is why you paste it once: changing the greeting later does not mean editing your website again.
+
+The id in the tag is not a password. It is meant to sit in your page source where anyone can see it, the same way an analytics tag does.
+
+## Where do you paste a chatbot script?
+
+Just before the closing `</body>` tag, on every page where the chatbot should appear. Placing it at the end means your page content loads first and the chatbot follows, so the page does not wait on it.
+
+Pasting it into a shared footer or layout puts it on every page at once. If you only want it on some pages, paste it into those pages individually instead.
+
+## How do you add a chatbot on common website builders?
+
+Each builder has a place for site-wide code. The names below are where it usually lives; builders rename their menus from time to time, so if a label has moved, search the builder's help for "custom code" or "footer code".
+
+| Website builder | Where site-wide code usually goes | Notes |
+| --- | --- | --- |
+| WordPress | A header-and-footer code plugin, or the theme's footer template | A plugin survives theme updates; editing the theme file does not |
+| Webflow | Site settings, then Custom code, then Footer code | Publish the site again for it to take effect |
+| Shopify | Online Store, Themes, Edit code, then the `theme.liquid` layout, before `</body>` | Back up the theme before editing |
+| Wix | Settings, then Custom code, placed in Body – end | Usually needs a paid plan with a connected domain |
+| Squarespace | Settings, then Code injection, Footer | Usually needs a paid plan |
+| Custom HTML or a framework | Your base layout or `index.html`, before `</body>` | One layout file covers every page |
+
+<Callout title="Paste it once" tone="neutral">
+  A chatbot tag pasted twice can load two chat bubbles, or one that behaves oddly. If you add it to a shared footer, do not also add it to individual pages.
+</Callout>
+
+## Which pages should show the chatbot?
+
+Most sites show it everywhere, but a few pages are worth a second thought:
+
+- **Pricing, product and contact pages.** The pages where visitors have questions. Always show it here.
+- **Checkout and payment pages.** A bubble over a payment form can distract at the worst moment. Many sites leave it off.
+- **Pages with their own form.** A lead form and a chat bubble asking for the same details compete. Pick one; see [lead form vs chatbot](/blog/lead-form-vs-chatbot/).
+- **Long articles.** Show it, but let it appear after the visitor has read a while. [Greeting messages and when to show them](/blog/chatbot-greeting-message-examples/) covers timing.
+
+## What should you check if the chatbot does not appear?
+
+Work down this list in order; the first three cover most cases.
+
+1. **The page you are looking at is the published one.** Many builders need you to publish or save the site before custom code goes live. Reload the live page, not the editor's preview.
+2. **The tag is really there.** View the page source in your browser and search for the script's file name. If it is not in the source, the code was saved in the wrong place.
+3. **The id matches.** One wrong character in the bot id loads nothing.
+4. **Nothing is blocking the script.** Open the browser's developer console and look for an error about a blocked script. Sites with a strict Content Security Policy must allow the chatbot's script host.
+5. **The bubble is not hidden.** A cookie banner or sticky bar can sit on top of it. Most widgets let you raise the bubble from the bottom of the screen.
+6. **It is not set to wait.** If the chatbot is set to appear after a delay or a scroll, it will not show the instant the page loads.
+
+## Does a chatbot slow down a website?
+
+A well-built one has little effect, because it loads after the page's own content and stays small until a visitor opens it. Check yours: run your page through a speed test with and without the tag, and compare. If the difference is large, ask your provider why.
+
+<div className="mt-16 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+  ### How Vyostra AI handles it
+
+  The Vyostra AI [chat agent](/features/chatbot) is one script tag you copy from your bot's settings and paste before the closing `</body>` tag. It works on WordPress, Webflow and custom HTML sites. The greeting, colour and when the widget appears are all set in the dashboard, so changing them needs no change to your page.
+
+  If the bubble covers a cookie banner or a sticky bar, add `data-bottom-offset` to the tag to raise it. The [widget embed guide](/docs/embed-widgets/) has the full tag, its options, and the same troubleshooting steps for lead forms and the voice agent.
+</div>

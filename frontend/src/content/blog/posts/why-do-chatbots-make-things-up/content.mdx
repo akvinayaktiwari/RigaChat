@@ -1,0 +1,90 @@
+{/*
+  An explainer. No hallucination-rate figures: published rates vary by model,
+  task and how they were measured, and none was checked at a primary source,
+  so none are quoted.
+
+  Product claims match backend/src/services/chat-service.ts as it is: the chat
+  agent answers only from retrieved website and knowledge base passages, and
+  when they hold no answer it says so and offers the team
+  ("I don't have that information right now. Would you like to speak with our
+  team?").
+*/}
+
+A chatbot makes things up when it is asked something its source text does not answer and nothing tells it to stop. The language model underneath writes the most likely-sounding reply, and a likely-sounding price or policy reads exactly like a real one. This is usually called hallucination. You cannot remove it from the model, but you can build the chatbot so it rarely gets the chance.
+
+This post explains where invented answers come from, which ones cost a business most, and the five things that prevent them.
+
+## Why does a chatbot invent answers?
+
+Because a language model is built to continue text plausibly, not to check it. Asked "what does your premium plan cost?", a model with no price in front of it still knows what a price looks like, and can produce one.
+
+There are three common situations where this happens:
+
+| Situation | What the chatbot does | Example |
+| --- | --- | --- |
+| The answer is not in its sources | Fills the gap with something typical | Quotes a delivery time your business never promised |
+| Its sources disagree | Picks one, or blends them | Gives last year's price from an old page |
+| The question is close to, but not, what the sources cover | Stretches a nearby answer | Says you serve a city because you serve the next one |
+
+The first is the most dangerous, because the answer has no source at all. The second and third have a source, just the wrong one, and they are fixed by cleaning up the sources.
+
+## Which made-up answers hurt a business most?
+
+The ones a customer acts on. A wrong answer about your opening hours costs a wasted trip. A wrong answer about these costs more:
+
+- **Prices, discounts and fees.** A customer quoted a lower price expects to pay it.
+- **Availability and delivery dates.** A promise you did not make is still a promise to them.
+- **Policies.** Refunds, cancellations, warranties and eligibility.
+- **Anything regulated.** Medical, legal, financial or safety advice.
+
+These are also the questions visitors ask most often before they buy, which is why preventing invented answers matters more for a sales chatbot than for one that only gives directions.
+
+## How do you stop a chatbot making things up?
+
+Five things, in rough order of how much they help.
+
+### 1. Answer only from your own text
+
+The chatbot should look up passages from your website and knowledge base for every question, and write its answer from those passages alone. This is called retrieval-augmented generation: the model writes, but your text supplies the facts. A chatbot that answers "from what it knows" is answering from the general internet the model was trained on, not from your business.
+
+### 2. Tell it to say "I don't know"
+
+Retrieval alone is not enough. When the passages it finds do not contain the answer, the model will still try to be helpful unless it is told not to. The instruction that matters is explicit: answer only from the provided text, and if the text does not contain the answer, say so plainly.
+
+### 3. Give it somewhere to send the visitor
+
+"I don't know" is a dead end on its own. Pair it with a next step: offer to have someone from the team reply, and ask how to reach them. A question the chatbot could not answer is often the most useful lead it captures, because the visitor has told you exactly what they need. See [when a chatbot should ask for contact details](/blog/when-should-a-chatbot-ask-for-contact-details/).
+
+### 4. Keep the sources current and consistent
+
+Most wrong answers with a source come from out-of-date pages. Remove or update old prices and offers, keep one page as the source of truth for each fact, and re-read the site when the facts change. [How to train a chatbot on your website](/blog/how-to-train-a-chatbot-on-your-website/) covers which pages to include.
+
+### 5. Test with the questions customers really ask
+
+Ask it the awkward questions before your customers do: a service you do not offer, a city you do not cover, a discount that does not exist. A chatbot that says "we don't offer that" or "I don't have that information" is behaving well. One that agrees is not ready.
+
+<Callout title="A quick test" tone="warning">
+  Ask your chatbot for something you know is not on your website, such as a price for a product you do not sell. If it gives a number, it is inventing answers, and it will invent them for real customers too.
+</Callout>
+
+## Can a chatbot ever be completely accurate?
+
+No chatbot is right every time, and any vendor who promises that is overclaiming. What you can control is how it fails. A chatbot built as above fails by saying "I don't know" and handing the visitor to your team, which costs you a little time. One built without those limits fails by inventing a confident answer, which costs you a customer's trust.
+
+## What should a chatbot say when it does not know?
+
+Something short that admits the gap and offers a next step. For example:
+
+- "I don't have that information right now. Would you like someone from our team to get back to you?"
+- "That isn't something I can confirm here. If you leave your number, the team can check and reply."
+- "I can't see a price for that on our site. Want me to pass your question on?"
+
+Avoid replies that pretend to know ("It's usually around…") or that blame the visitor ("Please rephrase your question") when the real problem is a missing answer.
+
+<div className="mt-16 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+  ### How Vyostra AI handles it
+
+  The Vyostra AI [chat agent](/features/chatbot) answers only from your website content and the knowledge base entries you add. For every question it looks up the matching passages first, and when they do not contain the answer it says so and offers to connect the visitor with your team, instead of guessing.
+
+  The visitor can then leave their details in a short lead form, and the lead is saved with the full conversation, so your team sees the exact question the chat agent could not answer.
+</div>
