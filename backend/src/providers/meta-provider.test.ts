@@ -398,3 +398,30 @@ describe('isPageSubscribedToLeadgen', () => {
     expect(url).toContain('access_token=tok-1')
   })
 })
+
+describe('fetchLeadFieldData', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  // The shape Meta sent for two Aspire Uru leads in Nov 2026: a blank optional
+  // phone question arrives with no `values` key at all, and the mapper's
+  // values[0] threw on it, so every redelivery failed and neither lead was saved.
+  it('gives a question the lead left blank an empty values array', async () => {
+    mockFetchSequence([
+      {
+        field_data: [
+          { name: 'full_name', values: ['Asha Rao'] },
+          { name: 'phone_number' },
+        ],
+      },
+    ])
+
+    const fieldData = await metaProvider.fetchLeadFieldData('lead-1', 'page-token')
+
+    expect(fieldData).toEqual([
+      { name: 'full_name', values: ['Asha Rao'] },
+      { name: 'phone_number', values: [] },
+    ])
+  })
+})
