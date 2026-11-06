@@ -105,8 +105,16 @@ export interface MetaPageCredentials {
   pageAccessToken: string
 }
 
+// Meta omits `values` on a question the lead left blank -- an optional phone
+// question answers {"name": "phone_number"} and nothing else. So the wire
+// shape is not MetaFieldDatum, and fetchLeadFieldData is where it becomes one.
+interface MetaLeadgenFieldDatum {
+  name: string
+  values?: string[]
+}
+
 interface MetaLeadgenResponse {
-  field_data?: MetaFieldDatum[]
+  field_data?: MetaLeadgenFieldDatum[]
   created_time?: string
   error?: { message?: string; code?: number }
 }
@@ -590,7 +598,7 @@ export class MetaProvider {
       throw new Error(`Meta leadgen fetch failed for ${leadgenId}: ${data.error.message ?? 'Unknown error'}`)
     }
 
-    return data.field_data ?? []
+    return (data.field_data ?? []).map(({ name, values }) => ({ name, values: values ?? [] }))
   }
 }
 
