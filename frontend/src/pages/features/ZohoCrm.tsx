@@ -140,9 +140,9 @@ export default function ZohoCrm() {
           },
         ]}
         integrations={[
-          { icon: <Users className="w-4 h-4" />, title: 'Lead CRM', href: '/features/crm' },
-          { icon: <FileText className="w-4 h-4" />, title: 'Form Builder', href: '/features/forms' },
-          { icon: <Bot className="w-4 h-4" />, title: 'AI Agent', href: '/features/chatbot' },
+          { icon: <Users className="w-4 h-4" />, title: 'Lead CRM', href: '/features/crm/' },
+          { icon: <FileText className="w-4 h-4" />, title: 'Form Builder', href: '/features/forms/' },
+          { icon: <Bot className="w-4 h-4" />, title: 'AI Agent', href: '/features/chatbot/' },
         ]}
         faq={{ heading: 'What do people ask about the Zoho CRM integration?', items: ZOHO_CRM_FAQ }}
         ctaHeadline="Put your form and lead ad leads into Zoho"

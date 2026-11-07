@@ -129,9 +129,9 @@ export default function VoiceAgent() {
           },
         ]}
         integrations={[
-          { icon: <Bot className="w-4 h-4" />, title: 'AI Chat Agent', href: '/features/chatbot' },
-          { icon: <MessageSquare className="w-4 h-4" />, title: 'WhatsApp Automation', href: '/features/whatsapp' },
-          { icon: <CrmIcon className="w-4 h-4" />, title: 'Lead CRM', href: '/features/crm' },
+          { icon: <Bot className="w-4 h-4" />, title: 'AI Chat Agent', href: '/features/chatbot/' },
+          { icon: <MessageSquare className="w-4 h-4" />, title: 'WhatsApp Automation', href: '/features/whatsapp/' },
+          { icon: <CrmIcon className="w-4 h-4" />, title: 'Lead CRM', href: '/features/crm/' },
         ]}
         faq={{ heading: 'What do people ask about the Vyostra AI voice agent?', items: VOICE_AGENT_FAQ }}
         ctaHeadline="Want visitors to talk to your site?"

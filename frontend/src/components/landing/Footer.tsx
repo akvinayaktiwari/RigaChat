@@ -1,5 +1,5 @@
 import { LinkedInIcon, WhatsAppIcon, XIcon, ZohoIcon } from './BrandIcons'
-import { FREE_TOOLS, TOOLS_HUB } from '../../lib/free-tools'
+import { FREE_TOOLS, TOOLS_HUB, servedPath } from '../../lib/free-tools'
 import { SOCIAL_PROFILES, type SocialProfile } from '../../lib/social-profiles'
 import VyostraLogo from '../VyostraLogo'
 
@@ -7,34 +7,34 @@ const LINK_COLUMNS = [
   {
     heading: 'Product',
     links: [
-      { label: 'Features', href: '/features' },
-      { label: 'Integrations', href: '/integrations' },
-      { label: 'For Real Estate', href: '/industries/real-estate' },
-      { label: 'Pricing', href: '/pricing' },
-      { label: 'FAQ', href: '/faq' },
-      { label: 'Glossary', href: '/glossary' },
+      { label: 'Features', href: '/features/' },
+      { label: 'Integrations', href: '/integrations/' },
+      { label: 'For Real Estate', href: '/industries/real-estate/' },
+      { label: 'Pricing', href: '/pricing/' },
+      { label: 'FAQ', href: '/faq/' },
+      { label: 'Glossary', href: '/glossary/' },
     ],
   },
   {
     heading: 'Free Tools',
-    links: [...FREE_TOOLS.map((tool) => ({ label: tool.name, href: tool.route })), { label: 'All free tools', href: TOOLS_HUB.route }],
+    links: [...FREE_TOOLS.map((tool) => ({ label: tool.name, href: servedPath(tool.route) })), { label: 'All free tools', href: servedPath(TOOLS_HUB.route) }],
   },
   {
     heading: 'Company',
     links: [
-      { label: 'About Us', href: '/about-us' },
-      { label: 'Blog', href: '/blog' },
-      { label: 'Help Center', href: '/help' },
-      { label: 'Developer Docs', href: '/docs' },
-      { label: 'Careers', href: '/careers' },
-      { label: 'Contact Us', href: '/contact' },
+      { label: 'About Us', href: '/about-us/' },
+      { label: 'Blog', href: '/blog/' },
+      { label: 'Help Center', href: '/help/' },
+      { label: 'Developer Docs', href: '/docs/' },
+      { label: 'Careers', href: '/careers/' },
+      { label: 'Contact Us', href: '/contact/' },
     ],
   },
   {
     heading: 'Legal',
     links: [
-      { label: 'Privacy Policy', href: '/privacy-policy' },
-      { label: 'Terms of Service', href: '/terms-of-service' },
+      { label: 'Privacy Policy', href: '/privacy-policy/' },
+      { label: 'Terms of Service', href: '/terms-of-service/' },
     ],
   },
 ]

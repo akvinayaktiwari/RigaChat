@@ -132,9 +132,9 @@ export default function Chatbot() {
           },
         ]}
         integrations={[
-          { icon: <MessageSquare className="w-4 h-4" />, title: 'WhatsApp Notifications', href: '/features/whatsapp' },
-          { icon: <CrmIcon className="w-4 h-4" />, title: 'Lead CRM', href: '/features/crm' },
-          { icon: <FileText className="w-4 h-4" />, title: 'Form Builder', href: '/features/forms' },
+          { icon: <MessageSquare className="w-4 h-4" />, title: 'WhatsApp Notifications', href: '/features/whatsapp/' },
+          { icon: <CrmIcon className="w-4 h-4" />, title: 'Lead CRM', href: '/features/crm/' },
+          { icon: <FileText className="w-4 h-4" />, title: 'Form Builder', href: '/features/forms/' },
         ]}
         faq={{ heading: 'What do people ask about the Vyostra AI chat agent?', items: CHAT_AGENT_FAQ }}
         ctaHeadline="Ready to capture leads on autopilot?"

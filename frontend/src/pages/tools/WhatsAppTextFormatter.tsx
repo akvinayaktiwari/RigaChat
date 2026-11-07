@@ -348,9 +348,9 @@ function WaysToUse() {
         ))}
       </div>
       <p className="mx-auto mt-8 max-w-3xl text-center text-base text-on-surface-variant">
-        Need people to reach you first? Make a <Link to="/tools/whatsapp-qr-code-generator" className={TEXT_LINK}>WhatsApp QR code</Link> or a{' '}
-        <Link to="/whatsapp-link-generator" className={TEXT_LINK}>click-to-chat link</Link>. Want a decorative word instead? Try the{' '}
-        <Link to="/tools/whatsapp-fonts" className={TEXT_LINK}>WhatsApp fonts tool</Link>.
+        Need people to reach you first? Make a <Link to="/tools/whatsapp-qr-code-generator/" className={TEXT_LINK}>WhatsApp QR code</Link> or a{' '}
+        <Link to="/whatsapp-link-generator/" className={TEXT_LINK}>click-to-chat link</Link>. Want a decorative word instead? Try the{' '}
+        <Link to="/tools/whatsapp-fonts/" className={TEXT_LINK}>WhatsApp fonts tool</Link>.
       </p>
     </section>
   )
@@ -365,7 +365,7 @@ function NextStep() {
         WhatsApp the moment it arrives.
       </p>
       <Link
-        to="/features/whatsapp"
+        to="/features/whatsapp/"
         onClick={() => trackEvent('tool_cta_click', { tool: TOOL_ID })}
         className="inline-flex items-center justify-center rounded-xl bg-primary px-8 py-4 font-bold text-white transition-opacity hover:opacity-95"
       >

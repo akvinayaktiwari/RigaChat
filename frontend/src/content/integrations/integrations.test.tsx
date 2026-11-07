@@ -68,7 +68,7 @@ describe.each(INTEGRATIONS.map((integration) => [integration.slug, integration] 
 describe('/integrations', () => {
   it('links every integration page', async () => {
     const { html } = await renderPublicPage('/integrations')
-    expect(INTEGRATIONS.filter((integration) => !html.includes(`href="/integrations/${integration.slug}"`)).map((integration) => integration.slug)).toEqual([])
+    expect(INTEGRATIONS.filter((integration) => !html.includes(`href="/integrations/${integration.slug}/"`)).map((integration) => integration.slug)).toEqual([])
   })
 
   it('names every integration in its opening answer', async () => {
@@ -82,7 +82,7 @@ describe('/integrations', () => {
 describe('the Zoho CRM card', () => {
   it('links to the Zoho feature page, and no integration page duplicates it', async () => {
     const html = (await renderPublicPage('/integrations')).html
-    expect(html).toContain('href="/features/zoho-crm"')
+    expect(html).toContain('href="/features/zoho-crm/"')
     expect(PRERENDERED_STATIC_ROUTES).not.toContain('/integrations/zoho-crm')
   })
 })

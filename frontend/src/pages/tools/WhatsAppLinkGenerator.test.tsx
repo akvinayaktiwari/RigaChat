@@ -92,7 +92,7 @@ describe('LinkBuilder', () => {
     type(/Pre-filled message/, 'Hi')
     fireEvent.click(screen.getByRole('link', { name: 'Get QR code' }))
     expect(screen.getByTestId('qr-tool').textContent).toBe(
-      '/tools/whatsapp-qr-code-generator {"countryCode":"44","phone":"07700 900123","message":"Hi"}',
+      '/tools/whatsapp-qr-code-generator/ {"countryCode":"44","phone":"07700 900123","message":"Hi"}',
     )
   })
 })

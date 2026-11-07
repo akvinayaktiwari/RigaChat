@@ -367,7 +367,7 @@ function NextStep() {
         follows up on WhatsApp.
       </p>
       <Link
-        to="/features/crm"
+        to="/features/crm/"
         onClick={() => trackEvent('tool_cta_click', { tool: TOOL_ID })}
         className="inline-flex items-center justify-center rounded-xl bg-primary px-8 py-4 font-bold text-white transition-opacity hover:opacity-95"
       >
@@ -404,8 +404,8 @@ export default function OpenHouseSignInSheet() {
               so check yours with your brokerage.
             </p>
             <p>
-              Need people to message you straight away? Make a <Link to="/tools/whatsapp-qr-code-generator" className={TEXT_LINK}>WhatsApp QR code</Link> or a{' '}
-              <Link to="/whatsapp-link-generator" className={TEXT_LINK}>click-to-chat link</Link>.
+              Need people to message you straight away? Make a <Link to="/tools/whatsapp-qr-code-generator/" className={TEXT_LINK}>WhatsApp QR code</Link> or a{' '}
+              <Link to="/whatsapp-link-generator/" className={TEXT_LINK}>click-to-chat link</Link>.
             </p>
           </div>
         </section>

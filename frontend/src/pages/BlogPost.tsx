@@ -50,7 +50,7 @@ function RelatedReading({ posts }: { posts: readonly BlogPostMeta[] }) {
 function BackToBlog() {
   return (
     <Link
-      to="/blog"
+      to="/blog/"
       className="inline-flex items-center gap-2 text-sm font-medium text-white/50 transition-colors hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-violet-300"
     >
       <ArrowLeft className="h-4 w-4" aria-hidden="true" />

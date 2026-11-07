@@ -136,10 +136,10 @@ export default function Crm() {
           },
         ]}
         integrations={[
-          { icon: <Bot className="w-4 h-4" />, title: 'AI Agent', href: '/features/chatbot' },
-          { icon: <MessageSquare className="w-4 h-4" />, title: 'WhatsApp Alerts', href: '/features/whatsapp' },
-          { icon: <FileText className="w-4 h-4" />, title: 'Form Builder', href: '/features/forms' },
-          { icon: <RefreshCw className="w-4 h-4" />, title: 'Zoho CRM', href: '/features/zoho-crm' },
+          { icon: <Bot className="w-4 h-4" />, title: 'AI Agent', href: '/features/chatbot/' },
+          { icon: <MessageSquare className="w-4 h-4" />, title: 'WhatsApp Alerts', href: '/features/whatsapp/' },
+          { icon: <FileText className="w-4 h-4" />, title: 'Form Builder', href: '/features/forms/' },
+          { icon: <RefreshCw className="w-4 h-4" />, title: 'Zoho CRM', href: '/features/zoho-crm/' },
         ]}
         faq={{ heading: 'What do people ask about the Vyostra AI lead CRM?', items: LEAD_CRM_FAQ }}
         ctaHeadline="See every lead in one place"

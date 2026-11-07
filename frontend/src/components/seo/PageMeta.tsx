@@ -11,7 +11,7 @@ interface PageMetaProps {
   /** Full document title, brand included. */
   title: string
   description: string
-  /** Path exactly as served, e.g. "/features/crm". Becomes canonical and og:url. */
+  /** Path exactly as served, e.g. "/features/crm/". Becomes canonical and og:url. */
   path: string
   type?: 'website' | 'article'
 }

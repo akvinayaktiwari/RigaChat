@@ -10,7 +10,7 @@ import { jsonLdGraph, organizationSchema, toolsIndexNodes } from '../../lib/stru
 function ToolCardLink({ tool }: { tool: FreeTool }) {
   return (
     <Link
-      to={tool.route}
+      to={servedPath(tool.route)}
       className="group flex flex-col rounded-2xl border border-outline-variant/30 bg-white p-6 shadow-xs transition-all hover:border-primary/40 hover:shadow-md"
     >
       <h3 className="mb-2 text-lg font-bold text-on-surface">{tool.name}</h3>
@@ -56,7 +56,7 @@ export default function ToolsIndex() {
             </p>
             <p>
               The tools are made by the team behind Vyostra AI, which builds AI chat, voice and WhatsApp agents with a built-in lead CRM. See{' '}
-              <Link to="/features" className="font-semibold text-primary hover:underline">what the product does</Link>.
+              <Link to="/features/" className="font-semibold text-primary hover:underline">what the product does</Link>.
             </p>
           </div>
         </section>

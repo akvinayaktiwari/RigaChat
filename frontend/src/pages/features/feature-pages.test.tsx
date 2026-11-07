@@ -69,6 +69,6 @@ describe('/features/whatsapp', () => {
   })
 
   it('links the Meta Lead Ads page', async () => {
-    expect((await renderPublicPage('/features/whatsapp')).html).toContain('href="/integrations/meta-lead-ads"')
+    expect((await renderPublicPage('/features/whatsapp')).html).toContain('href="/integrations/meta-lead-ads/"')
   })
 })
