@@ -9,6 +9,7 @@ import PageMeta from '../../components/seo/PageMeta'
 import StructuredData from '../../components/seo/StructuredData'
 import { adjacentDocs, getDocBySlug, loadedDocContent } from '../../content/docs/registry'
 import { PEOPLE } from '../../lib/people'
+import { docDocumentTitle } from '../../lib/search-snippet'
 import { breadcrumbSchema, faqPageSchema, jsonLdGraph, organizationSchema, techArticleSchema } from '../../lib/structured-data'
 import type { DocMeta, DocPage as DocPageRecord } from '../../types/docs'
 
@@ -110,7 +111,7 @@ function DocArticle({ doc }: { doc: DocPageRecord }) {
 
   return (
     <DocsLayout currentSlug={meta.slug}>
-      <PageMeta title={`${meta.metaTitle ?? meta.title} | Vyostra AI Docs`} description={meta.description} path={path} type="article" />
+      <PageMeta title={docDocumentTitle(meta)} description={meta.description} path={path} type="article" />
       <DocSchema meta={meta} path={path} />
 
       <article>
