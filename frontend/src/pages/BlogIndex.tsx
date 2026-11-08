@@ -131,8 +131,8 @@ export default function BlogIndex() {
   return (
     <div className="landing-page bg-background">
       <PageMeta
-        title="Blog — Vyostra AI"
-        description="Research, breakdowns and field notes from the Vyostra AI team on AI, lead generation and the markets our customers build in."
+        title="Chatbot, WhatsApp and Lead Generation Guides — Vyostra AI"
+        description="Practical guides to AI chatbots, WhatsApp automation, lead forms and lead follow-up, plus market notes for real estate teams in the UAE, India and the US."
         path="/blog/"
       />
       <StructuredData
