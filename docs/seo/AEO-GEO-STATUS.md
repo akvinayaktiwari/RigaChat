@@ -1,6 +1,6 @@
 # AEO / GEO Status — vyostra.com
 
-**The one file to read first.** What has shipped for search and answer-engine visibility, what is left, and who has to do it. Last updated: 2026-10-23. Next steps: `HANDOFF-2026-10-05.md` and, for the global market move, `GLOBAL-MARKET-HANDOFF.md`.
+**The one file to read first.** What has shipped for search and answer-engine visibility, what is left, and who has to do it. Last updated: 2026-11-08. Next steps: `HANDOFF-2026-10-05.md` and, for the global market move, `GLOBAL-MARKET-HANDOFF.md`.
 
 How to keep it current: when something ships, move its row from "To do" to "Implemented" with the date. Do not record plans here; plans live in the documents listed at the bottom.
 
@@ -14,6 +14,7 @@ Framing: Google's own guidance is that optimizing for AI search is ordinary SEO.
 |---|---|---|---|
 | GEO readiness (estimate) | 71 / 100 | 2026-10-02 | From `GEO-ANALYSIS-2026-10-02.md`, before the feature-page rebuild. Baseline was 63 on 2026-09-19. |
 | Indexed in Google | 7 of 8 key pages | 2026-10-23 | Search Console verified (Domain property, since 2026-10-05). Sitemap read 2026-10-11, 53 pages discovered. `/features/whatsapp/` was "Discovered - currently not indexed"; indexing requested 2026-10-13. Source: `COWORK-REPORT-2026-10-23.md`. |
+| Search clicks, 30 days | 10 | 2026-11-08 | Search Console, 8 Oct to 7 Nov. Impressions come mostly from India (327), the UAE (147) and the UK (99). Most pages sit at positions 20 to 70: authority, not content, is the limit (0 third-party referring domains). From the 2026-11-08 audit, run without OpenSEO (out of credits), so it has no fresh volume or backlink data. |
 | Public pages in the sitemap | 63 | 2026-10-22 | Counted from the built `sitemap.xml`. Adds `/glossary/` and the posts written since 2026-10-07. |
 | Blog posts | 27 | 2026-10-22 | Two global posts added 2026-10-22 (WhatsApp Business app vs API; chatbot greeting messages). Two global posts added 2026-10-06 (AI sales agent: what it can and cannot do; Trakheesi permit for property ads, limited to what the Dubai Land Department's service page states). Two market posts written 2026-10-06 (real estate CRM for Dubai brokers; WhatsApp automation for small business in India). Three global pillars published 2026-10-06 (WhatsApp CRM, real estate chatbot guide, AI receptionist vs website voice agent). Four published 2026-10-05: Meta lead ads auto-reply, click-to-WhatsApp vs lead forms, real estate chatbot qualification questions, and what a CRM chatbot is. |
 | Mobile LCP (lab) | about 1.7 s | 2026-10-02 | Was 2.3 s on the homepage and 3.25 s on a post. No field data yet. |
@@ -38,6 +39,9 @@ Framing: Google's own guidance is that optimizing for AI search is ordinary SEO.
 | Titles at 60 characters or fewer, descriptions within limits, with a guard test | 2026-09-19 |
 | App shell title (`index.html`, shown on login, signup and the dashboard) matches the homepage title; it still said "AI Chatbot with Native CRM" | 2026-10-05 |
 | A missing file or a missing URL under a prerendered path returns 404 with the site's own not-found page (`noindex`), not the homepage | 2026-10-02 |
+| Internal links point at the trailing-slash URL. 1,904 of 2,529 had linked the bare form, which 301s, and Search Console was reporting both forms as separate pages (`/tools/whatsapp-fonts` 175 impressions, `/tools/whatsapp-fonts/` 70). The prerender now fails the build on any link to a prerendered page without its slash (`src/lib/internal-links.ts`). Route names used as keys (`featurePath`, `relatedFeatures`, `route`) keep the router's slashless form | 2026-11-08 |
+| Login, signup, forgot-password, reset-password and verify-email screens carry `noindex` and their own titles. They are served from the app shell and had answered with the homepage's title; `/login` was showing in Search Console | 2026-11-08 |
+| Docs titles fit in 60 characters: `docDocumentTitle()` shortens or drops the " \| Vyostra AI Docs" suffix before the keyword title. All seven had run 64 to 73 | 2026-11-08 |
 
 ### Structured data
 
@@ -92,6 +96,7 @@ Rule held throughout: schema only for text the page shows. No ratings, no review
 | `llms-full.txt`, the body text of every prerendered page, linked from `llms.txt` (to-do 34). Returns 200 on the live site. Still open: an identity and pricing block in `llms.txt` itself | 2026-10-13 |
 | `/blog/chatbot-vs-live-chat/` (to-do 35, global; says the chat agent hands off a lead, not a live chat window, since no takeover exists) and `/blog/when-should-a-chatbot-ask-for-contact-details/` (global how-to behind the agent's "after N messages" setting). No sourced figures, so none quoted | 2026-10-18 |
 | Category comparison post `/blog/lead-form-vs-chatbot/` (to-do 35, global): names no competitor, so it does not wait on owner task 7. No sourced conversion figures exist, so none are quoted; product claims match the live Forms and Chatbot feature pages | 2026-10-14 |
+| Snippet rewrites from Search Console (8 Oct to 7 Nov). Three posts ranked in the top 10 with almost no clicks: Facebook lead ads auto-reply (position 8.5, 288 impressions, 2 clicks), property enquiry reply (6.1, 50, 0; its query "how to respond to property enquiries faster" at 4.7) and click-to-WhatsApp vs lead forms (5.5, 24, 0). Titles now use the searched words and descriptions open with the answer. Same day: `/features/chatbot/` retitled "AI Chatbot for Your Website That Captures Leads" (it never said "chatbot"), and `/blog/` and `/help/` given titles that name their subject. Re-read their CTR after 28 days | 2026-11-08 |
 | Two posts chosen from keyword data (OpenSEO, India): `/blog/real-estate-chatbot-lead-qualification-questions/` for "real estate chatbot" (about 480 searches a month) and `/blog/what-is-a-crm-chatbot/` for "crm chatbot" (about 90) | 2026-10-05 |
 | Real estate industry page: `/industries/real-estate/`, linked from the footer. Written against the prebuilt real estate journey and its WhatsApp templates | 2026-10-05 |
 | Help FAQs grouped under question headings | 2026-09-19 |
@@ -163,6 +168,9 @@ The owner's decision on 2026-10-06: Vyostra AI sells globally and leads with US 
 | `industries.test.tsx` | Two industries share an opening answer, an industry page drops its questions, flow or limits, links an unpublished post, or publishes FAQ schema for hidden text |
 | `crawl-files.test.ts` | A sitemap URL has no route, no date, or no CloudFront prefix |
 | `hydration-contract.test.ts` | The prerender and the browser stop rendering the same tree |
+| `scripts/prerender.mjs` via `internal-links.ts` (a build failure, not a test) | Any rendered page links a prerendered route without its trailing slash |
+| `search-snippet.test.ts` | A docs page title passes 60 characters or its description 160 (posts and marketing pages were already covered) |
+| `SignupPage.test.tsx` | The signup screen loses `noindex` or its own title |
 
 ---
 
@@ -173,6 +181,7 @@ The owner's decision on 2026-10-06: Vyostra AI sells globally and leads with US 
 | # | Task | Why it matters |
 |---|---|---|
 | 0b | A stable API hostname such as `api.vyostra.com` | The API is served from a Lambda Function URL, so the docs print no host and send developers to Settings for it. With a stable host the examples can be copy-paste complete. |
+| 1a | In Search Console, request indexing for the pages reported under two URLs: `/tools/whatsapp-fonts/`, `/blog/chatbot-greeting-message-examples/`, `/blog/chatbot-vs-faq-page/`, `/blog/how-many-fields-should-a-lead-form-have/`, `/tools/real-estate-commission-calculator/`, `/whatsapp-link-generator/` | The internal links stopped pointing at the bare form on 2026-11-08; reindexing consolidates the split signals sooner. |
 | 1 | Confirm `/features/whatsapp/` is indexed in Search Console | Indexing was requested 2026-10-13; it was the one key page not on Google. |
 | 2 | Import the property into Bing Webmaster Tools (sign in with the Google account that owns Search Console, then "Import from Google Search Console") | Bing feeds ChatGPT Search and Copilot. Still blocked on the owner's sign-in as of 2026-10-23. |
 | 3 | Create the Google API key and service account described in the setup notes | Lets Claude check index status per URL, real-user Core Web Vitals and search queries. |
