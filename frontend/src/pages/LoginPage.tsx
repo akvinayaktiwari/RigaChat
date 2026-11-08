@@ -5,6 +5,7 @@ import { AlertCircle, Loader2 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { safeNextPath, takePostLoginPath } from '../lib/post-login-redirect'
 import AuthHeroPanel from '../components/auth/AuthHeroPanel'
+import NoIndexMeta from '../components/seo/NoIndexMeta'
 import PasswordVisibilityToggle from '../components/auth/PasswordVisibilityToggle'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -68,6 +69,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
+      <NoIndexMeta title="Log in" />
       <div className="w-full lg:w-1/2">
         <AuthHeroPanel
           tagline="AI agents with native CRM"

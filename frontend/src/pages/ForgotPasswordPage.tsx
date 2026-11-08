@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { AlertCircle, ArrowRight, CheckCircle, Loader2 } from 'lucide-react'
 import { forgotPassword } from '../services/api'
 import AuthHeroPanel from '../components/auth/AuthHeroPanel'
+import NoIndexMeta from '../components/seo/NoIndexMeta'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
 
@@ -41,6 +42,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
+      <NoIndexMeta title="Reset your password" />
       <div className="w-full lg:w-1/2">
         <AuthHeroPanel
           tagline="AI agents with native CRM"

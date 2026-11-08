@@ -5,6 +5,7 @@ import { trackEvent } from '../lib/analytics'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import AuthHeroPanel from '../components/auth/AuthHeroPanel'
+import NoIndexMeta from '../components/seo/NoIndexMeta'
 import PasswordVisibilityToggle from '../components/auth/PasswordVisibilityToggle'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -122,6 +123,7 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
+      <NoIndexMeta title="Sign up" />
       <div className="w-full lg:w-1/2">
         <AuthHeroPanel
           tagline="AI agents with native CRM"
