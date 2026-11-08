@@ -11,9 +11,9 @@ const meta: BlogPostMeta = {
   market: 'in',
   tags: ['Real Estate', 'WhatsApp', 'Meta Lead Ads', 'India'],
   readingMinutes: 7,
-  seoTitle: 'Click-to-WhatsApp vs Lead Ads: Real Estate',
+  seoTitle: 'Click-to-WhatsApp vs Lead Form Ads for Property',
   seoDescription:
-    'Click-to-WhatsApp ads or lead form ads for property in India? Compare opt-in, the 24-hour and 72-hour windows, data captured, RERA rules and when to use each.',
+    'A click-to-WhatsApp ad opens a chat; a lead form ad collects answers and you message first. How that changes speed, data, WhatsApp rules and RERA in India.',
   relatedFeatures: ['/features/whatsapp', '/features/crm'],
   faq: [
     {

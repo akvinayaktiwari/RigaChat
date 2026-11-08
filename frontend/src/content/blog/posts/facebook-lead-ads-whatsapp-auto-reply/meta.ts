@@ -11,9 +11,9 @@ const meta: BlogPostMeta = {
   market: 'global',
   tags: ['WhatsApp', 'Meta Lead Ads', 'Lead Generation'],
   readingMinutes: 8,
-  seoTitle: 'WhatsApp Auto-Reply to Facebook Lead Ads',
+  seoTitle: 'Auto-Reply to Facebook Lead Ads on WhatsApp',
   seoDescription:
-    'How to send an automatic WhatsApp message to every Facebook and Instagram lead ad: opt-in, the lead webhook, approved templates and the 24-hour window.',
+    'Message every Facebook and Instagram lead on WhatsApp within seconds of the form. The three things you need: opt-in, the lead webhook and an approved template.',
   relatedFeatures: ['/features/whatsapp', '/features/crm'],
   faq: [
     {
