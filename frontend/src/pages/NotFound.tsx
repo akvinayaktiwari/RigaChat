@@ -7,9 +7,9 @@ import DemoModal from '../components/landing/modals/DemoModal'
 
 const SUGGESTED_LINKS: { label: string; to: string }[] = [
   { label: 'Home', to: '/' },
-  { label: 'Features', to: '/features' },
-  { label: 'Help Center', to: '/help' },
-  { label: 'Contact us', to: '/contact' },
+  { label: 'Features', to: '/features/' },
+  { label: 'Help Center', to: '/help/' },
+  { label: 'Contact us', to: '/contact/' },
 ]
 
 /**

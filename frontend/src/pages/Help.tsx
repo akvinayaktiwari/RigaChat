@@ -412,7 +412,7 @@ export default function Help() {
   return (
     <div className="landing-page bg-background">
       <PageMeta
-        title="Help Center — Vyostra AI"
+        title="Help Center: Set Up Your AI Agent — Vyostra AI"
         description="Set up your Vyostra AI agent: embed the chat widget, train the knowledge base, WhatsApp alerts, Zoho CRM sync, lead forms, trials and billing."
         path="/help/"
       />

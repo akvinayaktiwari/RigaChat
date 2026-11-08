@@ -23,10 +23,13 @@ function mountedRoutes(): Set<string> {
   return new Set(paths)
 }
 
-/** Literal internal hrefs ("/x", not "/#section" or template strings). */
+/**
+ * Literal internal hrefs ("/x", not "/#section" or template strings), as the
+ * route they reach: links carry the served trailing slash, routes do not.
+ */
 function internalHrefs(source: string): string[] {
-  const matches = source.matchAll(/(?:href|to)(?:=|:\s*)["'](\/[^"'#?]+)["']/g)
-  return [...matches].map((match) => match[1] ?? '')
+  const matches = source.matchAll(/(?:href|to)(?:=|:\s*)["'](\/[^"'#?]+)["'#]/g)
+  return [...matches].map((match) => (match[1] ?? '').replace(/(.)\/$/, '$1'))
 }
 
 describe('marketing page links', () => {

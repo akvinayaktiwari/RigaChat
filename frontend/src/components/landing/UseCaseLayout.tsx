@@ -41,7 +41,7 @@ interface UseCaseLayoutProps {
   integrations: Integration[]
   ctaHeadline: string
   ctaBody: string
-  /** This page's routed path, e.g. "/features/whatsapp"; lists the posts that declare it. */
+  /** This page's routed path, e.g. "/features/whatsapp/"; lists the posts that declare it. */
   featurePath: string
   /**
    * Questions answered on the page, under a question-phrased heading. The page

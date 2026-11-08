@@ -313,7 +313,7 @@ function NextStep() {
         conversation, and follows up on WhatsApp.
       </p>
       <Link
-        to="/features/crm"
+        to="/features/crm/"
         onClick={() => trackEvent('tool_cta_click', { tool: TOOL_ID })}
         className="inline-flex items-center justify-center rounded-xl bg-primary px-8 py-4 font-bold text-white transition-opacity hover:opacity-95"
       >

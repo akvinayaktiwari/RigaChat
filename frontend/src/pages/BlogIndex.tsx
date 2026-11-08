@@ -29,7 +29,7 @@ function FeaturedPost({ post }: { post: BlogPost }) {
           </div>
 
           <h2 className="mt-5 text-2xl font-extrabold leading-tight text-white md:text-4xl" style={JAKARTA_FONT}>
-            <Link to={`/blog/${meta.slug}`} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-violet-300">
+            <Link to={`/blog/${meta.slug}/`} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-violet-300">
               <span className="absolute inset-0" aria-hidden="true" />
               {meta.title}
             </Link>
@@ -75,7 +75,7 @@ function PostCard({ post, index }: { post: BlogPost; index: number }) {
       <article className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition-colors hover:border-violet-400/30">
         <PostEyebrow meta={meta} className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/55" />
         <h3 className="mt-3 text-lg font-bold leading-snug text-white" style={JAKARTA_FONT}>
-          <Link to={`/blog/${meta.slug}`} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-violet-300">
+          <Link to={`/blog/${meta.slug}/`} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-violet-300">
             <span className="absolute inset-0" aria-hidden="true" />
             {meta.title}
           </Link>
@@ -131,8 +131,8 @@ export default function BlogIndex() {
   return (
     <div className="landing-page bg-background">
       <PageMeta
-        title="Blog — Vyostra AI"
-        description="Research, breakdowns and field notes from the Vyostra AI team on AI, lead generation and the markets our customers build in."
+        title="Chatbot, WhatsApp and Lead Generation Guides — Vyostra AI"
+        description="Practical guides to AI chatbots, WhatsApp automation, lead forms and lead follow-up, plus market notes for real estate teams in the UAE, India and the US."
         path="/blog/"
       />
       <StructuredData

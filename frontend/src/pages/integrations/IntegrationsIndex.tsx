@@ -18,12 +18,12 @@ const FEATURE_PAGE_INTEGRATIONS: readonly FeaturePageIntegration[] = [
   {
     name: 'Zoho CRM',
     summary: 'Leads from your lead forms and Meta lead ads are created in Zoho CRM as they arrive.',
-    path: '/features/zoho-crm',
+    path: '/features/zoho-crm/',
   },
   {
     name: 'WhatsApp',
     summary: 'An instant WhatsApp alert for every new lead, a weekly summary, and follow-up journeys.',
-    path: '/features/whatsapp',
+    path: '/features/whatsapp/',
   },
 ]
 
@@ -54,7 +54,7 @@ export default function IntegrationsIndex() {
           <h2 className="text-3xl md:text-4xl font-extrabold text-on-surface tracking-tight text-center mb-10">Which tools does Vyostra AI connect to?</h2>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             {INTEGRATIONS.map((integration) => (
-              <IntegrationCard key={integration.slug} name={integration.name} summary={integration.summary} to={integrationPath(integration).replace(/\/$/, '')} />
+              <IntegrationCard key={integration.slug} name={integration.name} summary={integration.summary} to={integrationPath(integration)} />
             ))}
             {FEATURE_PAGE_INTEGRATIONS.map((integration) => (
               <IntegrationCard key={integration.path} name={integration.name} summary={integration.summary} to={integration.path} />

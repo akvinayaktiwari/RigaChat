@@ -67,3 +67,15 @@ describe('signup conversion tracking', () => {
     expect(trackMock).not.toHaveBeenCalled()
   })
 })
+
+describe('signup page head', () => {
+  afterEach(cleanup)
+
+  it('keeps the page out of search with its own title, not the homepage one', async () => {
+    renderPage()
+    await waitFor(() => {
+      expect(document.head.querySelector('meta[name="robots"]')?.getAttribute('content')).toBe('noindex')
+      expect(document.title).toBe('Sign up — Vyostra AI')
+    })
+  })
+})

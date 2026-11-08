@@ -126,11 +126,11 @@ export default function Faq() {
 
           <p className="text-sm md:text-base text-on-surface-variant leading-relaxed">
             Plan details are on the{' '}
-            <Link to="/pricing" className={LINK}>
+            <Link to="/pricing/" className={LINK}>
               pricing page
             </Link>
             . Already a customer? The{' '}
-            <Link to="/help" className={LINK}>
+            <Link to="/help/" className={LINK}>
               Help Center
             </Link>{' '}
             covers setup inside the dashboard.

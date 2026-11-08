@@ -11,13 +11,14 @@ import { getAllPosts, getAllSlugs } from './src/content/blog/registry'
 import { getAllDocMetas, getAllDocSlugs } from './src/content/docs/registry'
 import { PRERENDERED_STATIC_ROUTES, buildLlmsTxt, buildRobotsTxt, buildSitemapXml, servedPath, sitemapEntries } from './src/lib/crawl-files'
 import { buildLlmsFullTxt } from './src/lib/llms-full'
+import { auditInternalLinks } from './src/lib/internal-links'
 import { WHAT_IS_VYOSTRA } from './src/components/landing/WhatIsVyostra'
 import { PRICING_TIERS } from './src/lib/pricingTiers'
 import { postDescription } from './src/lib/search-snippet'
 import { SUPPORT_EMAIL } from './src/lib/structured-data'
 import { SITE_URL } from './src/lib/site'
 
-export { SITE_URL }
+export { SITE_URL, auditInternalLinks }
 
 /**
  * The URL rendered into dist/404.html. It matches no route in App.tsx, so it

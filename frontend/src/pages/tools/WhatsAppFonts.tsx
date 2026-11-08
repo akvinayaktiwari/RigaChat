@@ -170,7 +170,7 @@ function Cautions() {
       </div>
       <p className="mx-auto mt-8 max-w-3xl text-center text-base text-on-surface-variant">
         For emphasis that stays readable, use WhatsApp&rsquo;s own formatting: the{' '}
-        <Link to="/tools/whatsapp-text-formatter" className={TEXT_LINK}>WhatsApp text formatter</Link> adds bold, italic, strikethrough and lists for you.
+        <Link to="/tools/whatsapp-text-formatter/" className={TEXT_LINK}>WhatsApp text formatter</Link> adds bold, italic, strikethrough and lists for you.
       </p>
     </section>
   )
@@ -185,7 +185,7 @@ function NextStep() {
         to your WhatsApp the moment it arrives.
       </p>
       <Link
-        to="/features/whatsapp"
+        to="/features/whatsapp/"
         onClick={() => trackEvent('tool_cta_click', { tool: TOOL_ID })}
         className="inline-flex items-center justify-center rounded-xl bg-primary px-8 py-4 font-bold text-white transition-opacity hover:opacity-95"
       >

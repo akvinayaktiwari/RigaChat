@@ -81,8 +81,8 @@ export default function Chatbot() {
   return (
     <>
       <PageMeta
-        title="AI Agent for Lead Generation — Vyostra AI"
-        description="Capture leads 24/7 with an AI agent trained on your business data. No code required. Set up in under 5 minutes."
+        title="AI Chatbot for Your Website That Captures Leads — Vyostra AI"
+        description="An AI chatbot trained on your website that answers visitors and captures leads 24/7. One script tag, no code. Set up in under 5 minutes."
         path="/features/chatbot/"
       />
       <StructuredData data={jsonLdGraph([...featurePageNodes(PAGE), faqPageSchema(CHAT_AGENT_FAQ)])} />
@@ -132,9 +132,9 @@ export default function Chatbot() {
           },
         ]}
         integrations={[
-          { icon: <MessageSquare className="w-4 h-4" />, title: 'WhatsApp Notifications', href: '/features/whatsapp' },
-          { icon: <CrmIcon className="w-4 h-4" />, title: 'Lead CRM', href: '/features/crm' },
-          { icon: <FileText className="w-4 h-4" />, title: 'Form Builder', href: '/features/forms' },
+          { icon: <MessageSquare className="w-4 h-4" />, title: 'WhatsApp Notifications', href: '/features/whatsapp/' },
+          { icon: <CrmIcon className="w-4 h-4" />, title: 'Lead CRM', href: '/features/crm/' },
+          { icon: <FileText className="w-4 h-4" />, title: 'Form Builder', href: '/features/forms/' },
         ]}
         faq={{ heading: 'What do people ask about the Vyostra AI chat agent?', items: CHAT_AGENT_FAQ }}
         ctaHeadline="Ready to capture leads on autopilot?"

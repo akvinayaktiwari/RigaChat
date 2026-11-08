@@ -73,7 +73,7 @@ function StartSection() {
         <Link to="/signup" className="inline-flex items-center justify-center rounded-xl bg-primary px-8 py-4 font-bold text-white hover:opacity-95 transition-opacity">
           Start free trial
         </Link>
-        <Link to="/features" className="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/10 px-8 py-4 font-bold text-white hover:bg-white/20 transition-colors">
+        <Link to="/features/" className="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/10 px-8 py-4 font-bold text-white hover:bg-white/20 transition-colors">
           All features
         </Link>
       </div>

@@ -379,8 +379,8 @@ function HowItWorks() {
         <p>
           The code is static: it holds the link itself and does not pass through Vyostra AI. That is why it never expires, and also why the number and message
           cannot be changed after printing. To change either, make a new code. If you only need the link, use the{' '}
-          <Link to="/whatsapp-link-generator" className={TEXT_LINK}>WhatsApp link generator</Link>. To make the pre-filled message easier to read, use the{' '}
-          <Link to="/tools/whatsapp-text-formatter" className={TEXT_LINK}>WhatsApp text formatter</Link>.
+          <Link to="/whatsapp-link-generator/" className={TEXT_LINK}>WhatsApp link generator</Link>. To make the pre-filled message easier to read, use the{' '}
+          <Link to="/tools/whatsapp-text-formatter/" className={TEXT_LINK}>WhatsApp text formatter</Link>.
         </p>
       </div>
     </section>
@@ -443,7 +443,7 @@ function NextStep() {
         WhatsApp the moment it arrives.
       </p>
       <Link
-        to="/features/whatsapp"
+        to="/features/whatsapp/"
         onClick={() => trackEvent('tool_cta_click', { tool: TOOL_ID })}
         className="inline-flex items-center justify-center rounded-xl bg-primary px-8 py-4 font-bold text-white hover:opacity-95 transition-opacity"
       >

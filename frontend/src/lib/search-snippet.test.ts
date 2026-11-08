@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { getAllPosts } from '../content/blog/registry'
+import { getAllDocMetas } from '../content/docs/registry'
 import type { BlogPostMeta } from '../types/blog'
-import { MAX_DESCRIPTION_LENGTH, MAX_TITLE_LENGTH, postDescription, postDocumentTitle } from './search-snippet'
+import { MAX_DESCRIPTION_LENGTH, MAX_TITLE_LENGTH, docDocumentTitle, postDescription, postDocumentTitle } from './search-snippet'
 
 /**
  * A length limit nobody tests drifts: the homepage title reached 69 characters
@@ -58,6 +59,21 @@ describe('marketing page snippets fit in a results page', () => {
   it.each(literals.map((literal) => [literal.file, literal] as const))('%s', (_file, literal) => {
     expect(literal.title.length).toBeLessThanOrEqual(MAX_TITLE_LENGTH)
     expect(literal.description.length).toBeLessThanOrEqual(MAX_DESCRIPTION_LENGTH)
+  })
+})
+
+describe('docDocumentTitle', () => {
+  it('keeps the docs suffix when it fits, then the brand suffix, then none', () => {
+    expect(docDocumentTitle({ title: 'Errors', metaTitle: 'API Errors' })).toBe('API Errors | Vyostra AI Docs')
+    expect(docDocumentTitle({ title: 'x', metaTitle: 'a'.repeat(45) })).toBe(`${'a'.repeat(45)} — Vyostra AI`)
+    expect(docDocumentTitle({ title: 'x', metaTitle: 'a'.repeat(55) })).toBe('a'.repeat(55))
+  })
+})
+
+describe('docs page snippets fit in a results page', () => {
+  it.each(getAllDocMetas().map((docMeta) => [docMeta.slug, docMeta] as const))('%s', (_slug, docMeta) => {
+    expect(docDocumentTitle(docMeta).length).toBeLessThanOrEqual(MAX_TITLE_LENGTH)
+    expect(docMeta.description.length).toBeLessThanOrEqual(MAX_DESCRIPTION_LENGTH)
   })
 })
 

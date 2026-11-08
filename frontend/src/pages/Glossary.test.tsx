@@ -57,7 +57,7 @@ describe('/glossary', () => {
   // A "Read more" link to a page that does not exist is a dead end for a reader and a crawler alike.
   it('links only to pages the site serves', () => {
     const served = new Set([...PRERENDERED_STATIC_ROUTES, ...getAllSlugs().map((slug) => `/blog/${slug}`)])
-    const dead = GLOSSARY_TERMS.flatMap((entry) => (entry.link && !served.has(entry.link.path) ? [entry.link.path] : []))
+    const dead = GLOSSARY_TERMS.flatMap((entry) => (entry.link && !served.has(entry.link.path.replace(/\/$/, '')) ? [entry.link.path] : []))
     expect(dead).toEqual([])
   })
 })

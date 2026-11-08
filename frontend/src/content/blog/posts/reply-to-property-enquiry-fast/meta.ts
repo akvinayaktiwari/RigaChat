@@ -11,9 +11,9 @@ const meta: BlogPostMeta = {
   market: 'global',
   tags: ['Real Estate', 'Lead Follow-up', 'WhatsApp', 'Speed to Lead'],
   readingMinutes: 5,
-  seoTitle: 'Reply to a Property Enquiry Fast: A Guide',
+  seoTitle: 'How to Respond to Property Enquiries Faster',
   seoDescription:
-    'How to set up a fast, useful first reply to a property enquiry: what to say, what to ask, when a person takes over, and the WhatsApp rules that apply.',
+    'Respond to a property enquiry fast without sounding automated: what the first reply should say, the one easy question to ask, and who takes over after it.',
   relatedFeatures: ['/features/crm'],
   faq: [
     {

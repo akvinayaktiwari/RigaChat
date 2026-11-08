@@ -6,6 +6,7 @@ import { confirmForgotPassword } from '../services/api'
 import type { ConfirmForgotPasswordResponse } from '../services/api'
 import { useToast } from '../components/Toast/Toast'
 import AuthHeroPanel from '../components/auth/AuthHeroPanel'
+import NoIndexMeta from '../components/seo/NoIndexMeta'
 import PasswordVisibilityToggle from '../components/auth/PasswordVisibilityToggle'
 
 const JAKARTA_FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
@@ -130,6 +131,7 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
+      <NoIndexMeta title="Choose a new password" />
       <div className="w-full lg:w-1/2">
         <AuthHeroPanel
           tagline="AI agents with native CRM"

@@ -20,19 +20,19 @@ interface FeatureCardData {
 }
 
 const FEATURE_CARDS: FeatureCardData[] = [
-  { icon: <Bot className="w-6 h-6" />, title: 'AI Agent', body: '24/7 lead capture. Trained on your content. No code required.', href: '/features/chatbot' },
+  { icon: <Bot className="w-6 h-6" />, title: 'AI Agent', body: '24/7 lead capture. Trained on your content. No code required.', href: '/features/chatbot/' },
   {
     icon: <MessageSquare className="w-6 h-6" />,
     title: 'WhatsApp Automation',
     body: 'Instant lead alerts, weekly reports, and a two-way AI agent that answers replies.',
-    href: '/features/whatsapp',
+    href: '/features/whatsapp/',
   },
-  { icon: <Users className="w-6 h-6" />, title: 'Lead CRM', body: 'Every lead organized and trackable, with notes and statuses.', href: '/features/crm' },
+  { icon: <Users className="w-6 h-6" />, title: 'Lead CRM', body: 'Every lead organized and trackable, with notes and statuses.', href: '/features/crm/' },
   {
     icon: <FileText className="w-6 h-6" />,
     title: 'Form Builder',
     body: 'Beautiful forms that embed anywhere. Leads captured and notified instantly.',
-    href: '/features/forms',
+    href: '/features/forms/',
   },
   {
     icon: <Route className="w-6 h-6" />,
@@ -43,13 +43,13 @@ const FEATURE_CARDS: FeatureCardData[] = [
     icon: <Mic className="w-6 h-6" />,
     title: 'AI Voice Agent',
     body: 'Visitors talk to your agent on the page — no app, no phone call. Same knowledge base, same CRM.',
-    href: '/features/voice-agent',
+    href: '/features/voice-agent/',
   },
   {
     icon: <RefreshCw className="w-6 h-6" />,
     title: 'Zoho CRM Integration',
     body: 'New leads from your forms and Meta lead ads created in Zoho CRM automatically.',
-    href: '/features/zoho-crm',
+    href: '/features/zoho-crm/',
   },
   {
     icon: <CalendarCheck className="w-6 h-6" />,

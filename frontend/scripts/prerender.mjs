@@ -109,7 +109,7 @@ async function main() {
   })
 
   const entryPath = path.join(ssrOutDir, 'prerender-entry.mjs')
-  const { renderRoute, getRoutes, getCrawlFiles, buildLlmsFull, SITE_URL, NOT_FOUND_RENDER_PATH } = await import(
+  const { renderRoute, getRoutes, getCrawlFiles, buildLlmsFull, auditInternalLinks, SITE_URL, NOT_FOUND_RENDER_PATH } = await import(
     pathToFileURL(entryPath).href
   )
   assertPublicOrigin(SITE_URL)
@@ -146,6 +146,13 @@ async function main() {
 
     const kb = (Buffer.byteLength(page, 'utf8') / 1024).toFixed(1)
     console.log(`[prerender] ${route} -> ${path.relative(root, path.join(outDir, 'index.html'))} (${kb} kB)`)
+  }
+
+  // Every prerendered URL ends in a slash; the bare form only 301s there.
+  const slashless = auditInternalLinks(renderedPages)
+  if (slashless.length > 0) {
+    const lines = slashless.map(({ page, href }) => `  ${page}: href="${href}"`).join('\n')
+    throw new Error(`${slashless.length} internal link(s) to a prerendered page lack the trailing slash:\n${lines}`)
   }
 
   // After the loop: it needs every page's HTML.

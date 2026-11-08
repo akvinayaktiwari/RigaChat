@@ -22,7 +22,7 @@ const PAGE = {
   path: '/whatsapp-link-generator/',
   description: 'A free tool that builds a wa.me click-to-chat link with a pre-filled message. It runs in the browser.',
 }
-const QR_TOOL_ROUTE = '/tools/whatsapp-qr-code-generator'
+const QR_TOOL_ROUTE = '/tools/whatsapp-qr-code-generator/'
 
 /** WhatsApp's own description of the link format; the rules on this page restate it. */
 const CLICK_TO_CHAT_DOCS = 'https://faq.whatsapp.com/5913398998672934'
@@ -207,7 +207,7 @@ function NextStep() {
         A link starts the conversation; someone still has to answer it. Vyostra AI captures leads on your website with an AI agent and sends each one to
         your WhatsApp the moment it arrives.
       </p>
-      <Link to="/features/whatsapp" className="inline-flex items-center justify-center rounded-xl bg-primary px-8 py-4 font-bold text-white hover:opacity-95 transition-opacity">
+      <Link to="/features/whatsapp/" className="inline-flex items-center justify-center rounded-xl bg-primary px-8 py-4 font-bold text-white hover:opacity-95 transition-opacity">
         See WhatsApp lead alerts
       </Link>
     </section>
