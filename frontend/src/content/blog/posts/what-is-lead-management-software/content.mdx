@@ -1,0 +1,98 @@
+{/*
+  Global definition post for "lead management software". No figures: no
+  conversion or response-time study was checked at a primary source, so none
+  is quoted.
+
+  Product claims match the dashboard as it is: one inbox for chat, form and
+  Meta lead ad leads, most urgent first (LeadsPage.tsx); each lead's
+  transcript or answers, status, notes, outcome (Won, Lost, Unreachable) and
+  a next-action date, with overdue leads pinned to the top
+  (LeadDetailPage.tsx, lib/lead-display.ts); a WhatsApp button on the lead;
+  CSV export; archive and erase. Zoho is left out on purpose: the sync is
+  proven for India accounts only (AEO-GEO-STATUS.md owner task 26). No
+  status count is given, because the dashboard has six and /features/crm/
+  still says four.
+*/}
+
+Lead management software is a single place where every enquiry lands, whatever it came from: a website form, a chat, an ad, a message. Each lead keeps its source, what the person said and a next step, so whoever is replying can see who to contact now and what they already know. It covers the stretch from first enquiry to a qualified or closed lead.
+
+If your leads live in an inbox, a spreadsheet and three people's phones, this is the problem it solves.
+
+## What does lead management software do?
+
+Five jobs, in the order a lead meets them:
+
+| Job | What it means in practice |
+| --- | --- |
+| Capture | Leads from your website, ads and messages arrive in one list without anyone copying them in |
+| Context | Each lead keeps where it came from and what the person asked or filled in |
+| Prioritise | The list shows who needs attention first, not just who arrived last |
+| Follow up | Every lead has a next action and a date, so nobody has to remember |
+| Record | Status, notes and how it ended, so you can see what happened and why |
+
+Software that does the first two but not the fourth is a lead collector. Leads still go cold in it, just in a tidier list.
+
+## How is it different from a CRM?
+
+A full CRM (customer relationship management) system tracks the whole relationship: deals and their stages, sales forecasts, accounts with many contacts, renewals, reports for managers. Lead management is the front of that: getting a reply out and finding out whether the person is a real prospect.
+
+| | Lead management software | Full CRM |
+| --- | --- | --- |
+| Main question it answers | Who do I contact now, and what do I already know? | What stage is each deal in, and what will close this quarter? |
+| Typical user | The person replying to enquiries | A sales team and its manager |
+| Unit of work | A lead | A deal, an account, a pipeline |
+| Setup | Connect your lead sources | Model your sales process first |
+
+Many small businesses need lead management long before they need a CRM. Some never need the rest.
+
+## When do you need lead management software?
+
+When one of these happens:
+
+- **Leads come from more than one place.** Form emails, Facebook leads, WhatsApp messages and phone calls, each in a different app.
+- **More than one person replies.** Two people answer the same lead, or each assumes the other did.
+- **A lead goes cold and you find out later.** Someone enquired, got one reply and was never followed up.
+- **You cannot answer "where do our good leads come from?"** Because nobody recorded the source.
+
+A spreadsheet works for a handful of leads from one source. It stops working when someone has to copy every lead in by hand and nothing reminds anyone that a follow-up is due.
+
+## What features matter most?
+
+In order of how much they matter for a small team:
+
+1. **Every source in one list.** If any source still lives somewhere else, people stop checking the list.
+2. **The conversation saved with the lead.** The chat transcript or form answers, so the first reply can answer what they asked.
+3. **A next-action date.** The single feature that stops leads going cold. A lead without a next step should look different from one with a step due today.
+4. **Statuses that match your process.** Few enough that people use them. [Four lead statuses for a small real estate team](/blog/four-lead-statuses-for-a-small-real-estate-team/) is one example of keeping them short.
+5. **Notes and an outcome.** What was said on the call, and whether the lead was won, lost or never reached.
+6. **A way out.** An export, so your data is yours if you change tools.
+
+Features you can usually skip at the start: lead scoring formulas, territory rules, approval flows, custom report builders. They help large sales teams. A small team that adds them early often ends up maintaining the tool instead of calling leads.
+
+## What does a good lead record look like?
+
+Enough that someone who has never seen the lead can reply well:
+
+- Name and the contact details the person gave
+- Where they came from: which page, form, ad or chat
+- What they asked, in their own words
+- The current status and the next action, with a date
+- Notes from every contact so far
+
+If your first reply has to start with "How can I help?", the record is missing the part that matters.
+
+<Callout title="The test" tone="neutral">
+  Pick a lead from last week and ask: can anyone on the team see where it came from, what the person wanted, and what happens next, without asking a colleague? If not, start there.
+</Callout>
+
+## How does lead capture connect to it?
+
+The best place for lead management to start is the moment a lead is captured. A [lead form](/blog/how-many-fields-should-a-lead-form-have/) that asks the right questions, or a chatbot that answers the visitor and then asks for their details, hands the list a lead that already has context. [When a chatbot should ask for contact details](/blog/when-should-a-chatbot-ask-for-contact-details/) covers the timing. Then the first reply decides the rest: [how to follow up with a chatbot lead](/blog/how-to-follow-up-with-a-chatbot-lead/) covers that message.
+
+<div className="mt-16 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+  ### How Vyostra AI handles it
+
+  Vyostra AI's [lead CRM](/features/crm/) is lead management software, deliberately. Leads from your [chat agents](/features/chatbot/), [lead forms](/features/forms/) and Meta lead ads land in one inbox, sorted most urgent first. Each lead keeps the chat transcript or the answers the person submitted, a status, your notes, an outcome (Won, Lost or Unreachable) and a next-action date. Leads with an overdue next action are pinned to the top. A WhatsApp button opens a chat with the lead, and the whole list exports to CSV.
+
+  **Limits:** it is not a full CRM. There are no deal stages, forecasts, report builder or team hierarchy. If your team needs those, you will outgrow it, and the CSV export is there for that day.
+</div>
