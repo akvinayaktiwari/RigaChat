@@ -1,0 +1,88 @@
+{/*
+  Global companion to the Dubai post (real-estate-crm-dubai), which stays the
+  market-specific one. No figures and no local rules quoted: none were read
+  at a primary source for this post, so contact rules are left to "check
+  your market's rules" and the market posts that did read them.
+
+  Portals are named as examples only; nothing was read on their sites for
+  this post. How portal enquiries arrive (email, phone, WhatsApp) matches
+  what the Dubai post sourced from Property Finder.
+
+  Product claims match the dashboard as it is: one inbox for chat, form and
+  Meta lead ad leads, most urgent first (LeadsPage.tsx); property interest
+  and budget range shown when captured, statuses including "Site visit
+  planned", notes, an outcome (Won, Lost, Unreachable), a next-action date
+  with overdue leads pinned to the top, and a WhatsApp button
+  (LeadDetailPage.tsx, lib/lead-display.ts); CSV export; the REST API for
+  reading leads (/docs/api-reference/). Same limits as the Dubai post: no
+  portal import, no listings, deals or commissions, English. Zoho is left out
+  (proven for India accounts only).
+*/}
+
+A real estate CRM for a small agency is a shared list of every enquiry, wherever it came from: a property portal, your website, an ad, WhatsApp or a phone call. Each lead keeps the property they asked about, their budget, the conversation so far and the next follow-up date, so any agent can pick it up. For a small team, that matters more than listings, deal pipelines or reports.
+
+Large brokerages buy CRMs to manage agents, listings and commission. A small agency mostly loses business somewhere simpler: an enquiry that got no reply, or a buyer who got one reply and was never called again. Start there.
+
+## Where do a small agency's leads come from?
+
+Usually from several places at once, each arriving differently:
+
+| Source | How it usually arrives | What gets lost |
+| --- | --- | --- |
+| Property portals (Zillow, Rightmove, Property Finder and the like) | Email, phone call or WhatsApp, depending on what the person tapped | Which listing it was about, when the enquiry came in |
+| Your own website | A form email or a chat | The page they were on, what they asked |
+| Facebook and Instagram ads | Lead ad answers, or a WhatsApp chat from a click-to-WhatsApp ad | Who replied, and whether anyone did |
+| WhatsApp and calls to an agent's phone | On one person's phone | Everything, when that agent is away |
+| Walk-ins and open houses | A paper sheet | Most of it, until someone types it up |
+
+A CRM earns its keep by pulling as many of these as it can into one list. Before you choose one, check how each portal you pay for delivers its enquiries: that decides how much copying by hand will be left.
+
+## What should a real estate CRM do for a small team?
+
+Six things, in order of how much money they save:
+
+1. **One list for every source.** If portal leads live in email and website leads live in the CRM, agents stop checking the CRM.
+2. **The property and budget with each lead.** The first reply should name the property and answer what was asked. [What to say in that first reply](/blog/reply-to-property-enquiry-fast/) covers the message itself.
+3. **A next-follow-up date on every lead.** Most buyers do not decide after one message. A lead with no next step should stand out from one with a call due today.
+4. **Statuses your team will actually update.** New, contacted, qualified, site visit planned, closed. [Four lead statuses for a small real estate team](/blog/four-lead-statuses-for-a-small-real-estate-team/) makes the case for keeping the list short.
+5. **Notes and an outcome.** What the buyer said on the viewing, and whether the lead was won, lost or never reached, so you can see which sources bring buyers rather than just enquiries.
+6. **One tap to message the lead on their channel.** In many markets that is WhatsApp. Reaching for a personal phone and typing the number in is where follow-ups get skipped.
+
+## What can a small agency skip at first?
+
+Features built for brokerages with many agents and a manager reading reports:
+
+- Commission splits and agent leaderboards
+- Listing management and syndication to portals
+- Complex lead routing rules between offices
+- Custom report builders and forecasts
+
+These are useful when you have the team that needs them. Bought early, they turn a CRM into a project. A small team is better served by a lead list that everyone keeps up to date than by a full system that nobody does.
+
+## How fast should an agency reply to a property enquiry?
+
+As fast as you can while still answering the question, and the same working day at the latest. A buyer who enquired has often asked more than one agent, and the first useful reply tends to decide who they talk to next. A CRM helps in two ways: by showing a new lead the moment it arrives, and by making the lead's property and question visible so the reply can be specific. Software can send that first reply outside office hours: the [real estate chatbot guide](/blog/real-estate-chatbot-guide/) covers what a chatbot should and should not say to buyers.
+
+<Callout title="Check your market's contact rules" tone="neutral">
+  Messaging a lead on WhatsApp, calling them or adding them to a mailing list is regulated differently in each country. Check the rules where you sell before you automate any follow-up. The [Dubai CRM post](/blog/real-estate-crm-dubai/) covers the UAE.
+</Callout>
+
+## How do you choose between real estate CRMs?
+
+Run one real week of leads through a free trial instead of reading feature lists:
+
+- **Does every source you use arrive without copying?** List your sources first, then check each one.
+- **Can an agent who has never seen a lead reply well from the record alone?** Property, budget, what they asked, what was said.
+- **Does the list tell you who to call today?** Not just who arrived last.
+- **Can you get your data out?** An export or an API, so a later move does not mean retyping your leads.
+- **Will your agents use it on their phones?** A CRM used only at a desk misses the follow-ups that happen between viewings.
+
+The CRM that passes those five with the fewest features is usually the right one for a small agency. [What lead management software is](/blog/what-is-lead-management-software/) covers the same test for any business.
+
+<div className="mt-16 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+  ### Where Vyostra AI sits
+
+  Vyostra AI is a lead capture and follow-up tool for real estate teams, not a brokerage CRM. A [chat agent](/features/chatbot/) on your website answers buyers from your website and knowledge base and collects their details, and lead forms and Meta lead ads feed the same [lead list](/features/crm/). Each lead arrives with its transcript or submitted answers, and the property interest and budget when the buyer gave them. The list is sorted most urgent first: every lead has a status (including Site visit planned), notes, an outcome and a next-action date, and leads with an overdue next action are pinned to the top. A WhatsApp button opens a chat with the lead. The list exports to CSV. More on [Vyostra AI for real estate](/industries/real-estate/).
+
+  **Limits:** it does not import enquiries from property portals, it does not manage listings, deals or commissions, and it works in English. Your developers can read leads out of it with the [REST API](/docs/api-reference/) to pass them to a brokerage CRM when you outgrow it.
+</div>
