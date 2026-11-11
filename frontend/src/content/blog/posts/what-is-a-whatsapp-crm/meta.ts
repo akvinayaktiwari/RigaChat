@@ -39,7 +39,7 @@ const meta: BlogPostMeta = {
     {
       question: 'Is Vyostra AI a WhatsApp CRM?',
       answer:
-        'Vyostra AI is a lead CRM with WhatsApp follow-up built in. Leads from your chat agents, lead forms and Meta lead ads land in one list, and a follow-up journey messages a new chat or Meta lead ad lead on WhatsApp, waits for a real reply and hands the lead to your team when it needs a person. It is a follow-up queue with four statuses, not a pipeline CRM with deal stages.',
+        'Vyostra AI is a lead CRM with WhatsApp follow-up built in. Leads from your chat agents, lead forms and Meta lead ads land in one list, and a follow-up journey messages a new chat or Meta lead ad lead on WhatsApp, waits for a real reply and hands the lead to your team when it needs a person. It is a follow-up queue with six statuses, not a pipeline CRM with deal stages.',
     },
   ],
 }

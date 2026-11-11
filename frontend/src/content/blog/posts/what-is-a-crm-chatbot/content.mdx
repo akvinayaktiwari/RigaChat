@@ -3,8 +3,8 @@
   conversion rates: none are sourced, so none appear.
 
   Product claims match frontend/src/pages/features/Crm.tsx (LEAD_CRM_FAQ) as it
-  is: leads from chat agents, lead forms and Meta lead ads in one list; four
-  statuses (New, Contacted, Qualified, Closed); notes; filters by source, status
+  is: leads from chat agents, lead forms and Meta lead ads in one list; six
+  statuses (lib/lead-display.ts); notes; filters by source, status
   and date; archive and erase; Zoho CRM sync for form and Meta lead ad leads
   only. zoho-claims.test.ts holds the Zoho sentence.
 
@@ -97,7 +97,7 @@ Five things, in this order.
 <div className="mt-16 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
   ### Where Vyostra AI sits
 
-  Vyostra AI is the first kind: a chat agent with a built-in lead CRM. Every lead from your chat agents, lead forms and Meta lead ads lands in one list with its transcript or submitted answers. A lead has one of four statuses (New, Contacted, Qualified, Closed) and your notes, and you can filter the list by source, status and date.
+  Vyostra AI is the first kind: a chat agent with a built-in lead CRM. Every lead from your chat agents, lead forms and Meta lead ads lands in one list with its transcript or submitted answers. A lead has one of six statuses (Yet to contact, Contacted, Qualified, Site visit planned, Unqualified, Closed) and your notes, and you can filter the list by source, status and date.
 
   It is a follow-up queue, not a pipeline CRM. It has no deal stages with values, no forecasting and no custom report builder. If you need those, connect Zoho CRM: new leads from your lead forms and Meta lead ads are created there automatically, while leads from chat and voice conversations stay in the Vyostra AI lead CRM. More on [the lead CRM](/features/crm/), [the chat agent](/features/chatbot/) and [the Zoho CRM integration](/features/zoho-crm/).
 </div>

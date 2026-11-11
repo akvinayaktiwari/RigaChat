@@ -29,7 +29,7 @@ const meta: BlogPostMeta = {
     {
       question: 'Which statuses does Vyostra AI use?',
       answer:
-        'Vyostra AI’s lead list uses four statuses: new, contacted, qualified and closed. Each lead can also have an owner, a next-action date and notes.',
+        'Six: the four in this post, labelled Yet to contact, Contacted, Qualified and Closed, plus Site visit planned and Unqualified. Each lead also has a next-action date and notes.',
     },
   ],
 }
