@@ -11,6 +11,7 @@ import { describeApiError } from '../lib/api-error'
 import { exportInboxCsv } from '../lib/csv'
 import { leadDetailPath } from '../lib/lead-ref'
 import {
+  isTerminalStatus,
   leadInitials,
   leadStatus,
   leadUrgency,
@@ -99,7 +100,7 @@ function Badge({ className, children }: { className: string; children: React.Rea
 function matchesStatus(lead: UnifiedLead, filter: StatusFilter): boolean {
   if (filter === 'all') return true
   const status = leadStatus(lead)
-  if (filter === 'open') return status !== 'closed'
+  if (filter === 'open') return !isTerminalStatus(status)
   return status === filter
 }
 

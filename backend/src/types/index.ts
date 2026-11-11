@@ -1643,6 +1643,7 @@ export type Capability =
   | 'lead.timeline'  // GET /api/leads/events   (phase 2)
   | 'lead.inbox.filter' // GET /api/leads/inbox honours ?sort=latest|urgency, ?status=, ?source=
   | 'lead.inbox.date'   // ... and ?sort=oldest, ?createdFrom=, ?createdTo= (ISO timestamps)
+  | 'lead.status.v2'    // LeadStatus includes 'site_visit_planned' and 'unqualified'
 
 // Everything the app needs on launch, in one call: whether to show the inbox or
 // the "finish setting up on the web" gate, and what it may do once inside.
@@ -1693,11 +1694,20 @@ export interface JourneyLead {
 // before this table, so a recheck could never observe them.
 // ---------------------------------------------------------------------------
 
-// Four statuses on purpose. A longer pipeline is a different product with a
-// different buyer. `closed` carries an outcome.
-export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'closed'
+// Six statuses. The original four (new, contacted, qualified, closed) plus two
+// real-estate steps added 2026-11-11: 'site_visit_planned' (a viewing is
+// booked) and 'unqualified' (ruled out; finished, like 'closed'). Only
+// `closed` carries an outcome. Two statuses are terminal -- see
+// TERMINAL_LEAD_STATUSES in lib/lead-state-validation.ts.
+export type LeadStatus =
+  | 'new'
+  | 'contacted'
+  | 'qualified'
+  | 'site_visit_planned'
+  | 'unqualified'
+  | 'closed'
 
-// Archiving is a marker on lead_state, NOT a fifth LeadStatus. The four
+// Archiving is a marker on lead_state, NOT another LeadStatus. The
 // statuses are a queue position ("where is this lead in my process"), and
 // "I never want to see this" is not a position in that queue -- folding it in
 // would make every status filter carry an implicit "and not archived", which is

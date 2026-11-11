@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { leadInitials, leadStatus, leadUrgency } from './lead-display'
+import { isTerminalStatus, leadInitials, leadStatus, leadUrgency } from './lead-display'
 import type { LeadState, LeadStatus, UnifiedLead, UrgencyTier } from '../types/index'
 
 const NOW = Date.parse('2026-08-14T12:00:00.000Z')
@@ -48,6 +48,18 @@ describe('leadUrgency', () => {
       label: 'Won',
       tone: 'quiet',
     })
+  })
+
+  it('labels an unqualified lead quietly, even with a stale next action', () => {
+    expect(
+      leadUrgency(lead({ status: 'unqualified', nextActionAt: at(-2 * DAY_MS) }), NOW),
+    ).toEqual({ label: 'Unqualified', tone: 'quiet' })
+  })
+
+  it('treats unqualified and closed as finished', () => {
+    expect(isTerminalStatus('unqualified')).toBe(true)
+    expect(isTerminalStatus('closed')).toBe(true)
+    expect(isTerminalStatus('site_visit_planned')).toBe(false)
   })
 
   it('falls back to Closed when a closed lead has no outcome', () => {
@@ -141,7 +153,7 @@ const TIER_CLOSED = 4
 
 function serverTier(l: UnifiedLead, now: number): number {
   const state = l.state
-  if (state?.status === 'closed') return TIER_CLOSED
+  if (state && isTerminalStatus(state.status)) return TIER_CLOSED
   if (state?.nextActionAt) {
     return Date.parse(state.nextActionAt) <= now ? TIER_OVERDUE : TIER_SCHEDULED
   }

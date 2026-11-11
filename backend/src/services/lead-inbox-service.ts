@@ -23,6 +23,7 @@ import type { FormField, LeadRef, LeadSource, LeadState, LeadStatus, UnifiedLead
   UnifiedInboxPage,
 } from '../types/index.js'
 import { getLeadEvents } from '../repositories/lead-event-repository.js'
+import { isTerminalStatus } from '../lib/lead-state-validation.js'
 
 // One inbox across chat, form and Meta leads.
 //
@@ -260,7 +261,7 @@ const TIER_RANK: Record<UrgencyTier, number> = {
 
 export function urgencyTierOf(lead: { state: UnifiedLead['state'] }, now: number): UrgencyTier {
   const state = lead.state
-  if (state?.status === 'closed') return 'closed'
+  if (state && isTerminalStatus(state.status)) return 'closed'
   if (state?.nextActionAt) {
     return Date.parse(state.nextActionAt) <= now ? 'overdue' : 'scheduled'
   }

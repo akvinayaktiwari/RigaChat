@@ -73,7 +73,13 @@ export type LeadRef =
   | { source: 'meta'; pageId: string; leadId: string }
   | { source: 'voice'; agentId: string; leadId: string }
 
-export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'closed'
+export type LeadStatus =
+  | 'new'
+  | 'contacted'
+  | 'qualified'
+  | 'site_visit_planned'
+  | 'unqualified'
+  | 'closed'
 
 export type LeadOutcome = 'won' | 'lost' | 'unreachable'
 

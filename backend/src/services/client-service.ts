@@ -24,6 +24,8 @@ import type { AppBootstrap, Capability, ClientRecord, NotificationPreferences, S
 // 'lead.inbox.date' added 2026-10-13, SEPARATE from 'lead.inbox.filter' on purpose: a
 // server that has the first but not the second would silently ignore a date range, and
 // a list that says "Last 7 days" while showing everything is worse than no date filter.
+// 'lead.status.v2' added 2026-11-11: LeadStatus gains 'site_visit_planned' and
+// 'unqualified'. A build without it offers only the original four statuses.
 const READY_CAPABILITIES: Capability[] = [
   'lead.read',
   'lead.state',
@@ -31,6 +33,7 @@ const READY_CAPABILITIES: Capability[] = [
   'lead.timeline',
   'lead.inbox.filter',
   'lead.inbox.date',
+  'lead.status.v2',
 ]
 
 interface UpsertClientInput {

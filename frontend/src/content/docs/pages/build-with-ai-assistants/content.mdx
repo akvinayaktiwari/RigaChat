@@ -45,7 +45,7 @@ ENDPOINTS (all return JSON; every one is a read-only GET except POST /v1/forms)
 LEAD
 { id, source: "chat"|"form"|"meta"|"voice", sourceId, name, phone, email,
   sourceUrl, attributes: object of strings,
-  status: "new"|"contacted"|"qualified"|"closed",
+  status: "new"|"contacted"|"qualified"|"site_visit_planned"|"unqualified"|"closed",
   outcome: "won"|"lost"|"unreachable"|null, leadScore: number|null,
   archived: boolean, createdAt: ISO 8601 string }
 - name, phone, email and sourceUrl can be null. Missing values are null, never

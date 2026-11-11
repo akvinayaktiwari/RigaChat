@@ -7,7 +7,23 @@ import type { LeadStatePatch } from '../repositories/lead-state-repository.js'
 // the code that earns unit tests. The route now only maps the result to a
 // status code.
 
-const LEAD_STATUSES: readonly LeadStatus[] = ['new', 'contacted', 'qualified', 'closed']
+export const LEAD_STATUSES: readonly LeadStatus[] = [
+  'new',
+  'contacted',
+  'qualified',
+  'site_visit_planned',
+  'unqualified',
+  'closed',
+]
+
+// Statuses that mean "no more work on this lead". They sort last in the
+// urgency queue and are left out of "open" counts. Only 'closed' takes an
+// outcome; an unqualified lead is finished without one.
+export const TERMINAL_LEAD_STATUSES: readonly LeadStatus[] = ['unqualified', 'closed']
+
+export function isTerminalStatus(status: LeadStatus): boolean {
+  return TERMINAL_LEAD_STATUSES.includes(status)
+}
 const LEAD_OUTCOMES: readonly LeadOutcome[] = ['won', 'lost', 'unreachable']
 
 export class LeadStateValidationError extends Error {}

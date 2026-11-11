@@ -20,9 +20,11 @@ export const SOURCE_BADGE_CLASSES: Record<LeadSource, string> = {
 }
 
 export const STATUS_LABELS: Record<LeadStatus, string> = {
-  new: 'New',
+  new: 'Yet to contact',
   contacted: 'Contacted',
   qualified: 'Qualified',
+  site_visit_planned: 'Site visit planned',
+  unqualified: 'Unqualified',
   closed: 'Closed',
 }
 
@@ -30,6 +32,8 @@ export const STATUS_BADGE_CLASSES: Record<LeadStatus, string> = {
   new: 'bg-amber-50 text-amber-700 border-amber-200',
   contacted: 'bg-sky-50 text-sky-700 border-sky-200',
   qualified: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  site_visit_planned: 'bg-violet-50 text-violet-700 border-violet-200',
+  unqualified: 'bg-rose-50 text-rose-700 border-rose-200',
   closed: 'bg-gray-100 text-gray-500 border-gray-200',
 }
 
@@ -39,7 +43,20 @@ export const OUTCOME_LABELS: Record<LeadOutcome, string> = {
   unreachable: 'Unreachable',
 }
 
-export const STATUS_ORDER: LeadStatus[] = ['new', 'contacted', 'qualified', 'closed']
+export const STATUS_ORDER: LeadStatus[] = [
+  'new',
+  'contacted',
+  'qualified',
+  'site_visit_planned',
+  'unqualified',
+  'closed',
+]
+
+// Mirrors TERMINAL_LEAD_STATUSES in backend/src/lib/lead-state-validation.ts:
+// finished leads, left out of "Open leads" and sorted last by the server.
+export function isTerminalStatus(status: LeadStatus): boolean {
+  return status === 'unqualified' || status === 'closed'
+}
 export const OUTCOME_ORDER: LeadOutcome[] = ['won', 'lost', 'unreachable']
 
 // No state row means nobody has opened this lead yet, which is exactly what
@@ -77,6 +94,8 @@ export function leadUrgency(lead: UnifiedLead, now: number): Urgency {
     const outcome = state.outcome ? OUTCOME_LABELS[state.outcome] : 'Closed'
     return { label: outcome, tone: 'quiet' }
   }
+
+  if (state?.status === 'unqualified') return { label: 'Unqualified', tone: 'quiet' }
 
   if (state?.nextActionAt) {
     const due = Date.parse(state.nextActionAt)

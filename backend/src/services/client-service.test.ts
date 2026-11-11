@@ -221,7 +221,7 @@ describe('getAppBootstrap', () => {
 
     await expect(getAppBootstrap('client-1')).resolves.toEqual({
       ready: true,
-      capabilities: ['lead.read', 'lead.state', 'lead.note', 'lead.timeline', 'lead.inbox.filter', 'lead.inbox.date'],
+      capabilities: ['lead.read', 'lead.state', 'lead.note', 'lead.timeline', 'lead.inbox.filter', 'lead.inbox.date', 'lead.status.v2'],
     })
   })
 
