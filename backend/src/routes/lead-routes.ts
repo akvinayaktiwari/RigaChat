@@ -19,6 +19,7 @@ import {
 } from '../services/lead-inbox-service.js'
 import type { InboxSort } from '../services/lead-inbox-service.js'
 import {
+  LEAD_STATUSES,
   LeadStateValidationError,
   parseLeadRef,
   parseStatePatch,
@@ -130,7 +131,6 @@ function stateErrorResponse(error: unknown): { message: string; status: 400 | 40
   return { message: errorMessage(error), status: 500 }
 }
 
-const LEAD_STATUSES: readonly LeadStatus[] = ['new', 'contacted', 'qualified', 'closed']
 const LEAD_SOURCES: readonly LeadSource[] = ['chat', 'form', 'meta', 'voice']
 
 // Returns a PAGE, not a bare array. The shape changed on 2026-08-27 when this

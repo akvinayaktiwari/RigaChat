@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { LeadStateValidationError, parseLeadRef, parseStatePatch } from './lead-state-validation.js'
+import {
+  isTerminalStatus,
+  LeadStateValidationError,
+  parseLeadRef,
+  parseStatePatch,
+} from './lead-state-validation.js'
 
 // This module parses request bodies straight off the wire, so every test here
 // is an untrusted-input test: the question is never "does the happy path work"
@@ -47,6 +52,18 @@ describe('parseLeadRef', () => {
 describe('parseStatePatch', () => {
   it('accepts a valid status', () => {
     expect(parseStatePatch({ status: 'qualified' })).toMatchObject({ status: 'qualified' })
+  })
+
+  it('accepts the site-visit and unqualified statuses', () => {
+    expect(parseStatePatch({ status: 'site_visit_planned' })).toMatchObject({ status: 'site_visit_planned' })
+    expect(parseStatePatch({ status: 'unqualified' })).toMatchObject({ status: 'unqualified' })
+  })
+
+  // Unqualified is finished but takes no outcome; a stale 'won' must not survive it.
+  it('clears the outcome when a lead is marked unqualified', () => {
+    const patch = parseStatePatch({ status: 'unqualified' })
+    expect('outcome' in patch).toBe(true)
+    expect(patch.outcome).toBeUndefined()
   })
 
   it('rejects a status outside the enum', () => {
@@ -123,5 +140,16 @@ describe('parseStatePatch', () => {
     expect(() => parseStatePatch({ appointmentBooked: true })).toThrow(LeadStateValidationError)
     const patch = parseStatePatch({ status: 'contacted', replied: true })
     expect('replied' in patch).toBe(false)
+  })
+})
+
+describe('isTerminalStatus', () => {
+  it('treats unqualified and closed as finished, everything else as open', () => {
+    expect(isTerminalStatus('closed')).toBe(true)
+    expect(isTerminalStatus('unqualified')).toBe(true)
+    expect(isTerminalStatus('new')).toBe(false)
+    expect(isTerminalStatus('contacted')).toBe(false)
+    expect(isTerminalStatus('qualified')).toBe(false)
+    expect(isTerminalStatus('site_visit_planned')).toBe(false)
   })
 })

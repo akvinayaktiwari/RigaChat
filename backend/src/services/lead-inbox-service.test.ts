@@ -294,6 +294,26 @@ describe('getUnifiedInbox', () => {
 
     expect(inbox.map((lead) => lead.leadId)).toEqual(['overdue', 'closed'])
   })
+
+  // Unqualified is finished work: it sinks with closed even with a stale
+  // next-action date, and a planned site visit stays in the live queue.
+  it('ranks unqualified with closed and site_visit_planned as in progress', async () => {
+    getLeadsByClientId.mockResolvedValue([
+      chatLead('unqualified', '2026-08-07T00:00:00.000Z'),
+      chatLead('site-visit', '2026-08-01T00:00:00.000Z'),
+      chatLead('untouched', '2026-08-01T00:00:00.000Z'),
+    ])
+    getLeadStatesForClient.mockResolvedValue([
+      state('unqualified', { status: 'unqualified', nextActionAt: '2026-08-02T00:00:00.000Z' }),
+      state('site-visit', { status: 'site_visit_planned' }),
+      state('untouched', { status: 'new' }),
+    ])
+
+    const inbox = (await getUnifiedInbox(CLIENT)).leads
+
+    expect(inbox.map((lead) => lead.leadId)).toEqual(['untouched', 'site-visit', 'unqualified'])
+    expect(inbox.find((lead) => lead.leadId === 'unqualified')?.urgencyTier).toBe('closed')
+  })
 })
 
 describe('a voice lead in the merged inbox', () => {
