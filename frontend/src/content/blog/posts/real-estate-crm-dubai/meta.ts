@@ -39,7 +39,7 @@ const meta: BlogPostMeta = {
     {
       question: 'Is Vyostra AI a real estate CRM for Dubai brokers?',
       answer:
-        'Partly. Vyostra AI captures leads from a chat agent and lead forms on your own website and from Meta lead ads, keeps them in one list with four statuses, and follows up on WhatsApp. It does not import enquiries from Property Finder, Bayut or Dubizzle, and it does not manage listings or deals, so a brokerage that lives on portal leads needs a brokerage CRM as well.',
+        'Partly. Vyostra AI captures leads from a chat agent and lead forms on your own website and from Meta lead ads, keeps them in one list with a status on each lead, and follows up on WhatsApp. It does not import enquiries from Property Finder, Bayut or Dubizzle, and it does not manage listings or deals, so a brokerage that lives on portal leads needs a brokerage CRM as well.',
     },
   ],
 }

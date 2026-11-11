@@ -15,7 +15,7 @@ interface LeadRow {
  * Rendered on the page and published as FAQPage from this one array.
  *
  * Each answer matches the leads page as it is: its three filters and search
- * box, its four statuses, and the archive and erase actions on a lead.
+ * box, its six statuses, and the archive and erase actions on a lead.
  */
 export const LEAD_CRM_FAQ: FaqItem[] = [
   {
@@ -26,7 +26,7 @@ export const LEAD_CRM_FAQ: FaqItem[] = [
   {
     question: 'What statuses can a lead have?',
     answer:
-      'Four: New, Contacted, Qualified and Closed. You move a lead from one to the next as your team follows up, and you can add notes to it along the way.',
+      'Six: Yet to contact, Contacted, Qualified, Site visit planned, Unqualified and Closed. You move a lead along them as your team follows up, add notes on the way, and record how it ended: won, lost or unreachable.',
   },
   {
     question: 'How do I find a lead in the CRM?',
@@ -108,7 +108,7 @@ export default function Crm() {
           {
             number: '2',
             title: 'Filter and Track',
-            body: 'Filter leads by date, source, and status. Move each lead from New to Contacted, Qualified and Closed as your team follows up.',
+            body: 'Filter leads by date, source, and status. Move each lead from Yet to contact through Contacted, Qualified and Site visit planned to Closed as your team follows up.',
             icon: <Filter className="w-6 h-6" />,
           },
           {
