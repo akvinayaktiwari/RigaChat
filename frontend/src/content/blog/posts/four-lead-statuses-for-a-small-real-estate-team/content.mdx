@@ -1,7 +1,8 @@
 {/*
-  Global how-to. Statuses match LeadStatus in backend/src/types/index.ts
-  ('new' | 'contacted' | 'qualified' | 'closed'); owner, next-action date and
-  notes match the lead_state route in CLAUDE.md. No statistics or customer claims.
+  Global how-to. The advice is four statuses; the product has six (lib/lead-display.ts:
+  the four, labelled Yet to contact / Contacted / Qualified / Closed, plus Site
+  visit planned and Unqualified). Next-action date and notes are on the lead
+  page; the dashboard shows no owner, so none is claimed. No statistics or customer claims.
 */}
 
 A small real estate team does not need a ten-stage pipeline. Four statuses (new, contacted, qualified and closed) answer the questions that matter each morning: who has not been answered, who has, who is worth a call, and what is finished.
@@ -35,4 +36,4 @@ When nothing more is owed to it. Write the outcome in a note so you keep the rea
 
 ## Where does the assistant fit?
 
-Vyostra AI's lead list uses these four statuses, with an owner, a next-action date and notes on each lead, and the chat transcript attached. See [what a WhatsApp CRM is](/blog/what-is-a-whatsapp-crm/) and the [questions a real estate chatbot should ask](/blog/real-estate-chatbot-lead-qualification-questions/) for how leads arrive qualified.
+Vyostra AI's lead list uses these four statuses, labelled Yet to contact, Contacted, Qualified and Closed, and adds two more: Site visit planned and Unqualified. Each lead has a next-action date and notes, and the chat transcript attached. See [what a WhatsApp CRM is](/blog/what-is-a-whatsapp-crm/) and the [questions a real estate chatbot should ask](/blog/real-estate-chatbot-lead-qualification-questions/) for how leads arrive qualified.
