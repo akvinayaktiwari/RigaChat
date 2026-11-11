@@ -67,7 +67,7 @@ export const STATIC_PAGES: readonly StaticPage[] = [
     label: 'Lead CRM',
     summary: 'The built-in lead CRM: every captured lead stored and filterable; form and Meta lead ad leads sync to Zoho CRM.',
     section: 'Product',
-    lastModified: '2026-10-03',
+    lastModified: '2026-11-11',
   },
   {
     route: '/features/forms',
